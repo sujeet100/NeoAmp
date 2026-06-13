@@ -169,8 +169,10 @@
       var items = document.querySelectorAll("ytmusic-player-queue-item");
       var it = items[i];
       if (!it) return;
-      // clicking the row's song-info plays that queue entry in YTM
-      var target = it.querySelector(".song-info, .song-title, .left-items, #play-button") || it;
+      // Verified live: only the thumbnail play-button overlay actually starts
+      // the row — clicking .song-info / the row / dblclick do nothing.
+      var target = it.querySelector("ytmusic-play-button-renderer") ||
+        it.querySelector(".thumbnail yt-icon, yt-icon.icon") || it;
       target.click();
     },
   };
