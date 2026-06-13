@@ -72,6 +72,7 @@
 
   const FAVORITES = [
     { label: "Dance of the Freaky Circles ✦", wmp: "Dance of the Freaky Circles" },
+    { label: "Dance of the Freaky Circles (Classic) ✦", wmp: "Dance of the Freaky Circles (Classic)" },
     { label: "Alchemy Random ✦",              wmp: "Alchemy Random" },
     // Ambience family (amber/yellow fluid light)
     { label: "Ambience Thingus ✦",            wmp: "Ambience Thingus" },

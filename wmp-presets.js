@@ -174,10 +174,143 @@
   var P = {};
 
   // ── Dance of the Freaky Circles (Bateria: taniec dźwiękowych kółek) ─────────
-  // Magenta circular waveform; a second echoed ring fades in and out so you see
-  // one ring sometimes and two at others; the background washes slowly between
-  // dark and purple (matching the WMP capture); radius pulses with the bass.
+  // Re-derived from the reference video (Untitled.mp4 — frames st_18/st_33/zoom_a/cc2):
+  //   • TWO "circle-in-circle" units orbit each other. Each unit = a small SMOOTH
+  //     inner circle + a THICK JAGGED waveform ring AROUND it (the ring is the
+  //     audio waveform; it jumps outward with the music — louder = bigger jump).
+  //     Each unit's ring is driven by its OWN channel (value1 / value2).
+  //   • As the rings jump, their high-decay TRAIL lights the background mosaic:
+  //     coarse SQUARE cells (mostly crisp, soft edges), painted WIDE. The mosaic
+  //     fades by losing brightness AND hue — fresh/bright = PURPLE, faded = BLUE
+  //     (exactly as in the video), then dark.
   P["Dance of the Freaky Circles"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,             // primary waveform off; the custom waves draw everything
+        decay: 0.965,          // ~0.35s half-life @60fps (measured from the video); the
+                               // mosaic lingers, then fades SLOWLY/smoothly (no on/off pop)
+        gammaadj: 1.4,
+        zoom: 1.0,
+        warp: 0.04,
+        echo_alpha: 0,
+        darken_center: 0,
+        wrap: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var th = t.time * 1.0;                       // the two units orbit each other
+          var orbit = 0.11;                            // distance of each unit from the common center
+          t.q1 = 0.5 + orbit * Math.cos(th);                  // unit A center
+          t.q2 = 0.5 + orbit * Math.sin(th);
+          t.q3 = 0.5 + orbit * Math.cos(th + Math.PI);        // unit B center (opposite)
+          t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
+          // Inner circle: small, STABLE — it does NOT jump with the music.
+          t.q5 = 0.038;                                // constant small radius (no pulse)
+          t.q6 = 0.12 + 0.015 * bass;                  // ring base radius: nearly stable
+          // ONLY the outer waveform jumps: treble/mid spike it violently outward,
+          // and the bigger jump paints a WIDER mosaic.
+          t.q8 = 0.06 + 0.20 * Math.min(0.6 * treb + 0.4 * mid, 2.4);
+          // Breather: the outer rings turn OFF briefly at RANDOM intervals (not a
+          // fixed cadence), revealing the slowly-fading mosaic underneath. Each
+          // ~0.55s slot has a ~30% chance of a brief off-window at its start.
+          var slot = Math.floor(t.time / 0.55);
+          var rnd = Math.sin(slot * 12.9898) * 43758.5453;
+          rnd = rnd - Math.floor(rnd);                 // pseudo-random 0..1, stable per slot
+          var ph = t.time / 0.55 - slot;               // 0..1 within the slot
+          t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;     // 0 = rings hidden (breather), 1 = on
+          return t;
+        },
+        // COMP: the buffer holds the slow-fading trail (decay 0.955). Quantize it to
+        // a coarse grid and softly blur the cell edges -> the mosaic squares (the
+        // trail painted as blocks). Recolor by brightness so fresh/bright = PURPLE,
+        // faded/dim = BLUE, dim + capped so loud music never becomes a neon blob.
+        // The current crisp waves are added on top (detail), kept thick & bright.
+        comp:
+          "shader_body {\n" +
+          "float cy = 15.0;\n" +
+          "vec2 cells = vec2(cy * resolution.x / resolution.y, cy);\n" +
+          "vec3 crisp = texture2D(sampler_main, (floor(uv * cells) + 0.5) / cells).rgb;\n" +
+          "vec2 g = uv * cells - 0.5;\n" +
+          "vec2 gi = floor(g);\n" +
+          "vec2 gf = fract(g); gf = gf * gf * (3.0 - 2.0 * gf);\n" +
+          "vec3 c00 = texture2D(sampler_main, (gi + vec2(0.5, 0.5)) / cells).rgb;\n" +
+          "vec3 c10 = texture2D(sampler_main, (gi + vec2(1.5, 0.5)) / cells).rgb;\n" +
+          "vec3 c01 = texture2D(sampler_main, (gi + vec2(0.5, 1.5)) / cells).rgb;\n" +
+          "vec3 c11 = texture2D(sampler_main, (gi + vec2(1.5, 1.5)) / cells).rgb;\n" +
+          "vec3 soft = mix(mix(c00, c10, gf.x), mix(c01, c11, gf.x), gf.y);\n" +
+          "vec3 raw = mix(crisp, soft, 0.55);\n" +                // soft edges, square definition kept
+          "float lum = max(raw.r, max(raw.g, raw.b));\n" +
+          "vec3 fresh = vec3(0.45, 0.20, 0.78);\n" +              // violet when fresh/bright
+          "vec3 faded = vec3(0.16, 0.20, 0.50);\n" +              // blue when faded/dim
+          "vec3 col = mix(faded, fresh, smoothstep(0.05, 0.40, lum));\n" +
+          "vec3 mosaic = col * (lum / (lum + 0.55)) * 0.95;\n" +  // dim + capped -> never a neon blob
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +     // current crisp waves
+          "vec3 detail = max(sharp - soft, vec3(0.0)) * 1.1;\n" + // crisp THICK circles/lightning on top
+          "ret = mosaic + detail;\n" +
+          "}\n"
+      }
+    );
+
+    // SMOOTH small inner circle (no waveform on its circumference). Radius q5.
+    // Small + dim + stable (it does not jump); just a quiet anchor that keeps
+    // definition. Lower alpha than the rings so it never dominates.
+    function innerCircle(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.42, thick: 1, r: 0.80, g: 0.40, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var rad = (a.q5 || 0.045);                  // constant -> perfectly round
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          return a;
+        }
+      };
+    }
+
+    // THICK JAGGED waveform RING around the inner circle. Radius q6 + q8*sample;
+    // each unit on its own channel (value1 / value2). thick:1 = thicker lightning.
+    // q9 is the breather gate: when 0 the ring is hidden (points sent offscreen).
+    function waveRing(qx, qy, useSecondChannel) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.10, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) {  // breather: ring off this frame
+            a.x = -2; a.y = -2; return a;
+          }
+          var ang = a.sample * 6.2832;
+          var samp = useSecondChannel ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;     // jagged ring, jumps with music
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = innerCircle("q1", "q2");        // unit A inner circle (smooth)
+    preset.waves[1] = waveRing("q1", "q2", false);    // unit A waveform ring (channel 1)
+    preset.waves[2] = innerCircle("q3", "q4");        // unit B inner circle (smooth)
+    preset.waves[3] = waveRing("q3", "q4", true);     // unit B waveform ring (channel 2)
+    return preset;
+  })();
+
+  // ── Dance of the Freaky Circles (Classic) ──────────────────────────────────
+  // The original, simpler version (kept on its own — it reads well as-is): two
+  // magenta circular waveforms orbiting opposite sides of center over a faint slow
+  // purple wash. No mosaic. Preserved before the WMP-mosaic rework above.
+  P["Dance of the Freaky Circles (Classic)"] = (function () {
     var preset = build(
       {
         wave_a: 0,             // primary waveform off; the two custom circles draw it
