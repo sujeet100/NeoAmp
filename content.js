@@ -155,6 +155,78 @@
     return out;
   }
 
+  // --- search (drives YTM's own search box) --------------------------------
+  // Verified live: setting the search box value + dispatching Enter navigates
+  // to /search as an SPA route (NO full reload), so the audio capture survives
+  // and results render in the DOM. We then scrape the rendered rows and play a
+  // chosen one by clicking its play-button overlay (the only reliable trigger).
+  function triggerSearch(query) {
+    var input = q("ytmusic-search-box input#input") || q("ytmusic-search-box input");
+    if (!input) return null;
+    input.focus();
+    try {
+      var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set;
+      setter.call(input, query);
+    } catch (_) { input.value = query; }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    return input;
+  }
+
+  function scrapeResults() {
+    var out = [];
+    var card = document.querySelector("ytmusic-card-shelf-renderer");
+    if (card) {
+      var ctitle = clean((card.querySelector(".title, yt-formatted-string.title, a.yt-simple-endpoint") || {}).textContent);
+      // some card layouts have no .title — derive it from the leading text
+      // ("Arijit Singh Artist • …" → "Arijit Singh")
+      if (!ctitle) ctitle = clean(clean(card.textContent).split(/\s+(?:Artist|Song|Album|Single|EP|Video|Playlist)\b/)[0]).slice(0, 40);
+      out.push({
+        section: "Top result", title: ctitle,
+        subtitle: clean(clean(card.textContent).replace(ctitle, "")).slice(0, 80),
+        art: (card.querySelector("img") || {}).src || "", rowIndex: -1,
+        play: !!card.querySelector("ytmusic-play-button-renderer"),
+      });
+    }
+    var rows = document.querySelectorAll("ytmusic-responsive-list-item-renderer");
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.closest("ytmusic-card-shelf-renderer")) continue; // already covered by the top card
+      var sh = r.closest("ytmusic-shelf-renderer");
+      var section = sh ? clean((sh.querySelector("h2, .title") || {}).textContent) : "Results";
+      // .title is the reliable title across row types (song/album/artist);
+      // links[0]/.flex-column[0] are unreliable (often the subtitle).
+      var titleEl = r.querySelector("yt-formatted-string.title, .title");
+      var title = clean(titleEl && titleEl.textContent) || clean((r.querySelectorAll("a.yt-simple-endpoint")[0] || {}).textContent);
+      if (!title) continue;
+      var subtitle = clean(clean(r.textContent).replace(title, "")).replace(/^[•\-\s]+/, "").slice(0, 90);
+      out.push({
+        section: section || "Results", title: title, subtitle: subtitle,
+        art: (r.querySelector("img") || {}).src || "", rowIndex: i,
+        play: !!r.querySelector("ytmusic-play-button-renderer"),
+      });
+    }
+    return out;
+  }
+
+  function search(query, cb) {
+    if (!triggerSearch(query)) { cb({ error: "YouTube Music search box not found" }); return; }
+    // submit after a tick so autocomplete doesn't swallow the Enter
+    setTimeout(function () {
+      var input = q("ytmusic-search-box input#input") || q("ytmusic-search-box input");
+      if (input) ["keydown", "keypress", "keyup"].forEach(function (t) {
+        input.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+      });
+      var tries = 0;
+      (function waitForResults() {
+        var ready = location.href.indexOf("/search") !== -1 &&
+          document.querySelectorAll("ytmusic-responsive-list-item-renderer, ytmusic-card-shelf-renderer").length;
+        if (ready) { setTimeout(function () { cb({ results: scrapeResults(), query: query }); }, 650); return; }
+        if (++tries > 30) { cb({ error: "search timed out", query: query }); return; }
+        setTimeout(waitForResults, 300);
+      })();
+    }, 350);
+  }
+
   var control = {
     playPause: function () { var v = q("video"); if (v) { v.paused ? v.play() : v.pause(); sendTrack(); } },
     next: function () { var b = qa(["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"]); if (b) b.click(); },
@@ -174,6 +246,19 @@
       var target = it.querySelector("ytmusic-play-button-renderer") ||
         it.querySelector(".thumbnail yt-icon, yt-icon.icon") || it;
       target.click();
+    },
+    playLibraryItem: function (rowIndex) {
+      if (rowIndex < 0) {
+        var card = document.querySelector("ytmusic-card-shelf-renderer");
+        var cb = card && card.querySelector("ytmusic-play-button-renderer");
+        if (cb) cb.click();
+        return;
+      }
+      var rows = document.querySelectorAll("ytmusic-responsive-list-item-renderer");
+      var r = rows[rowIndex];
+      if (!r) return;
+      var b = r.querySelector("ytmusic-play-button-renderer") || r.querySelector(".thumbnail yt-icon, yt-icon.icon");
+      if (b) b.click();
     },
   };
 
@@ -201,6 +286,7 @@
     on: on, off: off,
     getTrack: getTrack,
     getQueue: readQueue,
+    search: search,
     control: control,
     storage: storage,
     toast: toast,

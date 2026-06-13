@@ -230,13 +230,14 @@
     });
     NA.storage.set({ neoampLayout: layout });
   }
-  var RESIZABLE = { "wa-viz": 1, "wa-pl": 1 };
+  var RESIZABLE = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1 };
   function applyLayout() {
     var defaults = {
       "wa-main": { x: 40, y: 70 },
       "wa-eq": { x: 40, y: 250 },
       "wa-viz": { x: 480, y: 70, w: 360, h: 280 },
       "wa-pl": { x: 40, y: 430, w: 430, h: 220 },
+      "wa-lib": { x: 480, y: 370, w: 380, h: 300, hidden: true },
     };
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
@@ -244,7 +245,7 @@
       e.style.left = (d.x || 40) + "px";
       e.style.top = (d.y || 60) + "px";
       if (d.w && RESIZABLE[k]) { e.style.width = d.w + "px"; e.style.height = d.h + "px"; }
-      if (d.hidden) e.style.display = "none";
+      e.style.display = d.hidden ? "none" : "";
     });
   }
 
@@ -325,7 +326,8 @@
     els.eqTog = tog("EQ", "Toggle equalizer", function (t) { toggleWin("wa-eq", t); });
     els.plTog = tog("PL", "Toggle playlist", function (t) { toggleWin("wa-pl", t); refreshQueue(true); });
     els.visTog = tog("VIS", "Toggle visualization", function (t) { toggleWin("wa-viz", t); });
-    var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.plTog, els.visTog]);
+    els.libTog = tog("LIB", "Toggle media library / search", function (t) { toggleWin("wa-lib", t); if (els.libInput) els.libInput.focus(); });
+    var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.plTog, els.visTog, els.libTog]);
 
     var controls = h("div", { class: "wa-controls" }, [transport, vols, toggles]);
 
@@ -502,6 +504,68 @@
   }
 
   // =========================================================================
+  // MEDIA LIBRARY WINDOW (search YTM → sectioned results → play)
+  // =========================================================================
+  function buildLibrary() {
+    var win = makeWindow("wa-lib", "NeoAmp Library", { shade: false, onClose: function () { hideWin("wa-lib"); } });
+    var input = h("input", { class: "wa-lib-input", type: "text", placeholder: "Search songs, artists, albums…" });
+    var go = h("button", { class: "wa-lib-go", text: "GO" });
+    var list = h("div", { class: "wa-lib-list" });
+    var status = h("div", { class: "wa-lib-status", text: "Type a query and press GO / Enter." });
+    win.body.appendChild(h("div", { class: "wa-lib-bar" }, [input, go]));
+    win.body.appendChild(list);
+    win.body.appendChild(status);
+    els.libInput = input; els.libList = list; els.libStatus = status;
+
+    var run = function () {
+      var qy = input.value.trim();
+      if (!qy) return;
+      status.textContent = "Searching “" + qy + "” …";
+      list.innerHTML = "";
+      NA.search(qy, renderResults);
+    };
+    go.addEventListener("click", run);
+    // keep keystrokes inside the field (don't let page/global handlers grab them)
+    input.addEventListener("keydown", function (e) { e.stopPropagation(); if (e.key === "Enter") run(); });
+    input.addEventListener("keyup", function (e) { e.stopPropagation(); });
+
+    var rs = h("div", { class: "wa-resize", title: "Resize" });
+    win.el.appendChild(rs);
+    makeResizable(win.el, rs, 260, 180);
+  }
+
+  function renderResults(res) {
+    var list = els.libList;
+    if (!list) return;
+    list.innerHTML = "";
+    if (!res || res.error) { els.libStatus.textContent = res && res.error ? "Search failed: " + res.error : "No response."; return; }
+    var items = res.results || [];
+    if (!items.length) { els.libStatus.textContent = "No results for “" + res.query + "”."; return; }
+    var lastSection = null;
+    items.forEach(function (it) {
+      if (it.section !== lastSection) {
+        lastSection = it.section;
+        list.appendChild(h("div", { class: "wa-lib-sec", text: it.section }));
+      }
+      var thumb = it.art ? h("img", { class: "wa-lib-thumb", src: it.art }) : h("span", { class: "wa-lib-thumb empty" });
+      var row = h("div", { class: "wa-lib-row" + (it.rowIndex < 0 ? " top" : "") }, [
+        thumb,
+        h("div", { class: "wa-lib-meta" }, [
+          h("div", { class: "wa-lib-t", text: it.title }),
+          h("div", { class: "wa-lib-s", text: it.subtitle || "" }),
+        ]),
+      ]);
+      row.title = "Double-click to play";
+      row.addEventListener("dblclick", function () {
+        NA.control.playLibraryItem(it.rowIndex);
+        setTimeout(function () { refreshQueue(true); }, 700);
+      });
+      list.appendChild(row);
+    });
+    els.libStatus.textContent = items.length + " results for “" + res.query + "”.";
+  }
+
+  // =========================================================================
   // iframe bridge (audio in, presets/favorites round-trip)
   // =========================================================================
   function postViz(m) {
@@ -649,6 +713,7 @@
     if (id === "wa-eq" && els.eqTog) els.eqTog.classList.remove("on");
     if (id === "wa-pl" && els.plTog) els.plTog.classList.remove("on");
     if (id === "wa-viz" && els.visTog) els.visTog.classList.remove("on");
+    if (id === "wa-lib" && els.libTog) els.libTog.classList.remove("on");
     saveLayout();
   }
 
@@ -666,10 +731,7 @@
     buildEq();
     buildViz();
     buildPlaylist();
-    // reflect EQ/PL/VIS toggle initial state
-    if (els.eqTog) els.eqTog.classList.add("on");
-    if (els.plTog) els.plTog.classList.add("on");
-    if (els.visTog) els.visTog.classList.add("on");
+    buildLibrary();
     NA.on("track", onTrack);
     NA.on("audio", onAudio);
     // slow poll so queue edits made in YTM while the same track plays show up
@@ -678,7 +740,15 @@
       if (w && w.el.style.display !== "none") refreshQueue();
     }, 1500);
     NA.storage.get("neoampSkin", function (id) { if (id) { currentSkin = id; applySkin(id); var ss = root.querySelector(".wa-skinsel"); if (ss) ss.value = id; } });
-    NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); });
+    NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); syncToggles(); });
+  }
+
+  // reflect each window's visibility on its main-window toggle
+  function syncToggles() {
+    var map = { "wa-eq": els.eqTog, "wa-pl": els.plTog, "wa-viz": els.visTog, "wa-lib": els.libTog };
+    Object.keys(map).forEach(function (id) {
+      if (map[id] && wins[id]) map[id].classList.toggle("on", wins[id].el.style.display !== "none");
+    });
   }
 
   function showUI() {
