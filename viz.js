@@ -32,11 +32,14 @@
 
   const FAVORITES = [
     { label: "Dance of the Freaky Circles ✦", wmp: "Dance of the Freaky Circles" },
+    { label: "Alchemy Random ✦",              wmp: "Alchemy Random" },
+    { label: "Ambience Thingus ✦",            wmp: "Ambience Thingus" },
+    { label: "Ambience Water ✦",              wmp: "Ambience Water" },
+    { label: "Ambience Down the Drain ✦",     wmp: "Ambience Down the Drain" },
+    { label: "Battery relatively calm ✦",     wmp: "Battery relatively calm" },
+    { label: "Battery strawberryaid ✦",       wmp: "Battery strawberryaid" },
+    { label: "Battery my tornado ✦",          wmp: "Battery my tornado is resting" },
     { label: "TEST ▶ Cascading Decay Swing",  exact: TEST_PRESET },
-    { label: "SepiaSwirl",                    re: /(swirl|spiral|smoke|flow|paint|liquid)/i },
-    { label: "My Tornado is Resting",         re: /(vortex|tornado|swirl|spiral|whirl|flow|calm)/i },
-    { label: "StrawberryAid",                 re: /(plasma|swirl|spiral|flow|melt|candy|pink)/i },
-    { label: "Alchemy: Random",               re: /(fractal|kaleid|mandala|symmet|alchem|geiss)/i, random: true },
   ];
 
   let viz = null, presets = {}, names = [], idx = 0, rafId = 0;
