@@ -267,7 +267,9 @@
 /* =======================================================================
    EQUALIZER WINDOW (cosmetic)
    ======================================================================= */
-#wa-eq { width: 420px; }
+/* same width as the main + playlist windows so the stack aligns (classic
+   Winamp keeps Main/EQ/Playlist a uniform width) */
+#wa-eq { width: 466px; }
 .wa-eq-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .wa-eq-curve {
   flex: 1 1 auto; height: 28px; display: block;
