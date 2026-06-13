@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "YT Music — WMP / Winamp Visualizer",
+  "version": "0.2.0",
+  "description": "Overlays MilkDrop (Butterchurn) visualizations on YouTube Music, with a WMP-favorites preset menu (Battery / Ambience / Alchemy vibes).",
+  "host_permissions": ["https://music.youtube.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://music.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "sandbox": {
+    "pages": ["viz.html"]
+  },
+  "content_security_policy": {
+    "sandbox": "sandbox allow-scripts allow-popups allow-modals allow-forms; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; child-src 'self'; object-src 'self';"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viz.html",
+        "viz.js",
+        "vendor/butterchurn.min.js",
+        "vendor/butterchurnPresets.min.js",
+        "vendor/butterchurnPresetsExtra.min.js",
+        "vendor/butterchurnPresetsExtra2.min.js"
+      ],
+      "matches": ["https://music.youtube.com/*"]
+    }
+  ]
+}
