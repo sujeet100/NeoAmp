@@ -60,6 +60,15 @@
     return el;
   }
 
+  // a list thumbnail: an <img> with an error fallback to an empty tile, or just
+  // an empty tile when there's no/invalid artwork (never a broken-image icon).
+  function makeThumb(cls, art) {
+    if (!(art && /^https?:\/\//.test(art))) return h("span", { class: cls + " empty" });
+    var img = h("img", { class: cls, src: art });
+    img.addEventListener("error", function () { img.className = cls + " empty"; img.removeAttribute("src"); });
+    return img;
+  }
+
   // ---- scalable inline-SVG transport icons --------------------------------
   function icon(name) {
     var P = {
@@ -309,6 +318,7 @@
     // left column: clock + album art
     els.clock = h("div", { class: "wa-clock wa-lcd", text: "0:00" });
     var artImg = h("img", { alt: "" });
+    artImg.addEventListener("error", function () { if (els.art) els.art.classList.add("empty"); });
     els.art = h("div", { class: "wa-art empty" }, [artImg]);
     els.artImg = artImg;
     var leftCol = h("div", {}, [els.clock, els.art]);
@@ -527,7 +537,7 @@
       els.plList.appendChild(h("div", { class: "wa-pl-empty", text: "Queue empty — play a track or open Up Next in YouTube Music." }));
     } else {
       q.forEach(function (item) {
-        var thumb = item.art ? h("img", { class: "wa-pl-thumb", src: item.art }) : h("span", { class: "wa-pl-thumb empty" });
+        var thumb = makeThumb("wa-pl-thumb", item.art);
         var row = h("div", { class: "wa-pl-row" + (item.playing ? " playing" : "") }, [
           h("span", { class: "wa-pl-n", text: (item.index + 1) + "." }),
           thumb,
@@ -590,7 +600,7 @@
         lastSection = it.section;
         list.appendChild(h("div", { class: "wa-lib-sec", text: it.section }));
       }
-      var thumb = it.art ? h("img", { class: "wa-lib-thumb", src: it.art }) : h("span", { class: "wa-lib-thumb empty" });
+      var thumb = makeThumb("wa-lib-thumb", it.art);
       var row = h("div", { class: "wa-lib-row" + (it.rowIndex < 0 ? " top" : "") }, [
         thumb,
         h("div", { class: "wa-lib-meta" }, [
@@ -641,8 +651,14 @@
     trackDur = t.duration || 0;
     var label = t.title ? (t.title + (t.artist ? "  —  " + t.artist : "")) : "NeoAmp ◢◤";
     setMarquee(label);
-    if (els.artImg && t.art && els.artImg.src !== t.art) els.artImg.src = t.art;
-    if (els.art) els.art.classList.toggle("empty", !t.art);
+    // Only show real artwork; clear the src otherwise so the <img> can't render
+    // a broken-image icon (YTM sometimes returns a stale/placeholder URL).
+    var hasArt = !!(t.art && /^https?:\/\//.test(t.art));
+    if (els.artImg) {
+      if (hasArt) { if (els.artImg.src !== t.art) els.artImg.src = t.art; }
+      else els.artImg.removeAttribute("src");
+    }
+    if (els.art) els.art.classList.toggle("empty", !hasArt);
     if (!seeking && els.seek) {
       var pct = trackDur > 0 ? (t.currentTime / trackDur) * 1000 : 0;
       els.seek.value = String(Math.round(pct));
