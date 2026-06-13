@@ -33,16 +33,49 @@
   const FAVORITES = [
     { label: "Dance of the Freaky Circles ✦", wmp: "Dance of the Freaky Circles" },
     { label: "Alchemy Random ✦",              wmp: "Alchemy Random" },
+    // Ambience family (amber/yellow fluid light)
     { label: "Ambience Thingus ✦",            wmp: "Ambience Thingus" },
     { label: "Ambience Water ✦",              wmp: "Ambience Water" },
     { label: "Ambience Down the Drain ✦",     wmp: "Ambience Down the Drain" },
+    { label: "Ambience Snell ✦",              wmp: "Ambience Snell" },
+    { label: "Ambience Warp ✦",               wmp: "Ambience Warp" },
+    { label: "Ambience Anon ✦",               wmp: "Ambience Anon" },
+    { label: "Ambience Falloff ✦",            wmp: "Ambience Falloff" },
+    { label: "Ambience Bubble ✦",             wmp: "Ambience Bubble" },
+    { label: "Ambience Dizzy ✦",              wmp: "Ambience Dizzy" },
+    { label: "Ambience Windmill ✦",           wmp: "Ambience Windmill" },
+    { label: "Ambience Niagara ✦",            wmp: "Ambience Niagara" },
+    { label: "Ambience Blender ✦",            wmp: "Ambience Blender" },
+    { label: "Ambience X Marks the Spot ✦",   wmp: "Ambience X Marks the Spot" },
+    // Battery family (colorful, energetic)
     { label: "Battery relatively calm ✦",     wmp: "Battery relatively calm" },
     { label: "Battery strawberryaid ✦",       wmp: "Battery strawberryaid" },
     { label: "Battery my tornado ✦",          wmp: "Battery my tornado is resting" },
+    { label: "Battery brightsphere ✦",        wmp: "Battery brightsphere" },
+    { label: "Battery cominatcha ✦",          wmp: "Battery cominatcha" },
+    { label: "Battery cottonstar ✦",          wmp: "Battery cottonstar" },
+    { label: "Battery dandelion ✦",           wmp: "Battery dandelion" },
+    { label: "Battery drinkdeep ✦",           wmp: "Battery drinkdeep" },
+    { label: "Battery elektrination ✦",       wmp: "Battery elektrination" },
+    { label: "Battery event horizon ✦",       wmp: "Battery event horizon" },
+    { label: "Battery hzodge ✦",              wmp: "Battery hzodge" },
+    { label: "Battery sepalvel ✦",            wmp: "Battery sepalvel" },
+    { label: "Battery illuminator ✦",         wmp: "Battery illuminator" },
+    { label: "Battery i learned the truth ✦", wmp: "Battery i learned the truth" },
+    { label: "Battery kaleidovision ✦",       wmp: "Battery kaleidovision" },
+    { label: "Battery chemicalnova ✦",        wmp: "Battery chemicalnova" },
+    { label: "Battery lotus ✦",               wmp: "Battery lotus" },
+    { label: "Battery green is not your enemy ✦", wmp: "Battery green is not your enemy" },
+    { label: "Battery sleepyspray ✦",         wmp: "Battery sleepyspray" },
+    { label: "Battery smoke or water? ✦",     wmp: "Battery smoke or water?" },
+    { label: "Battery spider's last moment ✦", wmp: "Battery spider's last moment" },
+    { label: "Battery the world ✦",           wmp: "Battery the world" },
+    { label: "Battery back to the groove ✦",  wmp: "Battery back to the groove" },
     { label: "TEST ▶ Cascading Decay Swing",  exact: TEST_PRESET },
   ];
 
   let viz = null, presets = {}, names = [], idx = 0, rafId = 0;
+  let favSelect = null; // the preset dropdown, kept in sync with what's loaded
   const favCursor = {};
   const latest = new Uint8Array(FFT_SIZE); // last received time-domain bytes
   const audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
@@ -94,6 +127,7 @@
     const key = names[idx];
     try { viz.loadPreset(presets[key], 2.0); } catch (e) { fail("loadPreset: " + e.message); return; }
     nameEl.textContent = "♪ " + key;
+    syncSelect(key);
     showBar();
   }
   const step = (d) => loadByIndex(idx + d);
@@ -104,6 +138,7 @@
       try { viz.loadPreset(window.WMP_PRESETS[fav.wmp], 1.0); }
       catch (e) { fail("wmp preset '" + fav.wmp + "': " + e.message); return; }
       nameEl.textContent = "♪ WMP ✦ " + fav.wmp;
+      syncSelect(fav.wmp);
       showBar();
       return;
     }
@@ -123,20 +158,53 @@
     loadByIndex(names.indexOf(m[c]));
   }
 
+  // The favorite picker is a single compact <select> (grouped by family) instead
+  // of ~40 buttons, so it doesn't cover the visualization.
   function buildBar() {
     const wrap = document.getElementById("favs");
-    FAVORITES.forEach((f) => {
-      const b = document.createElement("button");
-      b.className = "fav";
-      b.textContent = f.label;
-      b.addEventListener("click", () => loadFavorite(f));
-      wrap.appendChild(b);
+    const sel = document.createElement("select");
+    sel.className = "fav-select";
+    sel.title = "Pick a visualization";
+    const placeholder = document.createElement("option");
+    placeholder.value = "-1";
+    placeholder.textContent = "♪ pick a preset…";
+    placeholder.disabled = true; placeholder.selected = true;
+    sel.appendChild(placeholder);
+
+    const groups = {}, order = [];
+    const groupOf = (f) =>
+      f.exact ? "Test" :
+      /^Ambience/.test(f.label) ? "Ambience" :
+      /^Battery/.test(f.label) ? "Battery" : "Featured";
+    FAVORITES.forEach((f, i) => {
+      const g = groupOf(f);
+      if (!groups[g]) { groups[g] = document.createElement("optgroup"); groups[g].label = g; order.push(g); }
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = f.label.replace(/\s*✦\s*$/, "");
+      groups[g].appendChild(opt);
     });
+    order.forEach((g) => sel.appendChild(groups[g]));
+    sel.addEventListener("change", () => {
+      const f = FAVORITES[+sel.value];
+      if (f) { loadFavorite(f); showBar(); }
+    });
+    wrap.appendChild(sel);
+    favSelect = sel;
+
     document.getElementById("prev").addEventListener("click", () => step(-1));
     document.getElementById("next").addEventListener("click", () => step(1));
     document.getElementById("rand").addEventListener("click", randomPreset);
     document.getElementById("close").addEventListener("click", () => post({ type: "close" }));
     document.addEventListener("mousemove", showBar);
+  }
+
+  // Reflect the currently-loaded preset in the dropdown (falls back to the
+  // placeholder when navigating to a non-favorite via ⏮/⏭/🎲).
+  function syncSelect(name) {
+    if (!favSelect) return;
+    const i = FAVORITES.findIndex((f) => f.wmp === name || f.exact === name);
+    favSelect.value = i >= 0 ? String(i) : "-1";
   }
 
   function renderLoop() {
@@ -148,6 +216,10 @@
   function init() {
     if (!BC || typeof BC.createVisualizer !== "function") { fail("Butterchurn not loaded (createVisualizer missing)"); return; }
     presets = collectPresets();
+    // Fold our hand-authored WMP presets into the navigable list so ⏮/⏭/🎲 and
+    // arrow keys cycle through them too (the favorite buttons still load them
+    // directly). WMP presets win on name collisions.
+    Object.assign(presets, window.WMP_PRESETS || {});
     names = Object.keys(presets);
     if (!names.length) { fail("No presets found in bundle"); return; }
 

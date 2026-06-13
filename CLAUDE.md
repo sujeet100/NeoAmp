@@ -135,25 +135,53 @@ waveform circles — the best one, use it as the reference pattern), and batch 1
 Alchemy Random, Ambience Thingus/Water/Down the Drain, Battery relatively
 calm/strawberryaid/my tornado is resting.
 
-**Quality notes:** Dance, Ambience Thingus, Battery strawberryaid/my-tornado are
-good. Ambience Water/Down-the-Drain and Battery relatively-calm are acceptable.
-**Alchemy is the hardest** and went through ~10 iterations; it currently uses a
-contour-line kaleidoscope (6 crossfading scenes). Treat it as "captures the
-spirit," not frame-exact — its real motion is proprietary.
+**ALL Alchemy/Battery/Ambience presets are now built** (30 added in one batch via
+parallel subagents, then a frame-by-frame color-correction pass — see below).
+Reachable from the `viz.js` `FAVORITES` dropdown and the ⏮/⏭/🎲 navigation.
 
-**Color behavior (researched from the video):** cycles colors → **Alchemy**
-(full rainbow), **Battery relatively calm** (green↔blue), **Ambience Niagara**
-(yellow↔teal). Everything else holds a fixed hue. **Battery my tornado** is
-greyscale.
+**Quality notes:** Dance is the reference. **Alchemy Random was rewritten** from a
+dedicated 228s video (`Alchemy Random Media Player 480p.mp4`): it is now a
+real-audio engine — TWO pulsing ringed circles (`circleWave`) that orbit between
+opposite corners and center, joined by an oscilloscope **waveform line** (custom
+`waveLine` point_eqs marching A→B with perpendicular sample displacement), plus a
+central bass-spiked rosette — composited over a 4-scene crossfading shader
+background (kaleidoscope lens-bands / filament-flower free-space / perspective
+tunnel / wallpaper tiling), rainbow-cycling. The two-circles-joined-by-waveform is
+the WMP signature (essentially "Dance" in Alchemy's colors). Still "captures the
+spirit," not frame-exact. Most other new presets are unproven on-screen — iterate
+from the user's screenshots.
 
-**Remaining WMP presets to build** (scope is Alchemy/Battery/Ambience only — not
-Bars & Waves / Plenoptic / Particle):
-- Ambience (~10 left): Snell, Warp, Anon, Falloff, Bubble, Dizzy, Windmill,
-  Niagara, Blender, X Marks the Spot.
-- Battery (~18 left): brightsphere, cominatcha, cottonstar, dandelion, drinkdeep,
-  elektrination, event horizon, hzodge, sepalvel, illuminator, i learned the
-  truth, kaleidovision, chemicalnova, lotus, green is not your enemy, sleepyspray,
-  smoke or water?, spider's last moment, the world, back to the groove.
+**Color behavior (re-researched frame-by-frame from the video — the earlier
+"Ambience is all amber" note was WRONG):** Many presets **slowly cycle hue over
+time** (a ~15-60s drift, easy to miss in a short clip — confirm over a long span,
+not one frame). Implement cycling with a slow `0.5+0.5*sin(time*~0.05)` mix
+between two colors (or `tintComp(colA,colB,speed,boost)` / `pal()` for rainbow).
+- **Cycles:** Alchemy Random (full rainbow), Battery chemicalnova (full rainbow),
+  Battery relatively calm (green↔blue), Battery strawberryaid (red↔berry/pink),
+  Battery cottonstar (white↔teal), Battery dandelion (teal↔magenta),
+  Ambience Niagara (teal↔blue), Ambience Blender (blue↔purple),
+  Ambience Bubble (magenta↔teal), Ambience Warp (blue↔yellow),
+  Battery back to the groove (teal↔yellow-green).
+- **Fixed hue (per the frames):** Ambience is **not** uniformly amber — Anon/
+  Falloff/Water/Down-the-Drain/Snell are amber/yellow, but **Dizzy & Windmill are
+  cyan/teal**, **X Marks the Spot is magenta/pink**. Battery: brightsphere cyan,
+  drinkdeep blue, event horizon red/orange, **hzodge green/teal**, illuminator
+  amber/gold, i-learned-the-truth blue+gold, **kaleidovision GREEN (not rainbow)**,
+  lotus magenta/purple, green-is-not-your-enemy green, sleepyspray blue/teal,
+  **spider's-last-moment GREEN**, the-world blue.
+- **Greyscale:** Battery my tornado, Battery smoke or water?.
+
+**Remaining WMP presets to build:** none in scope — all Ambience (Snell, Warp,
+Anon, Falloff, Bubble, Dizzy, Windmill, Niagara, Blender, X Marks the Spot) and
+Battery (brightsphere, cominatcha, cottonstar, dandelion, drinkdeep, elektrination,
+event horizon, hzodge, sepalvel, illuminator, i learned the truth, kaleidovision,
+chemicalnova, lotus, green is not your enemy, sleepyspray, smoke or water?,
+spider's last moment, the world, back to the groove) are built. Out of scope:
+Bars & Waves / Plenoptic / Particle / Spikes. Remaining work is tuning from
+screenshots, not new presets.
+
+**Preset selector** is a compact grouped `<select>` dropdown in `viz.html`/`viz.js`
+(not a button bar — that covered the visuals); it syncs with ⏮/⏭/🎲.
 
 ## Reference assets & frame-extraction workflow
 

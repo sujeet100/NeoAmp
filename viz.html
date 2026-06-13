@@ -24,14 +24,19 @@
       min-width: 180px; max-width: 36vw; overflow: hidden; text-overflow: ellipsis;
       white-space: nowrap; color: #8becc4; font-weight: 600; letter-spacing: .02em;
     }
-    .favs { display: flex; gap: 6px; flex-wrap: wrap; }
-    .fav {
-      font: 600 11px/1 "Tahoma", system-ui, sans-serif; color: #07131d;
+    .favs { display: flex; align-items: center; }
+    .fav-select {
+      font: 600 12px/1 "Tahoma", system-ui, sans-serif; color: #07131d;
       background: linear-gradient(180deg, #9be8c6, #4fb78c);
-      border: 1px solid #2f8463; border-radius: 5px; padding: 6px 9px; cursor: pointer;
+      border: 1px solid #2f8463; border-radius: 5px; padding: 6px 28px 6px 10px;
+      cursor: pointer; max-width: 44vw; appearance: none; -webkit-appearance: none;
+      background-image: linear-gradient(180deg, #9be8c6, #4fb78c),
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%2307131d'/></svg>");
+      background-repeat: no-repeat; background-position: right 9px center;
     }
-    .fav:hover { filter: brightness(1.12); }
-    .fav:active { transform: translateY(1px); }
+    .fav-select:hover { filter: brightness(1.08); }
+    .fav-select optgroup { font-style: normal; font-weight: 700; color: #0a2540; }
+    .fav-select option { color: #07131d; background: #d7f5e8; font-weight: 600; }
     .ctrls { display: flex; gap: 6px; }
     .btn {
       font-size: 13px; line-height: 1; color: #d6ffe6; background: #1b2b3d;
