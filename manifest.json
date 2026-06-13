@@ -23,6 +23,7 @@
       "resources": [
         "viz.html",
         "viz.js",
+        "wmp-presets.js",
         "vendor/butterchurn.min.js",
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",

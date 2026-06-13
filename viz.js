@@ -31,12 +31,12 @@
   const TEST_PRESET = "Flexi + Martin - cascading decay swing";
 
   const FAVORITES = [
-    { label: "TEST ▶ Cascading Decay Swing", exact: TEST_PRESET },
-    { label: "Dance of the Freaky Circles", re: /(circle|ring|orb|sphere|tunnel|donut|radial|bubble)/i },
-    { label: "SepiaSwirl",                  re: /(swirl|spiral|smoke|flow|paint|liquid)/i },
-    { label: "My Tornado is Resting",       re: /(vortex|tornado|swirl|spiral|whirl|flow|calm)/i },
-    { label: "StrawberryAid",               re: /(plasma|swirl|spiral|flow|melt|candy|pink)/i },
-    { label: "Alchemy: Random",             re: /(fractal|kaleid|mandala|symmet|alchem|geiss)/i, random: true },
+    { label: "Dance of the Freaky Circles ✦", wmp: "Dance of the Freaky Circles" },
+    { label: "TEST ▶ Cascading Decay Swing",  exact: TEST_PRESET },
+    { label: "SepiaSwirl",                    re: /(swirl|spiral|smoke|flow|paint|liquid)/i },
+    { label: "My Tornado is Resting",         re: /(vortex|tornado|swirl|spiral|whirl|flow|calm)/i },
+    { label: "StrawberryAid",                 re: /(plasma|swirl|spiral|flow|melt|candy|pink)/i },
+    { label: "Alchemy: Random",               re: /(fractal|kaleid|mandala|symmet|alchem|geiss)/i, random: true },
   ];
 
   let viz = null, presets = {}, names = [], idx = 0, rafId = 0;
@@ -97,6 +97,13 @@
   const randomPreset = () => loadByIndex(Math.floor(Math.random() * names.length));
 
   function loadFavorite(fav) {
+    if (fav.wmp && window.WMP_PRESETS && window.WMP_PRESETS[fav.wmp]) {
+      try { viz.loadPreset(window.WMP_PRESETS[fav.wmp], 1.0); }
+      catch (e) { fail("wmp preset '" + fav.wmp + "': " + e.message); return; }
+      nameEl.textContent = "♪ WMP ✦ " + fav.wmp;
+      showBar();
+      return;
+    }
     if (fav.exact) {
       const i = names.indexOf(fav.exact);
       if (i >= 0) { loadByIndex(i); return; }
