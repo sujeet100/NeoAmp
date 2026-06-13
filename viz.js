@@ -248,7 +248,8 @@
       userFavs.clear();
       (m.names || []).forEach(function (n) { userFavs.add(n); });
       renderOptions(); syncSelect(names[idx]); updateStar();
-    } else if (m.type === "preset:load" && m.name) loadByName(m.name);
+    } else if (m.type === "resize") sizeCanvas();
+    else if (m.type === "preset:load" && m.name) loadByName(m.name);
     else if (m.type === "preset:step") step(m.dir || 1);
     else if (m.type === "preset:random") randomPreset();
   });

@@ -18,6 +18,25 @@
   var NA = window.NeoAmp;
   if (!NA) { console.error("[NeoAmp] backend (content.js) not present"); return; }
 
+  // Load the bundled VT323 LCD font via the FontFace API. A CSS @font-face
+  // url() inside a content-script-injected stylesheet gets blocked by YTM's
+  // font-src CSP (which is why the LCD looked like plain monospace). Fetching
+  // the bytes from our own web-accessible resource and registering the family
+  // on document.fonts bypasses that — the page CSP can't block our own bytes.
+  (function loadLcdFont() {
+    try {
+      if (!document.fonts || typeof FontFace === "undefined") return;
+      var already = false;
+      document.fonts.forEach(function (f) { if (f.family === "NeoAmp LCD") already = true; });
+      if (already) return;
+      fetch(chrome.runtime.getURL("fonts/VT323-Regular.ttf"))
+        .then(function (r) { return r.arrayBuffer(); })
+        .then(function (buf) { return new FontFace("NeoAmp LCD", buf).load(); })
+        .then(function (ff) { document.fonts.add(ff); })
+        .catch(function (e) { console.warn("[NeoAmp] LCD font load failed:", e); });
+    } catch (e) { console.warn("[NeoAmp] LCD font:", e); }
+  })();
+
   var SNAP = 9;                 // px magnetic-docking threshold
   var root = null, launcher = null;
   var wins = {};                // id -> { el, body, titlebar }
@@ -76,6 +95,13 @@
     var bar = h("div", { class: "wa-titlebar" }, [titleSpan, opts.gadget || null, tbtns]);
     var body = h("div", { class: "wa-body" });
     var el = h("div", { class: "wa-win inactive", id: id }, [bar, body]);
+
+    // optional extra titlebar buttons (e.g. fullscreen), then shade, then close
+    (opts.titleButtons || []).forEach(function (b) {
+      var btn = h("span", { class: "wa-tbtn", title: b.title, text: b.label });
+      btn.addEventListener("click", function (e) { e.stopPropagation(); b.onClick(); });
+      tbtns.appendChild(btn);
+    });
 
     // shade (collapse to titlebar) + close buttons
     if (opts.shade !== false) {
@@ -348,7 +374,11 @@
   // VISUALIZATION WINDOW (Butterchurn iframe in the body)
   // =========================================================================
   function buildViz() {
-    var win = makeWindow("wa-viz", "NeoAmp Visualization", { shade: false, onClose: function () { hideWin("wa-viz"); } });
+    var win = makeWindow("wa-viz", "NeoAmp Visualization", {
+      shade: false,
+      titleButtons: [{ label: "⛶", title: "Fullscreen (Esc to exit)", onClick: toggleVizFullscreen }],
+      onClose: function () { hideWin("wa-viz"); },
+    });
     vizFrame = h("iframe", { class: "wa-viz-frame", src: chrome.runtime.getURL("viz.html"), frameborder: "0", allowtransparency: "false" });
     vizFrame.style.border = "0"; vizFrame.style.outline = "none";
     win.body.appendChild(vizFrame);
@@ -357,6 +387,26 @@
     makeResizable(win.el, rs, 200, 150);
     vizBuilt = true;
   }
+
+  // Fullscreen the whole viz window (CSS hides its chrome so the canvas goes
+  // edge-to-edge); Esc exits. Requesting on the window <div> avoids sandboxed-
+  // iframe fullscreen-permission quirks. The iframe resizes with its element, so
+  // viz.js's resize handler reflows the canvas (nudged for good measure).
+  function toggleVizFullscreen() {
+    var el = wins["wa-viz"] && wins["wa-viz"].el;
+    if (!el) return;
+    if (document.fullscreenElement === el) {
+      (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+    } else {
+      (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+      raise(el);
+    }
+  }
+  document.addEventListener("fullscreenchange", function () {
+    var el = wins["wa-viz"] && wins["wa-viz"].el;
+    if (el) el.classList.toggle("wa-fs", document.fullscreenElement === el);
+    setTimeout(function () { postViz({ type: "resize" }); }, 80);
+  });
 
   // =========================================================================
   // iframe bridge (audio in, presets/favorites round-trip)
@@ -443,8 +493,11 @@
     var lo = cssVar("--wa-bar-lo") || "#16e651";
     var hi = cssVar("--wa-bar-hi") || "#ffe000";
     var pk = cssVar("--wa-bar-peak") || "#ff5050";
+    // classic green→yellow→red levels (color by absolute height: tall/loud bars
+    // turn yellow then red at their tips, like real Winamp)
     var grad = g.createLinearGradient(0, H, 0, 0);
-    grad.addColorStop(0, lo); grad.addColorStop(0.7, lo); grad.addColorStop(1, hi);
+    grad.addColorStop(0, lo); grad.addColorStop(0.45, lo);
+    grad.addColorStop(0.72, hi); grad.addColorStop(1, pk);
     var bw = W / N;
     // sample frequency bins logarithmically across the lower ~half of the FFT
     var bins = freq.length;

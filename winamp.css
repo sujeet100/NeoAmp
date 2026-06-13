@@ -46,9 +46,9 @@
 
   --wa-inset-bg: #050507;
 
-  --wa-btn-bg: linear-gradient(180deg, #44445a 0%, #2b2b39 50%, #232330 100%);
-  --wa-btn-active-bg: linear-gradient(180deg, #1c1c26 0%, #2b2b39 100%);
-  --wa-btn-fg: #d7d7e2;
+  --wa-btn-bg: linear-gradient(180deg, #ececec 0%, #c6c6c6 48%, #a8a8a8 100%);
+  --wa-btn-active-bg: linear-gradient(180deg, #9c9c9c 0%, #bdbdbd 100%);
+  --wa-btn-fg: #1a1a22;
   --wa-accent: #00ff4a;
   --wa-accent-glow: rgba(0, 255, 74, 0.55);
 
@@ -75,11 +75,13 @@
   position: absolute;
   pointer-events: auto;
   background: var(--wa-win-bg);
-  border: 1px solid var(--wa-win-border);
+  border: 2px solid var(--wa-win-border);
   border-radius: 2px;
+  /* chunky raised bevel: bright inner top-left, deep dark inner bottom-right */
   box-shadow:
-    inset 1px 1px 0 var(--wa-bevel-light),
-    inset -1px -1px 0 var(--wa-bevel-dark),
+    inset 2px 2px 0 var(--wa-bevel-light),
+    inset -2px -2px 0 var(--wa-bevel-dark),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
     var(--wa-win-shadow);
   color: var(--wa-fg);
   user-select: none;
@@ -87,16 +89,23 @@
 .wa-win.dragging { opacity: 0.97; }
 
 .wa-titlebar {
-  height: 16px;
+  height: 17px;
   display: flex;
   align-items: center;
   padding: 0 4px;
   cursor: move;
-  background: var(--wa-title-bg);
+  /* classic horizontal ridges layered over the skin's title gradient */
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, rgba(0,0,0,0.13) 1px 2px),
+    var(--wa-title-bg);
   border-bottom: 1px solid var(--wa-win-border);
   box-shadow: inset 0 1px 0 var(--wa-bevel-light);
 }
-.wa-win.inactive .wa-titlebar { background: var(--wa-title-bg-off); }
+.wa-win.inactive .wa-titlebar {
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, rgba(0,0,0,0.10) 1px 2px),
+    var(--wa-title-bg-off);
+}
 .wa-title {
   flex: 1 1 auto;
   font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
@@ -141,14 +150,15 @@
    MAIN WINDOW
    ======================================================================= */
 #wa-main { width: 420px; }
-#wa-main .wa-main-grid { display: grid; grid-template-columns: 64px 1fr; gap: 6px; }
+#wa-main .wa-main-grid { display: grid; grid-template-columns: 78px 1fr; gap: 6px; }
 
 .wa-clock {
-  font-size: 30px; line-height: 1; font-weight: 400; letter-spacing: 2px;
-  text-align: center; padding: 4px 0 2px;
+  font-size: 23px; line-height: 1; letter-spacing: 1px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 36px; padding: 2px; white-space: nowrap;
 }
 .wa-art {
-  margin-top: 6px; width: 64px; height: 64px;
+  margin: 6px auto 0; width: 64px; height: 64px;
   position: relative; overflow: hidden; background: #050507;
   border: 1px solid #000;
 }
@@ -164,10 +174,10 @@
 
 .wa-rcol { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 
-.wa-marquee { height: 18px; overflow: hidden; padding: 0 5px; display: flex; align-items: center; }
+.wa-marquee { height: 20px; overflow: hidden; padding: 0 5px; display: flex; align-items: center; }
 .wa-marquee-track {
   white-space: nowrap; font-family: var(--wa-lcd-font);
-  font-size: 15px; letter-spacing: 1px; color: var(--wa-lcd);
+  font-size: 15px; line-height: 1; letter-spacing: 1px; color: var(--wa-lcd);
   text-shadow: 0 0 4px var(--wa-lcd-glow); will-change: transform;
 }
 
@@ -192,34 +202,41 @@
   border: 1px solid #000; box-shadow: inset 0 1px 2px rgba(0,0,0,0.85);
   border-radius: 1px; outline: none; cursor: pointer;
 }
+/* grooved/grippy thumb: horizontal dark grip lines over the metal gradient */
 .wa-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 11px; height: 15px;
-  background: var(--wa-thumb-bg);
+  width: 13px; height: 16px;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0 1px, transparent 1px 3px), var(--wa-thumb-bg);
   border: 1px solid var(--wa-thumb-border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+  box-shadow: inset 1px 0 0 rgba(255,255,255,0.45), inset -1px 0 0 rgba(0,0,0,0.4);
   border-radius: 1px; cursor: pointer;
 }
 .wa-range::-moz-range-thumb {
-  width: 11px; height: 15px; background: var(--wa-thumb-bg);
+  width: 13px; height: 16px;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0 1px, transparent 1px 3px), var(--wa-thumb-bg);
   border: 1px solid var(--wa-thumb-border); border-radius: 1px; cursor: pointer;
 }
 
 .wa-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 5px 2px; }
 .wa-transport { display: flex; gap: 2px; }
+/* raised plastic: bright top/left edges, dark bottom/right edges (outset bevel) */
 .wa-btn {
-  min-width: 28px; height: 24px; padding: 0 5px;
+  min-width: 30px; height: 26px; padding: 0 5px;
   display: grid; place-items: center;
   color: var(--wa-btn-fg); background: var(--wa-btn-bg);
-  border: 1px solid var(--wa-win-border); border-radius: 2px;
-  box-shadow: inset 1px 1px 0 var(--wa-bevel-light), inset -1px -1px 0 rgba(0,0,0,0.45);
+  border: 2px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 1px 1px 2px rgba(0,0,0,0.5);
   cursor: pointer;
 }
 .wa-btn svg { width: 13px; height: 13px; fill: currentColor; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); pointer-events: none; }
-.wa-btn:hover { filter: brightness(1.14); }
+.wa-btn:hover { filter: brightness(1.1); }
 .wa-btn:active, .wa-btn.active {
+  /* press = invert the bevel so it sinks in */
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
   background: var(--wa-btn-active-bg);
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7);
+  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.6);
   color: var(--wa-accent);
 }
 .wa-btn.active svg { filter: drop-shadow(0 0 4px var(--wa-accent-glow)); }
@@ -230,13 +247,17 @@
 
 .wa-toggles { display: flex; gap: 4px; }
 .wa-tog {
-  height: 22px; padding: 0 7px;
-  font: 700 9px/1 var(--wa-font); letter-spacing: 1px;
-  display: grid; place-items: center; color: var(--wa-fg-dim); cursor: pointer;
-  background: var(--wa-btn-bg); border: 1px solid var(--wa-win-border); border-radius: 2px;
-  box-shadow: inset 1px 1px 0 var(--wa-bevel-light);
+  height: 24px; padding: 0 7px;
+  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
+  display: grid; place-items: center; color: var(--wa-btn-fg); opacity: 0.7; cursor: pointer;
+  background: var(--wa-btn-bg); border: 2px solid; border-radius: 2px;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
 }
-.wa-tog.on { color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow); box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7); }
+.wa-tog.on {
+  opacity: 1; color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow);
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
+  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.65);
+}
 
 /* =======================================================================
    EQUALIZER WINDOW (cosmetic)
@@ -249,17 +270,33 @@
 .wa-vrange {
   -webkit-appearance: none; appearance: none;
   writing-mode: vertical-lr; direction: rtl;
-  width: 9px; height: 64px;
-  background: var(--wa-track-bg); border: 1px solid #000;
-  box-shadow: inset 0 0 2px rgba(0,0,0,0.85); outline: none; cursor: pointer;
+  width: 10px; height: 66px;
+  /* recessed physical slot */
+  background: linear-gradient(90deg, #050505, #161616 50%, #050505);
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85), inset -1px -1px 0 var(--wa-bevel-light);
+  outline: none; cursor: pointer;
 }
+/* metallic handle with one dark groove line across the center (physical fader) */
 .wa-vrange::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none; width: 15px; height: 10px;
-  background: var(--wa-thumb-bg); border: 1px solid var(--wa-thumb-border); cursor: pointer;
+  -webkit-appearance: none; appearance: none; width: 18px; height: 12px;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.6) calc(50% - 1px),
+      rgba(0,0,0,0.6) calc(50% + 1px), transparent calc(50% + 1px)),
+    var(--wa-btn-bg);
+  border: 1px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
 }
 .wa-vrange::-moz-range-thumb {
-  width: 15px; height: 10px; background: var(--wa-thumb-bg);
-  border: 1px solid var(--wa-thumb-border); cursor: pointer;
+  width: 18px; height: 12px;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.6) calc(50% - 1px),
+      rgba(0,0,0,0.6) calc(50% + 1px), transparent calc(50% + 1px)),
+    var(--wa-btn-bg);
+  border: 1px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
 }
 .wa-eq-label { font-size: 8px; color: var(--wa-fg-dim); }
 
@@ -267,16 +304,29 @@
    VISUALIZATION WINDOW (Butterchurn iframe lives in the body)
    ======================================================================= */
 #wa-viz { width: 360px; height: 280px; display: flex; flex-direction: column; min-width: 200px; min-height: 150px; }
-#wa-viz .wa-body { flex: 1 1 auto; padding: 3px; display: flex; min-height: 0; }
+#wa-viz .wa-body { flex: 1 1 auto; padding: 5px; display: flex; min-height: 0; }
 .wa-viz-frame {
   flex: 1 1 auto; width: 100%; height: 100%;
-  border: 1px solid #000; background: #000; display: block;
+  /* recessed inner bevel (dark top-left / light bottom-right) so the canvas
+     reads as a sunken screen, matching the LCD boxes + the module double-bevel */
+  border: 2px solid;
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
+  background: #000; display: block;
 }
 .wa-resize {
   position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize;
   background: linear-gradient(135deg, transparent 45%, var(--wa-bevel-light) 45% 55%, transparent 55%,
     transparent 65%, var(--wa-bevel-light) 65% 75%, transparent 75%);
 }
+
+/* fullscreen: viz window fills the screen, chrome hidden, canvas edge-to-edge */
+#wa-viz:fullscreen, #wa-viz:-webkit-full-screen {
+  width: 100vw !important; height: 100vh !important;
+  border: 0; border-radius: 0;
+}
+#wa-viz:fullscreen .wa-titlebar, #wa-viz:-webkit-full-screen .wa-titlebar { display: none; }
+#wa-viz:fullscreen .wa-body, #wa-viz:-webkit-full-screen .wa-body { padding: 0; }
+#wa-viz:fullscreen .wa-resize, #wa-viz:-webkit-full-screen .wa-resize { display: none; }
 
 /* skin picker (in the main titlebar) */
 .wa-skinsel {
