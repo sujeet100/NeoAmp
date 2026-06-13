@@ -130,6 +130,22 @@
     el.style.zIndex = String(++zTop);
   }
 
+  // Transient full-viewport overlay shown during a drag/resize. Mouse events
+  // over a cross-origin iframe (the viz canvas) never reach our document, which
+  // would strand us in drag/resize mode (mouseup is lost). The shield sits on
+  // top and captures every move/up so our listeners always fire and release.
+  var dragShield = null;
+  function shield(on, cursor) {
+    if (on) {
+      if (!dragShield) dragShield = h("div", { id: "neoamp-shield" });
+      dragShield.style.cssText =
+        "position:fixed;inset:0;z-index:2147483640;pointer-events:auto;cursor:" + (cursor || "default") + ";";
+      root.appendChild(dragShield);
+    } else if (dragShield && dragShield.parentNode) {
+      dragShield.parentNode.removeChild(dragShield);
+    }
+  }
+
   function makeDraggable(el, handle) {
     var ox = 0, oy = 0, dragging = false;
     handle.addEventListener("mousedown", function (e) {
@@ -138,20 +154,24 @@
       var r = el.getBoundingClientRect();
       ox = e.clientX - r.left; oy = e.clientY - r.top;
       el.classList.add("dragging");
+      shield(true, "move");
       e.preventDefault();
     });
-    document.addEventListener("mousemove", function (e) {
+    window.addEventListener("mousemove", function (e) {
       if (!dragging) return;
       var x = e.clientX - ox, y = e.clientY - oy;
       var pos = snap(el, x, y);
       el.style.left = pos.x + "px"; el.style.top = pos.y + "px";
     });
-    document.addEventListener("mouseup", function () {
+    var stop = function () {
       if (!dragging) return;
       dragging = false;
       el.classList.remove("dragging");
+      shield(false);
       saveLayout();
-    });
+    };
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("blur", stop);
   }
 
   // Magnetic docking: snap the dragged window's edges to the viewport and to the
@@ -188,14 +208,18 @@
     handle.addEventListener("mousedown", function (e) {
       sizing = true; sx = e.clientX; sy = e.clientY;
       sw = el.offsetWidth; sh = el.offsetHeight;
+      shield(true, "nwse-resize");
+      raise(el);
       e.preventDefault(); e.stopPropagation();
     });
-    document.addEventListener("mousemove", function (e) {
+    window.addEventListener("mousemove", function (e) {
       if (!sizing) return;
       el.style.width = Math.max(minW, sw + (e.clientX - sx)) + "px";
       el.style.height = Math.max(minH, sh + (e.clientY - sy)) + "px";
     });
-    document.addEventListener("mouseup", function () { if (sizing) { sizing = false; saveLayout(); } });
+    var stop = function () { if (!sizing) return; sizing = false; shield(false); saveLayout(); };
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("blur", stop);
   }
 
   // ---- layout persistence --------------------------------------------------
@@ -514,6 +538,9 @@
       g.fillStyle = pk;
       g.fillRect(i * bw + 1, H - peaks[i] - 2, bw - 2, 2);
     }
+    // chop the bars into stacked LED blocks with dark horizontal gridlines
+    g.fillStyle = "rgba(0,0,0,0.82)";
+    for (var y = 0; y < H; y += 4) g.fillRect(0, y, W, 2);
   }
 
   // =========================================================================

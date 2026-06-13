@@ -246,17 +246,22 @@
 .wa-bal { flex: 1 1 0; }
 
 .wa-toggles { display: flex; gap: 4px; }
+/* secondary controls: small + dark grey so they recede vs. the silver
+   transport buttons (intentionally not skin-tinted; the active state is) */
 .wa-tog {
-  height: 24px; padding: 0 7px;
-  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
-  display: grid; place-items: center; color: var(--wa-btn-fg); opacity: 0.7; cursor: pointer;
-  background: var(--wa-btn-bg); border: 2px solid; border-radius: 2px;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  height: 18px; padding: 0 5px;
+  font: 700 7px/1 var(--wa-font); letter-spacing: 0.5px; text-transform: uppercase;
+  display: grid; place-items: center; color: #cfcfcf; opacity: 0.85; cursor: pointer;
+  background: linear-gradient(180deg, #565660, #393942);
+  border: 1px solid;
+  border-color: rgba(255,255,255,0.18) #15151c #15151c rgba(255,255,255,0.18);
+  border-radius: 2px;
 }
 .wa-tog.on {
   opacity: 1; color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow);
-  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
-  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.65);
+  background: linear-gradient(180deg, #2c2c34, #45454f);
+  border-color: #15151c rgba(255,255,255,0.18) rgba(255,255,255,0.18) #15151c;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.7);
 }
 
 /* =======================================================================
@@ -264,7 +269,14 @@
    ======================================================================= */
 #wa-eq { width: 420px; }
 .wa-eq-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.wa-eq-curve { flex: 1 1 auto; height: 28px; display: block; }
+.wa-eq-curve {
+  flex: 1 1 auto; height: 28px; display: block;
+  background-color: #000;
+  background-image:
+    linear-gradient(#2a2a2a 1px, transparent 1px),
+    linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
+  background-size: 10px 10px;
+}
 .wa-eq-bands { display: flex; gap: 6px; align-items: flex-end; justify-content: space-between; padding: 4px 8px; }
 .wa-eq-band { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .wa-vrange {
@@ -277,25 +289,23 @@
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85), inset -1px -1px 0 var(--wa-bevel-light);
   outline: none; cursor: pointer;
 }
-/* metallic handle with one dark groove line across the center (physical fader) */
+/* metallic grey fader cap with one dark groove line across the center */
 .wa-vrange::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 18px; height: 12px;
   background:
-    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.6) calc(50% - 1px),
-      rgba(0,0,0,0.6) calc(50% + 1px), transparent calc(50% + 1px)),
-    var(--wa-btn-bg);
-  border: 1px solid;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.55) calc(50% - 1px),
+      rgba(0,0,0,0.55) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(180deg, #dcdcdc, #888);
+  border: 1px solid #333;
   box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
 }
 .wa-vrange::-moz-range-thumb {
   width: 18px; height: 12px;
   background:
-    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.6) calc(50% - 1px),
-      rgba(0,0,0,0.6) calc(50% + 1px), transparent calc(50% + 1px)),
-    var(--wa-btn-bg);
-  border: 1px solid;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.55) calc(50% - 1px),
+      rgba(0,0,0,0.55) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(180deg, #dcdcdc, #888);
+  border: 1px solid #333;
   box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
 }
 .wa-eq-label { font-size: 8px; color: var(--wa-fg-dim); }
