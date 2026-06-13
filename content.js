@@ -144,11 +144,13 @@
       if (!title) continue;
       var byline = clean((it.querySelector(".byline") || {}).textContent);
       var pbs = it.getAttribute("play-button-state") || "";
+      var img = it.querySelector("img");
       out.push({
         index: i,
         title: title,
         artist: byline.split("•")[0].trim(),
         duration: clean((it.querySelector(".duration") || {}).textContent),
+        art: img && /^https?:/.test(img.src) ? img.src : "",
         playing: it.hasAttribute("selected") || pbs === "playing" || pbs === "paused",
       });
     }

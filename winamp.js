@@ -515,7 +515,7 @@
   function refreshQueue(force) {
     if (!els.plList) return;
     var q = NA.getQueue ? NA.getQueue() : [];
-    var sig = q.map(function (x) { return (x.playing ? "*" : "") + x.title; }).join("|");
+    var sig = q.map(function (x) { return (x.playing ? "*" : "") + (x.art ? "a" : "") + x.title; }).join("|");
     if (!force && sig === plSig) return;
     plSig = sig;
     els.plList.innerHTML = "";
@@ -523,8 +523,10 @@
       els.plList.appendChild(h("div", { class: "wa-pl-empty", text: "Queue empty — play a track or open Up Next in YouTube Music." }));
     } else {
       q.forEach(function (item) {
+        var thumb = item.art ? h("img", { class: "wa-pl-thumb", src: item.art }) : h("span", { class: "wa-pl-thumb empty" });
         var row = h("div", { class: "wa-pl-row" + (item.playing ? " playing" : "") }, [
           h("span", { class: "wa-pl-n", text: (item.index + 1) + "." }),
+          thumb,
           h("span", { class: "wa-pl-t", text: item.title + (item.artist ? " - " + item.artist : "") }),
           h("span", { class: "wa-pl-d", text: item.duration || "" }),
         ]);

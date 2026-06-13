@@ -351,10 +351,12 @@
   box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
   font-family: var(--wa-lcd-font); font-size: 14px; line-height: 1.2;
 }
-.wa-pl-row { display: flex; align-items: center; gap: 6px; padding: 1px 6px; color: var(--wa-lcd); cursor: pointer; white-space: nowrap; }
+.wa-pl-row { display: flex; align-items: center; gap: 7px; padding: 2px 6px; color: var(--wa-lcd); cursor: pointer; white-space: nowrap; }
 .wa-pl-row:hover { background: rgba(255,255,255,0.07); }
 .wa-pl-row.playing { background: #0a2a5e; color: #fff; text-shadow: 0 0 4px var(--wa-lcd-glow); }
 .wa-pl-n { min-width: 22px; text-align: right; opacity: 0.7; }
+.wa-pl-thumb { width: 26px; height: 26px; flex: 0 0 auto; object-fit: cover; image-rendering: pixelated; border: 1px solid #000; background: #000; }
+.wa-pl-thumb.empty { background: #111; }
 .wa-pl-t { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .wa-pl-d { opacity: 0.85; }
 .wa-pl-empty { padding: 10px; color: var(--wa-fg-dim); font: 11px/1.4 var(--wa-font); white-space: normal; }
