@@ -4,6 +4,46 @@
 (function () {
   "use strict";
 
+  // --- GLSL compile/link diagnostics ---------------------------------------
+  // Butterchurn compiles preset shaders internally and swallows the GL info
+  // log, so a bad preset shader only surfaces as the opaque "program not
+  // linked" warning. Wrap compileShader/linkProgram on the GL prototypes to
+  // print the actual compiler error AND the offending source with line numbers
+  // (prefixed [WMP-viz shader]). This is our only window into GLSL errors,
+  // which can't be validated in Node. Patches run before any context is made.
+  function installShaderDebug() {
+    const numbered = (src) =>
+      String(src || "").split("\n").map((l, i) => String(i + 1).padStart(3) + "| " + l).join("\n");
+    [self.WebGLRenderingContext, self.WebGL2RenderingContext].forEach((Ctx) => {
+      if (!Ctx || Ctx.prototype.__wmpShaderDebug) return;
+      Ctx.prototype.__wmpShaderDebug = true;
+      const srcOf = new WeakMap();
+      const _shaderSource = Ctx.prototype.shaderSource;
+      Ctx.prototype.shaderSource = function (shader, source) {
+        srcOf.set(shader, source);
+        return _shaderSource.call(this, shader, source);
+      };
+      const _compile = Ctx.prototype.compileShader;
+      Ctx.prototype.compileShader = function (shader) {
+        const r = _compile.call(this, shader);
+        if (!this.getShaderParameter(shader, this.COMPILE_STATUS)) {
+          console.error("[WMP-viz shader] compile FAILED\n" + this.getShaderInfoLog(shader) +
+            "\n--- source ---\n" + numbered(srcOf.get(shader)));
+        }
+        return r;
+      };
+      const _link = Ctx.prototype.linkProgram;
+      Ctx.prototype.linkProgram = function (program) {
+        const r = _link.call(this, program);
+        if (!this.getProgramParameter(program, this.LINK_STATUS)) {
+          console.error("[WMP-viz shader] link FAILED: " + this.getProgramInfoLog(program));
+        }
+        return r;
+      };
+    });
+  }
+  installShaderDebug();
+
   const FFT_SIZE = 1024; // matches the content script's analyser
   const post = (m) => { try { parent.postMessage(Object.assign({ __wmp: true }, m), "*"); } catch (_) {} };
   const fail = (msg) => { console.error("[WMP-viz]", msg); post({ type: "error", message: String(msg) }); };

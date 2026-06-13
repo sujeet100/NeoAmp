@@ -108,6 +108,15 @@ P["Name"] = build(baseValsOverrides, { frame: fn, pixel: fn, init: fn, warp: gls
   **GLSL gotcha:** don't assign to `uv` (treat it as read-only) — copy into a
   local `vec2`. Aspect-correct with `d.x *= resolution.x/resolution.y` (else
   circles render as ovals).
+  **GLSL gotcha (reserved names — caused a silent "program not linked"):**
+  `shader_body` is spliced into a generated `main()` that ALREADY declares the
+  MilkDrop pixel builtins as locals — notably **`ang`** (pixel angle) and **`rad`**
+  (radius), plus `ret`, `uv`, `hue_shader`, `time`, `bass…`, `q1..q32`. Declaring
+  your own `float ang`/`float rad` in `shader_body` is a **redefinition** →
+  fragment fails to compile → the whole comp/warp program never links (you only
+  see opaque `getUniformLocation: program not linked` warnings, not a clear
+  error). Name your locals anything else (`pang`, `pr`, …). Function PARAMETERS
+  named `ang`/`rad` are fine (they shadow in their own scope).
 - **Helpers in `wmp-presets.js`:** `build`, `circleWave(qx,qy)`,
   `waveLine()`, `WAVE_BASE`, `SHAPE_BASE`, `AMBER_RAMP` (yellow ramp GLSL),
   and inline `pal`/`fbm`/`ctr`/`hash21`/`vnoise` GLSL helpers used by Alchemy.
@@ -124,9 +133,28 @@ node -e 'global.window=global; require("./wmp-presets.js");
   }'
 ```
 
-GLSL **cannot** be compiled in Node — shader errors only show at runtime as an
-on-screen toast. Each preset is independent: a broken shader only fails when that
-favorite is clicked; startup loads "Dance of the Freaky Circles" (known-good).
+GLSL **cannot** be compiled in Node — shader errors only show at runtime. Each
+preset is independent: a broken shader only fails when that favorite is clicked;
+startup loads "Dance of the Freaky Circles" (known-good).
+
+**Two ways to actually see GLSL errors (use these — guessing wastes rounds):**
+
+1. **In-browser compiler log (best for the real failure).** `viz.js` installs a
+   `compileShader`/`linkProgram` hook on the WebGL prototypes that prints the
+   driver's error + the **numbered source** to the iframe console, prefixed
+   `[WMP-viz shader]`. So a bad preset shader now reports e.g.
+   `ERROR: 0:194: 'ang' : redefinition` instead of a black screen. (To see it:
+   DevTools console → switch the context dropdown from `top` to the `viz.html`
+   frame.) Keep this hook — it's the only window into GLSL errors.
+2. **Headless ANGLE pre-check (validate BEFORE asking for a reload).** Extract a
+   preset's `comp`/`warp` string in Node, wrap it as a standalone fragment, and
+   compile+link it through the *same* compiler Chrome uses (ANGLE) via the
+   chrome-devtools MCP. Crucial: **mimic Butterchurn's generated `main()`** — start
+   the body with predeclared locals (`vec3 ret; float rad=…; float ang=…;`) or you
+   WON'T reproduce the reserved-name redefinition (a bare wrap compiles fine and
+   hides the bug). Then `createProgram`+`linkProgram`+`validateProgram` in both
+   `webgl`/`webgl2` and read `getShaderInfoLog`/`getProgramInfoLog`. This caught
+   and confirmed the `ang` fix end-to-end without a single reload.
 
 ## Current state
 
