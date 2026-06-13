@@ -247,13 +247,17 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
   from `a.value1`/`a.value2` (the live samples), like Dance's `waveLine` — the
   512 real samples give the dense jaggedness for free. Apply the same to any shape
   (orb rings, urchin filaments): prefer real-waveform displacement over synthetic.
-- **Colors MUST stay MUTED** (the user repeats this — it is a hard requirement).
-  The original is dusty/pastel: muted backgrounds AND muted-but-colored geometry
-  (soft gold/lavender/sage), never neon and never blown out to flat white.
-  Techniques: desaturate hues (don't use full-saturation cosine palettes), keep
-  the background wash low-saturation, and **tone-map the final** (Reinhard
-  `c/(c+k)`) so additive/bloom highlights compress to soft color instead of pure
-  white. If it looks neon or white, it's wrong.
+- **Colors MUST stay MUTED — for the Alchemy/Ambience/Battery families** (the user
+  repeats this for those; it is a hard requirement *there*). Those originals are
+  dusty/pastel: muted backgrounds AND muted-but-colored geometry (soft gold/
+  lavender/sage), never neon and never blown out to flat white. Techniques:
+  desaturate hues (don't use full-saturation cosine palettes), keep the background
+  wash low-saturation, and **tone-map the final** (Reinhard `c/(c+k)`) so additive/
+  bloom highlights compress to soft color instead of pure white.
+  **NOT a global rule:** it does NOT apply to *Dance of the Freaky Circles*, whose
+  reference is genuinely vivid purple/magenta — match the reference's saturation
+  per preset, don't force muting everywhere. Confirm the target look from that
+  preset's own reference frames before deciding muted vs. vivid.
 
 ## Best practices for this codebase
 

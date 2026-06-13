@@ -190,7 +190,8 @@
         decay: 0.965,          // ~0.35s half-life @60fps (measured from the video); the
                                // mosaic lingers, then fades SLOWLY/smoothly (no on/off pop)
         gammaadj: 1.4,
-        zoom: 1.0,
+        zoom: 0.997,           // very slight inward feedback drift -> blocks recede a touch
+                               // as they fade = depth (not a flat slab). Subtle, no smear.
         warp: 0.04,
         echo_alpha: 0,
         darken_center: 0,
@@ -207,8 +208,10 @@
           t.q2 = 0.5 + orbit * Math.sin(th);
           t.q3 = 0.5 + orbit * Math.cos(th + Math.PI);        // unit B center (opposite)
           t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
-          // Inner circle: small, STABLE — it does NOT jump with the music.
-          t.q5 = 0.038;                                // constant small radius (no pulse)
+          // Inner shapes: small; they keep their structure (circle + horizontal bar)
+          // and only PULSE gently in size with the bass — no waveform distortion.
+          t.q5 = 0.038 + 0.014 * bass;                 // size pulses gently on the beat (bass)
+          t.q10 = Math.min(0.45 + 0.5 * ((bass + mid + treb) / 3), 1.2); // color intensity ~ volume
           t.q6 = 0.12 + 0.015 * bass;                  // ring base radius: nearly stable
           // ONLY the outer waveform jumps: treble/mid spike it violently outward,
           // and the bigger jump paints a WIDER mosaic.
@@ -223,16 +226,19 @@
           t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;     // 0 = rings hidden (breather), 1 = on
           return t;
         },
-        // COMP: the buffer holds the slow-fading trail (decay 0.955). Quantize it to
-        // a coarse grid and softly blur the cell edges -> the mosaic squares (the
-        // trail painted as blocks). Recolor by brightness so fresh/bright = PURPLE,
-        // faded/dim = BLUE, dim + capped so loud music never becomes a neon blob.
-        // The current crisp waves are added on top (detail), kept thick & bright.
+        // COMP: blocky TEXTURED mosaic background + visible (semi-sharp) circles and
+        // waveform on top (the reference keeps the thin circles readable over the
+        // blocks — full pixelation erases them).
+        //  - BACKGROUND: quantize the trail to squares (soft edges). Strong per-cell
+        //    brightness variation -> textured squares, NOT a flat uniform slab.
+        //  - LINES: the crisp current circles/waveform are extracted (sharp above the
+        //    block average) and RECOLOURED to magenta -> no green strings.
+        //  - Recolour by brightness to a magenta->purple ramp; green is clamped out.
         comp:
+          NOISE_GLSL +
           "shader_body {\n" +
-          "float cy = 15.0;\n" +
+          "float cy = 20.0;\n" +
           "vec2 cells = vec2(cy * resolution.x / resolution.y, cy);\n" +
-          "vec3 crisp = texture2D(sampler_main, (floor(uv * cells) + 0.5) / cells).rgb;\n" +
           "vec2 g = uv * cells - 0.5;\n" +
           "vec2 gi = floor(g);\n" +
           "vec2 gf = fract(g); gf = gf * gf * (3.0 - 2.0 * gf);\n" +
@@ -241,35 +247,40 @@
           "vec3 c01 = texture2D(sampler_main, (gi + vec2(0.5, 1.5)) / cells).rgb;\n" +
           "vec3 c11 = texture2D(sampler_main, (gi + vec2(1.5, 1.5)) / cells).rgb;\n" +
           "vec3 soft = mix(mix(c00, c10, gf.x), mix(c01, c11, gf.x), gf.y);\n" +
-          "vec3 raw = mix(crisp, soft, 0.55);\n" +                // soft edges, square definition kept
-          "float lum = max(raw.r, max(raw.g, raw.b));\n" +
-          "vec3 fresh = vec3(0.45, 0.20, 0.78);\n" +              // violet when fresh/bright
-          "vec3 faded = vec3(0.16, 0.20, 0.50);\n" +              // blue when faded/dim
-          "vec3 col = mix(faded, fresh, smoothstep(0.05, 0.40, lum));\n" +
-          "vec3 mosaic = col * (lum / (lum + 0.55)) * 0.95;\n" +  // dim + capped -> never a neon blob
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +     // current crisp waves
-          "vec3 detail = max(sharp - soft, vec3(0.0)) * 1.1;\n" + // crisp THICK circles/lightning on top
-          "ret = mosaic + detail;\n" +
+          "float bl = max(soft.r, max(soft.g, soft.b));\n" +       // block brightness (the trail)
+          "float rnd = hash21(gi);\n" +
+          "float lum = bl * (0.55 + 0.85 * rnd);\n" +              // STRONG per-cell variation -> texture
+          "vec3 fresh = vec3(0.62, 0.10, 0.98);\n" +               // bright magenta-violet
+          "vec3 faded = vec3(0.18, 0.09, 0.52);\n" +               // dark purple when faded
+          "vec3 mosaic = mix(faded, fresh, smoothstep(0.04, 0.45, lum)) * (lum / (lum + 0.5));\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +      // current circles + waveform
+          "float sd = max(max(sharp.r, max(sharp.g, sharp.b)) - bl, 0.0);\n" + // crisp line above blocks
+          "vec3 line = vec3(0.90, 0.32, 1.0) * sd * 1.25;\n" +     // recoloured magenta -> no green
+          "vec3 outc = mosaic + line;\n" +
+          "outc.g = min(outc.g, 0.5 * max(outc.r, outc.b));\n" +   // clamp any residual green
+          "ret = outc;\n" +
           "}\n"
       }
     );
 
-    // SMOOTH small inner circle (no waveform on its circumference). Radius q5.
-    // Small + dim + stable (it does not jump); just a quiet anchor that keeps
-    // definition. Lower alpha than the rings so it never dominates.
+    // Inner SHAPE: a clean, smooth circle. NOT a waveform — geometry stays smooth
+    // (any blockiness comes only from the mosaic shader over the top). Size from q5
+    // (gentle bass pulse), colour intensity from q10 (volume).
     function innerCircle(qx, qy) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
           enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.9, a: 0.42, thick: 1, r: 0.80, g: 0.40, b: 1.0
+          smoothing: 0.9, a: 0.7, thick: 1, r: 0.80, g: 0.20, b: 1.0
         }),
         init_eqs: passthrough,
         frame_eqs: passthrough,
         point_eqs: function (a) {
+          var r = (a.q5 || 0.04);
           var ang = a.sample * 6.2832;
-          var rad = (a.q5 || 0.045);                  // constant -> perfectly round
-          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
-          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var v = (a.q10 !== undefined ? a.q10 : 1);  // colour intensity tracks volume
+          a.r = 0.80 * v; a.g = 0.40 * v; a.b = 1.0 * v;
           return a;
         }
       };
@@ -295,6 +306,8 @@
           var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;     // jagged ring, jumps with music
           a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
           a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = (a.q10 !== undefined ? a.q10 : 1);            // intensity tracks volume (kept muted)
+          a.r = 0.80 * v; a.g = 0.35 * v; a.b = 1.0 * v;
           return a;
         }
       };
