@@ -1,99 +1,85 @@
-# YT Music — WMP / Winamp Visualizer
+# NeoAmp 🎵◢◤
 
-A Manifest V3 Chrome extension that overlays **MilkDrop-style WebGL visualizations**
-(via [Butterchurn](https://github.com/jberg/butterchurn)) on **YouTube Music**, with a
-**"WMP favorites"** menu that maps your remembered Windows Media Player presets to the
-closest-matching MilkDrop presets.
+**Winamp / Windows Media Player–style music visualizations, overlaid on YouTube Music.**
 
-This is the **fast / closest-match** route: it reuses the real YT Music player and your
-real account, captures the tab's audio for analysis, and renders 368 presets. It does not
-re-stream anything, so it stays on the right side of YouTube's terms.
+NeoAmp is a Manifest V3 Chrome/Arc extension that renders **MilkDrop**
+visualizations (via [Butterchurn](https://github.com/jberg/butterchurn)) on top of
+YouTube Music, driven by the live audio of the tab. On top of Butterchurn's bundled
+MilkDrop presets, NeoAmp ships **hand-authored presets that recreate the classic
+Windows Media Player visualizers** — the *Alchemy*, *Battery*, and *Ambience*
+families — behind a Winamp-flavored launcher.
+
+> Nostalgic for WMP's swirling Alchemy flower and Winamp's MilkDrop? NeoAmp brings
+> that look back, reacting to whatever you're playing.
+
+## Features
+
+- 🌀 **MilkDrop visuals on YouTube Music**, reacting to the live track.
+- 🎛️ **Hand-authored WMP recreations** — notably **Alchemy Random**, a 10-scene
+  engine (the two-orb "Dance" waveform, dandelion/urchin bursts, spiral arms,
+  kaleidoscope lens-bands, hexagon mesh, smoke plumes, comet streaks, spiderweb,
+  vertical-comb, landscape strata), plus Battery and Ambience families.
+- 🔀 Grouped preset dropdown + ⏮ / ⏭ / 🎲 navigation.
+- ⌨️ Launch with the **◢◤ Visualizer** button (bottom-right) or **Shift+V**.
+- 🔒 Fully local — no remote code, no tracking; only `music.youtube.com` host access.
+
+## Install (load unpacked)
+
+1. Go to `chrome://extensions` (Arc: `arc://extensions`) and enable **Developer mode**.
+2. **Load unpacked** → select this folder.
+3. Open <https://music.youtube.com> and play a track.
+4. Click the **◢◤ Visualizer** launcher (bottom-right) or press **Shift+V**.
+5. In the screen-share dialog, pick **this tab** and **tick "Also share tab audio"**
+   — this is required (no audio = frozen visuals; only the *Tab* option exposes the
+   audio checkbox).
 
 ## How it works
 
 ```
-content script (music.youtube.com)                 sandboxed iframe (viz.html)
-  getDisplayMedia ▶ AudioContext ▶ AnalyserNode  ──postMessage(bytes)──▶  Butterchurn.render({audioLevels})
-                                                                              ▶ WebGL canvas + controls
+content.js  (runs on music.youtube.com)
+  getDisplayMedia({video,audio}) → AudioContext → AnalyserNode (fftSize 1024)
+  → each frame: postMessage(time-domain bytes) ─┐
+                                                 │
+viz.html  (sandboxed extension page, fullscreen iframe)
+  Butterchurn (WebGL) ◄──── postMessage ◄────────┘  → renders the <canvas>
 ```
 
-- **Rendering:** WebGL via Butterchurn (a JS port of Winamp's MilkDrop 2 — the same
-  feedback-buffer engine family as WMP's Battery / Ambience / Alchemy).
-- **The sandbox, and why:** Butterchurn compiles MilkDrop preset equations with
-  `new Function`. Content scripts inherit YouTube Music's strict CSP, which bans
-  `unsafe-eval`, so Butterchurn cannot run in the content script. MV3's only context that
-  permits `unsafe-eval` is a **sandboxed extension page**, so the visualizer lives in a
-  fullscreen sandboxed iframe (`viz.html`).
-- **Audio:** the content script captures tab audio via `getDisplayMedia` (which sidesteps
-  the cross-origin tainting that makes `createMediaElementSource` on YouTube return silence,
-  and keeps the tab audible), reads `AnalyserNode` time-domain bytes each frame, and
-  `postMessage`s them into the iframe. The iframe feeds them to Butterchurn's external
-  `render({ audioLevels })` API — no audio-node bridging across the frame boundary.
-- **Preset curation:** your WMP favorites are matched to Butterchurn presets by keyword at
-  runtime, so each favorite button cycles through real, existing presets.
+Two deliberate design choices (full rationale in `CLAUDE.md`):
 
-## Install (load unpacked)
+- **Tab capture via `getDisplayMedia`** — `createMediaElementSource` on YouTube's
+  `<video>` returns all-zeros due to cross-origin tainting, so NeoAmp captures the
+  tab's audio instead (keeping it audible) and analyzes that.
+- **A sandboxed iframe for rendering** — Butterchurn compiles MilkDrop equations
+  with `new Function`, which needs `unsafe-eval`. MV3 only allows that in a
+  **sandboxed extension page**, so Butterchurn runs in `viz.html`.
 
-1. Open `chrome://extensions`.
-2. Toggle **Developer mode** on (top-right).
-3. Click **Load unpacked** and select this `ytmusic-wmp-visualizer/` folder.
-4. Go to <https://music.youtube.com> and start playing a track.
-5. Click the **◢◤ Visualizer** button (bottom-right), or press **Shift+V**.
-6. In Chrome's share dialog, pick **this tab** and **tick "Also share tab audio"** — this
-   is required, otherwise there's no signal to visualize.
+## Repo layout
 
-> Works in Chrome / Edge / Brave (Chromium, MV3). Firefox needs minor manifest tweaks.
-
-## Controls
-
-| Action | Key / Button |
+| Path | Role |
 | --- | --- |
-| Start / stop | `Shift+V`, or the launcher / `✕` button |
-| Next / previous preset | `→` or `Space` / `←`, or `⏭` `⏮` |
-| Random preset | `R`, or `🎲` |
-| WMP favorites | The named buttons in the bar (click again to cycle matches) |
-| Exit | `Esc` |
+| `manifest.json` | MV3 manifest (content script, sandbox page, CSP, web-accessible resources). |
+| `content.js` | Launcher, tab-audio capture, analyser, iframe, audio message pump. |
+| `viz.html` / `viz.js` | Sandboxed renderer: Butterchurn init, canvas sizing, controls, render loop. |
+| `wmp-presets.js` | Hand-authored WMP-style presets (`window.WMP_PRESETS`). |
+| `vendor/*.min.js` | Vendored Butterchurn 2.6.7 core + preset packs. |
+| `docs/alchemy-reference.md` | Frame-by-frame analysis of the original WMP Alchemy visualizer. |
+| `CLAUDE.md` | Developer notes / architecture gotchas / preset-authoring guide. |
 
-The control bar auto-hides after a few seconds; move the mouse to bring it back.
+## Contributing
 
-## WMP favorites → MilkDrop mapping
+Most of the work is **authoring presets** in `wmp-presets.js`. A preset is a
+Butterchurn "converted" object (equations are JS functions, shaders are GLSL
+strings). See `CLAUDE.md` for the reverse-engineered authoring rules and the
+validate-before-reload workflow (including a headless ANGLE shader-compile check —
+GLSL can't be validated by Node alone).
 
-Closest-match by keyword (matches found in the bundled 368 presets):
+## Credits
 
-| Your WMP preset | Matched by | ~matches |
-| --- | --- | --- |
-| Dance of the Freaky Circles | circle / ring / orb / sphere / tunnel / bubble | 26 |
-| SepiaSwirl | swirl / spiral / smoke / flow / liquid | 26 |
-| My Tornado is Resting | vortex / tornado / swirl / whirl / flow | 19 |
-| StrawberryAid | plasma / swirl / spiral / melt / candy | 16 |
-| Alchemy: Random | fractal / kaleido / mandala / symmetry / geiss | 83 |
+- [Butterchurn](https://github.com/jberg/butterchurn) by Jordan Berg — the WebGL
+  MilkDrop engine NeoAmp renders with (vendored under `vendor/`, MIT licensed).
+- MilkDrop, Winamp, and Windows Media Player are the inspiration; their visual
+  *character* is reproduced here, not their code (the originals are proprietary).
 
-These are *vibe* matches (~80% of the nostalgia), not the exact WMP plugins — those were
-closed-source Windows DLLs and have never been ported. To get them exactly, see the roadmap.
+## License
 
-## Roadmap (higher-fidelity tiers)
-
-- **Exact custom shaders:** build a small ping-pong feedback pipeline (framebuffer + warp +
-  palette + FFT uniforms) and hand-author each WMP preset to match a reference video. A
-  lightweight shader lib (`regl` / `OGL`) or `three.js` (especially for the 3D Alchemy
-  variant) would host this. Battery's real preset parameters live in the Windows registry
-  (`HKLM\SOFTWARE\WOW6432Node\Microsoft\MediaPlayer\Battery`) and can guide color/behavior.
-- **Winamp skin chrome:** wrap the player controls in a classic Winamp skin via
-  [Webamp](https://github.com/captbaritone/webamp), which loads real `.wsz` skins.
-
-## Files
-
-```
-manifest.json   MV3 manifest (content script on music.youtube.com)
-content.js      launcher + capture + Butterchurn render loop + favorites menu
-overlay.css     WMP/Winamp-flavored overlay chrome
-vendor/         Butterchurn core + 3 preset packs (vendored; MV3 bans remote code)
-```
-
-## Notes / limitations
-
-- The `getDisplayMedia` picker appears once per session and shows a "sharing" indicator —
-  acceptable for this PoC. A future version can swap in `chrome.tabCapture` +
-  offscreen-document audio for a picker-free start.
-- Visualization quality depends on your GPU; Butterchurn is WebGL-heavy.
-- Libraries: Butterchurn 2.6.7 and butterchurn-presets 2.4.7 (both MIT).
+[MIT](./LICENSE). Bundled Butterchurn retains its own MIT license.
