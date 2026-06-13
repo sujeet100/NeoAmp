@@ -146,22 +146,55 @@
     }
   }
 
+  // Windows whose edges touch form a docked group that moves together (classic
+  // Winamp). BFS from the dragged window over an adjacency test (edges within
+  // TOL px AND overlapping on the perpendicular axis). Returns each member with
+  // its starting position so the drag handler can shift them all by one delta.
+  function attachedCluster(start) {
+    var TOL = 9;
+    var keys = Object.keys(wins).filter(function (k) { return wins[k].el.style.display !== "none"; });
+    var rect = {};
+    keys.forEach(function (k) {
+      var e = wins[k].el;
+      rect[k] = { l: e.offsetLeft, t: e.offsetTop, r: e.offsetLeft + e.offsetWidth, b: e.offsetTop + e.offsetHeight };
+    });
+    function adjacent(a, b) {
+      var ra = rect[a], rb = rect[b];
+      var vOv = Math.min(ra.b, rb.b) - Math.max(ra.t, rb.t) > 2;   // share vertical extent
+      var hOv = Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l) > 2;   // share horizontal extent
+      var touchX = (Math.abs(ra.r - rb.l) <= TOL || Math.abs(ra.l - rb.r) <= TOL) && vOv;
+      var touchY = (Math.abs(ra.b - rb.t) <= TOL || Math.abs(ra.t - rb.b) <= TOL) && hOv;
+      return touchX || touchY;
+    }
+    var startK = null;
+    keys.forEach(function (k) { if (wins[k].el === start) startK = k; });
+    var seen = {}, queue = startK ? [startK] : [];
+    if (startK) seen[startK] = 1;
+    while (queue.length) {
+      var c = queue.shift();
+      keys.forEach(function (k) { if (!seen[k] && adjacent(c, k)) { seen[k] = 1; queue.push(k); } });
+    }
+    return Object.keys(seen).map(function (k) { var e = wins[k].el; return { el: e, sl: e.offsetLeft, st: e.offsetTop }; });
+  }
+
   function makeDraggable(el, handle) {
-    var ox = 0, oy = 0, dragging = false;
+    var ox = 0, oy = 0, dragging = false, cluster = [], sl0 = 0, st0 = 0;
     handle.addEventListener("mousedown", function (e) {
       if (e.button !== 0 || e.target.closest(".wa-tbtn, .wa-skinsel")) return;
       dragging = true;
       var r = el.getBoundingClientRect();
       ox = e.clientX - r.left; oy = e.clientY - r.top;
+      cluster = attachedCluster(el);          // group that moves with this window
+      sl0 = el.offsetLeft; st0 = el.offsetTop; // dragged window's start position
       el.classList.add("dragging");
       shield(true, "move");
       e.preventDefault();
     });
     window.addEventListener("mousemove", function (e) {
       if (!dragging) return;
-      var x = e.clientX - ox, y = e.clientY - oy;
-      var pos = snap(el, x, y);
-      el.style.left = pos.x + "px"; el.style.top = pos.y + "px";
+      var pos = snap(el, e.clientX - ox, e.clientY - oy, cluster);
+      var dx = pos.x - sl0, dy = pos.y - st0;   // apply the same delta to every member
+      cluster.forEach(function (m) { m.el.style.left = (m.sl + dx) + "px"; m.el.style.top = (m.st + dy) + "px"; });
     });
     var stop = function () {
       if (!dragging) return;
@@ -176,13 +209,17 @@
 
   // Magnetic docking: snap the dragged window's edges to the viewport and to the
   // other windows' edges when within SNAP px (Winamp's signature behavior).
-  function snap(el, x, y) {
+  // Windows in `cluster` (the group moving together) are excluded as snap
+  // targets so the group never snaps to itself.
+  function snap(el, x, y, cluster) {
+    var excl = {};
+    (cluster || []).forEach(function (m) { excl[m.el.id] = 1; });
     var w = el.offsetWidth, hgt = el.offsetHeight;
     var vw = window.innerWidth, vh = window.innerHeight;
     var L = x, T = y, R = x + w, B = y + hgt;
     var cand = [{ l: 0, t: 0, r: vw, b: vh }]; // viewport
     Object.keys(wins).forEach(function (k) {
-      if (wins[k].el === el) return;
+      if (wins[k].el === el || excl[wins[k].el.id] || wins[k].el.style.display === "none") return;
       var o = wins[k].el; var r = { l: o.offsetLeft, t: o.offsetTop, r: o.offsetLeft + o.offsetWidth, b: o.offsetTop + o.offsetHeight };
       cand.push(r);
     });
@@ -235,9 +272,9 @@
     var defaults = {
       "wa-main": { x: 40, y: 70 },
       "wa-eq": { x: 40, y: 250 },
-      "wa-viz": { x: 480, y: 70, w: 360, h: 280 },
-      "wa-pl": { x: 40, y: 430, w: 430, h: 220 },
-      "wa-lib": { x: 480, y: 370, w: 380, h: 300, hidden: true },
+      "wa-viz": { x: 514, y: 70, w: 360, h: 280 },
+      "wa-pl": { x: 40, y: 430, w: 466, h: 220 },
+      "wa-lib": { x: 514, y: 370, w: 380, h: 300, hidden: true },
     };
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
