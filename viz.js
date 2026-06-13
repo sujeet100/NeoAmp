@@ -123,6 +123,7 @@
   const nameEl = document.getElementById("name");
   const titleEl = document.getElementById("title");
   const artistEl = document.getElementById("artist");
+  const artEl = document.getElementById("art");
   const curEl = document.getElementById("cur");
   const durEl = document.getElementById("dur");
   const seekEl = document.getElementById("seek");
@@ -158,8 +159,10 @@
     const artist = (t.artist || "").trim();
     titleEl.textContent = title ? "♪ " + title : "♪ —";
     artistEl.textContent = artist;
+    if (t.art && artEl.src !== t.art) artEl.src = t.art;   // only on change (avoid reload flicker)
+    artEl.classList.toggle("show", !!t.art);
     playEl.textContent = t.paused ? "▶" : "⏸";
-    playEl.title = (t.paused ? "Play" : "Pause") + " (P)";
+    playEl.title = (t.paused ? "Play" : "Pause") + " (Space)";
     trackDur = t.duration || 0;
     durEl.textContent = fmtTime(trackDur);
     if (!seeking) {
@@ -391,7 +394,8 @@
 
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") post({ type: "close" });
-    else if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); step(1); }
+    else if (e.key === " ") { e.preventDefault(); post({ type: "playpause" }); }
+    else if (e.key === "ArrowRight") step(1);
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "r" || e.key === "R") randomPreset();
     else if (e.key === "f" || e.key === "F") toggleFav();

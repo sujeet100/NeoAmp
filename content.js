@@ -76,6 +76,11 @@
     iframe = document.createElement("iframe");
     iframe.id = "ytm-wmp-frame";
     iframe.src = chrome.runtime.getURL("viz.html");
+    // Belt-and-suspenders against a focus ring on the iframe (the "yellow
+    // border") — set inline too so it applies without an overlay.css reload.
+    iframe.style.outline = "none";
+    iframe.style.border = "0";
+    iframe.setAttribute("frameborder", "0");
     document.documentElement.appendChild(iframe);
 
     window.addEventListener("message", onMsg);
@@ -106,12 +111,15 @@
     const v = document.querySelector("video");
     const titleEl = document.querySelector("ytmusic-player-bar .title");
     const bylineEl = document.querySelector("ytmusic-player-bar .byline");
+    const artEl = document.querySelector("ytmusic-player-bar img.image") ||
+      document.querySelector("ytmusic-player-bar img");
     const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
     // The byline is "Artist • Album • Year • plays" — keep just the artist part.
     const artist = clean(bylineEl && bylineEl.textContent).split("•")[0].trim();
     return {
       title: clean(titleEl && titleEl.textContent),
       artist: artist,
+      art: artEl ? artEl.src : "",
       currentTime: v ? v.currentTime : 0,
       duration: v && isFinite(v.duration) ? v.duration : 0,
       paused: v ? v.paused : true,

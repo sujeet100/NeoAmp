@@ -23,7 +23,13 @@
 
     /* Stacked rows: song title, artist, seek bar, then controls — so the full
        song name always has the bar's whole width and is never truncated. */
-    #songinfo { text-align: center; }
+    #songinfo { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    #art {
+      width: 46px; height: 46px; flex: 0 0 auto; border-radius: 6px; object-fit: cover;
+      box-shadow: 0 2px 8px rgba(0,0,0,.5); display: none;
+    }
+    #art.show { display: block; }
+    #meta { min-width: 0; text-align: left; }
     #title {
       color: #fff; font-weight: 700; font-size: 14px; line-height: 1.25;
       word-break: break-word;
@@ -85,10 +91,14 @@
   <canvas id="c"></canvas>
   <div id="bar">
     <div id="songinfo">
-      <div id="title">♪ —</div>
-      <div id="artist"></div>
+      <img id="art" alt="" />
+      <div id="meta">
+        <div id="title">♪ —</div>
+        <div id="artist"></div>
+      </div>
     </div>
     <div id="seekrow">
+      <button class="btn" id="playpause" title="Play / Pause (Space)">⏸</button>
       <span id="cur" class="tcode">0:00</span>
       <input id="seek" type="range" min="0" max="1000" value="0" step="1" title="Seek" />
       <span id="dur" class="tcode">0:00</span>
@@ -98,10 +108,9 @@
       <span class="favs" id="favs"></span>
       <span class="ctrls">
         <button class="btn" id="star" title="Mark/unmark this preset as favorite (F)">☆</button>
-        <button class="btn" id="playpause" title="Play / Pause (P)">⏸</button>
         <button class="btn" id="prev" title="Previous preset (←)">⏮</button>
         <button class="btn" id="rand" title="Random preset (R)">🎲</button>
-        <button class="btn" id="next" title="Next preset (→ / Space)">⏭</button>
+        <button class="btn" id="next" title="Next preset (→)">⏭</button>
         <button class="btn" id="close" title="Close (Esc)">✕</button>
       </span>
     </div>

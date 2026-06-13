@@ -711,43 +711,136 @@
   })();
 
   // ── Ambience Thingus ─────────────────────────────────────────────────────
-  // Smooth yellow swirl on black: a smooth circular waveform churned by a warp
-  // and long feedback into spiraling liquid light, tinted by the amber ramp.
-  P["Ambience Thingus"] = build(
-    {
-      wave_mode: 0, wave_smoothing: 0.92, wave_scale: 0.6, additivewave: 1,
-      wave_r: 1.0, wave_g: 0.85, wave_b: 0.3, wave_a: 0.6,
-      decay: 0.96, gammaadj: 1.8,
-      zoom: 1.01, rot: 0.06, warp: 0.18, warpscale: 1.4, warpanimspeed: 0.7,
-      cx: 0.5, cy: 0.5, darken_center: 0, wrap: 1
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        var treb = t.treb || 1;
-        t.rot = 0.04 + 0.05 * Math.sin(t.time * 0.3);
-        t.zoom = 1.0 + 0.02 * Math.sin(t.time * 0.5) + 0.01 * bass;
-        t.warp = 0.14 + 0.08 * treb;
-        t.decay = 0.96;
-        t.wave_g = 0.8 + 0.1 * bass;
-        return t;
+  // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
+  //   • Exactly TWO jagged WHITE lightning lines crossing through dead center
+  //     (= 4 arms radiating) — the live audio waveform, displaced perpendicular
+  //     to each line. They cross cleanly at a single sharp centre (NO spiral eye).
+  //   • Slow rotation + long decay smears the lines' trails into 4 soft, broad
+  //     fluid arms behind them. Pure rotation only — no angular swirl (which
+  //     produced extra vortex eyes). The bolt + its fresh trail glow white,
+  //     fading out to the hue.
+  //   • The whole frame is filled with a single GLOBAL hue that jumps to a RANDOM
+  //     new hue every few seconds (crossfaded). Vivid monochrome (NOT amber),
+  //     fading to a dark hue when the music drops.
+  //   • Bass "breathes" the zoom slightly; rotation is slow CCW.
+  P["Ambience Thingus"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,                 // primary waveform off; the two custom lines draw the cross
+        decay: 0.94,               // trails smear into soft arms, but short enough to stay clean
+        gammaadj: 1.4,
+        zoom: 1.0, rot: 0.01, warp: 0.02, warpscale: 1.2, warpanimspeed: 0.4,
+        // wrap:0 — wrapping was smearing off-edge pixels back as blocky edge
+        // artifacts; clamp instead so the spiral dissipates cleanly into the void.
+        cx: 0.5, cy: 0.5, darken_center: 0, wrap: 0
       },
-      warp:
-        "shader_body {\n" +
-        "vec2 w = uv + 0.010 * vec2(sin(uv.y*8.0 + time*0.8), cos(uv.x*8.0 + time*0.6));\n" +
-        "ret = texture2D(sampler_main, w).rgb;\n" +
-        "ret -= 0.003;\n" +
-        "}\n",
-      comp:
-        AMBER_RAMP +
-        "shader_body {\n" +
-        "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-        "float v = dot(src, vec3(0.33)) * (1.0 + 0.4*bass);\n" +
-        "v += 0.05 * sin(time*0.4);\n" +
-        "ret = amber_ramp(v);\n" +
-        "}\n"
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var treb = t.treb_att || t.treb || 1;
+          t.q1 = t.time * 0.28;                            // the CROSS visibly rotates CCW
+          t.q5 = 0.72;                                     // half-length (reaches the edges)
+          t.q6 = 0.10 + 0.30 * Math.min(0.6 * treb + 0.4 * mid, 2.4); // waveform amplitude (the jaggedness)
+          t.q7 = 0.06 + 0.04 * bass;                       // gentle S-bend depth
+          t.q10 = Math.min(0.6 + 0.7 * bass, 1.5);         // bolt brightness PULSES with bass
+          // The LINES rotate (q1); the feedback/background is NOT rotated (rot=0)
+          // so it doesn't spin under them — matches the original.
+          t.rot = 0.0;
+          t.zoom = 1.0 + 0.035 * (bass - 1.0);             // beat zoom breathe (back by request)
+          t.decay = 0.90;                                  // faster fade -> deeper void, less fuzzy mesh
+          return t;
+        },
+        // Just a gentle feedback fade (rotation handles the smear). No angular
+        // swirl or jitter — those broke the single radial centre into many eyes.
+        warp:
+          "shader_body {\n" +
+          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "ret -= 0.005;\n" +
+          "}\n",
+        // THICK lines: dilate the bright feedback by taking the max luminance over
+        // a ring of taps (radius in screen pixels), so a thin bolt becomes a fat
+        // band. The radius PULSES with the bass (thicker on the beat). Then fill
+        // the WHOLE frame with one global hue that jumps to a RANDOM new hue every
+        // ~6s (crossfaded); dim feedback keeps the hue, only the fat bolt glows
+        // white. Slightly desaturated (vivid, not neon); soft tonemap.
+        comp:
+          "float h1d(float x){ return fract(sin(x*12.9898)*43758.5453); }\n" +
+          "float lc(vec3 c){ return max(c.r, max(c.g, c.b)); }\n" +
+          PAL_GLSL +
+          "shader_body {\n" +
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float R = 9.0 + 20.0 * bass;\n" +                       // line thickness (px), pulses hard w/ bass
+          "vec2 ips = vec2(1.0 / resolution.x, 1.0 / resolution.y);\n" +
+          "float lum = lc(src);\n" +
+          // Two rings (R and 0.5R) x 8 directions -> a SOLID fat band, not sparse.
+          "for (int ri = 0; ri < 2; ri++) {\n" +
+          "  float rr = R * (ri == 0 ? 1.0 : 0.5);\n" +
+          "  vec2 ex = vec2(rr, 0.0) * ips;\n" +
+          "  vec2 ey = vec2(0.0, rr) * ips;\n" +
+          "  vec2 ed = vec2(rr * 0.7071) * ips;\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv + ex).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv - ex).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv + ey).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv - ey).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv + ed).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv - ed).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv + vec2(ed.x, -ed.y)).rgb));\n" +
+          "  lum = max(lum, lc(texture2D(sampler_main, uv - vec2(ed.x, -ed.y)).rgb));\n" +
+          "}\n" +
+          "float seg = time / 6.0;\n" +                            // new random hue every ~6s
+          "float i0 = floor(seg);\n" +
+          "float f = smoothstep(0.0, 1.0, fract(seg));\n" +
+          "float h = mix(h1d(i0), h1d(i0 + 1.0), f);\n" +          // random hue, crossfaded
+          "vec3 base = pal(h);\n" +
+          "base = pow(base, vec3(1.5));\n" +                       // deepen (rich, not pastel)
+          "float bl = dot(base, vec3(0.333));\n" +
+          "base = clamp(bl + (base - bl) * 1.7, 0.0, 1.0);\n" +    // boost saturation (kill muddy grays)
+          "float fill = (0.12 + 0.20 * bass) + 0.5 * lum;\n" +     // DEEP saturated hue field
+          "vec3 col = base * fill;\n" +
+          "col += vec3(1.0) * smoothstep(0.45, 0.95, lum) * 0.9;\n" + // the fat bolt pops stark WHITE
+          "col = col / (col + 0.8);\n" +                           // gentler tonemap (less washout)
+          "ret = col;\n" +
+          "}\n"
+      }
+    );
+
+    // One full lightning line through center at angle (q1 + offset): the live
+    // waveform drawn from -len..+len, displaced PERPENDICULAR by the sample
+    // (little wander near the centre, more toward the ends). White; the comp
+    // tints the rest of the frame. Two of these (0 and 90deg) make the 4-arm X.
+    function crossLine(offset, useV2) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 1.0, thick: 1, r: 1.0, g: 1.0, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var th = (a.q1 || 0) + offset;
+          var ct = Math.cos(th), st = Math.sin(th);
+          var s = a.sample * 2.0 - 1.0;                      // -1 .. +1 through centre
+          var len = (a.q5 || 0.7);
+          var amp = (a.q6 || 0.12);
+          var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          // Overall S-shape: sin(s*PI) is 0 at the centre and bends one way on each
+          // half -> a smooth S. The live waveform jaggedness rides on top (also 0
+          // at centre so the two lines still cross cleanly).
+          var bend = (a.q7 || 0.1) * Math.sin(s * Math.PI);
+          var disp = bend + samp * amp * Math.abs(s);
+          a.x = 0.5 + s * len * ct - disp * st;
+          a.y = 0.5 + s * len * st + disp * ct;
+          var w = (a.q10 !== undefined ? a.q10 : 1);
+          a.r = w; a.g = w; a.b = w;
+          return a;
+        }
+      };
     }
-  );
+    preset.waves[0] = crossLine(0, false);
+    preset.waves[1] = crossLine(Math.PI * 0.5, true);
+    return preset;
+  })();
 
   // ── Ambience Water ────────────────────────────────────────────────────────
   // Soft yellow pool caustics: layered sine ripples, no rotation, luminous.
