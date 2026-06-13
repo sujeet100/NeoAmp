@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
   "name": "NeoAmp — Music Visualizer",
-  "version": "0.2.0",
-  "description": "NeoAmp overlays MilkDrop (Butterchurn) visualizations on YouTube Music, including hand-authored recreations of classic Windows Media Player visualizers (Alchemy / Battery / Ambience).",
+  "version": "0.3.0",
+  "description": "NeoAmp overlays a Winamp-style player + MilkDrop (Butterchurn) visualizations on YouTube Music, including hand-authored recreations of classic Windows Media Player visualizers (Alchemy / Battery / Ambience).",
   "permissions": ["storage"],
   "host_permissions": ["https://music.youtube.com/*"],
   "content_scripts": [
     {
       "matches": ["https://music.youtube.com/*"],
-      "js": ["content.js"],
-      "css": ["overlay.css"],
+      "js": ["skins.js", "content.js", "winamp.js"],
+      "css": ["overlay.css", "winamp.css"],
       "run_at": "document_idle"
     }
   ],
@@ -25,6 +25,7 @@
         "viz.html",
         "viz.js",
         "wmp-presets.js",
+        "fonts/VT323-Regular.ttf",
         "vendor/butterchurn.min.js",
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",

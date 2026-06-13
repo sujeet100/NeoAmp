@@ -1,0 +1,300 @@
+/* NeoAmp — Winamp-style player skin, fully dynamic (no bitmaps).
+ *
+ * SKINNING MODEL — everything visual is a CSS custom property declared on
+ * #neoamp-root. A "skin" (see skins.js) is just a bag of these variables that
+ * we set with element.style.setProperty(); swapping a skin re-themes the whole
+ * UI without touching markup. The defaults below ARE the classic green skin.
+ *
+ * Scope: every selector lives under #neoamp-root so injecting this into the
+ * live YouTube Music page can't restyle YTM. The root is a full-viewport layer
+ * with pointer-events:none; only the windows accept the pointer, so the real
+ * page underneath stays clickable in the gaps.
+ *
+ * The 90s metallic look is faked procedurally: linear-gradients for the brushed
+ * bezels, inset/outset box-shadows for the chunky 3D borders, an inset-dark
+ * "screen" + glowing monospace for the LCD, and inline SVG (see winamp.js) for
+ * crisp, scalable transport icons.
+ */
+
+@font-face {
+  font-family: "NeoAmp LCD";
+  src: url("fonts/VT323-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+#neoamp-root {
+  /* ---- skin variables (classic green defaults) ---------------------- */
+  --wa-font: "Lucida Console", "DejaVu Sans Mono", "Courier New", monospace;
+  --wa-lcd-font: "NeoAmp LCD", "Lucida Console", monospace;
+
+  --wa-win-bg: linear-gradient(180deg, #3b3b4d 0%, #2a2a38 5%, #23232f 100%);
+  --wa-win-border: #0c0c12;
+  --wa-bevel-light: rgba(255, 255, 255, 0.30);
+  --wa-bevel-dark: rgba(0, 0, 0, 0.80);
+  --wa-win-shadow: 0 8px 26px rgba(0, 0, 0, 0.6);
+
+  --wa-title-bg: linear-gradient(180deg, #4a5fb0 0%, #2c3a82 45%, #1d2864 55%, #243070 100%);
+  --wa-title-bg-off: linear-gradient(180deg, #555562 0%, #3a3a47 50%, #2e2e3a 100%);
+  --wa-title-fg: #d6deff;
+  --wa-logo-fg: #9fb4ff;
+
+  --wa-fg: #c9c9d6;
+  --wa-fg-dim: #8a8a9a;
+
+  --wa-lcd: #00ff4a;
+  --wa-lcd-glow: rgba(0, 255, 74, 0.7);
+
+  --wa-inset-bg: #050507;
+
+  --wa-btn-bg: linear-gradient(180deg, #44445a 0%, #2b2b39 50%, #232330 100%);
+  --wa-btn-active-bg: linear-gradient(180deg, #1c1c26 0%, #2b2b39 100%);
+  --wa-btn-fg: #d7d7e2;
+  --wa-accent: #00ff4a;
+  --wa-accent-glow: rgba(0, 255, 74, 0.55);
+
+  --wa-track-bg: linear-gradient(180deg, #14141c, #24242f);
+  --wa-thumb-bg: linear-gradient(180deg, #ffe08a 0%, #e0a300 50%, #9c6f00 100%);
+  --wa-thumb-border: #4a3500;
+
+  --wa-analyzer-bg: #08080c;
+  --wa-bar-lo: #00ff4a;
+  --wa-bar-hi: #ffe000;
+  --wa-bar-peak: #ff5050;
+
+  /* ---- layer setup -------------------------------------------------- */
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;          /* above YTM's own chrome */
+  pointer-events: none;          /* page underneath stays usable */
+  font-family: var(--wa-font);
+  -webkit-font-smoothing: none;
+}
+
+/* ---- generic window chrome --------------------------------------------- */
+.wa-win {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--wa-win-bg);
+  border: 1px solid var(--wa-win-border);
+  border-radius: 2px;
+  box-shadow:
+    inset 1px 1px 0 var(--wa-bevel-light),
+    inset -1px -1px 0 var(--wa-bevel-dark),
+    var(--wa-win-shadow);
+  color: var(--wa-fg);
+  user-select: none;
+}
+.wa-win.dragging { opacity: 0.97; }
+
+.wa-titlebar {
+  height: 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  cursor: move;
+  background: var(--wa-title-bg);
+  border-bottom: 1px solid var(--wa-win-border);
+  box-shadow: inset 0 1px 0 var(--wa-bevel-light);
+}
+.wa-win.inactive .wa-titlebar { background: var(--wa-title-bg-off); }
+.wa-title {
+  flex: 1 1 auto;
+  font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--wa-title-fg);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wa-title .wa-logo { color: var(--wa-logo-fg); margin-right: 5px; letter-spacing: 0; }
+
+.wa-tbtns { display: flex; gap: 2px; flex: 0 0 auto; }
+.wa-tbtn {
+  width: 13px; height: 12px;
+  display: grid; place-items: center;
+  font: 700 9px/1 var(--wa-font);
+  color: var(--wa-title-fg);
+  background: var(--wa-title-bg);
+  border: 1px solid var(--wa-win-border); border-radius: 1px;
+  cursor: pointer;
+}
+.wa-tbtn:hover { filter: brightness(1.2); }
+.wa-tbtn:active { filter: brightness(0.8); }
+
+.wa-body { padding: 6px; }
+
+/* recessed inset "screen" */
+.wa-inset {
+  background: var(--wa-inset-bg);
+  border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9), inset -1px -1px 0 var(--wa-bevel-light);
+  border-radius: 1px;
+}
+
+/* glowing LCD text */
+.wa-lcd {
+  font-family: var(--wa-lcd-font);
+  color: var(--wa-lcd);
+  text-shadow: 0 0 5px var(--wa-lcd-glow), 0 0 1px var(--wa-lcd-glow);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =======================================================================
+   MAIN WINDOW
+   ======================================================================= */
+#wa-main { width: 420px; }
+#wa-main .wa-main-grid { display: grid; grid-template-columns: 64px 1fr; gap: 6px; }
+
+.wa-clock {
+  font-size: 30px; line-height: 1; font-weight: 400; letter-spacing: 2px;
+  text-align: center; padding: 4px 0 2px;
+}
+.wa-art {
+  margin-top: 6px; width: 64px; height: 64px;
+  position: relative; overflow: hidden; background: #050507;
+  border: 1px solid #000;
+}
+.wa-art img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  image-rendering: pixelated; filter: saturate(1.05) contrast(1.02);
+}
+.wa-art::after {                  /* faint CRT scanlines */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 1px, rgba(0,0,0,0.28) 1px 2px);
+}
+.wa-art.empty img { display: none; }
+
+.wa-rcol { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.wa-marquee { height: 18px; overflow: hidden; padding: 0 5px; display: flex; align-items: center; }
+.wa-marquee-track {
+  white-space: nowrap; font-family: var(--wa-lcd-font);
+  font-size: 15px; letter-spacing: 1px; color: var(--wa-lcd);
+  text-shadow: 0 0 4px var(--wa-lcd-glow); will-change: transform;
+}
+
+.wa-midrow { display: flex; gap: 6px; align-items: stretch; }
+.wa-analyzer { width: 130px; height: 36px; display: block; background: var(--wa-analyzer-bg); }
+.wa-bitbox {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding: 2px 6px; font-family: var(--wa-lcd-font); font-size: 13px; letter-spacing: 1px;
+}
+.wa-bitline { display: flex; gap: 10px; color: var(--wa-lcd); text-shadow: 0 0 4px var(--wa-lcd-glow); }
+.wa-stereo { display: flex; gap: 8px; margin-left: auto; color: var(--wa-lcd); }
+.wa-stereo span { opacity: 0.22; }
+.wa-stereo span.on { opacity: 1; text-shadow: 0 0 4px var(--wa-lcd-glow); }
+
+.wa-posbar { padding: 3px 5px 0; }
+
+/* native range sliders, themed */
+.wa-range {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 9px;
+  background: var(--wa-track-bg);
+  border: 1px solid #000; box-shadow: inset 0 1px 2px rgba(0,0,0,0.85);
+  border-radius: 1px; outline: none; cursor: pointer;
+}
+.wa-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 11px; height: 15px;
+  background: var(--wa-thumb-bg);
+  border: 1px solid var(--wa-thumb-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+  border-radius: 1px; cursor: pointer;
+}
+.wa-range::-moz-range-thumb {
+  width: 11px; height: 15px; background: var(--wa-thumb-bg);
+  border: 1px solid var(--wa-thumb-border); border-radius: 1px; cursor: pointer;
+}
+
+.wa-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 5px 2px; }
+.wa-transport { display: flex; gap: 2px; }
+.wa-btn {
+  min-width: 28px; height: 24px; padding: 0 5px;
+  display: grid; place-items: center;
+  color: var(--wa-btn-fg); background: var(--wa-btn-bg);
+  border: 1px solid var(--wa-win-border); border-radius: 2px;
+  box-shadow: inset 1px 1px 0 var(--wa-bevel-light), inset -1px -1px 0 rgba(0,0,0,0.45);
+  cursor: pointer;
+}
+.wa-btn svg { width: 13px; height: 13px; fill: currentColor; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); pointer-events: none; }
+.wa-btn:hover { filter: brightness(1.14); }
+.wa-btn:active, .wa-btn.active {
+  background: var(--wa-btn-active-bg);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7);
+  color: var(--wa-accent);
+}
+.wa-btn.active svg { filter: drop-shadow(0 0 4px var(--wa-accent-glow)); }
+
+.wa-vols { display: flex; gap: 8px; align-items: center; flex: 1 1 auto; }
+.wa-vol { flex: 2 1 0; }
+.wa-bal { flex: 1 1 0; }
+
+.wa-toggles { display: flex; gap: 4px; }
+.wa-tog {
+  height: 22px; padding: 0 7px;
+  font: 700 9px/1 var(--wa-font); letter-spacing: 1px;
+  display: grid; place-items: center; color: var(--wa-fg-dim); cursor: pointer;
+  background: var(--wa-btn-bg); border: 1px solid var(--wa-win-border); border-radius: 2px;
+  box-shadow: inset 1px 1px 0 var(--wa-bevel-light);
+}
+.wa-tog.on { color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow); box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7); }
+
+/* =======================================================================
+   EQUALIZER WINDOW (cosmetic)
+   ======================================================================= */
+#wa-eq { width: 420px; }
+.wa-eq-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.wa-eq-curve { flex: 1 1 auto; height: 28px; display: block; }
+.wa-eq-bands { display: flex; gap: 6px; align-items: flex-end; justify-content: space-between; padding: 4px 8px; }
+.wa-eq-band { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wa-vrange {
+  -webkit-appearance: none; appearance: none;
+  writing-mode: vertical-lr; direction: rtl;
+  width: 9px; height: 64px;
+  background: var(--wa-track-bg); border: 1px solid #000;
+  box-shadow: inset 0 0 2px rgba(0,0,0,0.85); outline: none; cursor: pointer;
+}
+.wa-vrange::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 15px; height: 10px;
+  background: var(--wa-thumb-bg); border: 1px solid var(--wa-thumb-border); cursor: pointer;
+}
+.wa-vrange::-moz-range-thumb {
+  width: 15px; height: 10px; background: var(--wa-thumb-bg);
+  border: 1px solid var(--wa-thumb-border); cursor: pointer;
+}
+.wa-eq-label { font-size: 8px; color: var(--wa-fg-dim); }
+
+/* =======================================================================
+   VISUALIZATION WINDOW (Butterchurn iframe lives in the body)
+   ======================================================================= */
+#wa-viz { width: 360px; height: 280px; display: flex; flex-direction: column; min-width: 200px; min-height: 150px; }
+#wa-viz .wa-body { flex: 1 1 auto; padding: 3px; display: flex; min-height: 0; }
+.wa-viz-frame {
+  flex: 1 1 auto; width: 100%; height: 100%;
+  border: 1px solid #000; background: #000; display: block;
+}
+.wa-resize {
+  position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 45%, var(--wa-bevel-light) 45% 55%, transparent 55%,
+    transparent 65%, var(--wa-bevel-light) 65% 75%, transparent 75%);
+}
+
+/* skin picker (in the main titlebar) */
+.wa-skinsel {
+  font: 700 8px/1 var(--wa-font); color: var(--wa-title-fg);
+  background: rgba(0,0,0,0.25); border: 1px solid var(--wa-win-border); border-radius: 1px;
+  padding: 1px 2px; margin-right: 4px; cursor: pointer;
+}
+
+/* =======================================================================
+   LAUNCHER
+   ======================================================================= */
+#neoamp-launch {
+  position: fixed; right: 18px; bottom: 18px; z-index: 2147483601; pointer-events: auto;
+  font: 700 12px/1 "Lucida Console", monospace; letter-spacing: 1px;
+  color: #d6deff; padding: 9px 13px;
+  background: linear-gradient(180deg, #4a5fb0, #1d2864);
+  border: 1px solid #0c0c12; border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 14px rgba(0,0,0,0.5);
+  cursor: pointer;
+}
+#neoamp-launch:hover { filter: brightness(1.12); }

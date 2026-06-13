@@ -1,38 +1,6 @@
-/* Content-script chrome: launcher button, the fullscreen visualizer iframe,
- * and toasts. The visualizer UI itself lives inside viz.html. */
-
-#ytm-wmp-launch {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 2147483646;
-  font: 600 12px/1 "Tahoma", "Segoe UI", system-ui, sans-serif;
-  letter-spacing: .04em;
-  color: #d6ffe6;
-  background: linear-gradient(180deg, #2a3a52 0%, #15202e 100%);
-  border: 1px solid #3c5a78;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
-}
-#ytm-wmp-launch:hover { background: linear-gradient(180deg, #34587a 0%, #1b2b3d 100%); }
-
-#ytm-wmp-frame {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  border: 0;
-  /* Suppress the browser's focus ring on the iframe (shows as a yellow border
-     in Arc/Chrome when the iframe takes keyboard focus). */
-  outline: none;
-  margin: 0;
-  z-index: 2147483647;
-  background: #000;
-}
-#ytm-wmp-frame:focus,
-#ytm-wmp-frame:focus-visible { outline: none; }
+/* Content-script chrome: just the transient toast. The launcher button and all
+ * player windows are styled by winamp.css; the Butterchurn canvas lives inside
+ * the viz window's iframe (viz.html). */
 
 .ytm-wmp-toast {
   position: fixed;

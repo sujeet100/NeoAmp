@@ -3,117 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WMP Visualizer</title>
+  <title>NeoAmp Visualizer</title>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
     #c { position: fixed; top: 0; left: 0; display: block; width: 100%; height: 100%; }
 
+    /* Compact preset strip pinned to the bottom of the canvas; auto-hides. The
+       window chrome (titlebar, close, resize) is provided by the parent page. */
     #bar {
-      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
-      display: flex; flex-direction: column; gap: 8px;
-      width: min(720px, 94vw);
-      padding: 10px 14px;
-      background: linear-gradient(180deg, rgba(28,40,56,.92), rgba(10,16,24,.92));
-      border: 1px solid #3c5a78; border-radius: 10px;
-      box-shadow: 0 6px 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1);
-      font: 12px/1 "Tahoma", "Segoe UI", system-ui, sans-serif; color: #cfe9ff;
-      transition: opacity .4s ease; user-select: none;
+      position: fixed; left: 8px; right: 8px; bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 7px;
+      background: linear-gradient(180deg, rgba(20,20,28,.88), rgba(8,8,12,.88));
+      border: 1px solid rgba(255,255,255,.12); border-radius: 4px;
+      font: 11px/1 "Lucida Console", monospace; color: #cfe0ff;
+      transition: opacity .3s ease; user-select: none;
     }
     #bar.hidden { opacity: 0; pointer-events: none; }
-
-    /* Stacked rows: song title, artist, seek bar, then controls — so the full
-       song name always has the bar's whole width and is never truncated. */
-    #songinfo { display: flex; align-items: center; justify-content: center; gap: 12px; }
-    #art {
-      width: 46px; height: 46px; flex: 0 0 auto; border-radius: 6px; object-fit: cover;
-      box-shadow: 0 2px 8px rgba(0,0,0,.5); display: none;
-    }
-    #art.show { display: block; }
-    #meta { min-width: 0; text-align: left; }
-    #title {
-      color: #fff; font-weight: 700; font-size: 14px; line-height: 1.25;
-      word-break: break-word;
-    }
-    #artist { color: #9bd0ff; font-size: 12px; font-weight: 600; margin-top: 2px; word-break: break-word; }
-    #artist:empty { display: none; }
-
-    #seekrow { display: flex; align-items: center; gap: 10px; }
-    .tcode { color: #9bd0ff; font-variant-numeric: tabular-nums; min-width: 38px; }
-    #cur { text-align: right; }
-    #dur { text-align: left; }
-    #seek {
-      flex: 1 1 auto; appearance: none; -webkit-appearance: none; height: 6px;
-      border-radius: 4px; background: #20364c; outline: none; cursor: pointer;
-    }
-    #seek::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none; width: 14px; height: 14px;
-      border-radius: 50%; background: linear-gradient(180deg, #bfe0ff, #3f86d6);
-      border: 1px solid #245f99; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.5);
-    }
-    #seek::-moz-range-thumb {
-      width: 14px; height: 14px; border-radius: 50%;
-      background: linear-gradient(180deg, #bfe0ff, #3f86d6);
-      border: 1px solid #245f99; cursor: pointer;
-    }
-
-    #controls { display: flex; align-items: center; gap: 10px; }
-    #name {
-      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-      white-space: nowrap; color: #6f9bb8; font-size: 11px; font-weight: 600;
-    }
-    #name::before { content: "◢◤ "; }
-    .favs { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; }
     .fav-select {
-      font: 600 12px/1 "Tahoma", system-ui, sans-serif; color: #07131d;
-      background: linear-gradient(180deg, #bfe0ff, #3f86d6);
-      border: 1px solid #245f99; border-radius: 5px; padding: 6px 28px 6px 10px;
-      /* The option list holds hundreds of long preset names; cap + allow shrink
-         so the <select> can't eat the row. */
-      cursor: pointer; width: 240px; max-width: 50vw; min-width: 0;
+      flex: 1 1 auto; min-width: 0; font: 600 11px/1 "Lucida Console", monospace;
+      color: #06101a; background: #cfe0ff; border: 1px solid #2a4a68;
+      border-radius: 3px; padding: 4px 6px; cursor: pointer;
       text-overflow: ellipsis; appearance: none; -webkit-appearance: none;
-      background-image: linear-gradient(180deg, #bfe0ff, #3f86d6),
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%2307131d'/></svg>");
-      background-repeat: no-repeat; background-position: right 9px center;
     }
-    .fav-select:hover { filter: brightness(1.08); }
-    .fav-select optgroup { font-style: normal; font-weight: 700; color: #0a2540; }
-    .fav-select option { color: #07131d; background: #dbecff; font-weight: 600; }
-    .ctrls { display: flex; gap: 6px; }
+    .fav-select optgroup { font-weight: 700; }
     .btn {
-      font-size: 13px; line-height: 1; color: #cfe9ff; background: #1b2b3d;
-      border: 1px solid #3c5a78; border-radius: 5px; padding: 6px 9px; cursor: pointer;
+      flex: 0 0 auto; font-size: 12px; line-height: 1; color: #cfe0ff;
+      background: #1b2433; border: 1px solid #3a4a60; border-radius: 3px;
+      padding: 4px 7px; cursor: pointer;
     }
-    .btn:hover { background: #25405a; }
-    #star.on { color: #ffe27a; border-color: #c9a23a; text-shadow: 0 0 6px rgba(255,226,122,.6); }
+    .btn:hover { background: #26344a; }
+    #star.on { color: #ffe27a; border-color: #c9a23a; }
   </style>
 </head>
 <body>
   <canvas id="c"></canvas>
   <div id="bar">
-    <div id="songinfo">
-      <img id="art" alt="" />
-      <div id="meta">
-        <div id="title">♪ —</div>
-        <div id="artist"></div>
-      </div>
-    </div>
-    <div id="seekrow">
-      <button class="btn" id="playpause" title="Play / Pause (Space)">⏸</button>
-      <span id="cur" class="tcode">0:00</span>
-      <input id="seek" type="range" min="0" max="1000" value="0" step="1" title="Seek" />
-      <span id="dur" class="tcode">0:00</span>
-    </div>
-    <div id="controls">
-      <span id="name">loading…</span>
-      <span class="favs" id="favs"></span>
-      <span class="ctrls">
-        <button class="btn" id="star" title="Mark/unmark this preset as favorite (F)">☆</button>
-        <button class="btn" id="prev" title="Previous preset (←)">⏮</button>
-        <button class="btn" id="rand" title="Random preset (R)">🎲</button>
-        <button class="btn" id="next" title="Next preset (→)">⏭</button>
-        <button class="btn" id="close" title="Close (Esc)">✕</button>
-      </span>
-    </div>
+    <select class="fav-select" id="presetSel" title="Pick a visualization"></select>
+    <button class="btn" id="star" title="Favorite (F)">☆</button>
+    <button class="btn" id="prev" title="Previous (←)">◄</button>
+    <button class="btn" id="rand" title="Random (R)">🎲</button>
+    <button class="btn" id="next" title="Next (→)">►</button>
   </div>
 
   <script src="vendor/butterchurn.min.js"></script>
