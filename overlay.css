@@ -24,10 +24,15 @@
   width: 100vw;
   height: 100vh;
   border: 0;
+  /* Suppress the browser's focus ring on the iframe (shows as a yellow border
+     in Arc/Chrome when the iframe takes keyboard focus). */
+  outline: none;
   margin: 0;
   z-index: 2147483647;
   background: #000;
 }
+#ytm-wmp-frame:focus,
+#ytm-wmp-frame:focus-visible { outline: none; }
 
 .ytm-wmp-toast {
   position: fixed;

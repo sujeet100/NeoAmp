@@ -66,10 +66,9 @@
     );
   }
 
-  // TEST_PRESET loads by exact name so you can compare it 1:1 with the same
-  // preset on https://butterchurnviz.com (same butterchurn-presets package).
-  const TEST_PRESET = "Flexi + Martin - cascading decay swing";
-
+  // Curated hand-authored WMP presets, shown as named groups at the top of the
+  // picker. Every *bundled* MilkDrop preset is also listed (A–Z) further down,
+  // and user-starred presets get their own "★ Favorites" group above all.
   const FAVORITES = [
     { label: "Dance of the Freaky Circles ✦", wmp: "Dance of the Freaky Circles" },
     { label: "Dance of the Freaky Circles (Classic) ✦", wmp: "Dance of the Freaky Circles (Classic)" },
@@ -112,24 +111,63 @@
     { label: "Battery spider's last moment ✦", wmp: "Battery spider's last moment" },
     { label: "Battery the world ✦",           wmp: "Battery the world" },
     { label: "Battery back to the groove ✦",  wmp: "Battery back to the groove" },
-    { label: "TEST ▶ Cascading Decay Swing",  exact: TEST_PRESET },
   ];
 
   let viz = null, presets = {}, names = [], idx = 0, rafId = 0;
   let favSelect = null; // the preset dropdown, kept in sync with what's loaded
-  const favCursor = {};
+  const userFavs = new Set(); // preset names the user starred (persisted via content script)
   const latest = new Uint8Array(FFT_SIZE); // last received time-domain bytes
   const audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
 
   const canvas = document.getElementById("c");
   const nameEl = document.getElementById("name");
+  const titleEl = document.getElementById("title");
+  const artistEl = document.getElementById("artist");
+  const curEl = document.getElementById("cur");
+  const durEl = document.getElementById("dur");
+  const seekEl = document.getElementById("seek");
+  const starEl = document.getElementById("star");
+  const playEl = document.getElementById("playpause");
   const bar = document.getElementById("bar");
-  let hideTimer;
+  let hideTimer, trackDur = 0, seeking = false;
 
   function showBar() {
     bar.classList.remove("hidden");
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => bar.classList.add("hidden"), 3500);
+  }
+
+  // mm:ss for the seek-bar time codes.
+  function fmtTime(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  // Paint the played portion of the native range track (it doesn't fill itself).
+  function setSeekFill(pct) {
+    pct = Math.max(0, Math.min(100, pct));
+    seekEl.style.background =
+      "linear-gradient(90deg, #3f86d6 " + pct + "%, #20364c " + pct + "%)";
+  }
+
+  // Now-playing title/artist + playback position pushed from the content script.
+  function onTrack(t) {
+    const title = (t.title || "").trim();
+    const artist = (t.artist || "").trim();
+    titleEl.textContent = title ? "♪ " + title : "♪ —";
+    artistEl.textContent = artist;
+    playEl.textContent = t.paused ? "▶" : "⏸";
+    playEl.title = (t.paused ? "Play" : "Pause") + " (P)";
+    trackDur = t.duration || 0;
+    durEl.textContent = fmtTime(trackDur);
+    if (!seeking) {
+      curEl.textContent = fmtTime(t.currentTime);
+      const pct = trackDur > 0 ? (t.currentTime / trackDur) * 100 : 0;
+      seekEl.value = String(Math.round(pct * 10)); // range is 0..1000
+      setSeekFill(pct);
+    }
   }
 
   function setSize() {
@@ -167,85 +205,127 @@
     idx = ((i % names.length) + names.length) % names.length;
     const key = names[idx];
     try { viz.loadPreset(presets[key], 2.0); } catch (e) { fail("loadPreset: " + e.message); return; }
-    nameEl.textContent = "♪ " + key;
+    nameEl.textContent = key;
     syncSelect(key);
+    updateStar();
     showBar();
+  }
+  function loadByName(name) {
+    const i = names.indexOf(name);
+    if (i >= 0) loadByIndex(i);
+    else console.warn("[WMP-viz] preset not found:", name);
   }
   const step = (d) => loadByIndex(idx + d);
   const randomPreset = () => loadByIndex(Math.floor(Math.random() * names.length));
 
-  function loadFavorite(fav) {
-    if (fav.wmp && window.WMP_PRESETS && window.WMP_PRESETS[fav.wmp]) {
-      try { viz.loadPreset(window.WMP_PRESETS[fav.wmp], 1.0); }
-      catch (e) { fail("wmp preset '" + fav.wmp + "': " + e.message); return; }
-      nameEl.textContent = "♪ WMP ✦ " + fav.wmp;
-      syncSelect(fav.wmp);
-      showBar();
-      return;
-    }
-    if (fav.exact) {
-      const i = names.indexOf(fav.exact);
-      if (i >= 0) { loadByIndex(i); return; }
-      console.warn("[WMP-viz] exact preset not found:", fav.exact);
-    }
-    let m = names.filter((n) => fav.re.test(n));
-    if (!m.length) m = names;
-    if (fav.random) { loadByIndex(names.indexOf(m[Math.floor(Math.random() * m.length)])); return; }
-    // Seed each favorite at a different offset so similar-keyword favorites
-    // (e.g. SepiaSwirl vs My Tornado) don't land on the same preset.
-    if (favCursor[fav.label] === undefined) favCursor[fav.label] = FAVORITES.indexOf(fav) * 3;
-    const c = favCursor[fav.label] % m.length;
-    favCursor[fav.label] = c + 1;
-    loadByIndex(names.indexOf(m[c]));
+  // The preset picker is a single compact grouped <select> (so it doesn't cover
+  // the visualization). Groups, top to bottom: ★ user favorites, the curated
+  // WMP families, then every bundled MilkDrop preset A–Z. Option values are the
+  // preset name itself. Rebuilt whenever the favorites set changes.
+  function renderOptions() {
+    if (!favSelect) return;
+    const sel = favSelect;
+    sel.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "♪ pick a preset…"; ph.disabled = true;
+    sel.appendChild(ph);
+
+    const addGroup = (label, entries) => {
+      const og = document.createElement("optgroup");
+      og.label = label;
+      entries.forEach(function (e) {
+        if (!presets[e[0]]) return;
+        const o = document.createElement("option");
+        o.value = e[0];
+        o.textContent = e[1];
+        og.appendChild(o);
+      });
+      if (og.children.length) sel.appendChild(og);
+    };
+
+    // ★ user favorites first
+    const favEntries = Array.from(userFavs).filter((n) => presets[n]).sort()
+      .map((n) => [n, "★ " + n]);
+    if (favEntries.length) addGroup("★ Favorites", favEntries);
+
+    // curated WMP families
+    const wmpSet = window.WMP_PRESETS ? Object.keys(window.WMP_PRESETS) : [];
+    const wmpNames = {}; wmpSet.forEach((n) => (wmpNames[n] = true));
+    const groups = { Featured: [], Ambience: [], Battery: [] };
+    FAVORITES.forEach((f) => {
+      const g = /^Ambience/.test(f.label) ? "Ambience" : /^Battery/.test(f.label) ? "Battery" : "Featured";
+      groups[g].push([f.wmp, f.label.replace(/\s*✦\s*$/, "")]);
+    });
+    addGroup("◢◤ WMP — Featured", groups.Featured);
+    addGroup("◢◤ WMP — Ambience", groups.Ambience);
+    addGroup("◢◤ WMP — Battery", groups.Battery);
+
+    // every other bundled MilkDrop preset, alphabetical
+    const milkdrop = names.filter((n) => !wmpNames[n])
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+      .map((n) => [n, n]);
+    addGroup("MilkDrop presets (A–Z)", milkdrop);
+
+    const cur = names[idx];
+    sel.value = cur && presets[cur] ? cur : "";
   }
 
-  // The favorite picker is a single compact <select> (grouped by family) instead
-  // of ~40 buttons, so it doesn't cover the visualization.
   function buildBar() {
     const wrap = document.getElementById("favs");
     const sel = document.createElement("select");
     sel.className = "fav-select";
     sel.title = "Pick a visualization";
-    const placeholder = document.createElement("option");
-    placeholder.value = "-1";
-    placeholder.textContent = "♪ pick a preset…";
-    placeholder.disabled = true; placeholder.selected = true;
-    sel.appendChild(placeholder);
-
-    const groups = {}, order = [];
-    const groupOf = (f) =>
-      f.exact ? "Test" :
-      /^Ambience/.test(f.label) ? "Ambience" :
-      /^Battery/.test(f.label) ? "Battery" : "Featured";
-    FAVORITES.forEach((f, i) => {
-      const g = groupOf(f);
-      if (!groups[g]) { groups[g] = document.createElement("optgroup"); groups[g].label = g; order.push(g); }
-      const opt = document.createElement("option");
-      opt.value = String(i);
-      opt.textContent = f.label.replace(/\s*✦\s*$/, "");
-      groups[g].appendChild(opt);
-    });
-    order.forEach((g) => sel.appendChild(groups[g]));
-    sel.addEventListener("change", () => {
-      const f = FAVORITES[+sel.value];
-      if (f) { loadFavorite(f); showBar(); }
-    });
     wrap.appendChild(sel);
     favSelect = sel;
+    renderOptions();
+    sel.addEventListener("change", () => { if (sel.value) { loadByName(sel.value); showBar(); } });
 
+    starEl.addEventListener("click", toggleFav);
+    playEl.addEventListener("click", () => post({ type: "playpause" }));
     document.getElementById("prev").addEventListener("click", () => step(-1));
     document.getElementById("next").addEventListener("click", () => step(1));
     document.getElementById("rand").addEventListener("click", randomPreset);
     document.getElementById("close").addEventListener("click", () => post({ type: "close" }));
     document.addEventListener("mousemove", showBar);
+
+    // Drag the seek bar → scrub the track. Suspend position updates while the
+    // user is dragging so it doesn't fight the incoming time, and commit the
+    // seek (to the content script, which owns the <video>) on release.
+    seekEl.addEventListener("input", () => {
+      seeking = true;
+      const time = trackDur * (+seekEl.value / 1000);
+      curEl.textContent = fmtTime(time);
+      setSeekFill(+seekEl.value / 10);
+      showBar();
+    });
+    seekEl.addEventListener("change", () => {
+      post({ type: "seek", time: trackDur * (+seekEl.value / 1000) });
+      seeking = false;
+    });
   }
 
-  // Reflect the currently-loaded preset in the dropdown (falls back to the
-  // placeholder when navigating to a non-favorite via ⏮/⏭/🎲).
+  // Reflect the currently-loaded preset in the dropdown.
   function syncSelect(name) {
-    if (!favSelect) return;
-    const i = FAVORITES.findIndex((f) => f.wmp === name || f.exact === name);
-    favSelect.value = i >= 0 ? String(i) : "-1";
+    if (favSelect) favSelect.value = name && presets[name] ? name : "";
+  }
+
+  // Star = mark the *currently loaded* preset as a favorite. Updates the picker's
+  // ★ group and persists the set through the content script.
+  function updateStar() {
+    const on = userFavs.has(names[idx]);
+    starEl.textContent = on ? "★" : "☆";
+    starEl.classList.toggle("on", on);
+    starEl.title = (on ? "Unmark" : "Mark") + " this preset as favorite (F)";
+  }
+  function toggleFav() {
+    const cur = names[idx];
+    if (!cur) return;
+    if (userFavs.has(cur)) userFavs.delete(cur); else userFavs.add(cur);
+    updateStar();
+    renderOptions();
+    syncSelect(cur);
+    post({ type: "favorites:set", names: Array.from(userFavs) });
+    showBar();
   }
 
   function renderLoop() {
@@ -289,16 +369,24 @@
     requestAnimationFrame(sizeCanvas);
     setTimeout(sizeCanvas, 400);
     // Default to Alchemy Random while we're actively refining it (fall back to
-    // the first favorite if it's ever renamed/removed).
-    loadFavorite(FAVORITES.find((f) => f.wmp === "Alchemy Random") || FAVORITES[0]);
+    // the first preset if it's ever renamed/removed).
+    loadByName(presets["Alchemy Random"] ? "Alchemy Random" : names[0]);
     renderLoop();
     post({ type: "ready", presets: names.length });
   }
 
   window.addEventListener("message", (e) => {
     const m = e.data || {};
-    if (!m.__wmp || m.type !== "audio" || !m.data) return;
-    latest.set(m.data);
+    if (!m.__wmp) return;
+    if (m.type === "audio" && m.data) latest.set(m.data);
+    else if (m.type === "track") onTrack(m);
+    else if (m.type === "favorites:init") {
+      userFavs.clear();
+      (m.names || []).forEach((n) => userFavs.add(n));
+      renderOptions();
+      syncSelect(names[idx]);
+      updateStar();
+    }
   });
 
   window.addEventListener("keydown", (e) => {
@@ -306,6 +394,8 @@
     else if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); step(1); }
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "r" || e.key === "R") randomPreset();
+    else if (e.key === "f" || e.key === "F") toggleFav();
+    else if (e.key === "p" || e.key === "P") post({ type: "playpause" });
   });
 
   try { init(); } catch (e) { fail("init: " + (e && e.message ? e.message : e)); }

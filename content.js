@@ -16,6 +16,7 @@
 
   let audioCtx = null, analyser = null, stream = null;
   let iframe = null, rafId = 0, timeBytes = null, running = false;
+  let trackTimer = 0;
 
   function launcher() {
     if (document.getElementById("ytm-wmp-launch")) return;
@@ -80,6 +81,10 @@
     window.addEventListener("message", onMsg);
     running = true;
     pump();
+    // Now-playing metadata + playback position update on a slow timer (the audio
+    // pump runs every frame; track info only needs ~2 Hz). Drives the title and
+    // seek bar in the iframe.
+    trackTimer = setInterval(sendTrack, 500);
 
     const l = document.getElementById("ytm-wmp-launch");
     if (l) l.style.display = "none";
@@ -93,18 +98,68 @@
     iframe.contentWindow.postMessage({ __wmp: true, type: "audio", data: timeBytes }, "*");
   }
 
+  // Read now-playing title/artist + playback position straight from the page.
+  // The <video> element is the source of truth for time/duration/seek (YouTube
+  // Music plays audio through it); the player bar carries the human-readable
+  // title and byline.
+  function readTrack() {
+    const v = document.querySelector("video");
+    const titleEl = document.querySelector("ytmusic-player-bar .title");
+    const bylineEl = document.querySelector("ytmusic-player-bar .byline");
+    const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
+    // The byline is "Artist • Album • Year • plays" — keep just the artist part.
+    const artist = clean(bylineEl && bylineEl.textContent).split("•")[0].trim();
+    return {
+      title: clean(titleEl && titleEl.textContent),
+      artist: artist,
+      currentTime: v ? v.currentTime : 0,
+      duration: v && isFinite(v.duration) ? v.duration : 0,
+      paused: v ? v.paused : true,
+    };
+  }
+
+  function sendTrack() {
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage(Object.assign({ __wmp: true, type: "track" }, readTrack()), "*");
+  }
+
+  // Favorites persist via chrome.storage (the sandboxed iframe is an opaque
+  // origin and cannot use storage itself, so it round-trips through here).
+  function loadFavs(cb) {
+    try { chrome.storage.local.get("neoampFavorites", (r) => cb((r && r.neoampFavorites) || [])); }
+    catch (_) { cb([]); }
+  }
+  function saveFavs(names) {
+    try { chrome.storage.local.set({ neoampFavorites: Array.isArray(names) ? names : [] }); } catch (_) {}
+  }
+
   function onMsg(e) {
     if (!iframe || e.source !== iframe.contentWindow) return;
     const m = e.data || {};
     if (!m.__wmp) return;
     if (m.type === "close") stop();
     else if (m.type === "error") { toast("Visualizer: " + m.message); console.error("[WMP-viz iframe]", m.message); }
-    else if (m.type === "ready") console.log("[WMP-viz] iframe ready; presets:", m.presets);
+    else if (m.type === "ready") {
+      console.log("[WMP-viz] iframe ready; presets:", m.presets);
+      loadFavs((names) =>
+        iframe && iframe.contentWindow &&
+        iframe.contentWindow.postMessage({ __wmp: true, type: "favorites:init", names: names }, "*"));
+      sendTrack();
+    } else if (m.type === "seek") {
+      const v = document.querySelector("video");
+      if (v && isFinite(m.time)) v.currentTime = m.time;
+    } else if (m.type === "playpause") {
+      const v = document.querySelector("video");
+      if (v) { if (v.paused) v.play(); else v.pause(); sendTrack(); }
+    } else if (m.type === "favorites:set") {
+      saveFavs(m.names);
+    }
   }
 
   function stop() {
     running = false;
     cancelAnimationFrame(rafId);
+    clearInterval(trackTimer); trackTimer = 0;
     window.removeEventListener("message", onMsg);
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (audioCtx) { try { audioCtx.close(); } catch (_) {} }
