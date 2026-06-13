@@ -281,8 +281,8 @@
         // the additive build-up blowing the frame to white. The colorful
         // background is drawn procedurally in comp (NOT fed back), so only the
         // additive orbs/line/spokes accumulate here.
-        wave_a: 0, decay: 0.93, gammaadj: 1.3, zoom: 1.0, rot: 0.0,
-        warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+        wave_a: 0, decay: 0.91, gammaadj: 1.3, zoom: 1.0, rot: 0.0,
+        warp: 0.0, wrap: 0, darken_center: 0.10, echo_alpha: 0
       },
       {
         frame: function (t) {
@@ -335,7 +335,7 @@
           t.q17 = bass;
           t.q18 = tm;
           t.q29 = (bass + (t.mid || 1) + treb) / 3;          // overall loudness (RMS-ish) -> geometry brightness
-          t.decay = 0.93;
+          t.decay = 0.91;
           return t;
         },
         // Background: four SOFT, MUTED PASTEL washes (no hard grids/fans — those
@@ -401,8 +401,8 @@
           "  fb += texture2D(sampler_main, vec2(1.0-zuv.x, zuv.y)).rgb * km;\n" +   // mirror fill (kaleidoscope)
           "  fb += texture2D(sampler_main, vec2(zuv.x, 1.0-zuv.y)).rgb * km;\n" +
           "  vec3 glow = texture2D(sampler_blur1, zuv).rgb + texture2D(sampler_blur2, zuv).rgb;\n" +
-          "  vec3 outc = col + fb*0.7 + glow*0.6;\n" +
-          "  ret = outc / (outc + vec3(0.6));\n" +                      // Reinhard tone-map: muted, no white clip
+          "  vec3 outc = col + fb*0.55 + glow*0.45;\n" +
+          "  ret = outc / (outc + vec3(0.9));\n" +                      // Reinhard tone-map (stronger): keep color, no white-out
           "}\n",
         // Gentle outward drift + a slow swirl of the feedback (trail) buffer:
         // makes each roaming orb's stamped echoes streak/recede into the coil-and-
