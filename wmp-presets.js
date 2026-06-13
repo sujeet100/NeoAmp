@@ -369,15 +369,17 @@
           "  float kc = (cur < 0.5 || (cur > 1.5 && cur < 2.5)) ? 1.0 : 0.0;\n" +  // kaleidoscope on scenes 0 & 2
           "  float kn = (nxt < 0.5 || (nxt > 1.5 && nxt < 2.5)) ? 1.0 : 0.0;\n" +
           "  float km = 0.22 + 0.5 * mix(kc, kn, f);\n" +               // baseline corner fill + extra on kaleidoscope scenes
+          "  float Z = 1.4;\n" +                                        // zoom IN on the geometry (fills the frame)
+          "  vec2 zuv = (uv - 0.5) / Z + 0.5;\n" +
           "  float o = 2.5 / resolution.y;\n" +                         // dilation radius -> THICK lines
-          "  vec3 fb = texture2D(sampler_main, uv).rgb;\n" +
-          "  fb = max(fb, texture2D(sampler_main, uv + vec2(o,0.0)).rgb);\n" +
-          "  fb = max(fb, texture2D(sampler_main, uv - vec2(o,0.0)).rgb);\n" +
-          "  fb = max(fb, texture2D(sampler_main, uv + vec2(0.0,o)).rgb);\n" +
-          "  fb = max(fb, texture2D(sampler_main, uv - vec2(0.0,o)).rgb);\n" +
-          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, uv.y)).rgb * km;\n" +     // mirror fill (kaleidoscope)
-          "  fb += texture2D(sampler_main, vec2(uv.x, 1.0-uv.y)).rgb * km;\n" +
-          "  vec3 glow = texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb;\n" +
+          "  vec3 fb = texture2D(sampler_main, zuv).rgb;\n" +
+          "  fb = max(fb, texture2D(sampler_main, zuv + vec2(o,0.0)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, zuv - vec2(o,0.0)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, zuv + vec2(0.0,o)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, zuv - vec2(0.0,o)).rgb);\n" +
+          "  fb += texture2D(sampler_main, vec2(1.0-zuv.x, zuv.y)).rgb * km;\n" +   // mirror fill (kaleidoscope)
+          "  fb += texture2D(sampler_main, vec2(zuv.x, 1.0-zuv.y)).rgb * km;\n" +
+          "  vec3 glow = texture2D(sampler_blur1, zuv).rgb + texture2D(sampler_blur2, zuv).rgb;\n" +
           "  vec3 outc = col + fb*0.7 + glow*0.6;\n" +
           "  ret = outc / (outc + vec3(0.6));\n" +                      // Reinhard tone-map: muted, no white clip
           "}\n",
