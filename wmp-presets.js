@@ -238,8 +238,23 @@
   P["Alchemy Random"] = (function () {
     // Scene clock shared by frame eqs + shaders. Keep D / FADE in sync with the
     // identical constants hard-coded in the GLSL below.
-    var SCENE_D = 9.0;       // seconds per scene (faster scene changes)
+    var SCENE_N = 6;         // number of distinct scenes in the cycle
+    var SCENE_D = 8.0;       // seconds per scene
     var SCENE_FADE = 2.0;    // crossfade window (last seconds of each scene)
+
+    // Per-scene config (mix-and-match for variety). shape: 0 rose · 1 none
+    // (orbs+lightning only) · 2 spiral S-arms · 3 urchin · 4 lissajous · 5 star-web.
+    // cx/cy = central-motif center (off-center on some); orb = how much the
+    // circles show; rot = rotation speed. Kaleidoscope per scene is in the shader
+    // (kalFor) — keep these in sync with SCENE_N scenes.
+    var SCENES = [
+      { shape: 0, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.22 },  // rose, centered (kaleidoscope)
+      { shape: 1, cx: 0.38, cy: 0.44, orb: 1.00, rot: 0.18 },  // two orbs + lightning, off-center
+      { shape: 2, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.55 },  // spiral S-arms, centered (kaleidoscope)
+      { shape: 3, cx: 0.62, cy: 0.58, orb: 0.45, rot: 0.25 },  // urchin, off-center
+      { shape: 4, cx: 0.50, cy: 0.50, orb: 0.20, rot: 0.35 },  // lissajous, centered (kaleidoscope)
+      { shape: 5, cx: 0.40, cy: 0.60, orb: 0.40, rot: 0.40 }   // star-web, off-center
+    ];
 
     // Soft on/off envelope from a -1..1 sine: 0 for part of the cycle, smoothly
     // ramping to 1 — gives the rings/line their "come and go" behavior.
@@ -276,21 +291,14 @@
 
           // State machine: current scene + smooth crossfade weight to the next.
           var ph = t.time / SCENE_D;
-          var cur = Math.floor(ph) % 4;
+          var cur = Math.floor(ph) % SCENE_N;
           var fr = ph - Math.floor(ph);              // 0..1 within the scene
           var fadeFrac = SCENE_FADE / SCENE_D;
           var f = (fr - (1 - fadeFrac)) / fadeFrac;  // ramps 0..1 over the fade window
           f = f < 0 ? 0 : (f > 1 ? 1 : f);
           f = f * f * (3 - 2 * f);                   // smoothstep
-          var next = (cur + 1) % 4;
-
-          // Per-scene foreground weights (alpha gates) — active scene fades to
-          // the next so two elements overlap during the transition.
-          var w = [0, 0, 0, 0];
-          w[cur] = 1 - f;
-          w[next] += f;
-          t.q11 = w[0]; t.q12 = w[1]; t.q13 = w[2]; t.q14 = w[3];
-          t.q9 = cur; t.q10 = f;
+          var next = (cur + 1) % SCENE_N;
+          var sc = SCENES[cur], sn = SCENES[next];
 
           // Two orbs zipping on independent paths — FAST (the original has quick,
           // whippy movement). Wide travel makes the connecting lightning span
@@ -303,24 +311,30 @@
           t.q4 = 0.5 + 0.34 * Math.sin(tm * 0.51 + 2.0);
           t.q5 = 0.035 + 0.02 * bass;                       // ring radius
 
-          // Presence floors so both orbs + the thread stay mostly visible.
-          t.q20 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.35));         // orb A
-          t.q21 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.31 + 2.2));   // orb B
-          t.q22 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.27 + 1.5));   // thread
-          t.q23 = ((tm * 0.05) + 0.25 * cur) % 1;           // hue drift + per-scene hue offset
-          t.q25 = tm * 0.25;                                // urchin rotation (quicker)
-          // Per-scene composition (lerp cur->next by f): OFF-CENTER on scenes 1 & 3,
-          // urchin OFF on scene 1 (orbs + lightning only), spiral shape on scene 2 —
-          // so the four scenes read as genuinely different, not one.
-          var ox = [0.5, 0.36, 0.5, 0.64], oy = [0.5, 0.42, 0.5, 0.58], uo = [1, 0, 1, 1];
-          t.q26 = ox[cur] * (1 - f) + ox[next] * f;         // urchin center x
-          t.q27 = oy[cur] * (1 - f) + oy[next] * f;         // urchin center y
-          t.q28 = cur;                                      // urchin shape selector
-          var uon = uo[cur] * (1 - f) + uo[next] * f;
-          t.q24 = uon * (0.6 + 0.4 * comeGo(Math.sin(tm * 0.24 + 0.7)));  // urchin presence (per-scene)
+          // Orbs (circles) show per the scene config — mainly the orbs+lightning
+          // scene, faint elsewhere so circles don't dominate.
+          var orbAmt = sc.orb * (1 - f) + sn.orb * f;
+          t.q20 = orbAmt * (0.5 + 0.5 * comeGo(Math.sin(tm * 0.35)));        // orb A
+          t.q21 = orbAmt * (0.5 + 0.5 * comeGo(Math.sin(tm * 0.31 + 2.2)));  // orb B
+          t.q22 = orbAmt * (0.6 + 0.4 * comeGo(Math.sin(tm * 0.27 + 1.5)));  // thread
+          t.q23 = ((tm * 0.05) + 0.16 * cur) % 1;           // hue drift + per-scene hue offset
+
+          // Central motif: center lerps cur->next; rotation speed lerps; shape is
+          // cur's motif id. A visibility window dips the alpha near scene edges so
+          // the shape can swap during the crossfade without a hard pop.
+          t.q26 = sc.cx * (1 - f) + sn.cx * f;              // central center x
+          t.q27 = sc.cy * (1 - f) + sn.cy * f;              // central center y
+          t.q28 = sc.shape;                                 // central motif id (0..5)
+          t.q25 = tm * (sc.rot * (1 - f) + sn.rot * f);     // rotation
+          var edge = 0.14;
+          var vis = Math.min(fr / edge, (1 - fr) / edge);
+          vis = vis < 0 ? 0 : (vis > 1 ? 1 : vis);
+          vis = vis * vis * (3 - 2 * vis);                  // fade in after scene start, out before end
+          t.q24 = vis * (0.6 + 0.4 * comeGo(Math.sin(tm * 0.24 + 0.7)));  // central presence
 
           t.q17 = bass;
           t.q18 = tm;
+          t.q29 = (bass + (t.mid || 1) + treb) / 3;          // overall loudness (RMS-ish) -> geometry brightness
           t.decay = 0.93;
           return t;
         },
@@ -341,35 +355,42 @@
           "  c = mix(c, cc, smoothstep(0.30, 0.80, n2));\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 sc0(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.40,0.22,0.18), vec3(0.34,0.14,0.26), vec3(0.26,0.20,0.40), d, gy, t); }\n" +   // orange/magenta/purple
-          "vec3 sc1(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.20,0.26,0.40), vec3(0.20,0.36,0.34), vec3(0.30,0.36,0.24), d, gy, t); }\n" +   // blue/teal/olive
-          "vec3 sc2(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.42,0.46,0.42), vec3(0.40,0.38,0.48), vec3(0.48,0.42,0.36), d, gy, t); }\n" +   // light mint/lavender/peach
-          "vec3 sc3(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.42,0.24,0.28), vec3(0.44,0.30,0.18), vec3(0.30,0.22,0.40), d, gy, t); }\n" +   // pink/orange/violet
-          "vec3 alScene(float id,vec2 d,float r,float ang,float gy,float t,float bs){\n" +
-          "  if(id<0.5) return sc0(d,r,ang,gy,t,bs);\n" +
-          "  if(id<1.5) return sc1(d,r,ang,gy,t,bs);\n" +
-          "  if(id<2.5) return sc2(d,r,ang,gy,t,bs);\n" +
-          "  return sc3(d,r,ang,gy,t,bs);\n" +
+          "vec3 alScene(float id, vec2 d, float gy, float t){\n" +
+          "  if(id<0.5) return bleed(vec3(0.40,0.22,0.18), vec3(0.34,0.14,0.26), vec3(0.26,0.20,0.40), d, gy, t);\n" +  // orange/magenta/purple
+          "  if(id<1.5) return bleed(vec3(0.20,0.26,0.40), vec3(0.20,0.36,0.34), vec3(0.30,0.36,0.24), d, gy, t);\n" +  // blue/teal/olive
+          "  if(id<2.5) return bleed(vec3(0.42,0.46,0.42), vec3(0.40,0.38,0.48), vec3(0.48,0.42,0.36), d, gy, t);\n" +  // light mint/lavender/peach
+          "  if(id<3.5) return bleed(vec3(0.42,0.24,0.28), vec3(0.44,0.30,0.18), vec3(0.30,0.22,0.40), d, gy, t);\n" +  // pink/orange/violet
+          "  if(id<4.5) return bleed(vec3(0.18,0.30,0.34), vec3(0.30,0.24,0.42), vec3(0.22,0.36,0.30), d, gy, t);\n" +  // teal/indigo/green
+          "  return bleed(vec3(0.44,0.32,0.20), vec3(0.40,0.22,0.26), vec3(0.34,0.30,0.40), d, gy, t);\n" +            // amber/rose/mauve
           "}\n" +
+          "float kalFor(float id){\n" +     // per-scene kaleidoscope (mirror) amount
+          "  if(id<0.5) return 0.6;\n" +     // rose
+          "  if(id<1.5) return 0.0;\n" +     // orbs + lightning (free)
+          "  if(id<2.5) return 0.6;\n" +     // spiral
+          "  if(id<3.5) return 0.0;\n" +     // urchin (off-center)
+          "  if(id<4.5) return 0.6;\n" +     // lissajous
+          "  return 0.25;\n" +               // star-web (mild)
+          "}\n" +
+          "float gzFor(float id){ if(id<0.5) return 1.5; if(id<1.5) return 1.2; if(id<2.5) return 1.7; if(id<3.5) return 1.3; if(id<4.5) return 1.5; return 1.45; }\n" +  // per-scene geometry zoom (viewport)
+          "float darkFor(float id){ if(id<0.5) return 0.85; if(id<1.5) return 0.35; if(id<2.5) return 0.7; if(id<3.5) return 0.4; if(id<4.5) return 0.8; return 0.6; }\n" +  // per-scene bg darkness: neon-on-black (hero/urchin) vs pastel
           "shader_body {\n" +
           "  vec2 d = uv - 0.5;\n" +
           "  d.x *= resolution.x / resolution.y;\n" +
           "  float r = length(d) * 2.0;\n" +
           "  float pang = atan(d.y, d.x);\n" +   // NOT 'ang'/'rad' — Butterchurn predeclares those
           "  float gy = uv.y;\n" +
-          "  float D = 9.0;\n" +                           // == SCENE_D
+          "  float D = 8.0;\n" +                           // == SCENE_D
           "  float ph = time / D;\n" +
-          "  float cur = mod(floor(ph), 4.0);\n" +
-          "  float nxt = mod(cur + 1.0, 4.0);\n" +
+          "  float cur = mod(floor(ph), 6.0);\n" +         // == SCENE_N
+          "  float nxt = mod(cur + 1.0, 6.0);\n" +
           "  float fr = fract(ph);\n" +
           "  float fade = 2.0 / D;\n" +                    // == SCENE_FADE / SCENE_D
           "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
-          "  vec3 col = mix(alScene(cur, d, r, pang, gy, time, bass), alScene(nxt, d, r, pang, gy, time, bass), f);\n" +
+          "  vec3 col = mix(alScene(cur, d, gy, time), alScene(nxt, d, gy, time), f);\n" +
           "  col *= (0.95 + 0.12*bass);\n" +                            // bg already muted/desaturated in bleed()
-          "  float kc = (cur < 0.5 || (cur > 1.5 && cur < 2.5)) ? 1.0 : 0.0;\n" +  // kaleidoscope on scenes 0 & 2
-          "  float kn = (nxt < 0.5 || (nxt > 1.5 && nxt < 2.5)) ? 1.0 : 0.0;\n" +
-          "  float km = 0.22 + 0.5 * mix(kc, kn, f);\n" +               // baseline corner fill + extra on kaleidoscope scenes
-          "  float Z = 1.4;\n" +                                        // zoom IN on the geometry (fills the frame)
+          "  col *= mix(darkFor(cur), darkFor(nxt), f);\n" +            // neon scenes -> near-black bg, pastel scenes stay light
+          "  float km = 0.18 + mix(kalFor(cur), kalFor(nxt), f);\n" +   // baseline corner fill + per-scene kaleidoscope
+          "  float Z = mix(gzFor(cur), gzFor(nxt), f);\n" +             // per-scene geometry zoom (viewport)
           "  vec2 zuv = (uv - 0.5) / Z + 0.5;\n" +
           "  float o = 2.5 / resolution.y;\n" +                         // dilation radius -> THICK lines
           "  vec3 fb = texture2D(sampler_main, zuv).rgb;\n" +
@@ -387,11 +408,21 @@
         // makes each roaming orb's stamped echoes streak/recede into the coil-and-
         // bead trails seen in the reference, without smearing them into mush.
         warp:
+          // Per-scene CAMERA on the feedback (trail) buffer: tunnel push (zoom>1)
+          // for the starburst/swirl scenes, flat for the hero/urchin, rotation for
+          // the swirl scenes. Computed from the same scene clock as comp/frame.
+          "float camZoom(float id){ if(id<0.5) return 1.0; if(id<1.5) return 1.002; if(id<2.5) return 1.018; if(id<3.5) return 1.0; if(id<4.5) return 1.006; return 1.014; }\n" +
+          "float camRot(float id){ if(id<0.5) return 0.004; if(id<1.5) return 0.0; if(id<2.5) return 0.016; if(id<3.5) return 0.0; if(id<4.5) return 0.006; return 0.020; }\n" +
           "shader_body {\n" +
+          "  float D = 8.0; float ph = time / D;\n" +
+          "  float cur = mod(floor(ph), 6.0); float nxt = mod(cur + 1.0, 6.0);\n" +
+          "  float fr = fract(ph); float fade = 2.0 / D;\n" +
+          "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
+          "  float zm = mix(camZoom(cur), camZoom(nxt), f);\n" +   // per-scene tunnel zoom
+          "  float a = mix(camRot(cur), camRot(nxt), f);\n" +      // per-scene swirl rotation
           "  vec2 d = uv - 0.5;\n" +
-          "  float a = 0.004 * sin(time * 0.1);\n" +     // very slow swirl
           "  float s = sin(a), c = cos(a);\n" +
-          "  vec2 ruv = 0.5 + mat2(c, -s, s, c) * d * 1.0015;\n" + // tiny zoom: local coils, no radial ray-streaks
+          "  vec2 ruv = 0.5 + mat2(c, -s, s, c) * d * zm;\n" +
           "  ret = texture2D(sampler_main, ruv).rgb;\n" +
           "  ret -= 0.008;\n" +                          // trim trails so beads stay discrete
           "}\n"
@@ -424,7 +455,7 @@
         a.y = (a[cyq] !== undefined ? a[cyq] : 0.5) + rad * Math.sin(ang);
         var c = hueBright((a.q23 || 0) + hoff);                // bright per-scene hue (gold/blue/...)
         a.r = c[0]; a.g = c[1]; a.b = c[2];
-        a.a = env;
+        a.a = env * (0.3 + 0.7 * (a.q29 || 1));                // brightness scales with overall volume (RMS)
         return a;
       });
       w.baseVals.smoothing = 0.85;                             // round ring, not jagged
@@ -451,7 +482,7 @@
       a.y = ay + dy * s + py * jag;
       var c = hueBright((a.q23 || 0) + 0.04);                  // same hue family as the orbs
       a.r = c[0]; a.g = c[1]; a.b = c[2];
-      a.a = w;
+      a.a = w * (0.3 + 0.7 * (a.q29 || 1));                    // brightness scales with overall volume (RMS)
       return a;
     });
     preset.waves[2].baseVals.smoothing = 0.0;                  // jagged, like a real oscilloscope
@@ -462,23 +493,43 @@
     preset.waves[3] = sceneWave(function (a) {
       var cx = a.q26 !== undefined ? a.q26 : 0.5;             // per-scene (possibly off-) center
       var cy = a.q27 !== undefined ? a.q27 : 0.5;
-      var scene = a.q28 || 0;
-      if (scene > 1.5 && scene < 2.5) {
-        // scene 2: a SPIRAL fractal (different shape) — radius grows along the wave
-        var sang = a.sample * 6.2832 * 5.0 + (a.q25 || 0);
-        var srad = 0.04 + a.sample * 0.40 + 0.05 * a.value1;
-        a.x = cx + srad * Math.cos(sang);
-        a.y = cy + srad * Math.sin(sang);
+      var shape = a.q28 || 0;
+      var rot = a.q25 || 0;
+      var s = a.sample, v = a.value1, av = Math.abs(v), th = s * 6.2832;
+      var alpha = (a.q24 || 0) * 0.8;
+      // Per Gemini: the central "puffballs/rings" SCALE with BASS (kick flare,
+      // shrink when quiet); the waveform amplitude adds the jagged detail.
+      var bscale = 0.5 + 0.7 * (a.q17 || 1);
+      if (shape < 0.5) {
+        // 0 ROSE / spirograph: a k-petal curve (rotating; bass-scaled, audio-jagged)
+        var rr = bscale * 0.34 * (0.6 + 0.4 * av) * Math.cos(4.0 * th + rot);
+        a.x = cx + rr * Math.cos(th); a.y = cy + rr * Math.sin(th);
+      } else if (shape < 1.5) {
+        // 1 none (orbs + lightning scene): keep the central slot invisible
+        a.x = cx; a.y = cy; alpha = 0.0;
+      } else if (shape < 2.5) {
+        // 2 SPIRAL S-arms rotating from center (decay leaves the trails)
+        var ARMS = 3.0, seg = Math.floor(s * ARMS), u = s * ARMS - seg;
+        var th2 = u * 2.5 * 6.2832 + seg * (6.2832 / ARMS) + rot;
+        var rr2 = bscale * u * 0.40 + 0.04 * v;
+        a.x = cx + rr2 * Math.cos(th2); a.y = cy + rr2 * Math.sin(th2);
+        if (u < 0.02) alpha = 0.0;                            // hide the jump between arms
+      } else if (shape < 3.5) {
+        // 3 URCHIN: real-waveform radial filaments; bass flares the whole burst
+        var rad = bscale * (0.08 + 0.26 * av), ang = th + rot;
+        a.x = cx + rad * Math.cos(ang); a.y = cy + rad * Math.sin(ang);
+      } else if (shape < 4.5) {
+        // 4 LISSAJOUS figure (bass-scaled, audio-jittered)
+        a.x = cx + bscale * (0.34 + 0.05 * v) * Math.sin(3.0 * th + rot);
+        a.y = cy + bscale * (0.32 + 0.05 * v) * Math.sin(2.0 * th);
       } else {
-        // radial "flower urchin": real-waveform filaments shooting outward
-        var ang = a.sample * 6.2832 + (a.q25 || 0);
-        var rad = 0.10 + 0.38 * Math.abs(a.value1);
-        a.x = cx + rad * Math.cos(ang);
-        a.y = cy + rad * Math.sin(ang);
+        // 5 STAR-WEB: star polygon (non-integer angular step) + waveform radius
+        var th5 = th * 2.5 + rot, rr5 = bscale * 0.32 * (0.7 + 0.3 * av);
+        a.x = cx + rr5 * Math.cos(th5); a.y = cy + rr5 * Math.sin(th5);
       }
       var c = hueBright((a.q23 || 0) + 0.5);                  // complementary to orbs/thread
       a.r = c[0]; a.g = c[1]; a.b = c[2];
-      a.a = (a.q24 || 0) * 0.8;
+      a.a = alpha * (0.3 + 0.7 * (a.q29 || 1));               // brightness scales with overall volume (RMS)
       return a;
     });
     preset.waves[3].baseVals.smoothing = 0.0;
