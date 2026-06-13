@@ -58,44 +58,75 @@
     };
   }
 
+  // A custom wave that draws the audio waveform as a jagged circle, centered on
+  // (a[qx], a[qy]) with radius a.q5 — values fed from the main per-frame eqs.
+  // Equations are real FUNCTIONS: for a converted preset (function-based main
+  // eqs) Butterchurn calls wave.point_eqs directly and never compiles *_str, so
+  // point_eqs MUST be a function (an empty string would be skipped at draw time).
+  function circleWave(qx, qy) {
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.1, a: 1, r: 0.85, g: 0.13, b: 0.95
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ang = a.sample * 6.2832;
+        var rad = (a.q5 || 0.15) + 0.05 * a.value1;
+        a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+        a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+        return a;
+      }
+    };
+  }
+
   var P = {};
 
-  // ── Dance of the Freaky Circles ────────────────────────────────────────────
-  // Glowing purple circular waveform on a dark background; a second echoed,
-  // slightly-zoomed copy creates the overlapping-rings look; radius pulses with
-  // the bass and the center drifts for the "freaky" wobble.
-  P["Dance of the Freaky Circles"] = build(
-    {
-      wave_mode: 0,            // circular waveform
-      additivewave: 1,
-      wave_a: 1,
-      wave_r: 0.6, wave_g: 0.2, wave_b: 0.95,
-      wave_scale: 0.5,
-      wave_smoothing: 0.7,
-      decay: 0.94,             // moderate trails, fades to black
-      gammaadj: 2.2,
-      zoom: 1.0,
-      warp: 0.02,
-      echo_alpha: 0.45,        // overlapping second ring
-      echo_zoom: 0.97,
-      darken_center: 0,
-      wrap: 0
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        t.wave_scale = 0.40 + 0.28 * bass;        // ring radius pulses with bass
-        t.wave_r = 0.55 + 0.12 * Math.sin(t.time * 0.6);
-        t.wave_g = 0.18;
-        t.wave_b = 0.92;
-        t.decay = 0.94;
-        t.rot = 0.015 * Math.sin(t.time * 0.3);   // gentle wobble
-        t.cx = 0.5 + 0.025 * Math.sin(t.time * 0.5);
-        t.cy = 0.5 + 0.025 * Math.cos(t.time * 0.43);
-        return t;
+  // ── Dance of the Freaky Circles (Bateria: taniec dźwiękowych kółek) ─────────
+  // Magenta circular waveform; a second echoed ring fades in and out so you see
+  // one ring sometimes and two at others; the background washes slowly between
+  // dark and purple (matching the WMP capture); radius pulses with the bass.
+  P["Dance of the Freaky Circles"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,             // primary waveform off; the two custom circles draw it
+        decay: 0.92,           // trails leave faint motion arcs as the circles orbit
+        gammaadj: 2.0,
+        zoom: 1.0,
+        warp: 0.04,
+        echo_alpha: 0,
+        darken_center: 0,
+        wrap: 0
+      },
+      {
+        // Two orbit centers (q1,q2)=(q3,q4) on opposite sides of center, plus a
+        // bass-pulsing radius (q5). Read by the two circleWave point equations.
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var th = t.time * 0.6;
+          var orbit = 0.13;
+          t.q1 = 0.5 + orbit * Math.cos(th);
+          t.q2 = 0.5 + orbit * Math.sin(th);
+          t.q3 = 0.5 - orbit * Math.cos(th);
+          t.q4 = 0.5 - orbit * Math.sin(th);
+          t.q5 = 0.12 + 0.06 * bass;     // ring radius pulses with bass
+          t.decay = 0.92;
+          return t;
+        },
+        // Mostly black with only a faint, slow purple wash now and then.
+        comp:
+          "shader_body {\n" +
+          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "float bg = 0.04 * (0.5 + 0.5 * sin(time * 0.10));\n" +
+          "ret += vec3(bg, bg * 0.10, bg * 1.3);\n" +
+          "}\n"
       }
-    }
-  );
+    );
+    preset.waves[0] = circleWave("q1", "q2");  // orbiting circle A
+    preset.waves[1] = circleWave("q3", "q4");  // orbiting circle B
+    return preset;
+  })();
 
   window.WMP_PRESETS = P;
 })();
