@@ -242,6 +242,11 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
 - The user's key insight that unblocked good visuals: **real audio-waveform
   geometry** (drawing the waveform via custom waves, like Dance) looks far more
   "WMP" than procedural noise.
+- **Terminology — "zigzag line" / "lightning line" / "jagged line" ALWAYS means a
+  real audio waveform**, NOT an artificial `sin()` zig-zag. Drive the displacement
+  from `a.value1`/`a.value2` (the live samples), like Dance's `waveLine` — the
+  512 real samples give the dense jaggedness for free. Apply the same to any shape
+  (orb rings, urchin filaments): prefer real-waveform displacement over synthetic.
 
 ## Best practices for this codebase
 

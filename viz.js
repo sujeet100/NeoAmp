@@ -287,7 +287,9 @@
     // Re-apply on the next couple of frames, once layout has its final size.
     requestAnimationFrame(sizeCanvas);
     setTimeout(sizeCanvas, 400);
-    loadFavorite(FAVORITES[0]);
+    // Default to Alchemy Random while we're actively refining it (fall back to
+    // the first favorite if it's ever renamed/removed).
+    loadFavorite(FAVORITES.find((f) => f.wmp === "Alchemy Random") || FAVORITES[0]);
     renderLoop();
     post({ type: "ready", presets: names.length });
   }

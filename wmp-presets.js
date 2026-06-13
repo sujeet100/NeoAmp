@@ -238,8 +238,8 @@
   P["Alchemy Random"] = (function () {
     // Scene clock shared by frame eqs + shaders. Keep D / FADE in sync with the
     // identical constants hard-coded in the GLSL below.
-    var SCENE_D = 14.0;      // seconds per scene
-    var SCENE_FADE = 2.5;    // crossfade window (last seconds of each scene)
+    var SCENE_D = 9.0;       // seconds per scene (faster scene changes)
+    var SCENE_FADE = 2.0;    // crossfade window (last seconds of each scene)
 
     // Soft on/off envelope from a -1..1 sine: 0 for part of the cycle, smoothly
     // ramping to 1 — gives the rings/line their "come and go" behavior.
@@ -249,12 +249,22 @@
       return x * x * (3 - 2 * x);
     }
 
+    // Bright, saturated cosine-palette color from a hue phase (0..1). The lines in
+    // the original are vivid/glowing (gold/blue/magenta); only the BACKGROUND is
+    // muted — so geometry uses this, the wash gets desaturated in the comp.
+    function hueBright(h) {
+      return [0.5 + 0.5 * Math.cos(6.2832 * h),
+              0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)),
+              0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))];
+    }
+
     var preset = build(
       {
-        // High decay so the roaming orbs leave long coil/bead recede trails
-        // (the colorful background is drawn procedurally in comp, NOT fed back,
-        // so only the additive orbs/line/urchin accumulate here).
-        wave_a: 0, decay: 0.95, gammaadj: 1.5, zoom: 1.0, rot: 0.0,
+        // Moderate decay: the roaming orbs leave coil/bead recede trails without
+        // the additive build-up blowing the frame to white. The colorful
+        // background is drawn procedurally in comp (NOT fed back), so only the
+        // additive orbs/line/spokes accumulate here.
+        wave_a: 0, decay: 0.93, gammaadj: 1.3, zoom: 1.0, rot: 0.0,
         warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
       {
@@ -280,69 +290,53 @@
           t.q11 = w[0]; t.q12 = w[1]; t.q13 = w[2]; t.q14 = w[3];
           t.q9 = cur; t.q10 = f;
 
-          // Signature motif: two SMALL orbs roaming the WHOLE frame on INDEPENDENT
-          // slow paths (different freqs/phases) so their midpoint — and the line
-          // joining them — wanders well OFF center. Wide amplitude = they travel
-          // corner to corner, so the feedback leaves long coil/bead recede trails.
+          // Two orbs zipping on independent paths — FAST (the original has quick,
+          // whippy movement). Wide travel makes the connecting lightning span
+          // corner-to-corner, and with high decay the fast motion drags trails
+          // across the whole screen (the "multiple lines everywhere" look).
           var tm = t.time;
-          t.q1 = 0.5 + 0.30 * Math.sin(tm * 0.23);          // orb A center
-          t.q2 = 0.5 + 0.26 * Math.cos(tm * 0.19);
-          t.q3 = 0.5 + 0.28 * Math.cos(tm * 0.17 + 1.0);    // orb B center
-          t.q4 = 0.5 + 0.30 * Math.sin(tm * 0.21 + 2.0);
-          t.q5 = 0.035 + 0.02 * bass;                       // small clean ring radius (bass pulse)
+          t.q1 = 0.5 + 0.34 * Math.sin(tm * 0.55);          // orb A center
+          t.q2 = 0.5 + 0.30 * Math.cos(tm * 0.47);
+          t.q3 = 0.5 + 0.32 * Math.cos(tm * 0.43 + 1.0);    // orb B center
+          t.q4 = 0.5 + 0.34 * Math.sin(tm * 0.51 + 2.0);
+          t.q5 = 0.035 + 0.02 * bass;                       // ring radius
 
-          // Independent come-and-go envelopes: each orb and the line fade in/out
-          // on its own slow cycle, so they appear and recede separately.
-          t.q20 = comeGo(Math.sin(tm * 0.45));              // orb A presence
-          t.q21 = comeGo(Math.sin(tm * 0.37 + 2.2));        // orb B presence
-          t.q22 = comeGo(Math.sin(tm * 0.33 + 1.5));        // connecting line presence
+          // Presence floors so both orbs + the thread stay mostly visible.
+          t.q20 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.35));         // orb A
+          t.q21 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.31 + 2.2));   // orb B
+          t.q22 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.27 + 1.5));   // thread
+          t.q23 = ((tm * 0.05) + 0.25 * cur) % 1;           // hue drift + per-scene hue offset
+          t.q24 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.24 + 0.7));   // urchin presence
+          t.q25 = tm * 0.25;                                // urchin rotation (quicker)
 
-          t.q18 = tm;                            // time, handed to the lightning jitter
-          t.decay = 0.95;
+          t.q17 = bass;
+          t.q18 = tm;
+          t.decay = 0.93;
           return t;
         },
-        // Background: four BUSY, FULL-FRAME scenes — each a rich color gradient
-        // packed with fine radial/mesh/web lines — crossfading on the same clock
-        // (computed from `time`). Drawn procedurally here (not fed back), so the
-        // colorful background stays crisp while only the orbs/line leave trails.
+        // Background: four SOFT, MUTED PASTEL washes (no hard grids/fans — those
+        // read as neon webs; in the real preset ALL the structure is the central
+        // urchin + orbs). Each scene is a gentle 2-tone gradient + a faint soft
+        // center warmth; they crossfade on the scene clock.
         comp:
-          NOISE_GLSL + CTR_GLSL +
-          // dense radial spoke fan around point p (n ~ half the line count)
-          "float fan(vec2 p, float n, float w){ float a = atan(p.y, p.x); return smoothstep(w,0.0, abs(fract(a*n/3.14159)-0.5)); }\n" +
-          "vec3 sc0(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // Deep-space fan (blue/purple)
-          "  vec3 c = mix(vec3(0.02,0.0,0.07), vec3(0.0,0.03,0.13), gy);\n" +
-          "  vec3 spc = mix(vec3(0.25,0.35,1.0), vec3(0.55,0.25,0.95), 0.5+0.5*sin(ang*2.0+t*0.5));\n" +
-          "  c += spc * fan(d, 22.0, 0.05) * smoothstep(1.7,0.05,r);\n" +                 // dense spokes
-          "  c += vec3(0.20,0.45,1.0) * smoothstep(0.08,0.0, abs(fract(r*5.0 - t*0.3)-0.5)) * 0.3;\n" +  // faint rings
-          "  c += vec3(0.40,0.60,1.0) * exp(-r*r*7.0) * (0.4 + 0.3*bs);\n" +              // core glow
+          "vec3 sc0(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // dusty rose / salmon
+          "  vec3 c = mix(vec3(0.34,0.17,0.20), vec3(0.42,0.27,0.18), gy);\n" +
+          "  c += vec3(0.10,0.05,0.06) * exp(-r*r*1.8);\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 sc1(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // Perspective bowl mesh (warm)
-          "  vec2 p = d - vec2(0.0, -0.30);\n" +                                          // viewpoint above bowl
-          "  float rr = length(p);\n" +
-          "  float sp = fan(p, 26.0, 0.05);\n" +                                          // dense radial filaments
-          "  float rings = smoothstep(0.06,0.0, abs(fract(rr*7.0 - t*0.4)-0.5));\n" +     // concentric -> mesh
-          "  vec3 warm = mix(vec3(0.90,0.60,0.10), vec3(0.30,0.90,0.20), 0.5+0.5*sin(t*0.12));\n" +  // amber<->green
-          "  warm = mix(warm, vec3(1.0,0.40,0.60), 0.5+0.5*sin(t*0.07+2.0));\n" +         // <->pink
-          "  vec3 c = mix(vec3(0.10,0.03,0.0), vec3(0.22,0.10,0.02), gy);\n" +
-          "  c += warm*(sp+rings)*1.1*smoothstep(2.0,0.1,rr);\n" +
-          "  c += vec3(1.0,0.85,0.40)*sp*rings*0.8;\n" +                                  // bright mesh crossings
+          "vec3 sc1(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // lavender / periwinkle
+          "  vec3 c = mix(vec3(0.22,0.20,0.34), vec3(0.30,0.27,0.42), gy);\n" +
+          "  c += vec3(0.06,0.06,0.10) * exp(-r*r*1.8);\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 sc2(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // Teal web field
-          "  vec3 c = mix(vec3(0.0,0.10,0.11), vec3(0.03,0.20,0.17), gy);\n" +
-          "  c += vec3(0.0,0.18,0.15)*fbm(d*3.0 + t*0.10);\n" +                           // soft teal clouds
-          "  c += vec3(0.60,0.95,0.85)*ctr(fbm(d*4.0+t*0.15)*7.0, 0.05)*0.7;\n" +         // web filaments
-          "  c += vec3(0.90,0.50,0.20)*ctr(fbm(d*6.0+5.0)*9.0, 0.04)*0.3;\n" +            // orange speckle web
-          "  c += vec3(0.50,0.90,0.80)*fan(d, 14.0, 0.04)*smoothstep(1.6,0.2,r)*0.4;\n" + // faint spokes
+          "vec3 sc2(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // sage green
+          "  vec3 c = mix(vec3(0.24,0.30,0.22), vec3(0.32,0.38,0.27), gy);\n" +
+          "  c += vec3(0.06,0.08,0.05) * exp(-r*r*1.8);\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 sc3(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // Color storm (red<->blue/purple)
-          "  vec3 c = mix(vec3(0.15,0.08,0.45), vec3(0.55,0.06,0.12), gy);\n" +           // purple/blue -> red gradient
-          "  float vmask = pow(abs(normalize(d + vec2(0.0001,0.0001)).y), 1.5);\n" +      // emphasize vertical -> hourglass
-          "  c += vec3(1.0,0.85,0.20)*fan(vec2(d.x*0.5, d.y), 16.0, 0.05)*vmask*smoothstep(1.6,0.05,r)*1.1;\n" +  // yellow hourglass fan
-          "  c += vec3(0.10,0.70,0.20)*exp(-r*r*4.0)*(0.5 + 0.4*bs);\n" +                 // green center cloud
-          "  c += vec3(1.0,0.60,0.70)*ctr(d.x*8.0 - d.y*2.0 - t*0.5, 0.06)*smoothstep(0.0,1.5,r)*0.4;\n" +  // pink ripples
+          "vec3 sc3(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // warm tan / beige
+          "  vec3 c = mix(vec3(0.36,0.29,0.20), vec3(0.30,0.24,0.17), gy);\n" +
+          "  c += vec3(0.08,0.06,0.04) * exp(-r*r*1.8);\n" +
           "  return c;\n" +
           "}\n" +
           "vec3 alScene(float id,vec2 d,float r,float ang,float gy,float t,float bs){\n" +
@@ -357,19 +351,24 @@
           "  float r = length(d) * 2.0;\n" +
           "  float pang = atan(d.y, d.x);\n" +   // NOT 'ang'/'rad' — Butterchurn predeclares those
           "  float gy = uv.y;\n" +
-          "  float D = 14.0;\n" +                          // == SCENE_D
+          "  float D = 9.0;\n" +                           // == SCENE_D
           "  float ph = time / D;\n" +
           "  float cur = mod(floor(ph), 4.0);\n" +
           "  float nxt = mod(cur + 1.0, 4.0);\n" +
           "  float fr = fract(ph);\n" +
-          "  float fade = 2.5 / D;\n" +                    // == SCENE_FADE / SCENE_D
+          "  float fade = 2.0 / D;\n" +                    // == SCENE_FADE / SCENE_D
           "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
           "  vec3 col = mix(alScene(cur, d, r, pang, gy, time, bass), alScene(nxt, d, r, pang, gy, time, bass), f);\n" +
-          "  col *= (0.9 + 0.3*bass);\n" +
-          "  float luma = dot(col, vec3(0.333));\n" +
-          "  col = mix(vec3(luma), col, 0.92);\n" +          // keep saturation (the frames are colorful)
-          "  vec3 fb = texture2D(sampler_main, uv).rgb;\n" +  // additive orbs + their coil trails
-          "  ret = col*0.85 + fb;\n" +                        // colorful busy bg + glowing geometry on top
+          "  float bgl = dot(col, vec3(0.333));\n" +
+          "  col = mix(vec3(bgl), col, 0.6) * (0.92 + 0.15*bass);\n" +    // mute the BACKGROUND wash only
+          "  float km = 0.50 + 0.25*sin(time*0.03);\n" +                 // mirror-overlay (fills corners + more lines)
+          "  vec3 fb = texture2D(sampler_main, uv).rgb;\n" +
+          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, uv.y)).rgb * km;\n" +
+          "  fb += texture2D(sampler_main, vec2(uv.x, 1.0-uv.y)).rgb * km;\n" +
+          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, 1.0-uv.y)).rgb * km * 0.8;\n" +
+          "  vec3 glow = texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb;\n" +
+          "  glow += texture2D(sampler_blur1, vec2(1.0-uv.x, 1.0-uv.y)).rgb * km;\n" +
+          "  ret = col + fb*0.6 + glow*0.45;\n" +                        // colorful glowing geometry over the muted wash
           "}\n",
         // Gentle outward drift + a slow swirl of the feedback (trail) buffer:
         // makes each roaming orb's stamped echoes streak/recede into the coil-and-
@@ -377,11 +376,11 @@
         warp:
           "shader_body {\n" +
           "  vec2 d = uv - 0.5;\n" +
-          "  float a = 0.006 * sin(time * 0.2);\n" +     // very slow swirl
+          "  float a = 0.004 * sin(time * 0.1);\n" +     // very slow swirl
           "  float s = sin(a), c = cos(a);\n" +
-          "  vec2 ruv = 0.5 + mat2(c, -s, s, c) * d * 1.004;\n" +  // slight zoom-out = recede in z
+          "  vec2 ruv = 0.5 + mat2(c, -s, s, c) * d * 1.0015;\n" + // tiny zoom: local coils, no radial ray-streaks
           "  ret = texture2D(sampler_main, ruv).rgb;\n" +
-          "  ret -= 0.006;\n" +                          // trim trails so beads stay discrete
+          "  ret -= 0.008;\n" +                          // trim trails so beads stay discrete
           "}\n"
       }
     );
@@ -403,27 +402,29 @@
     // A small, clean ringed orb at center (cxq,cyq), faded by envelope envq. As
     // it roams (high decay) it stamps a string of fading rings = the coil/bead
     // RECEDE trail from the reference frames. col = [r,g,b] glow color.
-    function orbWave(cxq, cyq, envq, col) {
+    function orbWave(cxq, cyq, envq, hoff) {
       var w = sceneWave(function (a) {
         var env = a[envq] || 0;
         var ang = a.sample * 6.2832;
-        var rad = a.q5 || 0.04;                                // keep it a clean small ring
+        var rad = (a.q5 || 0.04) + 0.010 * a.value1;          // real-waveform ring (subtle, stays circular)
         a.x = (a[cxq] !== undefined ? a[cxq] : 0.4) + rad * Math.cos(ang);
         a.y = (a[cyq] !== undefined ? a[cyq] : 0.5) + rad * Math.sin(ang);
-        a.r = col[0]; a.g = col[1]; a.b = col[2];
+        var c = hueBright((a.q23 || 0) + hoff);                // bright per-scene hue (gold/blue/...)
+        a.r = c[0]; a.g = c[1]; a.b = c[2];
         a.a = env;
         return a;
       });
-      w.baseVals.smoothing = 0.85;                             // round, not jagged
+      w.baseVals.smoothing = 0.85;                             // round ring, not jagged
       return w;
     }
-    // wave[0],[1] — the two roaming orbs (teal-white, blue-violet).
-    preset.waves[0] = orbWave("q1", "q2", "q20", [0.55, 1.0, 0.85]);
-    preset.waves[1] = orbWave("q3", "q4", "q21", [0.60, 0.50, 1.0]);
+    // wave[0],[1] — the two bright roaming orbs (colored by the per-scene hue).
+    preset.waves[0] = orbWave("q1", "q2", "q20", 0.0);
+    preset.waves[1] = orbWave("q3", "q4", "q21", 0.08);
 
-    // wave[2] — the jagged LIGHTNING line joining the two orbs. Because the orbs
-    // roam independently the line is usually OFF center; its own envelope (q22)
-    // makes it appear and disappear. White-blue, sharp zig-zag jitter.
+    // wave[2] — the THICK JAGGED glowing waveform joining the two orbs: a dense
+    // high-freq zig-zag plus the live waveform (an electric oscilloscope line,
+    // like the original's gold lightning), colored by the per-scene hue. Off
+    // center because the orbs roam; spans the frame when they're far apart.
     preset.waves[2] = sceneWave(function (a) {
       var w = a.q22 || 0;
       var ax = a.q1 !== undefined ? a.q1 : 0.35, ay = a.q2 !== undefined ? a.q2 : 0.5;
@@ -432,26 +433,28 @@
       var dx = bx - ax, dy = by - ay;
       var len = Math.sqrt(dx * dx + dy * dy) || 1;
       var px = -dy / len, py = dx / len;                       // unit perpendicular
-      var jit = a.value1 * 0.10 + 0.05 * Math.sin(s * 90 + (a.q18 || 0) * 11);  // sharp lightning zig-zag
-      a.x = ax + dx * s + px * jit;
-      a.y = ay + dy * s + py * jit;
-      a.r = 0.80; a.g = 0.90; a.b = 1.0;
+      var jag = a.value1 * 0.16 + a.value2 * 0.05;             // REAL audio waveform (like Dance) — naturally jagged
+      a.x = ax + dx * s + px * jag;
+      a.y = ay + dy * s + py * jag;
+      var c = hueBright((a.q23 || 0) + 0.04);                  // same hue family as the orbs
+      a.r = c[0]; a.g = c[1]; a.b = c[2];
       a.a = w;
       return a;
     });
-    preset.waves[2].baseVals.smoothing = 0.0;
+    preset.waves[2].baseVals.smoothing = 0.0;                  // jagged, like a real oscilloscope
 
-    // wave[3] — central jagged "urchin": a spiky circular waveform whose spikes
-    // are the live samples. Brightest during the teal web scene (q13) but kept
-    // faintly present elsewhere so the frame stays busy. Teal-white.
+    // wave[3] — the central "flower urchin": each of the 512 waveform samples
+    // shoots a filament outward by its amplitude → a thick spiky star of
+    // filaments. Rotates (q25). Bright, complementary to the orbs/thread hue.
     preset.waves[3] = sceneWave(function (a) {
-      var w = Math.max(a.q13 || 0, 0.30);
-      var ang = a.sample * 6.2832;
-      var rad = 0.10 + 0.13 * Math.abs(a.value1);              // jagged spikes
+      var ang = a.sample * 6.2832 + (a.q25 || 0);             // rotation
+      var spike = Math.abs(a.value1);
+      var rad = 0.10 + 0.38 * spike;                          // filaments shoot outward
       a.x = 0.5 + rad * Math.cos(ang);
       a.y = 0.5 + rad * Math.sin(ang);
-      a.r = 0.70; a.g = 0.95; a.b = 0.90;
-      a.a = w;
+      var c = hueBright((a.q23 || 0) + 0.5);                  // complementary to orbs/thread
+      a.r = c[0]; a.g = c[1]; a.b = c[2];
+      a.a = (a.q24 || 0) * 0.8;
       return a;
     });
     preset.waves[3].baseVals.smoothing = 0.0;
