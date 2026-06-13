@@ -238,22 +238,28 @@
   P["Alchemy Random"] = (function () {
     // Scene clock shared by frame eqs + shaders. Keep D / FADE in sync with the
     // identical constants hard-coded in the GLSL below.
-    var SCENE_N = 6;         // number of distinct scenes in the cycle
+    var SCENE_N = 10;        // number of distinct scenes in the cycle
     var SCENE_D = 8.0;       // seconds per scene
     var SCENE_FADE = 2.0;    // crossfade window (last seconds of each scene)
 
-    // Per-scene config (mix-and-match for variety). shape: 0 rose · 1 none
-    // (orbs+lightning only) · 2 spiral S-arms · 3 urchin · 4 lissajous · 5 star-web.
-    // cx/cy = central-motif center (off-center on some); orb = how much the
-    // circles show; rot = rotation speed. Kaleidoscope per scene is in the shader
-    // (kalFor) — keep these in sync with SCENE_N scenes.
+    // Per-scene config — one entry per scene in the catalog (docs/alchemy-reference.md).
+    // shape (central motif): 0 rose · 1 none(orbs/bg-led) · 2 spiral · 3 urchin ·
+    //   4 lissajous · 5 star-web · 6 spiderweb · 7 crescent · 8 central waveform bolt.
+    // cx/cy = central-motif center (off-center on some); orb = circle visibility;
+    // rot = rotation speed. The BACKGROUND look + camera + kaleidoscope + darkness
+    // for each scene index are hard-coded in the shaders (alScene/kalFor/gzFor/
+    // darkFor/camZoom/camRot) — keep all of them indexed 0..9 in sync with this.
     var SCENES = [
-      { shape: 0, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.22 },  // rose, centered (kaleidoscope)
-      { shape: 1, cx: 0.38, cy: 0.44, orb: 1.00, rot: 0.18 },  // two orbs + lightning, off-center
-      { shape: 2, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.55 },  // spiral S-arms, centered (kaleidoscope)
-      { shape: 3, cx: 0.62, cy: 0.58, orb: 0.45, rot: 0.25 },  // urchin, off-center
-      { shape: 4, cx: 0.50, cy: 0.50, orb: 0.20, rot: 0.35 },  // lissajous, centered (kaleidoscope)
-      { shape: 5, cx: 0.40, cy: 0.60, orb: 0.40, rot: 0.40 }   // star-web, off-center
+      { shape: 3, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.25 },  // 0 dandelion / urchin burst
+      { shape: 1, cx: 0.50, cy: 0.50, orb: 1.00, rot: 0.10 },  // 1 HERO: two orbs + waveform + bloom
+      { shape: 2, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.45 },  // 2 perspective-tunnel spiral starburst
+      { shape: 1, cx: 0.50, cy: 0.50, orb: 0.10, rot: 0.10 },  // 3 kaleidoscope lens-bands (bg-led)
+      { shape: 8, cx: 0.50, cy: 0.50, orb: 0.10, rot: 0.10 },  // 4 hexagon mesh + central bolt
+      { shape: 8, cx: 0.50, cy: 0.50, orb: 0.10, rot: 0.15 },  // 5 smoke plumes + central bolt
+      { shape: 1, cx: 0.40, cy: 0.45, orb: 0.70, rot: 0.10 },  // 6 diagonal comet streaks
+      { shape: 6, cx: 0.50, cy: 0.50, orb: 0.15, rot: 0.40 },  // 7 rainbow spiderweb
+      { shape: 0, cx: 0.50, cy: 0.55, orb: 0.15, rot: 0.30 },  // 8 vertical-comb wallpaper + rosette
+      { shape: 7, cx: 0.45, cy: 0.55, orb: 0.30, rot: 0.50 }   // 9 crescent swirl
     ];
 
     // Soft on/off envelope from a -1..1 sine: 0 for part of the cycle, smoothly
@@ -271,8 +277,8 @@
       var r = 0.5 + 0.5 * Math.cos(6.2832 * h);
       var g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
       var b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-      var l = (r + g + b) / 3, s = 0.6;                       // desaturate toward luma -> muted, not neon
-      return [(r * s + l * (1 - s)) * 0.85, (g * s + l * (1 - s)) * 0.85, (b * s + l * (1 - s)) * 0.85];
+      var l = (r + g + b) / 3, s = 0.85;                      // keep saturation (grey/washed-out otherwise);
+      return [(r * s + l * (1 - s)) * 0.95, (g * s + l * (1 - s)) * 0.95, (b * s + l * (1 - s)) * 0.95];  // the tonemap tames white
     }
 
     var preset = build(
@@ -355,24 +361,28 @@
           "  c = mix(c, cc, smoothstep(0.30, 0.80, n2));\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 alScene(float id, vec2 d, float gy, float t){\n" +
-          "  if(id<0.5) return bleed(vec3(0.40,0.22,0.18), vec3(0.34,0.14,0.26), vec3(0.26,0.20,0.40), d, gy, t);\n" +  // orange/magenta/purple
-          "  if(id<1.5) return bleed(vec3(0.20,0.26,0.40), vec3(0.20,0.36,0.34), vec3(0.30,0.36,0.24), d, gy, t);\n" +  // blue/teal/olive
-          "  if(id<2.5) return bleed(vec3(0.42,0.46,0.42), vec3(0.40,0.38,0.48), vec3(0.48,0.42,0.36), d, gy, t);\n" +  // light mint/lavender/peach
-          "  if(id<3.5) return bleed(vec3(0.42,0.24,0.28), vec3(0.44,0.30,0.18), vec3(0.30,0.22,0.40), d, gy, t);\n" +  // pink/orange/violet
-          "  if(id<4.5) return bleed(vec3(0.18,0.30,0.34), vec3(0.30,0.24,0.42), vec3(0.22,0.36,0.30), d, gy, t);\n" +  // teal/indigo/green
-          "  return bleed(vec3(0.44,0.32,0.20), vec3(0.40,0.22,0.26), vec3(0.34,0.30,0.40), d, gy, t);\n" +            // amber/rose/mauve
+          // Structured per-scene BACKGROUND looks (catalog in docs/alchemy-reference.md).
+          "vec3 bgLens(vec2 d,float t){ vec2 q=abs(fract(vec2(d.x*3.0, d.y*4.0+sin(d.x*6.0+t)*0.2))-0.5); float eye=smoothstep(0.5,0.2,q.y)*smoothstep(0.5,0.34,q.x); vec3 c=mix(vec3(0.04,0.16,0.14), vec3(0.10,0.42,0.20), eye); c+=vec3(0.5,0.12,0.10)*smoothstep(0.14,0.0,q.y)*0.7; return c; }\n" +  // 3 kaleidoscope lens-bands / eye-lattice
+          "vec3 bgHex(vec2 d,float t){ vec2 p=d*6.0; float l1=abs(fract(p.x)-0.5), l2=abs(fract(p.x*0.5+p.y*0.866)-0.5), l3=abs(fract(p.x*0.5-p.y*0.866)-0.5); float g=smoothstep(0.06,0.0,min(min(l1,l2),l3)); return vec3(0.05,0.09,0.15) + vec3(0.25,0.5,0.4)*g*0.5; }\n" +  // 4 hexagon wireframe mesh (steel-blue)
+          "vec3 bgSmoke(vec2 d,float t){ vec2 w=d*2.0 + vec2(fbm(d*1.5+t*0.1), fbm(d*1.5-t*0.1)); float n=fbm(w*2.0); vec3 cyc=mix(vec3(0.45,0.10,0.42), vec3(0.10,0.42,0.20), 0.5+0.5*sin(t*0.05)); return cyc*(0.25+0.7*n); }\n" +  // 5 smoke/lava plumes (magenta<->green)
+          "vec3 bgComb(vec2 d,float t){ float s=smoothstep(0.46,0.5, abs(fract(d.x*14.0)-0.5)); return mix(vec3(0.05,0.13,0.06), vec3(0.16,0.30,0.12), s); }\n" +  // 8 vertical-comb wallpaper (olive)
+          "vec3 bgTunnel(vec2 d,float r,float ang,float t){ float rays=smoothstep(0.5,0.0, abs(fract(ang*8.0/3.14159+0.5)-0.5)); vec3 cyc=mix(vec3(0.10,0.5,0.25), vec3(0.45,0.10,0.40), 0.5+0.5*sin(t*0.05)); return vec3(0.03,0.07,0.05) + cyc*rays*smoothstep(1.7,0.1,r); }\n" +  // 2 perspective-tunnel rays
+          "vec3 bgStrata(vec2 d,float gy,float t){ float band=0.5+0.5*sin(gy*16.0 + sin(t*0.3)); vec3 cool=mix(vec3(0.10,0.30,0.34), vec3(0.42,0.12,0.36), 0.5+0.5*sin(t*0.05)); vec3 c=cool*(0.5+0.4*band); c+=vec3(0.5,0.34,0.10)*exp(-dot(d,d)*6.0); return c; }\n" +  // 9 landscape strata + amber clump
+          "vec3 alScene(float id, vec2 d, float r, float ang, float gy, float t){\n" +
+          "  if(id<0.5) return bleed(vec3(0.10,0.26,0.16), vec3(0.06,0.18,0.12), vec3(0.16,0.10,0.24), d, gy, t);\n" +  // 0 dandelion: dark green field
+          "  if(id<1.5) return bleed(vec3(0.04,0.05,0.13), vec3(0.07,0.04,0.11), vec3(0.12,0.06,0.16), d, gy, t);\n" +  // 1 hero: dark navy free-space
+          "  if(id<2.5) return bgTunnel(d, r, ang, t);\n" +
+          "  if(id<3.5) return bgLens(d, t);\n" +
+          "  if(id<4.5) return bgHex(d, t);\n" +
+          "  if(id<5.5) return bgSmoke(d, t);\n" +
+          "  if(id<6.5) return bleed(vec3(0.20,0.05,0.06), vec3(0.13,0.04,0.08), vec3(0.10,0.05,0.15), d, gy, t);\n" +  // 6 comet: dark maroon
+          "  if(id<7.5) return vec3(0.02,0.02,0.045);\n" +     // 7 spiderweb: near-black
+          "  if(id<8.5) return bgComb(d, t);\n" +
+          "  return bgStrata(d, gy, t);\n" +                    // 9 strata
           "}\n" +
-          "float kalFor(float id){\n" +     // per-scene kaleidoscope (mirror) amount
-          "  if(id<0.5) return 0.6;\n" +     // rose
-          "  if(id<1.5) return 0.0;\n" +     // orbs + lightning (free)
-          "  if(id<2.5) return 0.6;\n" +     // spiral
-          "  if(id<3.5) return 0.0;\n" +     // urchin (off-center)
-          "  if(id<4.5) return 0.6;\n" +     // lissajous
-          "  return 0.25;\n" +               // star-web (mild)
-          "}\n" +
-          "float gzFor(float id){ if(id<0.5) return 1.5; if(id<1.5) return 1.2; if(id<2.5) return 1.7; if(id<3.5) return 1.3; if(id<4.5) return 1.5; return 1.45; }\n" +  // per-scene geometry zoom (viewport)
-          "float darkFor(float id){ if(id<0.5) return 0.85; if(id<1.5) return 0.35; if(id<2.5) return 0.7; if(id<3.5) return 0.4; if(id<4.5) return 0.8; return 0.6; }\n" +  // per-scene bg darkness: neon-on-black (hero/urchin) vs pastel
+          "float kalFor(float id){ if(id<0.5) return 0.1; if(id<1.5) return 0.0; if(id<2.5) return 0.0; if(id<3.5) return 0.6; if(id<4.5) return 0.3; if(id<5.5) return 0.0; if(id<6.5) return 0.0; if(id<7.5) return 0.3; if(id<8.5) return 0.2; return 0.0; }\n" +  // per-scene kaleidoscope (mirror)
+          "float gzFor(float id){ if(id<0.5) return 1.4; if(id<1.5) return 1.2; if(id<2.5) return 1.7; if(id<3.5) return 1.3; if(id<4.5) return 1.2; if(id<5.5) return 1.4; if(id<6.5) return 1.3; if(id<7.5) return 1.5; if(id<8.5) return 1.3; return 1.4; }\n" +  // per-scene geometry zoom (viewport)
+          "float darkFor(float id){ if(id<0.5) return 0.5; if(id<1.5) return 0.35; if(id<2.5) return 0.6; if(id<3.5) return 0.95; if(id<4.5) return 0.85; if(id<5.5) return 0.7; if(id<6.5) return 0.5; if(id<7.5) return 0.4; if(id<8.5) return 0.85; return 0.7; }\n" +  // per-scene bg darkness (neon-on-black vs pastel)
           "shader_body {\n" +
           "  vec2 d = uv - 0.5;\n" +
           "  d.x *= resolution.x / resolution.y;\n" +
@@ -381,16 +391,16 @@
           "  float gy = uv.y;\n" +
           "  float D = 8.0;\n" +                           // == SCENE_D
           "  float ph = time / D;\n" +
-          "  float cur = mod(floor(ph), 6.0);\n" +         // == SCENE_N
-          "  float nxt = mod(cur + 1.0, 6.0);\n" +
+          "  float cur = mod(floor(ph), 10.0);\n" +        // == SCENE_N
+          "  float nxt = mod(cur + 1.0, 10.0);\n" +
           "  float fr = fract(ph);\n" +
           "  float fade = 2.0 / D;\n" +                    // == SCENE_FADE / SCENE_D
           "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
-          "  vec3 col = mix(alScene(cur, d, gy, time), alScene(nxt, d, gy, time), f);\n" +
-          "  col *= (0.95 + 0.12*bass);\n" +                            // bg already muted/desaturated in bleed()
-          "  col *= mix(darkFor(cur), darkFor(nxt), f);\n" +            // neon scenes -> near-black bg, pastel scenes stay light
-          "  float km = 0.18 + mix(kalFor(cur), kalFor(nxt), f);\n" +   // baseline corner fill + per-scene kaleidoscope
-          "  float Z = mix(gzFor(cur), gzFor(nxt), f);\n" +             // per-scene geometry zoom (viewport)
+          "  vec3 col = mix(alScene(cur, d, r, pang, gy, time), alScene(nxt, d, r, pang, gy, time), f);\n" +
+          "  col *= (0.95 + 0.12*bass);\n" +
+          "  col *= mix(darkFor(cur), darkFor(nxt), f);\n" +            // neon scenes -> near-black bg, pastel stay light
+          "  float km = 0.18 + mix(kalFor(cur), kalFor(nxt), f);\n" +
+          "  float Z = mix(gzFor(cur), gzFor(nxt), f);\n" +
           "  vec2 zuv = (uv - 0.5) / Z + 0.5;\n" +
           "  float o = 2.5 / resolution.y;\n" +                         // dilation radius -> THICK lines
           "  vec3 fb = texture2D(sampler_main, zuv).rgb;\n" +
@@ -402,7 +412,9 @@
           "  fb += texture2D(sampler_main, vec2(zuv.x, 1.0-zuv.y)).rgb * km;\n" +
           "  vec3 glow = texture2D(sampler_blur1, zuv).rgb + texture2D(sampler_blur2, zuv).rgb;\n" +
           "  vec3 outc = col + fb*0.55 + glow*0.45;\n" +
-          "  ret = outc / (outc + vec3(0.9));\n" +                      // Reinhard tone-map (stronger): keep color, no white-out
+          "  float hw = (abs(cur-1.0)<0.5 ? (1.0-f) : 0.0) + (abs(nxt-1.0)<0.5 ? f : 0.0);\n" +  // HERO central bloom
+          "  outc += vec3(1.0,0.82,0.55) * exp(-r*r*7.0) * (0.12 + 0.6*bass) * hw;\n" +
+          "  ret = outc / (outc + vec3(0.9));\n" +                      // Reinhard tone-map: keep color, no white-out
           "}\n",
         // Gentle outward drift + a slow swirl of the feedback (trail) buffer:
         // makes each roaming orb's stamped echoes streak/recede into the coil-and-
@@ -411,11 +423,11 @@
           // Per-scene CAMERA on the feedback (trail) buffer: tunnel push (zoom>1)
           // for the starburst/swirl scenes, flat for the hero/urchin, rotation for
           // the swirl scenes. Computed from the same scene clock as comp/frame.
-          "float camZoom(float id){ if(id<0.5) return 1.0; if(id<1.5) return 1.002; if(id<2.5) return 1.018; if(id<3.5) return 1.0; if(id<4.5) return 1.006; return 1.014; }\n" +
-          "float camRot(float id){ if(id<0.5) return 0.004; if(id<1.5) return 0.0; if(id<2.5) return 0.016; if(id<3.5) return 0.0; if(id<4.5) return 0.006; return 0.020; }\n" +
+          "float camZoom(float id){ if(id<0.5) return 1.0; if(id<1.5) return 1.0; if(id<2.5) return 1.018; if(id<3.5) return 1.0; if(id<4.5) return 1.0; if(id<5.5) return 1.008; if(id<6.5) return 1.002; if(id<7.5) return 1.008; if(id<8.5) return 1.004; return 1.012; }\n" +
+          "float camRot(float id){ if(id<0.5) return 0.004; if(id<1.5) return 0.0; if(id<2.5) return 0.016; if(id<3.5) return 0.0; if(id<4.5) return 0.0; if(id<5.5) return 0.002; if(id<6.5) return 0.010; if(id<7.5) return 0.016; if(id<8.5) return 0.0; return 0.022; }\n" +
           "shader_body {\n" +
           "  float D = 8.0; float ph = time / D;\n" +
-          "  float cur = mod(floor(ph), 6.0); float nxt = mod(cur + 1.0, 6.0);\n" +
+          "  float cur = mod(floor(ph), 10.0); float nxt = mod(cur + 1.0, 10.0);\n" +
           "  float fr = fract(ph); float fade = 2.0 / D;\n" +
           "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
           "  float zm = mix(camZoom(cur), camZoom(nxt), f);\n" +   // per-scene tunnel zoom
@@ -522,10 +534,26 @@
         // 4 LISSAJOUS figure (bass-scaled, audio-jittered)
         a.x = cx + bscale * (0.34 + 0.05 * v) * Math.sin(3.0 * th + rot);
         a.y = cy + bscale * (0.32 + 0.05 * v) * Math.sin(2.0 * th);
-      } else {
+      } else if (shape < 5.5) {
         // 5 STAR-WEB: star polygon (non-integer angular step) + waveform radius
         var th5 = th * 2.5 + rot, rr5 = bscale * 0.32 * (0.7 + 0.3 * av);
         a.x = cx + rr5 * Math.cos(th5); a.y = cy + rr5 * Math.sin(th5);
+      } else if (shape < 6.5) {
+        // 6 SPIDERWEB: many fine radial spokes (dense), bass-flared, rotating
+        var SPK = 24.0, sp = Math.floor(s * SPK), u6 = s * SPK - sp;
+        var ang6 = sp * (6.2832 / SPK) + rot;
+        var rr6 = bscale * (0.05 + u6 * 0.45) + 0.03 * v;
+        a.x = cx + rr6 * Math.cos(ang6); a.y = cy + rr6 * Math.sin(ang6);
+        if (u6 < 0.02) alpha = 0.0;                           // hide spoke-to-spoke jumps
+      } else if (shape < 7.5) {
+        // 7 CRESCENT: a single arc (half sweep); the feedback swirl smears it into
+        // the comma/crescent seen in the original.
+        var ca = s * 3.1416 + rot, rr7 = bscale * 0.34 + 0.04 * v;
+        a.x = cx + rr7 * Math.cos(ca); a.y = cy + rr7 * Math.sin(ca);
+      } else {
+        // 8 BOLT: a central vertical waveform line (for the hex-mesh / smoke scenes)
+        a.x = cx + (a.value1 * 0.16 + a.value2 * 0.05);
+        a.y = 0.08 + s * 0.84;
       }
       var c = hueBright((a.q23 || 0) + 0.5);                  // complementary to orbs/thread
       a.r = c[0]; a.g = c[1]; a.b = c[2];
