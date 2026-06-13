@@ -253,9 +253,11 @@
     // the original are vivid/glowing (gold/blue/magenta); only the BACKGROUND is
     // muted — so geometry uses this, the wash gets desaturated in the comp.
     function hueBright(h) {
-      return [0.5 + 0.5 * Math.cos(6.2832 * h),
-              0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)),
-              0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))];
+      var r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+      var g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+      var b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+      var l = (r + g + b) / 3, s = 0.6;                       // desaturate toward luma -> muted, not neon
+      return [(r * s + l * (1 - s)) * 0.85, (g * s + l * (1 - s)) * 0.85, (b * s + l * (1 - s)) * 0.85];
     }
 
     var preset = build(
@@ -306,8 +308,16 @@
           t.q21 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.31 + 2.2));   // orb B
           t.q22 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.27 + 1.5));   // thread
           t.q23 = ((tm * 0.05) + 0.25 * cur) % 1;           // hue drift + per-scene hue offset
-          t.q24 = 0.6 + 0.4 * comeGo(Math.sin(tm * 0.24 + 0.7));   // urchin presence
           t.q25 = tm * 0.25;                                // urchin rotation (quicker)
+          // Per-scene composition (lerp cur->next by f): OFF-CENTER on scenes 1 & 3,
+          // urchin OFF on scene 1 (orbs + lightning only), spiral shape on scene 2 —
+          // so the four scenes read as genuinely different, not one.
+          var ox = [0.5, 0.36, 0.5, 0.64], oy = [0.5, 0.42, 0.5, 0.58], uo = [1, 0, 1, 1];
+          t.q26 = ox[cur] * (1 - f) + ox[next] * f;         // urchin center x
+          t.q27 = oy[cur] * (1 - f) + oy[next] * f;         // urchin center y
+          t.q28 = cur;                                      // urchin shape selector
+          var uon = uo[cur] * (1 - f) + uo[next] * f;
+          t.q24 = uon * (0.6 + 0.4 * comeGo(Math.sin(tm * 0.24 + 0.7)));  // urchin presence (per-scene)
 
           t.q17 = bass;
           t.q18 = tm;
@@ -319,26 +329,22 @@
         // urchin + orbs). Each scene is a gentle 2-tone gradient + a faint soft
         // center warmth; they crossfade on the scene clock.
         comp:
-          "vec3 sc0(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // dusty rose / salmon
-          "  vec3 c = mix(vec3(0.34,0.17,0.20), vec3(0.42,0.27,0.18), gy);\n" +
-          "  c += vec3(0.10,0.05,0.06) * exp(-r*r*1.8);\n" +
+          NOISE_GLSL +
+          // Soft MULTI-COLOR bleed: 3 muted tones blended by low-freq fbm + a
+          // gentle vertical gradient, slowly drifting — the original's background
+          // has several colors bleeding together (not a flat 2-tone wash). This is
+          // color blending, NOT the sharp contour "blobs" from before.
+          "vec3 bleed(vec3 a, vec3 b, vec3 cc, vec2 d, float gy, float t){\n" +
+          "  float n1 = fbm(d*1.3 + vec2(t*0.05, -t*0.04));\n" +
+          "  float n2 = fbm(d*0.9 + vec2(-t*0.03, t*0.05) + 7.0);\n" +
+          "  vec3 c = mix(a, b, clamp(gy*0.6 + 0.7*(n1-0.5) + 0.5, 0.0, 1.0));\n" +
+          "  c = mix(c, cc, smoothstep(0.30, 0.80, n2));\n" +
           "  return c;\n" +
           "}\n" +
-          "vec3 sc1(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // lavender / periwinkle
-          "  vec3 c = mix(vec3(0.22,0.20,0.34), vec3(0.30,0.27,0.42), gy);\n" +
-          "  c += vec3(0.06,0.06,0.10) * exp(-r*r*1.8);\n" +
-          "  return c;\n" +
-          "}\n" +
-          "vec3 sc2(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // sage green
-          "  vec3 c = mix(vec3(0.24,0.30,0.22), vec3(0.32,0.38,0.27), gy);\n" +
-          "  c += vec3(0.06,0.08,0.05) * exp(-r*r*1.8);\n" +
-          "  return c;\n" +
-          "}\n" +
-          "vec3 sc3(vec2 d,float r,float ang,float gy,float t,float bs){\n" +   // warm tan / beige
-          "  vec3 c = mix(vec3(0.36,0.29,0.20), vec3(0.30,0.24,0.17), gy);\n" +
-          "  c += vec3(0.08,0.06,0.04) * exp(-r*r*1.8);\n" +
-          "  return c;\n" +
-          "}\n" +
+          "vec3 sc0(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.40,0.22,0.18), vec3(0.34,0.14,0.26), vec3(0.26,0.20,0.40), d, gy, t); }\n" +   // orange/magenta/purple
+          "vec3 sc1(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.20,0.26,0.40), vec3(0.20,0.36,0.34), vec3(0.30,0.36,0.24), d, gy, t); }\n" +   // blue/teal/olive
+          "vec3 sc2(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.42,0.46,0.42), vec3(0.40,0.38,0.48), vec3(0.48,0.42,0.36), d, gy, t); }\n" +   // light mint/lavender/peach
+          "vec3 sc3(vec2 d,float r,float ang,float gy,float t,float bs){ return bleed(vec3(0.42,0.24,0.28), vec3(0.44,0.30,0.18), vec3(0.30,0.22,0.40), d, gy, t); }\n" +   // pink/orange/violet
           "vec3 alScene(float id,vec2 d,float r,float ang,float gy,float t,float bs){\n" +
           "  if(id<0.5) return sc0(d,r,ang,gy,t,bs);\n" +
           "  if(id<1.5) return sc1(d,r,ang,gy,t,bs);\n" +
@@ -359,16 +365,21 @@
           "  float fade = 2.0 / D;\n" +                    // == SCENE_FADE / SCENE_D
           "  float f = clamp((fr - (1.0 - fade)) / fade, 0.0, 1.0); f = f*f*(3.0-2.0*f);\n" +
           "  vec3 col = mix(alScene(cur, d, r, pang, gy, time, bass), alScene(nxt, d, r, pang, gy, time, bass), f);\n" +
-          "  float bgl = dot(col, vec3(0.333));\n" +
-          "  col = mix(vec3(bgl), col, 0.6) * (0.92 + 0.15*bass);\n" +    // mute the BACKGROUND wash only
-          "  float km = 0.50 + 0.25*sin(time*0.03);\n" +                 // mirror-overlay (fills corners + more lines)
+          "  col *= (0.95 + 0.12*bass);\n" +                            // bg already muted/desaturated in bleed()
+          "  float kc = (cur < 0.5 || (cur > 1.5 && cur < 2.5)) ? 1.0 : 0.0;\n" +  // kaleidoscope on scenes 0 & 2
+          "  float kn = (nxt < 0.5 || (nxt > 1.5 && nxt < 2.5)) ? 1.0 : 0.0;\n" +
+          "  float km = 0.22 + 0.5 * mix(kc, kn, f);\n" +               // baseline corner fill + extra on kaleidoscope scenes
+          "  float o = 2.5 / resolution.y;\n" +                         // dilation radius -> THICK lines
           "  vec3 fb = texture2D(sampler_main, uv).rgb;\n" +
-          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, uv.y)).rgb * km;\n" +
+          "  fb = max(fb, texture2D(sampler_main, uv + vec2(o,0.0)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, uv - vec2(o,0.0)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, uv + vec2(0.0,o)).rgb);\n" +
+          "  fb = max(fb, texture2D(sampler_main, uv - vec2(0.0,o)).rgb);\n" +
+          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, uv.y)).rgb * km;\n" +     // mirror fill (kaleidoscope)
           "  fb += texture2D(sampler_main, vec2(uv.x, 1.0-uv.y)).rgb * km;\n" +
-          "  fb += texture2D(sampler_main, vec2(1.0-uv.x, 1.0-uv.y)).rgb * km * 0.8;\n" +
           "  vec3 glow = texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb;\n" +
-          "  glow += texture2D(sampler_blur1, vec2(1.0-uv.x, 1.0-uv.y)).rgb * km;\n" +
-          "  ret = col + fb*0.6 + glow*0.45;\n" +                        // colorful glowing geometry over the muted wash
+          "  vec3 outc = col + fb*0.7 + glow*0.6;\n" +
+          "  ret = outc / (outc + vec3(0.6));\n" +                      // Reinhard tone-map: muted, no white clip
           "}\n",
         // Gentle outward drift + a slow swirl of the feedback (trail) buffer:
         // makes each roaming orb's stamped echoes streak/recede into the coil-and-
@@ -447,11 +458,22 @@
     // shoots a filament outward by its amplitude → a thick spiky star of
     // filaments. Rotates (q25). Bright, complementary to the orbs/thread hue.
     preset.waves[3] = sceneWave(function (a) {
-      var ang = a.sample * 6.2832 + (a.q25 || 0);             // rotation
-      var spike = Math.abs(a.value1);
-      var rad = 0.10 + 0.38 * spike;                          // filaments shoot outward
-      a.x = 0.5 + rad * Math.cos(ang);
-      a.y = 0.5 + rad * Math.sin(ang);
+      var cx = a.q26 !== undefined ? a.q26 : 0.5;             // per-scene (possibly off-) center
+      var cy = a.q27 !== undefined ? a.q27 : 0.5;
+      var scene = a.q28 || 0;
+      if (scene > 1.5 && scene < 2.5) {
+        // scene 2: a SPIRAL fractal (different shape) — radius grows along the wave
+        var sang = a.sample * 6.2832 * 5.0 + (a.q25 || 0);
+        var srad = 0.04 + a.sample * 0.40 + 0.05 * a.value1;
+        a.x = cx + srad * Math.cos(sang);
+        a.y = cy + srad * Math.sin(sang);
+      } else {
+        // radial "flower urchin": real-waveform filaments shooting outward
+        var ang = a.sample * 6.2832 + (a.q25 || 0);
+        var rad = 0.10 + 0.38 * Math.abs(a.value1);
+        a.x = cx + rad * Math.cos(ang);
+        a.y = cy + rad * Math.sin(ang);
+      }
       var c = hueBright((a.q23 || 0) + 0.5);                  // complementary to orbs/thread
       a.r = c[0]; a.g = c[1]; a.b = c[2];
       a.a = (a.q24 || 0) * 0.8;

@@ -247,6 +247,13 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
   from `a.value1`/`a.value2` (the live samples), like Dance's `waveLine` — the
   512 real samples give the dense jaggedness for free. Apply the same to any shape
   (orb rings, urchin filaments): prefer real-waveform displacement over synthetic.
+- **Colors MUST stay MUTED** (the user repeats this — it is a hard requirement).
+  The original is dusty/pastel: muted backgrounds AND muted-but-colored geometry
+  (soft gold/lavender/sage), never neon and never blown out to flat white.
+  Techniques: desaturate hues (don't use full-saturation cosine palettes), keep
+  the background wash low-saturation, and **tone-map the final** (Reinhard
+  `c/(c+k)`) so additive/bloom highlights compress to soft color instead of pure
+  white. If it looks neon or white, it's wrong.
 
 ## Best practices for this codebase
 
