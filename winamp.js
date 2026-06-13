@@ -230,14 +230,20 @@
     });
     NA.storage.set({ neoampLayout: layout });
   }
+  var RESIZABLE = { "wa-viz": 1, "wa-pl": 1 };
   function applyLayout() {
-    var defaults = { "wa-main": { x: 40, y: 70 }, "wa-eq": { x: 40, y: 250 }, "wa-viz": { x: 480, y: 70, w: 360, h: 280 } };
+    var defaults = {
+      "wa-main": { x: 40, y: 70 },
+      "wa-eq": { x: 40, y: 250 },
+      "wa-viz": { x: 480, y: 70, w: 360, h: 280 },
+      "wa-pl": { x: 40, y: 430, w: 430, h: 220 },
+    };
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
       var d = (layout[k]) || defaults[k] || { x: 60, y: 60 };
       e.style.left = (d.x || 40) + "px";
       e.style.top = (d.y || 60) + "px";
-      if (d.w && k === "wa-viz") { e.style.width = d.w + "px"; e.style.height = d.h + "px"; }
+      if (d.w && RESIZABLE[k]) { e.style.width = d.w + "px"; e.style.height = d.h + "px"; }
       if (d.hidden) e.style.display = "none";
     });
   }
@@ -317,8 +323,9 @@
     els.shuffleTog = tog("SHUF", "Shuffle", function (t) { t.classList.toggle("on"); NA.control.toggleShuffle(); });
     els.repeatTog = tog("REP", "Repeat", function (t) { t.classList.toggle("on"); NA.control.toggleRepeat(); });
     els.eqTog = tog("EQ", "Toggle equalizer", function (t) { toggleWin("wa-eq", t); });
+    els.plTog = tog("PL", "Toggle playlist", function (t) { toggleWin("wa-pl", t); refreshQueue(true); });
     els.visTog = tog("VIS", "Toggle visualization", function (t) { toggleWin("wa-viz", t); });
-    var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.visTog]);
+    var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.plTog, els.visTog]);
 
     var controls = h("div", { class: "wa-controls" }, [transport, vols, toggles]);
 
@@ -433,6 +440,68 @@
   });
 
   // =========================================================================
+  // PLAYLIST WINDOW (mirrors YTM's "Up Next" queue)
+  // =========================================================================
+  function buildPlaylist() {
+    var win = makeWindow("wa-pl", "NeoAmp Playlist", { shade: false, onClose: function () { hideWin("wa-pl"); } });
+    var list = h("div", { class: "wa-pl-list" });
+    var mk = function (lbl, title, fn) {
+      var b = h("div", { class: "wa-pl-btn", title: title, text: lbl });
+      if (fn) b.addEventListener("click", fn);
+      return b;
+    };
+    var btns = h("div", { class: "wa-pl-btns" }, [
+      mk("ADD", "Add tracks (opens YouTube Music search)", focusYtSearch),
+      mk("REM", "Remove — use YTM's queue menu (not yet supported)"),
+      mk("SEL", "Select"),
+      mk("MISC", "Refresh queue", function () { refreshQueue(true); }),
+    ]);
+    els.plCount = h("div", { class: "wa-pl-count", text: "0 items" });
+    els.plTime = h("div", { class: "wa-pl-time wa-lcd", text: "0:00 / 0:00" });
+    var foot = h("div", { class: "wa-pl-foot" }, [btns, els.plCount, els.plTime]);
+
+    win.body.appendChild(list);
+    win.body.appendChild(foot);
+    els.plList = list;
+
+    var rs = h("div", { class: "wa-resize", title: "Resize" });
+    win.el.appendChild(rs);
+    makeResizable(win.el, rs, 240, 140);
+    refreshQueue(true);
+  }
+
+  // Rebuild the row list only when the queue actually changed (signature check),
+  // so the 400ms track tick + the slow poll don't thrash the DOM / scroll.
+  var plSig = "";
+  function refreshQueue(force) {
+    if (!els.plList) return;
+    var q = NA.getQueue ? NA.getQueue() : [];
+    var sig = q.map(function (x) { return (x.playing ? "*" : "") + x.title; }).join("|");
+    if (!force && sig === plSig) return;
+    plSig = sig;
+    els.plList.innerHTML = "";
+    if (!q.length) {
+      els.plList.appendChild(h("div", { class: "wa-pl-empty", text: "Queue empty — play a track or open Up Next in YouTube Music." }));
+    } else {
+      q.forEach(function (item) {
+        var row = h("div", { class: "wa-pl-row" + (item.playing ? " playing" : "") }, [
+          h("span", { class: "wa-pl-n", text: (item.index + 1) + "." }),
+          h("span", { class: "wa-pl-t", text: item.title + (item.artist ? " - " + item.artist : "") }),
+          h("span", { class: "wa-pl-d", text: item.duration || "" }),
+        ]);
+        row.title = "Double-click to play";
+        row.addEventListener("dblclick", function () {
+          NA.control.playQueueItem(item.index);
+          setTimeout(function () { refreshQueue(true); }, 450);
+        });
+        els.plList.appendChild(row);
+        if (item.playing) requestAnimationFrame(function () { row.scrollIntoView({ block: "nearest" }); });
+      });
+    }
+    if (els.plCount) els.plCount.textContent = q.length + (q.length === 1 ? " item" : " items");
+  }
+
+  // =========================================================================
   // iframe bridge (audio in, presets/favorites round-trip)
   // =========================================================================
   function postViz(m) {
@@ -472,6 +541,8 @@
       els.seek.value = String(Math.round(pct));
       paintRange(els.seek);
     }
+    if (els.plTime) els.plTime.textContent = fmt(t.currentTime) + " / " + fmt(trackDur);
+    refreshQueue();
   }
 
   var marqueeAnim = null, lastMarquee = "";
@@ -576,6 +647,7 @@
   function hideWin(id) {
     if (wins[id]) wins[id].el.style.display = "none";
     if (id === "wa-eq" && els.eqTog) els.eqTog.classList.remove("on");
+    if (id === "wa-pl" && els.plTog) els.plTog.classList.remove("on");
     if (id === "wa-viz" && els.visTog) els.visTog.classList.remove("on");
     saveLayout();
   }
@@ -593,11 +665,18 @@
     buildMain();
     buildEq();
     buildViz();
-    // reflect EQ/VIS toggle initial state
+    buildPlaylist();
+    // reflect EQ/PL/VIS toggle initial state
     if (els.eqTog) els.eqTog.classList.add("on");
+    if (els.plTog) els.plTog.classList.add("on");
     if (els.visTog) els.visTog.classList.add("on");
     NA.on("track", onTrack);
     NA.on("audio", onAudio);
+    // slow poll so queue edits made in YTM while the same track plays show up
+    setInterval(function () {
+      var w = wins["wa-pl"];
+      if (w && w.el.style.display !== "none") refreshQueue();
+    }, 1500);
     NA.storage.get("neoampSkin", function (id) { if (id) { currentSkin = id; applySkin(id); var ss = root.querySelector(".wa-skinsel"); if (ss) ss.value = id; } });
     NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); });
   }

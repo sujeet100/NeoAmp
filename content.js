@@ -133,6 +133,28 @@
   function getTrack() { return lastTrack || readTrack(); }
   function sendTrack() { lastTrack = readTrack(); emit("track", lastTrack); }
 
+  // The "Up Next" queue, read straight from YTM's DOM. Each row is a
+  // <ytmusic-player-queue-item>; the currently-playing one carries [selected].
+  function readQueue() {
+    var items = document.querySelectorAll("ytmusic-player-queue-item");
+    var out = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var title = clean((it.querySelector(".song-title") || {}).textContent);
+      if (!title) continue;
+      var byline = clean((it.querySelector(".byline") || {}).textContent);
+      var pbs = it.getAttribute("play-button-state") || "";
+      out.push({
+        index: i,
+        title: title,
+        artist: byline.split("•")[0].trim(),
+        duration: clean((it.querySelector(".duration") || {}).textContent),
+        playing: it.hasAttribute("selected") || pbs === "playing" || pbs === "paused",
+      });
+    }
+    return out;
+  }
+
   var control = {
     playPause: function () { var v = q("video"); if (v) { v.paused ? v.play() : v.pause(); sendTrack(); } },
     next: function () { var b = qa(["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"]); if (b) b.click(); },
@@ -143,6 +165,14 @@
     getVolume: function () { var v = q("video"); return v ? v.volume : 1; },
     toggleShuffle: function () { var b = qa(["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"]); if (b) b.click(); },
     toggleRepeat: function () { var b = qa(["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]); if (b) b.click(); },
+    playQueueItem: function (i) {
+      var items = document.querySelectorAll("ytmusic-player-queue-item");
+      var it = items[i];
+      if (!it) return;
+      // clicking the row's song-info plays that queue entry in YTM
+      var target = it.querySelector(".song-info, .song-title, .left-items, #play-button") || it;
+      target.click();
+    },
   };
 
   // --- storage (chrome.storage, async; the iframe can't use it directly) ----
@@ -168,6 +198,7 @@
     isRunning: function () { return running; },
     on: on, off: off,
     getTrack: getTrack,
+    getQueue: readQueue,
     control: control,
     storage: storage,
     toast: toast,

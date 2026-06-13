@@ -338,6 +338,39 @@
 #wa-viz:fullscreen .wa-body, #wa-viz:-webkit-full-screen .wa-body { padding: 0; }
 #wa-viz:fullscreen .wa-resize, #wa-viz:-webkit-full-screen .wa-resize { display: none; }
 
+/* =======================================================================
+   PLAYLIST WINDOW (YTM "Up Next" queue)
+   ======================================================================= */
+#wa-pl { width: 430px; height: 220px; display: flex; flex-direction: column; min-width: 240px; min-height: 140px; }
+#wa-pl .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
+.wa-pl-list {
+  flex: 1 1 auto; overflow-y: auto; min-height: 0;
+  background: var(--wa-inset-bg); border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
+  font-family: var(--wa-lcd-font); font-size: 14px; line-height: 1.2;
+}
+.wa-pl-row { display: flex; align-items: center; gap: 6px; padding: 1px 6px; color: var(--wa-lcd); cursor: pointer; white-space: nowrap; }
+.wa-pl-row:hover { background: rgba(255,255,255,0.07); }
+.wa-pl-row.playing { background: #0a2a5e; color: #fff; text-shadow: 0 0 4px var(--wa-lcd-glow); }
+.wa-pl-n { min-width: 22px; text-align: right; opacity: 0.7; }
+.wa-pl-t { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.wa-pl-d { opacity: 0.85; }
+.wa-pl-empty { padding: 10px; color: var(--wa-fg-dim); font: 11px/1.4 var(--wa-font); white-space: normal; }
+.wa-pl-foot { display: flex; align-items: center; gap: 6px; }
+.wa-pl-btns { display: flex; gap: 3px; }
+.wa-pl-btn {
+  font: 700 8px/1 var(--wa-font); letter-spacing: 0.5px; color: var(--wa-btn-fg);
+  background: var(--wa-btn-bg); border: 2px solid; border-radius: 2px;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  padding: 5px 7px; cursor: pointer;
+}
+.wa-pl-btn:active { border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark); }
+.wa-pl-count { margin-left: auto; font: 700 9px/1 var(--wa-font); color: var(--wa-fg-dim); }
+.wa-pl-time {
+  font-size: 14px; padding: 3px 6px; color: var(--wa-lcd);
+  border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85);
+}
+
 /* skin picker (in the main titlebar) */
 .wa-skinsel {
   font: 700 8px/1 var(--wa-font); color: var(--wa-title-fg);
