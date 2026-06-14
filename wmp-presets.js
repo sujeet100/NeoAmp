@@ -385,6 +385,185 @@
     return preset;
   })();
 
+  // ── Dance of the Freaky Circles (Nebula Spectrum) ───────────────────────────
+  // Same as (Nebula) but with WMP-style HUE CYCLING: the whole palette slowly rotates
+  // through the colour wheel over ~50s (warm -> cool -> magenta) and periodically
+  // desaturates to a grey/monochrome phase, like WMP's HueShift / "Musical Colors".
+  // Background takes the complementary hue (cool/warm depth); cores still flare white-hot.
+  P["Dance of the Freaky Circles (Nebula Spectrum)"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.965,
+        gammaadj: 1.4,
+        zoom: 0.997,
+        warp: 0.04,
+        echo_alpha: 0,
+        darken_center: 0,
+        wrap: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var th = t.time * 1.0;
+          var orbit = 0.11;
+          t.q1 = 0.5 + orbit * Math.cos(th);
+          t.q2 = 0.5 + orbit * Math.sin(th);
+          t.q3 = 0.5 + orbit * Math.cos(th + Math.PI);
+          t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
+          t.q5 = 0.052 + 0.004 * bass;
+          t.q10 = Math.min(0.45 + 0.5 * ((bass + mid + treb) / 3), 1.2);
+          var midA = (t.mid_att !== undefined ? t.mid_att : (t.mid || 0));
+          var trebA = (t.treb_att !== undefined ? t.treb_att : (t.treb || 0));
+          t.q14 = Math.max(0, Math.min((0.5 * (midA + trebA) - 0.55) * 1.8, 1.2));
+          t.q6 = 0.055 + 0.085 * t.q14;
+          t.q8 = 0.03 + 0.06 * Math.min(0.6 * treb + 0.4 * mid, 2.4);
+          t.q11 = t.time;
+          t.q12 = (t.vol_att !== undefined ? t.vol_att : (t.vol || 0.5));
+          t.q15 = 0.02 + 0.05 * Math.min(0.5 * bass + 0.5 * mid, 2.0);
+          var slot = Math.floor(t.time / 0.55);
+          var rnd = Math.sin(slot * 12.9898) * 43758.5453;
+          rnd = rnd - Math.floor(rnd);
+          var ph = t.time / 0.55 - slot;
+          t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;
+          return t;
+        },
+        warp:
+          "shader_body {\n" +
+          "vec2 wp = 1.0 / resolution;\n" +
+          "float br = 1.5;\n" +
+          "vec3 acc = texture2D(sampler_main, uv).rgb * 0.5;\n" +
+          "acc += texture2D(sampler_main, uv + vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv - vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv + vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv - vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
+          "ret = acc * 0.95;\n" +
+          "}\n",
+        // COMP: hue-cycling palette (WMP HueShift). hueCol() rotates through the wheel and
+        // desaturates toward grey when s is low. NO green clamp (the hue may legitimately
+        // be green/cyan during the cycle).
+        comp:
+          NOISE_GLSL +
+          "vec3 hueCol(float h, float s, float v) {\n" +
+          "  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (h + vec3(0.0, 0.33, 0.67)));\n" +
+          "  return mix(vec3(0.5), rb, s) * v;\n" +
+          "}\n" +
+          "shader_body {\n" +
+          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" +
+          "float n = fbm(nuv); n = n * n;\n" +
+          "float vig = 1.0 - smoothstep(0.20, 0.92, length(uv - 0.5));\n" +
+          "float hb = time * 0.02;\n" +                                  // ~50s full hue rotation
+          "float S = clamp(0.55 + 0.55 * sin(time * 0.045), 0.0, 1.0);\n" +  // periodic grey phase
+          "vec3 nebCol = hueCol(hb + 0.5, S * 0.85, 1.0);\n" +           // complementary bg hue
+          "vec3 neb = mix(vec3(0.02, 0.02, 0.03), nebCol * 0.5, n) * (0.14 + 0.11 * bass) * vig;\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
+          "float sl = max(sharp.r, max(sharp.g, sharp.b));\n" +
+          "vec3 base = hueCol(hb, S, 1.0);\n" +
+          "vec3 lc = base * mix(0.45, 1.0, smoothstep(0.10, 0.60, sl));\n" +
+          "lc = mix(lc, vec3(1.0), smoothstep(0.80, 1.30, sl) * 0.55);\n" +   // hot white cores
+          "vec3 line = lc * sl;\n" +
+          "ret = neb + line;\n" +
+          "}\n"
+      }
+    );
+    function innerCircle(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.7, thick: 1, r: 0.80, g: 0.20, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = (a.q5 || 0.04);
+          var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = 0.78; a.g = 0.22; a.b = 0.95;
+          return a;
+        }
+      };
+    }
+    function waveRing(qx, qy, useSecondChannel) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 180, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) {
+            a.x = -2; a.y = -2; return a;
+          }
+          var ang = a.sample * 6.2832;
+          var samp = useSecondChannel ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;
+          rad = Math.max(0.045, Math.min(rad, 0.40));
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = (a.q10 !== undefined ? a.q10 : 1) * (a.q14 !== undefined ? a.q14 : 1);
+          a.r = 0.80 * v; a.g = 0.35 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    function innerHarmonic(qx, qy, useFirstChannel) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 160, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 0.40, thick: 0, r: 0.55, g: 0.22, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) { a.x = -2; a.y = -2; return a; }
+          var ang = a.sample * 6.2832 + (a.q11 || 0) * 0.3;
+          var samp = useFirstChannel ? a.value1 : (a.value2 !== undefined ? a.value2 : a.value1);
+          var rad = (a.q6 || 0.11) * 0.60 + (a.q15 || 0.04) * (samp || 0);
+          rad = Math.max(0.035, Math.min(rad, 0.32));
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = 0.6 * (a.q14 !== undefined ? a.q14 : 1);
+          a.r = 0.55 * v; a.g = 0.22 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    function outerAura(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 128, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.5, a: 0.18, thick: 1, r: 0.45, g: 0.18, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) { a.x = -2; a.y = -2; return a; }
+          var ang = a.sample * 6.2832 - (a.q11 || 0) * 0.15;
+          var amp = 0.02 + 0.05 * (a.q12 || 0.5);
+          var rad = (a.q6 || 0.11) * 1.55 + amp * Math.sin(a.sample * 6.2832 * 5.0 + (a.q11 || 0));
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = 0.32 * (a.q14 !== undefined ? a.q14 : 1);
+          a.r = 0.45 * v; a.g = 0.18 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = innerCircle("q1", "q2");
+    preset.waves[1] = waveRing("q1", "q2", false);
+    preset.waves[2] = innerCircle("q3", "q4");
+    preset.waves[3] = waveRing("q3", "q4", true);
+    preset.waves[4] = innerHarmonic("q1", "q2", false);
+    preset.waves[5] = innerHarmonic("q3", "q4", true);
+    preset.waves[6] = outerAura("q1", "q2");
+    preset.waves[7] = outerAura("q3", "q4");
+    return preset;
+  })();
+
   // ── Dance of the Freaky Circles (Fire) ──────────────────────────────────────
   // A procedural fire visualizer over a clean black background, recoloured by a
   // MULTI-SHADE purple ramp (deep violet -> magenta -> pink-white). Two static inner
