@@ -33,7 +33,8 @@
         "vendor/skins/base-2.91.wsz",
         "vendor/skins/sony-esprit.wsz",
         "vendor/skins/nucleo-nlog.wsz",
-        "vendor/skins/winamp3-classified.wsz"
+        "vendor/skins/winamp3-classified.wsz",
+        "vendor/skins/bento-classified.wsz"
       ],
       "matches": ["https://music.youtube.com/*"]
     }

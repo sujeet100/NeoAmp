@@ -53,6 +53,7 @@
     { id: "sony-esprit", name: "Sony Esprit", file: "vendor/skins/sony-esprit.wsz" },
     { id: "nucleo-nlog", name: "Nucleo NLog", file: "vendor/skins/nucleo-nlog.wsz" },
     { id: "winamp3-classified", name: "Winamp3 Classified", file: "vendor/skins/winamp3-classified.wsz" },
+    { id: "bento-classified", name: "Bento Classified", file: "vendor/skins/bento-classified.wsz" },
   ];
   var classicApi = null;        // mounted Main-window renderer (null = procedural mode)
 

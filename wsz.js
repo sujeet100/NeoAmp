@@ -316,13 +316,15 @@
 
     // mm:ss split into the four digit slots (48,60,78,90 @ y=26), 9x13 each
     function drawTime(sec) {
-      if (!sheet("NUMBERS") || st.stopped) return;
+      // some skins ship NUMS_EX instead of NUMBERS (same 9x13 digit grid)
+      var num = sheet("NUMBERS") ? "NUMBERS" : (sheet("NUMS_EX") ? "NUMS_EX" : null);
+      if (!num || st.stopped) return;
       var t = Math.max(0, Math.floor(sec));
       var mm = Math.floor(t / 60), ss = t % 60;
       var d = [Math.floor(mm / 10), mm % 10, Math.floor(ss / 10), ss % 10];
       var xs = [LAYOUT.timeX, LAYOUT.timeX + 12, LAYOUT.timeX + 30, LAYOUT.timeX + 42];
       for (var i = 0; i < 4; i++) {
-        blitRect("NUMBERS", d[i] * 9, 0, 9, 13, xs[i], LAYOUT.timeY);
+        blitRect(num, d[i] * 9, 0, 9, 13, xs[i], LAYOUT.timeY);
       }
     }
 
