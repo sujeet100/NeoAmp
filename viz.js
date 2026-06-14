@@ -57,7 +57,7 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Dance of the Freaky Circles", wmp: "Dance of the Freaky Circles" },
+    { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },

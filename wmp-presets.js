@@ -173,17 +173,14 @@
 
   var P = {};
 
-  // ── Dance of the Freaky Circles (Bateria: taniec dźwiękowych kółek) ─────────
-  // Re-derived from the reference video (Untitled.mp4 — frames st_18/st_33/zoom_a/cc2):
-  //   • TWO "circle-in-circle" units orbit each other. Each unit = a small SMOOTH
-  //     inner circle + a THICK JAGGED waveform ring AROUND it (the ring is the
-  //     audio waveform; it jumps outward with the music — louder = bigger jump).
-  //     Each unit's ring is driven by its OWN channel (value1 / value2).
-  //   • As the rings jump, their high-decay TRAIL lights the background mosaic:
-  //     coarse SQUARE cells (mostly crisp, soft edges), painted WIDE. The mosaic
-  //     fades by losing brightness AND hue — fresh/bright = PURPLE, faded = BLUE
-  //     (exactly as in the video), then dark.
-  P["Dance of the Freaky Circles"] = (function () {
+  // ── Dance of the Freaky Circles (Nebula) ────────────────────────────────────
+  // TWO "circle-in-circle" units orbit each other (originally re-derived from the
+  // reference video). Each unit = a static inner circle "eye" + a POINTED, audio-gated
+  // waveform ring around it (fades to zero + contracts when mid/treb are quiet), plus a
+  // drifting inner harmonic and a counter-rotating outer aura -> a layered energy field.
+  // Background is a cool bluish-purple NEBULA wash (drifting fbm, breathes with bass);
+  // a motion-blur warp leaves soft phosphor trails; comp recolours to a magenta ramp.
+  P["Dance of the Freaky Circles (Nebula)"] = (function () {
     var preset = build(
       {
         wave_a: 0,             // primary waveform off; the custom waves draw everything
@@ -210,12 +207,20 @@
           t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
           // Inner shapes: small; they keep their structure (circle + horizontal bar)
           // and only PULSE gently in size with the bass — no waveform distortion.
-          t.q5 = 0.038 + 0.014 * bass;                 // size pulses gently on the beat (bass)
-          t.q10 = Math.min(0.45 + 0.5 * ((bass + mid + treb) / 3), 1.2); // color intensity ~ volume
-          t.q6 = 0.12 + 0.015 * bass;                  // ring base radius: nearly stable
-          // ONLY the outer waveform jumps: treble/mid spike it violently outward,
-          // and the bigger jump paints a WIDER mosaic.
-          t.q8 = 0.06 + 0.20 * Math.min(0.6 * treb + 0.4 * mid, 2.4);
+          t.q5 = 0.052 + 0.004 * bass;                 // inner circles almost STATIC (tiny bass wobble)
+          t.q10 = Math.min(0.45 + 0.5 * ((bass + mid + treb) / 3), 1.2); // inner-circle intensity ~ volume
+          // AUDIO GATE for the OUTER ring only (q14): when mid/treb drop, the waveform fades
+          // to zero and contracts onto the inner circles; the inner circles (on q10) stay.
+          var midA = (t.mid_att !== undefined ? t.mid_att : (t.mid || 0));
+          var trebA = (t.treb_att !== undefined ? t.treb_att : (t.treb || 0));
+          t.q14 = Math.max(0, Math.min((0.5 * (midA + trebA) - 0.55) * 1.8, 1.2));
+          t.q6 = 0.055 + 0.085 * t.q14;                // ring radius contracts onto the inner circle when quiet
+          // ONLY the outer waveform jumps: treble/mid spike it outward.
+          t.q8 = 0.03 + 0.06 * Math.min(0.6 * treb + 0.4 * mid, 2.4);   // smaller jump (pointiness comes from fewer samples)
+          // harmonic-layer drivers
+          t.q11 = t.time;                              // phase clock for drift / counter-rotation
+          t.q12 = (t.vol_att !== undefined ? t.vol_att : (t.vol || 0.5));  // volume -> outer-aura undulation
+          t.q15 = 0.02 + 0.05 * Math.min(0.5 * bass + 0.5 * mid, 2.0);     // inner-harmonic amplitude (bass/mid)
           // Breather: the outer rings turn OFF briefly at RANDOM intervals (not a
           // fixed cadence), revealing the slowly-fading mosaic underneath. Each
           // ~0.55s slot has a ~30% chance of a brief off-window at its start.
@@ -226,38 +231,45 @@
           t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;     // 0 = rings hidden (breather), 1 = on
           return t;
         },
-        // COMP: blocky TEXTURED mosaic background + visible (semi-sharp) circles and
-        // waveform on top (the reference keeps the thin circles readable over the
-        // blocks — full pixelation erases them).
-        //  - BACKGROUND: quantize the trail to squares (soft edges). Strong per-cell
-        //    brightness variation -> textured squares, NOT a flat uniform slab.
-        //  - LINES: the crisp current circles/waveform are extracted (sharp above the
-        //    block average) and RECOLOURED to magenta -> no green strings.
-        //  - Recolour by brightness to a magenta->purple ramp; green is clamped out.
+        // WARP: trail control + soft PHOSPHOR blur. Each frame the feedback is lightly
+        // blurred (5-tap) and faded, so the decay traces soften into glowing light as they
+        // age, while the live waveform (drawn after warp) stays sharp. Fade keeps it short.
+        warp:
+          "shader_body {\n" +
+          "vec2 wp = 1.0 / resolution;\n" +
+          "float br = 1.5;\n" +                              // blur -> motion smears into a soft fill
+          "vec3 acc = texture2D(sampler_main, uv).rgb * 0.5;\n" +
+          "acc += texture2D(sampler_main, uv + vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv - vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv + vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, uv - vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
+          "ret = acc * 0.95;\n" +                            // longer-lasting motion blur (trails linger)
+          "}\n",
+        // COMP: DEEP NEBULA wash (mosaic dropped) + the vivid circles/waveform on top.
+        //  - BACKGROUND: a slow-drifting fbm cloud, kept very dim (~5-12%) and darkened
+        //    toward the edges (vignette) so it adds depth without competing with the
+        //    circles. No grid, no shapes, no feedback -> can't accumulate or interfere.
+        //    Brightens gently with bass so the void "breathes".
+        //  - LINES: the circles + waveform (from the feedback buffer) are recoloured to
+        //    vivid magenta and added on top; residual green is clamped out.
         comp:
           NOISE_GLSL +
           "shader_body {\n" +
-          "float cy = 20.0;\n" +
-          "vec2 cells = vec2(cy * resolution.x / resolution.y, cy);\n" +
-          "vec2 g = uv * cells - 0.5;\n" +
-          "vec2 gi = floor(g);\n" +
-          "vec2 gf = fract(g); gf = gf * gf * (3.0 - 2.0 * gf);\n" +
-          "vec3 c00 = texture2D(sampler_main, (gi + vec2(0.5, 0.5)) / cells).rgb;\n" +
-          "vec3 c10 = texture2D(sampler_main, (gi + vec2(1.5, 0.5)) / cells).rgb;\n" +
-          "vec3 c01 = texture2D(sampler_main, (gi + vec2(0.5, 1.5)) / cells).rgb;\n" +
-          "vec3 c11 = texture2D(sampler_main, (gi + vec2(1.5, 1.5)) / cells).rgb;\n" +
-          "vec3 soft = mix(mix(c00, c10, gf.x), mix(c01, c11, gf.x), gf.y);\n" +
-          "float bl = max(soft.r, max(soft.g, soft.b));\n" +       // block brightness (the trail)
-          "float rnd = hash21(gi);\n" +
-          "float lum = bl * (0.55 + 0.85 * rnd);\n" +              // STRONG per-cell variation -> texture
-          "vec3 fresh = vec3(0.62, 0.10, 0.98);\n" +               // bright magenta-violet
-          "vec3 faded = vec3(0.18, 0.09, 0.52);\n" +               // dark purple when faded
-          "vec3 mosaic = mix(faded, fresh, smoothstep(0.04, 0.45, lum)) * (lum / (lum + 0.5));\n" +
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +      // current circles + waveform
-          "float sd = max(max(sharp.r, max(sharp.g, sharp.b)) - bl, 0.0);\n" + // crisp line above blocks
-          "vec3 line = vec3(0.90, 0.32, 1.0) * sd * 1.25;\n" +     // recoloured magenta -> no green
-          "vec3 outc = mosaic + line;\n" +
-          "outc.g = min(outc.g, 0.5 * max(outc.r, outc.b));\n" +   // clamp any residual green
+          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" +   // slow drift
+          "float n = fbm(nuv); n = n * n;\n" +                            // deepen -> dark with soft wisps
+          "float vig = 1.0 - smoothstep(0.20, 0.92, length(uv - 0.5));\n" +
+          // COOL bluish-purple smoke behind the WARM magenta waveform (cool/warm depth).
+          // Floor keeps an ambient, slowly-drifting cloud alive even when the bass drops.
+          "vec3 neb = mix(vec3(0.02, 0.012, 0.07), vec3(0.18, 0.07, 0.52), n) * (0.14 + 0.11 * bass) * vig;\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +             // circles + waveform (+ trails)
+          "float sl = max(sharp.r, max(sharp.g, sharp.b));\n" +
+          // multi-shade ramp, all in the PURPLE family (no blue/green dip) so dim trails
+          // stay deep purple and only the bright cores flare hot pink -> dramatic but cohesive
+          "vec3 lc = mix(vec3(0.42, 0.05, 0.66), vec3(0.92, 0.18, 1.0), smoothstep(0.10, 0.60, sl));\n" +
+          "lc = mix(lc, vec3(1.0, 0.60, 1.0), smoothstep(0.72, 1.25, sl));\n" +
+          "vec3 line = lc * sl * 0.95;\n" +
+          "vec3 outc = neb + line;\n" +
+          "outc.g = min(outc.g, 0.5 * max(outc.r, outc.b));\n" +          // clamp residual green
           "ret = outc;\n" +
           "}\n"
       }
@@ -279,21 +291,21 @@
           var ang = a.sample * 6.2832;
           a.x = (a[qx] || 0.5) + r * Math.cos(ang);
           a.y = (a[qy] || 0.5) + r * Math.sin(ang);
-          var v = (a.q10 !== undefined ? a.q10 : 1);  // colour intensity tracks volume
-          a.r = 0.80 * v; a.g = 0.40 * v; a.b = 1.0 * v;
+          a.r = 0.78; a.g = 0.22; a.b = 0.95;          // FIXED -> steady "eyes", no flashing
           return a;
         }
       };
     }
 
-    // THICK JAGGED waveform RING around the inner circle. Radius q6 + q8*sample;
+    // POINTED/JAGGED waveform RING around the inner circle. Radius q6 + q8*sample;
     // each unit on its own channel (value1 / value2). thick:1 = thicker lightning.
-    // q9 is the breather gate: when 0 the ring is hidden (points sent offscreen).
+    // FEWER samples + smoothing 0 -> distinct angular spikes (pointed teeth, not a dense
+    // fuzzy noodle). q9 is the breather gate: when 0 the ring is hidden (offscreen).
     function waveRing(qx, qy, useSecondChannel) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.10, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
+          enabled: 1, samples: 180, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
         }),
         init_eqs: passthrough,
         frame_eqs: passthrough,
@@ -304,18 +316,72 @@
           var ang = a.sample * 6.2832;
           var samp = useSecondChannel ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
           var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;     // jagged ring, jumps with music
+          rad = Math.max(0.045, Math.min(rad, 0.40));           // clamp -> no center-crossing spaghetti
           a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
           a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
-          var v = (a.q10 !== undefined ? a.q10 : 1);            // intensity tracks volume (kept muted)
+          var v = (a.q10 !== undefined ? a.q10 : 1) * (a.q14 !== undefined ? a.q14 : 1);  // GATED: fades out when mid/treb quiet
           a.r = 0.80 * v; a.g = 0.35 * v; a.b = 1.0 * v;
           return a;
         }
       };
     }
-    preset.waves[0] = innerCircle("q1", "q2");        // unit A inner circle (smooth)
-    preset.waves[1] = waveRing("q1", "q2", false);    // unit A waveform ring (channel 1)
-    preset.waves[2] = innerCircle("q3", "q4");        // unit B inner circle (smooth)
-    preset.waves[3] = waveRing("q3", "q4", true);     // unit B waveform ring (channel 2)
+    // INNER HARMONIC (layer 2): a thin, fainter waveform inside the main ring, size driven
+    // by bass/mid (q15), angle slowly DRIFTING (q11*0.3) so its spikes weave in and out of
+    // the main ring. Opposite channel + driver -> moves independently. thick:0 = thin.
+    function innerHarmonic(qx, qy, useFirstChannel) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 160, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 0.40, thick: 0, r: 0.55, g: 0.22, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) { a.x = -2; a.y = -2; return a; }
+          var ang = a.sample * 6.2832 + (a.q11 || 0) * 0.3;     // drifting phase -> weaves
+          var samp = useFirstChannel ? a.value1 : (a.value2 !== undefined ? a.value2 : a.value1);
+          var rad = (a.q6 || 0.11) * 0.60 + (a.q15 || 0.04) * (samp || 0);
+          rad = Math.max(0.035, Math.min(rad, 0.32));
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = 0.6 * (a.q14 !== undefined ? a.q14 : 1);      // gated like the main ring
+          a.r = 0.55 * v; a.g = 0.22 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    // OUTER AURA (layer 3): a faint, smoothly UNDULATING ring outside the main one (5 sine
+    // lobes whose depth tracks volume q12), rotating the OPPOSITE way (-q11*0.15) -> an
+    // electric field enclosing the waves. Very low opacity -> atmosphere, not clutter.
+    function outerAura(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 128, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.5, a: 0.18, thick: 1, r: 0.45, g: 0.18, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) { a.x = -2; a.y = -2; return a; }
+          var ang = a.sample * 6.2832 - (a.q11 || 0) * 0.15;    // opposite rotation
+          var amp = 0.02 + 0.05 * (a.q12 || 0.5);               // undulation depth ~ volume
+          var rad = (a.q6 || 0.11) * 1.55 + amp * Math.sin(a.sample * 6.2832 * 5.0 + (a.q11 || 0));
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = 0.32 * (a.q14 !== undefined ? a.q14 : 1);     // gated, very faint
+          a.r = 0.45 * v; a.g = 0.18 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = innerCircle("q1", "q2");        // unit A inner circle (static eye)
+    preset.waves[1] = waveRing("q1", "q2", false);    // unit A PRIMARY spiky ring (treb/mid)
+    preset.waves[2] = innerCircle("q3", "q4");        // unit B inner circle (static eye)
+    preset.waves[3] = waveRing("q3", "q4", true);     // unit B PRIMARY spiky ring
+    preset.waves[4] = innerHarmonic("q1", "q2", false);  // unit A inner harmonic (drifts +)
+    preset.waves[5] = innerHarmonic("q3", "q4", true);   // unit B inner harmonic
+    preset.waves[6] = outerAura("q1", "q2");             // unit A outer aura (rotates -)
+    preset.waves[7] = outerAura("q3", "q4");             // unit B outer aura
     return preset;
   })();
 
