@@ -524,9 +524,15 @@
       if (p.selectedbg) root.style.setProperty("--pl-selectedbg", p.selectedbg);
     }
     if (g) GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.add("wa-genskin"); });
+    // unify width with the 550px (275*2) skin stack: wa-pl follows --wa-stack-w,
+    // wa-lib needs an explicit width (it's freely width-resizable).
+    root.style.setProperty("--wa-stack-w", "550px");
+    if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "550px";
   }
   function removeGenChrome() {
     GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.remove("wa-genskin"); });
+    root.style.removeProperty("--wa-stack-w");           // back to procedural 466px
+    if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "";
   }
   // skinned EQ window (chrome-less host, like the main window). Hidden until the
   // EQ button is clicked. The procedural #wa-eq stays hidden in classic mode.
@@ -568,6 +574,7 @@
         e.stopPropagation();
         toggleWin(id);
         b.classList.toggle("on", isShown(id));
+        if (classicApi) dockClassicStack();   // re-dock LIB into the stack (no-op for VIS)
         if (after) after();
       });
       els["np" + label] = b;
@@ -587,14 +594,17 @@
     root.appendChild(el);
     wins["wa-np"] = { el: el, body: el, titlebar: el, img: img };
   }
-  // Dock the classic stack flush: Main → Now-Playing → EQ (EQ only if shown).
+  // Dock the classic stack flush, top to bottom: Main → Now-Playing → EQ →
+  // Playlist → Library (each shown one sits directly under the previous one).
   function dockClassicStack() {
     var m = classicWin && classicWin.el; if (!m) return;
-    var np = wins["wa-np"] && wins["wa-np"].el;
-    if (np) { np.style.left = m.offsetLeft + "px"; np.style.top = (m.offsetTop + m.offsetHeight) + "px"; }
-    var anchor = (np && np.style.display !== "none") ? np : m;
-    var eq = wins["wa-eq-skin"] && wins["wa-eq-skin"].el;
-    if (eq && eq.style.display !== "none") { eq.style.left = anchor.offsetLeft + "px"; eq.style.top = (anchor.offsetTop + anchor.offsetHeight) + "px"; }
+    var prev = m;
+    ["wa-np", "wa-eq-skin", "wa-pl", "wa-lib"].forEach(function (id) {
+      var w = wins[id]; if (!w || w.el.style.display === "none") return;
+      w.el.style.left = prev.offsetLeft + "px";
+      w.el.style.top = (prev.offsetTop + prev.offsetHeight) + "px";
+      prev = w.el;
+    });
   }
   function syncNpButtons() {
     if (els.npVIS) els.npVIS.classList.toggle("on", isShown("wa-viz"));
@@ -624,7 +634,7 @@
       onShuffle: function () { NA.control.toggleShuffle(); },
       onRepeat: function () { NA.control.toggleRepeat(); },
       onToggleEq: function () { toggleWin("wa-eq-skin"); dockClassicStack(); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
-      onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
+      onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); dockClassicStack(); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onToggleViz: function () { toggleWin("wa-viz", els.visTog); },
       onClose: function () { NA.stop(); },
     };

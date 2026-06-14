@@ -284,7 +284,7 @@
 /* "Now Playing" panel docked between Main and EQ in classic (.wsz) mode.
    Skin-width (550px = 275 * 2x) so it lines up flush with the skinned windows. */
 .wa-np {
-  width: 550px; height: 84px; cursor: move;
+  width: 550px; height: 84px; cursor: move; box-sizing: border-box;  /* border inside 550 so it matches the borderless main canvas */
   display: flex; align-items: stretch; gap: 8px; padding: 6px;
   background: var(--wa-win-bg);
   border: 2px solid var(--wa-win-border);
@@ -304,25 +304,27 @@
   text-shadow: 0 0 4px var(--wa-lcd-glow);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.wa-np-artist { font: 11px/1.2 var(--wa-font); color: var(--wa-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-np-album { font: 10px/1.2 var(--wa-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--wa-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
 .wa-np-btns .wa-skinsel { max-width: 104px; margin: 0; }
+/* classic Winamp raised silver button; presses in + glows green when active */
 .wa-np-btn {
-  height: 20px; padding: 0 8px; cursor: pointer;
-  font: 700 8px/1 var(--wa-font); letter-spacing: 0.5px; text-transform: uppercase;
-  display: grid; place-items: center; color: #cfcfcf; opacity: 0.85;
-  background: linear-gradient(180deg, #565660, #393942);
-  border: 1px solid;
-  border-color: rgba(255,255,255,0.18) #15151c #15151c rgba(255,255,255,0.18);
+  height: 20px; padding: 0 10px; cursor: pointer;
+  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
+  display: grid; place-items: center; color: var(--wa-btn-fg);
+  background: var(--wa-btn-bg);
+  border: 2px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
   border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 1px 1px 2px rgba(0,0,0,0.5);
 }
-.wa-np-btn:hover { opacity: 1; filter: brightness(1.1); }
+.wa-np-btn:hover { filter: brightness(1.1); }
 .wa-np-btn.on {
-  opacity: 1; color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow);
-  background: linear-gradient(180deg, #2c2c34, #45454f);
-  border-color: #15151c rgba(255,255,255,0.18) rgba(255,255,255,0.18) #15151c;
-  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.7);
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
+  background: var(--wa-btn-active-bg);
+  color: var(--wa-accent); text-shadow: 0 0 4px var(--wa-accent-glow);
+  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.6);
 }
 
 /* =======================================================================
@@ -336,8 +338,10 @@
   background: #1c1c26; box-shadow: var(--wa-win-shadow);
   image-rendering: pixelated;
 }
-.wa-genskin .wa-titlebar {
-  height: 40px; padding: 0 22px; border: 0; box-shadow: none;
+/* .wa-win.wa-genskin (3 classes) so it beats `.wa-win.inactive .wa-titlebar`
+   — skinned windows always show the active gold titlebar, even when unfocused */
+.wa-win.wa-genskin .wa-titlebar {
+  height: 40px; padding: 0 30px; border: 0; box-shadow: none;
   background:
     var(--gen-tl) left top / 50px 40px no-repeat,
     var(--gen-tr) right top / 50px 40px no-repeat,
