@@ -319,133 +319,16 @@
     return preset;
   })();
 
-  // ── Dance of the Freaky Circles (Mosaic) ───────────────────────────────────
-  // Experimental variant kept separate so it doesn't disturb the main Dance. The
-  // mosaic is pixelated in COMP (distinct soft-edged blocks) with a continuous
-  // fresh-magenta -> aged blue-purple -> black fade and a slow ~3s decay; the
-  // sharp circles/waveform are composited brighter on top. A sandbox to iterate
-  // the WMP look in (the main Dance keeps its original static mosaic).
-  P["Dance of the Freaky Circles (Mosaic)"] = (function () {
-    var preset = build(
-      {
-        wave_a: 0,
-        decay: 0.996,          // very slow fade -> mosaic blocks linger ~3s, fade to black
-        gammaadj: 1.4,
-        zoom: 0.997,
-        warp: 0.04,
-        echo_alpha: 0,
-        darken_center: 0,
-        wrap: 0
-      },
-      {
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          var treb = t.treb_att || t.treb || 1;
-          var mid = t.mid_att || t.mid || 1;
-          var th = t.time * 1.0;
-          var orbit = 0.11;
-          t.q1 = 0.5 + orbit * Math.cos(th);
-          t.q2 = 0.5 + orbit * Math.sin(th);
-          t.q3 = 0.5 + orbit * Math.cos(th + Math.PI);
-          t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
-          t.q5 = 0.038 + 0.014 * bass;
-          t.q10 = Math.min(0.45 + 0.5 * ((bass + mid + treb) / 3), 1.2);
-          t.q6 = 0.12 + 0.015 * bass;
-          t.q8 = 0.06 + 0.20 * Math.min(0.6 * treb + 0.4 * mid, 2.4);
-          var slot = Math.floor(t.time / 0.55);
-          var rnd = Math.sin(slot * 12.9898) * 43758.5453;
-          rnd = rnd - Math.floor(rnd);
-          var ph = t.time / 0.55 - slot;
-          t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;
-          return t;
-        },
-        // COMP: pixelated mosaic BACKGROUND — distinct soft-edged blocks (bilinear
-        // sampling + compressed interpolation) with a CONTINUOUS fresh-magenta ->
-        // aged blue-purple -> black fade (dimmed; it's the background). The sharp
-        // circles/waveform are extracted and composited brighter ON TOP.
-        comp:
-          NOISE_GLSL +
-          "shader_body {\n" +
-          "float cy = 20.0;\n" +
-          "vec2 cells = vec2(cy * resolution.x / resolution.y, cy);\n" +
-          "vec2 g = uv * cells - 0.5;\n" +
-          "vec2 gi = floor(g);\n" +
-          "vec2 gf = clamp((fract(g) - 0.5) * 2.2 + 0.5, 0.0, 1.0); gf = gf * gf * (3.0 - 2.0 * gf);\n" +
-          "vec3 c00 = texture2D(sampler_main, (gi + vec2(0.5, 0.5)) / cells).rgb;\n" +
-          "vec3 c10 = texture2D(sampler_main, (gi + vec2(1.5, 0.5)) / cells).rgb;\n" +
-          "vec3 c01 = texture2D(sampler_main, (gi + vec2(0.5, 1.5)) / cells).rgb;\n" +
-          "vec3 c11 = texture2D(sampler_main, (gi + vec2(1.5, 1.5)) / cells).rgb;\n" +
-          "vec3 soft = mix(mix(c00, c10, gf.x), mix(c01, c11, gf.x), gf.y);\n" +
-          "float e = clamp(max(soft.r, max(soft.g, soft.b)), 0.0, 1.0);\n" +
-          "vec3 fresh = vec3(0.62, 0.10, 0.98);\n" +
-          "vec3 faded = vec3(0.18, 0.09, 0.52);\n" +
-          "vec3 mosaic = mix(faded, fresh, e) * (e / (e + 0.5)) * 0.6;\n" +
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
-          "float sd = max(max(sharp.r, max(sharp.g, sharp.b)) - e, 0.0);\n" +
-          "vec3 line = vec3(0.88, 0.32, 1.0) * sd * 1.4;\n" +
-          "vec3 outc = mosaic + line;\n" +
-          "outc.g = min(outc.g, 0.5 * max(outc.r, outc.b));\n" +
-          "ret = outc;\n" +
-          "}\n"
-      }
-    );
-    function innerCircle(qx, qy) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.9, a: 0.7, thick: 1, r: 0.80, g: 0.20, b: 1.0
-        }),
-        init_eqs: passthrough,
-        frame_eqs: passthrough,
-        point_eqs: function (a) {
-          var r = (a.q5 || 0.04);
-          var ang = a.sample * 6.2832;
-          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
-          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
-          var v = (a.q10 !== undefined ? a.q10 : 1);
-          a.r = 0.80 * v; a.g = 0.40 * v; a.b = 1.0 * v;
-          return a;
-        }
-      };
-    }
-    function waveRing(qx, qy, useSecondChannel) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.10, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
-        }),
-        init_eqs: passthrough,
-        frame_eqs: passthrough,
-        point_eqs: function (a) {
-          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) {
-            a.x = -2; a.y = -2; return a;
-          }
-          var ang = a.sample * 6.2832;
-          var samp = useSecondChannel ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
-          var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;
-          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
-          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
-          var v = (a.q10 !== undefined ? a.q10 : 1);
-          a.r = 0.80 * v; a.g = 0.35 * v; a.b = 1.0 * v;
-          return a;
-        }
-      };
-    }
-    preset.waves[0] = innerCircle("q1", "q2");
-    preset.waves[1] = waveRing("q1", "q2", false);
-    preset.waves[2] = innerCircle("q3", "q4");
-    preset.waves[3] = waveRing("q3", "q4", true);
-    return preset;
-  })();
-
   // ── Dance of the Freaky Circles (Fire) ──────────────────────────────────────
-  // The (Mosaic) preset with the BACKGROUND MOSAIC REMOVED: the two orbiting circles
-  // (thin ring core + reactive waveform ring) over a clean black background, tinted
-  // a MULTI-SHADE purple ramp (deep violet -> magenta -> pink-white) for drama. The
-  // comp BLURS the buffer into soft glowing circles (the smoothing the mosaic used to
-  // do, minus the grid). PROCEDURAL PARTICLES (30 additive glows in the comp GLSL)
-  // fire ONLY on a detected bass jump (beat), spawning at the outer-waveform radius
-  // and flying OUT to the screen border on a wavy, flickering fire trajectory.
+  // A procedural fire visualizer over a clean black background, recoloured by a
+  // MULTI-SHADE purple ramp (deep violet -> magenta -> pink-white). Two static inner
+  // "eye" circles sit at the center; the OUTER ring is an audio-gated oscilloscope
+  // that fades to zero + contracts when mid/treb are quiet, expands/spikes when active,
+  // and beat-punches on detected bass jumps (radius hard-clamped so it can't blow out).
+  // PROCEDURAL GLSL PARTICLES (custom-wave dots degrade to lines in this build): a
+  // beat-triggered burst layer with ember physics (drag/buoyancy/turbulence, colour
+  // temperature) + a continuous ambient ember layer. Trails use a motion-blur warp
+  // (rotating, lightly-blurred multiplicative fade) since decay has no effect here.
   P["Dance of the Freaky Circles (Fire)"] = (function () {
     // beat-detection state (persists across frames via this closure) — used to fire a
     // particle burst ONLY when the bass jumps, not continuously.
@@ -712,51 +595,6 @@
     preset.waves[1] = waveRing("q1", "q2", false);
     preset.waves[2] = innerCircle("q3", "q4");
     preset.waves[3] = waveRing("q3", "q4", true);
-    return preset;
-  })();
-
-  // ── Dance of the Freaky Circles (Classic) ──────────────────────────────────
-  // The original, simpler version (kept on its own — it reads well as-is): two
-  // magenta circular waveforms orbiting opposite sides of center over a faint slow
-  // purple wash. No mosaic. Preserved before the WMP-mosaic rework above.
-  P["Dance of the Freaky Circles (Classic)"] = (function () {
-    var preset = build(
-      {
-        wave_a: 0,             // primary waveform off; the two custom circles draw it
-        decay: 0.92,           // trails leave faint motion arcs as the circles orbit
-        gammaadj: 2.0,
-        zoom: 1.0,
-        warp: 0.04,
-        echo_alpha: 0,
-        darken_center: 0,
-        wrap: 0
-      },
-      {
-        // Two orbit centers (q1,q2)=(q3,q4) on opposite sides of center, plus a
-        // bass-pulsing radius (q5). Read by the two circleWave point equations.
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          var th = t.time * 0.6;
-          var orbit = 0.13;
-          t.q1 = 0.5 + orbit * Math.cos(th);
-          t.q2 = 0.5 + orbit * Math.sin(th);
-          t.q3 = 0.5 - orbit * Math.cos(th);
-          t.q4 = 0.5 - orbit * Math.sin(th);
-          t.q5 = 0.12 + 0.06 * bass;     // ring radius pulses with bass
-          t.decay = 0.92;
-          return t;
-        },
-        // Mostly black with only a faint, slow purple wash now and then.
-        comp:
-          "shader_body {\n" +
-          "ret = texture2D(sampler_main, uv).rgb;\n" +
-          "float bg = 0.04 * (0.5 + 0.5 * sin(time * 0.10));\n" +
-          "ret += vec3(bg, bg * 0.10, bg * 1.3);\n" +
-          "}\n"
-      }
-    );
-    preset.waves[0] = circleWave("q1", "q2");  // orbiting circle A
-    preset.waves[1] = circleWave("q3", "q4");  // orbiting circle B
     return preset;
   })();
 
