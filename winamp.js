@@ -198,8 +198,9 @@
       var r = el.getBoundingClientRect();
       ox = e.clientX - r.left; oy = e.clientY - r.top;
       // Winamp's anchor model: only the main window drags the whole docked
-      // group; sub-windows (EQ/Viz/Playlist/Library) move on their own.
-      cluster = el.id === "wa-main"
+      // group; sub-windows (EQ/Viz/Playlist/Library) move on their own. In
+      // classic (.wsz) mode the main window is #wa-skin, so it anchors too.
+      cluster = (el.id === "wa-main" || el.id === "wa-skin")
         ? attachedCluster(el)
         : [{ el: el, sl: el.offsetLeft, st: el.offsetTop }];
       sl0 = el.offsetLeft; st0 = el.offsetTop; // dragged window's start position
