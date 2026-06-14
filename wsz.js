@@ -85,6 +85,19 @@
     return createImageBitmap(new Blob([bytes], { type: "image/bmp" }));
   }
 
+  // Crop a sprite rect out of a decoded sheet into a standalone PNG data URL —
+  // used to feed GEN.BMP window-frame pieces to CSS as background-image layers
+  // (so the browser handles the resizable tiling of the borders).
+  function spriteDataURL(bitmap, rect) {
+    if (!bitmap) return "";
+    var c = document.createElement("canvas");
+    c.width = rect[2]; c.height = rect[3];
+    var x = c.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    x.drawImage(bitmap, rect[0], rect[1], rect[2], rect[3], 0, 0, rect[2], rect[3]);
+    return c.toDataURL();
+  }
+
   // =========================================================================
   // Sprite rectangles within each sheet (from Webamp skinSprites.ts). Only the
   // sheets the main window needs are listed.
@@ -204,7 +217,7 @@
         // Decode whichever sheets are present (skins may omit some).
         var wanted = ["MAIN", "TITLEBAR", "CBUTTONS", "NUMBERS", "NUMS_EX",
           "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS",
-          "EQMAIN", "EQ_EX"];
+          "EQMAIN", "EQ_EX", "GEN"];
         var sheets = {};
         var jobs = wanted.map(function (name) {
           var bytes = files[name + ".BMP"];
@@ -552,5 +565,42 @@
     };
   }
 
-  window.NeoAmpClassic = { loadSkin: loadSkin, mountMain: mountMain, mountEq: mountEq, MAIN_W: MAIN_W, MAIN_H: MAIN_H };
+  // =========================================================================
+  // GEN.BMP generic-window frame, as CSS background-image layers (the browser
+  // tiles them so the framed windows stay resizable). Returns null if the skin
+  // omits GEN.BMP. Coordinates from skinSprites.ts (GEN, *_SELECTED variants).
+  // =========================================================================
+  var GEN = {
+    TL: [0, 0, 25, 20], TFILL: [52, 0, 25, 20], TR: [130, 0, 25, 20],
+    ML: [127, 42, 11, 29], MR: [139, 42, 8, 29],
+    BL: [0, 42, 125, 14], BR: [0, 57, 125, 14], BFILL: [127, 72, 25, 14],
+    CLOSE: [148, 42, 9, 9],
+  };
+  function genAssets(skin) {
+    var g = skin.sheets.GEN; if (!g) return null;
+    var u = {};
+    Object.keys(GEN).forEach(function (k) { u[k] = spriteDataURL(g, GEN[k]); });
+    return u;
+  }
+
+  // Parse PLEDIT.TXT (playlist colors) into { normal, current, normalbg, selectedbg }.
+  function parsePledit(skin) {
+    var bytes = skin.files && skin.files["PLEDIT.TXT"]; if (!bytes) return null;
+    var txt = new TextDecoder().decode(bytes);
+    var out = {};
+    txt.split(/\r?\n/).forEach(function (line) {
+      var m = line.split("=");
+      if (m.length === 2) out[m[0].trim().toLowerCase()] = m[1].trim();
+    });
+    var norm = function (c) { return c && c[0] === "#" ? c : (c ? "#" + c : null); };
+    return {
+      normal: norm(out.normal), current: norm(out.current),
+      normalbg: norm(out.normalbg), selectedbg: norm(out.selectedbg),
+    };
+  }
+
+  window.NeoAmpClassic = {
+    loadSkin: loadSkin, mountMain: mountMain, mountEq: mountEq,
+    genAssets: genAssets, parsePledit: parsePledit, MAIN_W: MAIN_W, MAIN_H: MAIN_H,
+  };
 })();

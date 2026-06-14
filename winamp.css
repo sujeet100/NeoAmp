@@ -326,6 +326,46 @@
 }
 
 /* =======================================================================
+   GEN.BMP generic-window frame (Playlist / Library / Viz in classic mode).
+   The GEN sprites are 1x; classic windows render at 2x to match Main/EQ, so
+   every background layer is scaled via background-size with pixelated rendering.
+   Data-URL backgrounds are injected as --gen-* custom props (see winamp.js).
+   ======================================================================= */
+.wa-genskin {
+  border: 0; border-radius: 0; padding: 0;
+  background: #1c1c26; box-shadow: var(--wa-win-shadow);
+  image-rendering: pixelated;
+}
+.wa-genskin .wa-titlebar {
+  height: 40px; padding: 0 22px; border: 0; box-shadow: none;
+  background:
+    var(--gen-tl) left top / 50px 40px no-repeat,
+    var(--gen-tr) right top / 50px 40px no-repeat,
+    var(--gen-tfill) left top / 50px 40px repeat-x;
+  image-rendering: pixelated;
+}
+.wa-genskin .wa-title { color: #c8d2e8; font-size: 11px; }
+.wa-genskin .wa-title .wa-logo { display: none; }
+.wa-genskin .wa-tbtn { background: rgba(0,0,0,0.25); border-color: rgba(0,0,0,0.5); }
+/* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
+#wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body {
+  margin: 0; padding: 6px 18px 30px 24px;
+  background:
+    var(--gen-ml) left top / 22px 58px repeat-y,
+    var(--gen-mr) right top / 16px 58px repeat-y,
+    var(--gen-bl) left bottom / 250px 28px no-repeat,
+    var(--gen-br) right bottom / 250px 28px no-repeat,
+    var(--gen-bfill) left bottom / 50px 28px repeat-x;
+  image-rendering: pixelated;
+}
+/* playlist list colors come from PLEDIT.TXT (injected as --pl-* props) */
+.wa-genskin .wa-pl-list, .wa-genskin .wa-lib-list {
+  background: var(--pl-normalbg, var(--wa-inset-bg)); border-color: #000;
+}
+.wa-genskin .wa-pl-row, .wa-genskin .wa-pl-n, .wa-genskin .wa-pl-d { color: var(--pl-normal, var(--wa-lcd)); }
+.wa-genskin .wa-pl-row.playing { background: var(--pl-selectedbg, #0a2a5e); color: var(--pl-current, #fff); }
+
+/* =======================================================================
    EQUALIZER WINDOW (cosmetic)
    ======================================================================= */
 /* same width as the main + playlist windows so the stack aligns (classic

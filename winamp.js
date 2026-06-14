@@ -484,6 +484,7 @@
       classicWin.drag.style.width = classicApi.dragRegion.w + "px";
       classicWin.drag.style.height = classicApi.dragRegion.h + "px";
       mountClassicEq(skin);
+      applyGenChrome(skin);
       dockClassicStack();
       var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
       classicApi.setVolume(NA.control.getVolume());
@@ -503,6 +504,29 @@
     if (wins["wa-np"]) wins["wa-np"].el.style.display = "none";
     if (wins["wa-eq-skin"]) wins["wa-eq-skin"].el.style.display = "none";
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
+    removeGenChrome();
+  }
+  // Wrap the DOM windows (Playlist/Library/Viz) in the skin's GEN.BMP frame by
+  // injecting the sprite pieces as --gen-* CSS background vars on the root and
+  // tagging each window .wa-genskin. PLEDIT.TXT colors drive the playlist list.
+  var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz"];
+  function applyGenChrome(skin) {
+    var g = window.NeoAmpClassic.genAssets(skin);
+    if (g) {
+      var map = { TL: "tl", TFILL: "tfill", TR: "tr", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
+      Object.keys(map).forEach(function (k) { root.style.setProperty("--gen-" + map[k], "url(" + g[k] + ")"); });
+    }
+    var p = window.NeoAmpClassic.parsePledit(skin);
+    if (p) {
+      if (p.normal) root.style.setProperty("--pl-normal", p.normal);
+      if (p.current) root.style.setProperty("--pl-current", p.current);
+      if (p.normalbg) root.style.setProperty("--pl-normalbg", p.normalbg);
+      if (p.selectedbg) root.style.setProperty("--pl-selectedbg", p.selectedbg);
+    }
+    if (g) GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.add("wa-genskin"); });
+  }
+  function removeGenChrome() {
+    GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.remove("wa-genskin"); });
   }
   // skinned EQ window (chrome-less host, like the main window). Hidden until the
   // EQ button is clicked. The procedural #wa-eq stays hidden in classic mode.
