@@ -213,7 +213,7 @@
     // Decode whichever sheets are present (skins may omit some).
     var wanted = ["MAIN", "TITLEBAR", "CBUTTONS", "NUMBERS", "NUMS_EX",
       "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS",
-      "EQMAIN", "EQ_EX", "GEN"];
+      "EQMAIN", "EQ_EX", "GEN", "PLEDIT"];
     var sheets = {};
     var jobs = wanted.map(function (name) {
       var bytes = files[name + ".BMP"];
@@ -598,6 +598,21 @@
     return u;
   }
 
+  // PLEDIT.BMP window frame, used for skins that omit GEN.BMP so the framed
+  // windows still match the skin. PLEDIT is present in every skin. Top SELECTED
+  // (active) variants at y=0; sides/bottom shared.
+  var PLED = {
+    TL: [0, 0, 25, 20], TFILL: [127, 0, 25, 20], TITLE: [26, 0, 100, 20], TR: [153, 0, 25, 20],
+    LEFT: [0, 42, 12, 29], RIGHT: [31, 42, 20, 29],
+    BL: [0, 72, 125, 38], BR: [126, 72, 150, 38], BFILL: [179, 0, 25, 38],
+  };
+  function pleditFrameAssets(skin) {
+    var p = skin.sheets.PLEDIT; if (!p) return null;
+    var u = {};
+    Object.keys(PLED).forEach(function (k) { u[k] = spriteDataURL(p, PLED[k]); });
+    return u;
+  }
+
   // Parse PLEDIT.TXT (playlist colors) into { normal, current, normalbg, selectedbg }.
   function parsePledit(skin) {
     var bytes = skin.files && skin.files["PLEDIT.TXT"]; if (!bytes) return null;
@@ -617,6 +632,7 @@
   window.NeoAmpClassic = {
     loadSkin: loadSkin, loadSkinFromArrayBuffer: loadSkinFromArrayBuffer,
     mountMain: mountMain, mountEq: mountEq,
-    genAssets: genAssets, parsePledit: parsePledit, MAIN_W: MAIN_W, MAIN_H: MAIN_H,
+    genAssets: genAssets, pleditFrameAssets: pleditFrameAssets,
+    parsePledit: parsePledit, MAIN_W: MAIN_W, MAIN_H: MAIN_H,
   };
 })();

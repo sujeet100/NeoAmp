@@ -550,40 +550,25 @@
 
     classicLoading = true;
     skinSourcePromise(def).then(function (skin) {
-      // Most third-party skins omit GEN.BMP; Winamp uses a default generic frame
-      // in that case, so we borrow base-2.91's GEN as the fallback.
-      var own = window.NeoAmpClassic.genAssets(skin);
-      if (own) return finishClassic(skin, own);
-      return getGenFallback().then(function (fb) { finishClassic(skin, fb); });
+      classicLoading = false;
+      classicSkin = skin;
+      if (classicApi) classicApi.destroy();
+      classicApi = window.NeoAmpClassic.mountMain(classicWin.el, skin, classicHooks());
+      classicWin.drag.style.width = classicApi.dragRegion.w + "px";
+      classicWin.drag.style.height = classicApi.dragRegion.h + "px";
+      mountClassicEq(skin);
+      applyFrame(skin);
+      dockClassicStack();
+      var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
+      classicApi.setVolume(NA.control.getVolume());
+      classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl"));
+      syncNpButtons();
     }).catch(function (e) {
       classicLoading = false;
       console.error("[NeoAmp] .wsz load failed:", e);
       NA.toast("Skin failed to load: " + (e && e.message || e));
       disableClassic();
     });
-  }
-  function finishClassic(skin, genObj) {
-    classicLoading = false;
-    classicSkin = skin;
-    if (classicApi) classicApi.destroy();
-    classicApi = window.NeoAmpClassic.mountMain(classicWin.el, skin, classicHooks());
-    classicWin.drag.style.width = classicApi.dragRegion.w + "px";
-    classicWin.drag.style.height = classicApi.dragRegion.h + "px";
-    mountClassicEq(skin);
-    applyGenChrome(genObj, skin);
-    dockClassicStack();
-    var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
-    classicApi.setVolume(NA.control.getVolume());
-    classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl"));
-    syncNpButtons();
-  }
-  // base-2.91's GEN frame, cached, used for skins that don't ship their own.
-  var genFallback = null;
-  function getGenFallback() {
-    if (genFallback) return Promise.resolve(genFallback);
-    return window.NeoAmpClassic.loadSkin(chrome.runtime.getURL("vendor/skins/base-2.91.wsz"))
-      .then(function (s) { genFallback = window.NeoAmpClassic.genAssets(s); return genFallback; })
-      .catch(function () { return null; });
   }
   function disableClassic() {
     if (classicApi) { classicApi.destroy(); classicApi = null; }
@@ -592,41 +577,46 @@
     if (wins["wa-np"]) wins["wa-np"].el.style.display = "none";
     if (wins["wa-eq-skin"]) wins["wa-eq-skin"].el.style.display = "none";
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
-    removeGenChrome();
+    removeFrame();
   }
-  // Wrap the DOM windows (Playlist/Library/Viz) in the skin's GEN.BMP frame by
-  // injecting the sprite pieces as --gen-* CSS background vars on the root and
-  // tagging each window .wa-genskin. PLEDIT.TXT colors drive the playlist list.
+  // Wrap the DOM windows (Playlist/Library/Viz) in a skin-matching frame: the
+  // skin's GEN.BMP if present, else its PLEDIT.BMP (every skin ships PLEDIT, so
+  // the frame always matches — no more gold fallback for GEN-less skins).
+  // PLEDIT.TXT colors drive the playlist/library list text.
   var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz"];
-  // g = resolved gen-frame asset URLs (skin's own or the base fallback); skin
-  // supplies the PLEDIT.TXT playlist colors.
-  function applyGenChrome(g, skin) {
-    removeGenChrome();   // clear any previous skin's frame/colors first
-    if (g) {
-      var map = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend",
-        ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
-      Object.keys(map).forEach(function (k) { root.style.setProperty("--gen-" + map[k], "url(" + g[k] + ")"); });
+  var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
+  var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill" };
+  function applyFrame(skin) {
+    removeFrame();
+    var gen = window.NeoAmpClassic.genAssets(skin);
+    if (gen) {
+      Object.keys(GEN_KEYS).forEach(function (k) { root.style.setProperty("--gen-" + GEN_KEYS[k], "url(" + gen[k] + ")"); });
       GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.add("wa-genskin"); });
+    } else {
+      var pf = window.NeoAmpClassic.pleditFrameAssets(skin);
+      if (pf) {
+        Object.keys(PLF_KEYS).forEach(function (k) { root.style.setProperty("--plf-" + PLF_KEYS[k], "url(" + pf[k] + ")"); });
+        GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.add("wa-plskin"); });
+      }
     }
-    var p = skin && window.NeoAmpClassic.parsePledit(skin);
+    var p = window.NeoAmpClassic.parsePledit(skin);
     if (p) {
       if (p.normal) root.style.setProperty("--pl-normal", p.normal);
       if (p.current) root.style.setProperty("--pl-current", p.current);
       if (p.normalbg) root.style.setProperty("--pl-normalbg", p.normalbg);
       if (p.selectedbg) root.style.setProperty("--pl-selectedbg", p.selectedbg);
     }
-    // unify width with the 550px (275*2) skin stack: wa-pl follows --wa-stack-w,
-    // wa-lib needs an explicit width (it's freely width-resizable).
+    // unify width with the 550px (275*2) skin stack
     root.style.setProperty("--wa-stack-w", "550px");
     if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "550px";
   }
-  function removeGenChrome() {
-    GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.remove("wa-genskin"); });
-    ["tl", "gold", "tr", "lend", "cfill", "rend", "ml", "mr", "bl", "br", "bfill"].forEach(function (k) {
-      root.style.removeProperty("--gen-" + k);
-    });
-    ["normal", "current", "normalbg", "selectedbg"].forEach(function (k) { root.style.removeProperty("--pl-" + k); });
-    root.style.removeProperty("--wa-stack-w");           // back to procedural 466px
+  function removeFrame() {
+    GEN_WINDOWS.forEach(function (id) { if (wins[id]) { wins[id].el.classList.remove("wa-genskin"); wins[id].el.classList.remove("wa-plskin"); } });
+    var s = root.style;
+    ["tl", "gold", "tr", "lend", "cfill", "rend", "ml", "mr", "bl", "br", "bfill"].forEach(function (k) { s.removeProperty("--gen-" + k); });
+    ["tl", "tfill", "title", "tr", "left", "right", "bl", "br", "bfill"].forEach(function (k) { s.removeProperty("--plf-" + k); });
+    ["normal", "current", "normalbg", "selectedbg"].forEach(function (k) { s.removeProperty("--pl-" + k); });
+    s.removeProperty("--wa-stack-w");
     if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "";
   }
   // skinned EQ window (chrome-less host, like the main window). Hidden until the
