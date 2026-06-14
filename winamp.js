@@ -253,18 +253,20 @@
     return { x: x, y: y };
   }
 
-  function makeResizable(el, handle, minW, minH) {
+  // lockWidth=true → height-only resize (the playlist keeps the stack width so
+  // the Main/EQ/Playlist column stays flush, as in classic Winamp).
+  function makeResizable(el, handle, minW, minH, lockWidth) {
     var sx = 0, sy = 0, sw = 0, sh = 0, sizing = false;
     handle.addEventListener("mousedown", function (e) {
       sizing = true; sx = e.clientX; sy = e.clientY;
       sw = el.offsetWidth; sh = el.offsetHeight;
-      shield(true, "nwse-resize");
+      shield(true, lockWidth ? "ns-resize" : "nwse-resize");
       raise(el);
       e.preventDefault(); e.stopPropagation();
     });
     window.addEventListener("mousemove", function (e) {
       if (!sizing) return;
-      el.style.width = Math.max(minW, sw + (e.clientX - sx)) + "px";
+      if (!lockWidth) el.style.width = Math.max(minW, sw + (e.clientX - sx)) + "px";
       el.style.height = Math.max(minH, sh + (e.clientY - sy)) + "px";
     });
     var stop = function () { if (!sizing) return; sizing = false; shield(false); saveLayout(); };
@@ -280,13 +282,17 @@
     });
     NA.storage.set({ neoampLayout: layout });
   }
-  var RESIZABLE = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1 };
+  // wa-pl resizes in height only — its width is locked to --wa-stack-w via CSS,
+  // so we never apply an inline width to it (that's what let it drift out of
+  // alignment with Main/EQ). wa-viz/wa-lib resize freely in both axes.
+  var RESIZABLE_W = { "wa-viz": 1, "wa-lib": 1 };
+  var RESIZABLE_H = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1 };
   function applyLayout() {
     var defaults = {
       "wa-main": { x: 40, y: 70 },
       "wa-eq": { x: 40, y: 250 },
       "wa-viz": { x: 514, y: 70, w: 360, h: 280 },
-      "wa-pl": { x: 40, y: 430, w: 466, h: 220 },
+      "wa-pl": { x: 40, y: 430, h: 220 },
       "wa-lib": { x: 514, y: 370, w: 380, h: 300, hidden: true },
     };
     Object.keys(wins).forEach(function (k) {
@@ -294,7 +300,8 @@
       var d = (layout[k]) || defaults[k] || { x: 60, y: 60 };
       e.style.left = (d.x || 40) + "px";
       e.style.top = (d.y || 60) + "px";
-      if (d.w && RESIZABLE[k]) { e.style.width = d.w + "px"; e.style.height = d.h + "px"; }
+      if (d.w && RESIZABLE_W[k]) e.style.width = d.w + "px";
+      if (d.h && RESIZABLE_H[k]) e.style.height = d.h + "px";
       e.style.display = d.hidden ? "none" : "";
     });
   }
@@ -517,9 +524,9 @@
     win.body.appendChild(foot);
     els.plList = list;
 
-    var rs = h("div", { class: "wa-resize", title: "Resize" });
+    var rs = h("div", { class: "wa-resize wa-resize-v", title: "Resize height" });
     win.el.appendChild(rs);
-    makeResizable(win.el, rs, 240, 140);
+    makeResizable(win.el, rs, 240, 140, true); // height-only: width is locked to the stack
     refreshQueue(true);
   }
 

@@ -27,6 +27,10 @@
   --wa-font: "Lucida Console", "DejaVu Sans Mono", "Courier New", monospace;
   --wa-lcd-font: "NeoAmp LCD", "Lucida Console", monospace;
 
+  /* shared width of the docked column (Main / EQ / Playlist) — classic
+     Winamp keeps these a single uniform width so the stack aligns flush */
+  --wa-stack-w: 466px;
+
   --wa-win-bg: linear-gradient(180deg, #3b3b4d 0%, #2a2a38 5%, #23232f 100%);
   --wa-win-border: #0c0c12;
   --wa-bevel-light: rgba(255, 255, 255, 0.30);
@@ -149,7 +153,7 @@
 /* =======================================================================
    MAIN WINDOW
    ======================================================================= */
-#wa-main { width: 466px; }
+#wa-main { width: var(--wa-stack-w); }
 #wa-main .wa-main-grid { display: grid; grid-template-columns: 78px 1fr; gap: 6px; }
 
 .wa-clock {
@@ -269,7 +273,7 @@
    ======================================================================= */
 /* same width as the main + playlist windows so the stack aligns (classic
    Winamp keeps Main/EQ/Playlist a uniform width) */
-#wa-eq { width: 466px; }
+#wa-eq { width: var(--wa-stack-w); }
 .wa-eq-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .wa-eq-curve {
   flex: 1 1 auto; height: 28px; display: block;
@@ -330,6 +334,13 @@
   background: linear-gradient(135deg, transparent 45%, var(--wa-bevel-light) 45% 55%, transparent 55%,
     transparent 65%, var(--wa-bevel-light) 65% 75%, transparent 75%);
 }
+/* playlist resizes in height only → full-width bottom-edge grabber, ns cursor */
+.wa-resize-v {
+  left: 0; right: 0; width: auto; height: 6px; cursor: ns-resize;
+  background: repeating-linear-gradient(90deg,
+    var(--wa-bevel-light) 0 2px, transparent 2px 6px);
+  opacity: 0.5;
+}
 
 /* fullscreen: viz window fills the screen, chrome hidden, canvas edge-to-edge */
 #wa-viz:fullscreen, #wa-viz:-webkit-full-screen {
@@ -343,7 +354,8 @@
 /* =======================================================================
    PLAYLIST WINDOW (YTM "Up Next" queue)
    ======================================================================= */
-#wa-pl { width: 430px; height: 220px; display: flex; flex-direction: column; min-width: 240px; min-height: 140px; }
+/* width locked to the stack (var, not resizable); only the height grows */
+#wa-pl { width: var(--wa-stack-w); height: 220px; display: flex; flex-direction: column; min-height: 140px; }
 #wa-pl .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
 .wa-pl-list {
   flex: 1 1 auto; overflow-y: auto; min-height: 0;
