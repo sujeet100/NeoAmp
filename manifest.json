@@ -30,7 +30,9 @@
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",
         "vendor/butterchurnPresetsExtra2.min.js",
-        "vendor/skins/base-2.91.wsz"
+        "vendor/skins/base-2.91.wsz",
+        "vendor/skins/sony-esprit.wsz",
+        "vendor/skins/nucleo-nlog.wsz"
       ],
       "matches": ["https://music.youtube.com/*"]
     }
