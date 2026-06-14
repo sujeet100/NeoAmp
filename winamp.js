@@ -310,29 +310,39 @@
     });
   }
 
+  // The skin picker appears in two places (procedural main titlebar + classic
+  // Now-Playing panel); every instance is registered here so they stay in sync.
+  var skinSelectors = [];
+  function buildSkinSelect() {
+    var sel = h("select", { class: "wa-skinsel", title: "Skin" });
+    var g1 = h("optgroup", { label: "Procedural (themeable)" });
+    (window.NeoAmpSkins ? window.NeoAmpSkins.list : []).forEach(function (s) {
+      g1.appendChild(h("option", { value: s.id, text: s.name }));
+    });
+    sel.appendChild(g1);
+    var g2 = h("optgroup", { label: "Real Winamp skin (.wsz)" });
+    CLASSIC_SKINS.forEach(function (s) { g2.appendChild(h("option", { value: "wsz:" + s.id, text: s.name })); });
+    sel.appendChild(g2);
+    sel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    sel.addEventListener("change", function () { selectSkin(sel.value); });
+    skinSelectors.push(sel);
+    return sel;
+  }
+  function selectSkin(value) {
+    if (value.indexOf("wsz:") === 0) enableClassic(value.slice(4));
+    else { disableClassic(); applySkin(value); }
+    setSkinSelectors(value);
+  }
+  function setSkinSelectors(value) { skinSelectors.forEach(function (s) { s.value = value; }); }
+
   // =========================================================================
   // MAIN WINDOW
   // =========================================================================
   function buildMain() {
-    // skin picker gadget in the titlebar
-    var skinSel = h("select", { class: "wa-skinsel", title: "Skin" });
-    var cssGroup = h("optgroup", { label: "Procedural (themeable)" });
-    (window.NeoAmpSkins ? window.NeoAmpSkins.list : []).forEach(function (s) {
-      cssGroup.appendChild(h("option", { value: s.id, text: s.name }));
-    });
-    skinSel.appendChild(cssGroup);
-    // real Winamp .wsz skins, rendered by the sprite engine (wsz.js)
-    var wszGroup = h("optgroup", { label: "Real Winamp skin (.wsz)" });
-    CLASSIC_SKINS.forEach(function (s) {
-      wszGroup.appendChild(h("option", { value: "wsz:" + s.id, text: s.name }));
-    });
-    skinSel.appendChild(wszGroup);
+    // skin picker gadget in the titlebar (a second copy lives on the Now-Playing
+    // panel for classic mode, where this window is hidden — see buildSkinSelect)
+    var skinSel = buildSkinSelect();
     skinSel.value = currentSkin;
-    skinSel.addEventListener("change", function () {
-      if (skinSel.value.indexOf("wsz:") === 0) enableClassic(skinSel.value.slice(4));
-      else { disableClassic(); applySkin(skinSel.value); }
-    });
-    skinSel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
 
     var win = makeWindow("wa-main", "NeoAmp", { gadget: skinSel, onClose: function () { NA.stop(); } });
 
@@ -538,9 +548,12 @@
       els["np" + label] = b;
       return b;
     }
+    var npSkinSel = buildSkinSelect();
+    npSkinSel.value = "wsz:" + (CLASSIC_SKINS[0] && CLASSIC_SKINS[0].id);
     var btns = h("div", { class: "wa-np-btns" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (els.libInput) els.libInput.focus(); }),
+      npSkinSel,
     ]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
@@ -997,10 +1010,9 @@
     }, 1500);
     NA.storage.get("neoampSkin", function (id) {
       if (!id) return;
-      var ss = root.querySelector(".wa-skinsel");
       if (id.indexOf("wsz:") === 0) { enableClassic(id.slice(4)); }
       else { currentSkin = id; applySkin(id); }
-      if (ss) ss.value = id;
+      setSkinSelectors(id);
     });
     NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); syncToggles(); });
   }

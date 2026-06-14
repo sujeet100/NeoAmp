@@ -307,6 +307,7 @@
 .wa-np-artist { font: 11px/1.2 var(--wa-font); color: var(--wa-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 10px/1.2 var(--wa-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.wa-np-btns .wa-skinsel { max-width: 104px; margin: 0; }
 .wa-np-btn {
   height: 20px; padding: 0 8px; cursor: pointer;
   font: 700 8px/1 var(--wa-font); letter-spacing: 0.5px; text-transform: uppercase;
