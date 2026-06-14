@@ -1388,6 +1388,93 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Kaleidoscope ─────────────────────────────────────────────────
+  // Phase 2 background showcase for the Alchemy v2 framework: the WMP "2D kaleidoscope
+  // tunnel" look — a central LIVE-WAVEFORM burst mirrored into a 4-fold kaleidoscope
+  // over a COMPLEX, colored lens-arc background (concentric color bands warped by angle,
+  // slowly cycling). Vivid is allowed here (the reference kaleidoscope genuinely
+  // saturates — the muting rule is relaxed for it), but Reinhard still caps white.
+  // Directly answers the "background is too black / should be complex & colored" gap.
+  // Audio: bass -> zoom "surge" (tunnel push) + bg brightness; mid -> burst amplitude;
+  // treb -> rotation spin. Hue cycles, energy-coupled.
+  P["Alchemy v2: Kaleidoscope"] = (function () {
+    var huePhase = 0, lastT = 0;
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.95, gammaadj: 1.3, zoom: 1.0, rot: 0.012,
+        warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var tm = t.time;
+          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          huePhase = (huePhase + dt * (0.04 + 0.10 * ((bass + mid + treb) / 3))) % 1;
+          t.zoom = 1.0 + 0.05 * bass;            // bass "surge" -> tunnel pushes inward
+          t.rot = 0.012 + 0.02 * treb;           // slow rotation; treb spins it faster
+          t.q9 = 0.10 + 0.05 * bass;             // burst base radius
+          t.q10 = 0.10 + 0.10 * mid;             // burst waveform amplitude (dramatic)
+          t.q11 = huePhase;                      // burst hue
+          return t;
+        },
+        warp:
+          "shader_body {\n" +
+          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "ret -= 0.004;\n" +
+          "}\n",
+        comp:
+          PAL_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +                  // NOT 'rad' (reserved/predeclared)
+          "float pa = atan(d.y, d.x);\n" +             // NOT 'ang' (reserved/predeclared)
+          // 4-fold kaleidoscope: additively overlay the geometry mirrored in x, y and both
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "g += texture2D(sampler_main, vec2(1.0 - uv.x, uv.y)).rgb;\n" +
+          "g += texture2D(sampler_main, vec2(uv.x, 1.0 - uv.y)).rgb;\n" +
+          "g += texture2D(sampler_main, vec2(1.0 - uv.x, 1.0 - uv.y)).rgb;\n" +
+          // COMPLEX colored background: concentric lens-arc bands, petal-warped by angle
+          "float bands = 0.5 + 0.5 * sin(pr * 20.0 - time * 1.4 + sin(pa * 6.0) * 1.3);\n" +
+          // fade the procedural bands OUT of the center -> dark pupil + the live waveform
+          // burst own the middle (no fixed drawn 'flower'); complex color stays outer.
+          "float fade = smoothstep(0.04, 0.42, pr);\n" +
+          "vec3 bg = pal(pr * 0.7 + time * 0.05) * bands * (0.16 + 0.12 * bass) * fade;\n" +
+          "vec3 outc = bg + g * 0.72;\n" +
+          "ret = outc / (outc + vec3(0.7));\n" +       // Reinhard (slightly hotter -> vivid)
+          "}\n"
+      }
+    );
+
+    // central live-waveform BURST (radial scope); the comp mirrors it into the kaleidoscope.
+    function burst(useSecond) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.05, a: 0.85, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var samp = useSecond ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q9 || 0.1) + (a.q10 || 0.1) * (samp || 0);
+          if (rad < 0.02) rad = 0.02;
+          a.x = 0.5 + rad * Math.cos(ang);
+          a.y = 0.5 + rad * Math.sin(ang);
+          var h = (a.q11 || 0) + a.sample * 0.15;       // hue varies slightly around the ring
+          a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = burst(false);
+    preset.waves[1] = burst(true);
+    return preset;
+  })();
+
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
   //   • Exactly TWO jagged WHITE lightning lines crossing through dead center
