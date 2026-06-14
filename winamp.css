@@ -286,7 +286,8 @@
 .wa-np {
   width: 550px; height: 84px; cursor: move; box-sizing: border-box;  /* border inside 550 so it matches the borderless main canvas */
   display: flex; align-items: stretch; gap: 8px; padding: 6px;
-  background: var(--wa-win-bg);
+  /* themed from the skin's PLEDIT palette so it changes per skin */
+  background: var(--pl-normalbg, var(--wa-win-bg));
   border: 2px solid var(--wa-win-border);
   box-shadow:
     inset 2px 2px 0 var(--wa-bevel-light), inset -2px -2px 0 var(--wa-bevel-dark),
@@ -299,32 +300,33 @@
 }
 .wa-np.empty .wa-np-art { visibility: hidden; }
 .wa-np-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+/* title/artist use the skin's PLEDIT text palette so they change per skin */
 .wa-np-title {
-  font-family: var(--wa-lcd-font); font-size: 17px; line-height: 1; color: var(--wa-lcd);
-  text-shadow: 0 0 4px var(--wa-lcd-glow);
+  font-family: var(--wa-lcd-font); font-size: 17px; line-height: 1;
+  color: var(--pl-current, var(--wa-lcd));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--wa-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
-/* VIS/LIB styled like the main window's EQ/PL toggles: small dark button with a
-   green LED that lights when the window is open + green label text */
+/* VIS/LIB match the main window's EQ/PL toggles: silver button, dark label,
+   green LED that lights when the window is open */
 .wa-np-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  height: 18px; padding: 0 10px; cursor: pointer;
+  height: 22px; padding: 0 12px; cursor: pointer;
   font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
-  color: #8f97a6;
-  background: linear-gradient(180deg, #3c3c46, #2a2a32);
-  border: 1px solid;
-  border-color: rgba(255,255,255,0.18) #15151c #15151c rgba(255,255,255,0.18);
+  color: var(--wa-btn-fg);
+  background: var(--wa-btn-bg);
+  border: 2px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
   border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 1px 1px 2px rgba(0,0,0,0.5);
 }
 .wa-np-btn::before {
   content: ""; width: 6px; height: 6px; border-radius: 1px;
   background: #16401f; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);   /* LED off */
 }
-.wa-np-btn:hover { filter: brightness(1.12); }
-.wa-np-btn.on { color: var(--wa-accent); text-shadow: 0 0 4px var(--wa-accent-glow); }
+.wa-np-btn:hover { filter: brightness(1.08); }
 .wa-np-btn.on::before { background: var(--wa-accent); box-shadow: 0 0 5px var(--wa-accent-glow); }  /* LED on */
 /* prominent skin selector (was buried) */
 .wa-np-btns .wa-skinsel {
