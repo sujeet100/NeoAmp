@@ -1759,6 +1759,98 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Wireframe Net ────────────────────────────────────────────────
+  // The WMP "3D wireframe corridor": a funnel/tunnel of thin line-coils receding to an
+  // OFF-CENTER vanishing point (camera low-left), built by a fake-perspective divide in
+  // point_eqs. The net morphs ORDERED (clean funnel) <-> TANGLE (chaotic) on bass, with the
+  // chaos driven by the live waveform (a.value1). Muted teal/green over a dark corridor
+  // background (depth rings + a VP glow). New capability: the 3D off-center camera.
+  // Audio: bass -> tangle amount + VP glow; mid -> hue drift; treb -> fine jitter.
+  P["Alchemy v2: Wireframe Net"] = (function () {
+    var huePhase = 0, lastT = 0;
+    var VPX = 0.62, VPY = 0.45;          // off-center vanishing point
+    var NCX = 0.50, NCY = 0.54;          // near-plane axis center (camera sits low-left)
+
+    // fake perspective: depth d (0 near .. 1 far at the VP), lateral world offset (lu,lv).
+    function project(d, lu, lv) {
+      var sc = 1.0 - 0.85 * d;                 // rings shrink with depth
+      var cx = NCX + (VPX - NCX) * d;          // axis drifts toward the VP
+      var cy = NCY + (VPY - NCY) * d;
+      return [cx + lu * sc, cy + lv * sc];
+    }
+
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.82, gammaadj: 1.3,   // SHORT trail so the wireframe lines read (not smeared to a rose)
+        zoom: 1.0, cx: 0.5, cy: 0.5,             // no feedback pull -> the coil geometry shows, not concentric arcs
+        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var tm = t.time;
+          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          huePhase = (huePhase + dt * (0.015 + 0.04 * ((bass + mid + treb) / 3))) % 1;
+          t.q17 = Math.max(0, Math.min((bass - 0.7) * 1.2, 1.2));   // tangle amount (bass-gated)
+          t.q18 = 0.10 + 0.20 * treb;                              // fine jitter scale
+          t.q11 = huePhase;
+          t.q19 = tm;                                              // phase clock for slow undulation
+          return t;
+        },
+        comp:
+          "shader_body {\n" +
+          "vec2 vp = vec2(" + VPX + ", " + VPY + ");\n" +
+          "vec2 dv = uv - vp; dv.x *= resolution.x / resolution.y;\n" +
+          "float rv = length(dv);\n" +
+          "float bands = 0.5 + 0.5 * sin(rv * 24.0 - time * 1.0);\n" +          // depth rings around the VP
+          "vec3 bg = mix(vec3(0.010, 0.030, 0.040), vec3(0.020, 0.065, 0.055), bands);\n" +
+          "bg *= smoothstep(0.0, 0.9, rv) * 0.5;\n" +                           // darker toward the VP
+          "bg += vec3(0.05, 0.10, 0.09) * exp(-rv * rv * 6.0) * (0.5 + 0.5 * bass);\n" +  // VP glow
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.30;\n" +
+          "ret = outc / (outc + vec3(0.85));\n" +
+          "}\n"
+      }
+    );
+
+    // one net coil: a 3D spring/cone (winds `loops` times from near->far) projected to the
+    // off-center VP. R gets live-waveform jitter scaled by bass -> ordered<->tangle morph.
+    function netCoil(phase, loops, hueOff) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.2, a: 0.5, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var t = a.sample;                                   // 0 near .. 1 far
+          var th = t * 6.2832 * loops + phase + (a.q19 || 0) * 0.2;   // slow undulation
+          var jit = (a.value1 || 0) * (0.16 * (a.q17 || 0) + 0.04 * (a.q18 || 0.1));
+          var R = 0.36 + jit;
+          var p = project(t, R * Math.cos(th), R * Math.sin(th));
+          a.x = p[0]; a.y = p[1];
+          var h = 0.45 + (hueOff - 0.36) * 0.4 + 0.04 * Math.sin(6.2832 * (a.q11 || 0));  // teal/green band, slight drift
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3, sat = 0.5;              // muted teal/green family
+          var fade = 0.35 + 0.65 * (1.0 - t);                 // far end dimmer (depth cue)
+          a.r = (rr * sat + l * (1 - sat)) * 0.7 * fade;
+          a.g = (gg * sat + l * (1 - sat)) * 0.7 * fade;
+          a.b = (bb * sat + l * (1 - sat)) * 0.7 * fade;
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = netCoil(0.0, 7, 0.30);          // teal-ish
+    preset.waves[1] = netCoil(2.094, 7, 0.42);        // 120 deg, greener
+    preset.waves[2] = netCoil(4.188, 6, 0.36);        // 240 deg, different loop count -> mesh
+    return preset;
+  })();
+
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
   //   • Exactly TWO jagged WHITE lightning lines crossing through dead center

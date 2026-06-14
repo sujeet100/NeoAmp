@@ -65,6 +65,7 @@
     { label: "Alchemy v2: Kaleidoscope", wmp: "Alchemy v2: Kaleidoscope" },
     { label: "Alchemy v2: Anemone Pulsar", wmp: "Alchemy v2: Anemone Pulsar" },
     { label: "Alchemy v2: Vortex", wmp: "Alchemy v2: Vortex" },
+    { label: "Alchemy v2: Wireframe Net", wmp: "Alchemy v2: Wireframe Net" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
     { label: "Ambience Water", wmp: "Ambience Water" },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },
