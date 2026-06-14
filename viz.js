@@ -61,6 +61,7 @@
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
+    { label: "Alchemy v2: Orbiters", wmp: "Alchemy v2: Orbiters" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
     { label: "Ambience Water", wmp: "Ambience Water" },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },

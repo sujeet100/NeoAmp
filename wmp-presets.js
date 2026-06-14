@@ -67,6 +67,23 @@
   var PAL_GLSL = "vec3 pal(float h){ return 0.5+0.5*cos(6.2832*(h+vec3(0.0,0.33,0.67))); }\n";
   var CTR_GLSL = "float ctr(float v, float w){ return smoothstep(w, 0.0, abs(fract(v)-0.5)); }\n";
 
+  // Alchemy v2 framework: a COMPLEX, dusty/muted fluid background (domain-warped fbm,
+  // three low-saturation tones bleeding together — teal/purple/teal-grey), breathing
+  // with bass. Fixes the "too black / single flat color" gap without going neon.
+  // Needs NOISE_GLSL (fbm) prepended before the shader_body that calls alcFluid().
+  var ALC_FLUID_GLSL =
+    "vec3 alcFluid(vec2 p, float t, float b){\n" +
+    "  vec2 q = vec2(fbm(p*1.7 + vec2(t*0.04, -t*0.03)), fbm(p*1.7 + vec2(5.2,1.3) - t*0.035));\n" +
+    "  float n = fbm(p*1.5 + q*1.4 + vec2(-t*0.02, t*0.025));\n" +
+    "  float n2 = fbm(p*2.6 - q*1.1 + t*0.015);\n" +
+    "  vec3 deep = vec3(0.012, 0.045, 0.055);\n" +   // dark teal
+    "  vec3 mids = vec3(0.06, 0.035, 0.11);\n" +     // dusty purple
+    "  vec3 hi   = vec3(0.09, 0.15, 0.15);\n" +      // muted teal-grey
+    "  vec3 c = mix(deep, mids, clamp(n*1.3, 0.0, 1.0));\n" +
+    "  c = mix(c, hi, smoothstep(0.55, 0.95, n2));\n" +
+    "  return c * (0.55 + 0.5 * b);\n" +
+    "}\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -1186,6 +1203,188 @@
       return a;
     });
     preset.waves[3].baseVals.smoothing = 0.0;
+    return preset;
+  })();
+
+  // ── Alchemy v2: Orbiters ─────────────────────────────────────────────────────
+  // First preset of the Alchemy v2 framework (see docs/alchemy-v2/). A focused,
+  // CRISP recreation of the WMP "Orbiters" signature that fixes the gaps the user
+  // flagged in the current Alchemy:
+  //   • the central "flower" IS the live audio waveform (radial scope), not drawn loops
+  //   • the two orbs are joined by ONE thin LIGHTNING line (a single waveLine with a
+  //     small, fast, treb-driven zig-zag) — NOT a wide thick fuzzy band
+  //   • SMALL bright ringed orbs (white "Saturn" rings); the orb:line ratio favors the line
+  //   • crisp thin high-alpha strokes; feedback sits BEHIND the geometry (no blur smear)
+  //   • a COMPLEX dusty fbm fluid background (teal<->purple), never flat black
+  //   • Reinhard tone-map so additive cores glow without blowing out to white
+  // Audio: bass -> orb/flower size + bg breathe; mid -> flower amplitude + hue rate;
+  // treb -> lightning amplitude + ring brightness. Hue cycles slowly, energy-coupled.
+  // Does NOT touch "Alchemy Random" — this is a separate, additive entry.
+  P["Alchemy v2: Orbiters"] = (function () {
+    var huePhase = 0, lastT = 0;        // energy-coupled hue accumulator (closure state)
+
+    var preset = build(
+      {
+        wave_a: 0,            // primary waveform off; the custom waves draw everything
+        decay: 0.92,          // short, CRISP trail (dotted orb beads), not a smear
+        gammaadj: 1.3,
+        zoom: 0.995,          // slight INWARD drift keeps trails compact (1.0 made them sprawl)
+        rot: 0.0,
+        warp: 0.0,            // no sinusoidal warp -> lines stay clean/sharp
+        wrap: 0,              // clamp (no edge-wrap border artifact)
+        darken_center: 0.06,  // keep the busy center from over-blooming
+        echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var tm = t.time;
+
+          // energy-coupled hue drift: faster when the music is loud, slow when calm
+          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3;
+          huePhase = (huePhase + dt * (0.02 + 0.06 * energy)) % 1;
+
+          // two orbs on opposing elliptical orbits (180 deg apart) -> the single
+          // tether between them reads as ONE clean lightning line through center.
+          var th = tm * 0.42;
+          t.q1 = 0.5 + 0.27 * Math.cos(th);            // orb A center
+          t.q2 = 0.5 + 0.20 * Math.sin(th * 1.06);
+          t.q3 = 0.5 + 0.27 * Math.cos(th + Math.PI);  // orb B center (opposite)
+          t.q4 = 0.5 + 0.20 * Math.sin(th * 1.06 + Math.PI);
+
+          t.q5 = 0.018 + 0.012 * bass;                 // orb core radius (SMALL)
+          t.q6 = t.q5 * 2.1 + 0.006;                   // Saturn-ring radius (just outside core)
+          t.q7 = 0.012 + 0.045 * treb;                 // lightning displacement (SMALL + fast)
+          t.q8 = huePhase;                             // (reserved) shared hue phase
+
+          t.q9 = 0.085 + 0.05 * bass;                  // central flower base radius
+          t.q10 = 0.05 + 0.06 * mid;                   // flower waveform amplitude
+          t.q11 = (huePhase + 0.45) % 1;               // flower hue (offset from orbs)
+          t.q12 = energy;                              // loudness -> bg breathe / brightness
+          return t;
+        },
+        // feedback: recede + trim, NO blur. zoom (baseVal) shrinks old frames inward
+        // into a dotted bead trail; the live strokes (drawn after) stay razor-sharp.
+        warp:
+          "shader_body {\n" +
+          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "ret -= 0.006;\n" +
+          "}\n",
+        // COMPLEX dusty fluid background + crisp additive geometry + Reinhard tone-map.
+        comp:
+          NOISE_GLSL + ALC_FLUID_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float vig = 1.0 - smoothstep(0.22, 0.95, length(d));\n" +
+          "vec3 bg = alcFluid(uv * 2.0, time, bass) * vig;\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +                 // geometry + recede trails
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + sharp + glow * 0.30;\n" +
+          "ret = outc / (outc + vec3(0.85));\n" +                            // Reinhard: glow, never white-out
+          "}\n"
+      }
+    );
+
+    // central FLOWER = the live audio waveform as a radial scope (the U3 fix). Each
+    // of the 512 samples is a spoke whose radius = base + amp*value1 -> jagged petals.
+    function waveFlower() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.06, a: 0.8, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var rad = (a.q9 || 0.1) + (a.q10 || 0.05) * (a.value1 || 0);
+          if (rad < 0.02) rad = 0.02;
+          a.x = 0.5 + rad * Math.cos(ang);
+          a.y = 0.5 + rad * Math.sin(ang);
+          var h = a.q11 || 0;                          // dusty (desaturated) hue
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3, s = 0.62;
+          a.r = (rr * s + l * (1 - s)) * 0.85;
+          a.g = (gg * s + l * (1 - s)) * 0.85;
+          a.b = (bb * s + l * (1 - s)) * 0.85;
+          return a;
+        }
+      };
+    }
+
+    // SINGLE lightning tether A->B (the U4 fix): one thin line, small fast perpendicular
+    // displacement from the live waveform -> a crisp lightning filament, not a fuzzy band.
+    function tether() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.03, a: 0.9, thick: 0, r: 0.62, g: 0.85, b: 1.0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ax = a.q1 !== undefined ? a.q1 : 0.4, ay = a.q2 !== undefined ? a.q2 : 0.5;
+          var bx = a.q3 !== undefined ? a.q3 : 0.6, by = a.q4 !== undefined ? a.q4 : 0.5;
+          var dx = bx - ax, dy = by - ay;
+          var len = Math.sqrt(dx * dx + dy * dy) || 1;
+          var nx = -dy / len, ny = dx / len;            // unit perpendicular
+          var s = a.sample;                              // 0..1 from A to B
+          var disp = (a.value1 || 0) * (a.q7 || 0.03);
+          a.x = ax + s * dx + nx * disp;
+          a.y = ay + s * dy + ny * disp;
+          a.r = 0.65; a.g = 0.85; a.b = 1.0;             // electric blue-white lightning
+          return a;
+        }
+      };
+    }
+
+    // SMALL orb core: a tiny bright smooth ring that reads as a glowing node under bloom.
+    function orbCore(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 80, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.95, thick: 1, r: 1.0, g: 0.72, b: 0.34
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = a.q5 || 0.02;
+          var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = 1.0; a.g = 0.72; a.b = 0.34;
+          return a;
+        }
+      };
+    }
+
+    // thin near-white "Saturn" ring around each orb (the orb:line ratio detail).
+    function orbRing(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 96, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.5, thick: 0, r: 0.85, g: 0.92, b: 1.0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = a.q6 || 0.05;
+          var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = 0.85; a.g = 0.92; a.b = 1.0;
+          return a;
+        }
+      };
+    }
+
+    preset.waves[0] = waveFlower();        // central live-waveform flower (back)
+    preset.waves[1] = tether();            // single lightning line A<->B
+    preset.waves[2] = orbCore("q1", "q2"); // orb A
+    preset.waves[3] = orbCore("q3", "q4"); // orb B
+    preset.waves[4] = orbRing("q1", "q2"); // orb A Saturn ring
+    preset.waves[5] = orbRing("q3", "q4"); // orb B Saturn ring
     return preset;
   })();
 
