@@ -436,7 +436,7 @@
   // a chrome-less host window in place of the procedural #wa-main. Opt-in via
   // the skin picker; selecting a procedural skin switches back.
   // =========================================================================
-  var classicWin = null, classicLoading = false;
+  var classicWin = null, classicLoading = false, classicEqApi = null, classicSkin = null;
   function enableClassic(id) {
     if (!window.NeoAmpClassic) { NA.toast("Classic skin engine not loaded"); return; }
     var def = null;
@@ -466,14 +466,16 @@
     classicLoading = true;
     window.NeoAmpClassic.loadSkin(chrome.runtime.getURL(def.file)).then(function (skin) {
       classicLoading = false;
+      classicSkin = skin;
       if (classicApi) classicApi.destroy();
       classicApi = window.NeoAmpClassic.mountMain(classicWin.el, skin, classicHooks());
       // size the drag strip to the rendered titlebar
       classicWin.drag.style.width = classicApi.dragRegion.w + "px";
       classicWin.drag.style.height = classicApi.dragRegion.h + "px";
+      mountClassicEq(skin);
       var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
       classicApi.setVolume(NA.control.getVolume());
-      classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl"));
+      classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl"));
     }).catch(function (e) {
       classicLoading = false;
       console.error("[NeoAmp] .wsz load failed:", e);
@@ -483,9 +485,34 @@
   }
   function disableClassic() {
     if (classicApi) { classicApi.destroy(); classicApi = null; }
+    if (classicEqApi) { classicEqApi.destroy(); classicEqApi = null; }
     if (classicWin) classicWin.el.style.display = "none";
     if (wins["wa-art"]) wins["wa-art"].el.style.display = "none";
+    if (wins["wa-eq-skin"]) wins["wa-eq-skin"].el.style.display = "none";
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
+  }
+  // skinned EQ window (chrome-less host, like the main window). Hidden until the
+  // EQ button is clicked. The procedural #wa-eq stays hidden in classic mode.
+  function mountClassicEq(skin) {
+    var w = wins["wa-eq-skin"];
+    if (!w) {
+      var el = h("div", { class: "wa-win wa-skinwin inactive", id: "wa-eq-skin" });
+      var drag = h("div", { class: "wa-skin-drag" });
+      el.appendChild(drag);
+      el.addEventListener("mousedown", function () { raise(el); }, true);
+      makeDraggable(el, drag);
+      el.style.display = "none";
+      root.appendChild(el);
+      w = wins["wa-eq-skin"] = { el: el, body: el, titlebar: drag, drag: drag };
+      var d = layout["wa-eq-skin"] || { x: 40, y: 320 };
+      el.style.left = (d.x || 40) + "px"; el.style.top = (d.y || 320) + "px";
+    }
+    if (classicEqApi) classicEqApi.destroy();
+    classicEqApi = window.NeoAmpClassic.mountEq(w.el, skin, { onClose: function () {
+      w.el.style.display = "none"; classicApi && classicApi.setToggles(false, isShown("wa-pl"));
+    } });
+    w.drag.style.width = classicEqApi.dragRegion.w + "px";
+    w.drag.style.height = classicEqApi.dragRegion.h + "px";
   }
   // Companion album-art window — Winamp 2 has no art region, so we show it in a
   // small separate framed tile alongside the skinned windows (classic mode only).
@@ -521,8 +548,8 @@
       onVolume: function (v) { NA.control.setVolume(v); if (els.vol) els.vol.value = String(Math.round(v * 100)); },
       onShuffle: function () { NA.control.toggleShuffle(); },
       onRepeat: function () { NA.control.toggleRepeat(); },
-      onToggleEq: function () { toggleWin("wa-eq", els.eqTog); classicApi && classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl")); },
-      onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); classicApi && classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl")); },
+      onToggleEq: function () { toggleWin("wa-eq-skin"); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
+      onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onToggleViz: function () { toggleWin("wa-viz", els.visTog); },
       onClose: function () { NA.stop(); },
     };

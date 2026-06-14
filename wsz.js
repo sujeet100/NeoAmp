@@ -138,6 +138,28 @@
     },
     VOLUME: { THUMB:[15,422,14,11], THUMB_A:[0,422,14,11] },   // 28 bg frames: 68x15 each, y=i*15
     BALANCE: { BG_X:9, THUMB:[15,422,14,11], THUMB_A:[0,422,14,11] }, // bg 38x15 frames at x=9, y=i*15
+    EQMAIN: {
+      BG:[0,0,275,116], TITLE:[0,149,275,14], TITLE_SEL:[0,134,275,14],
+      THUMB:[0,164,11,11], THUMB_A:[0,176,11,11],
+      CLOSE:[0,116,9,9], CLOSE_A:[0,125,9,9],
+      ON:[10,119,26,12], ON_D:[128,119,26,12], ON_SEL:[69,119,26,12], ON_SEL_D:[187,119,26,12],
+      AUTO:[36,119,32,12], AUTO_D:[154,119,32,12], AUTO_SEL:[95,119,32,12], AUTO_SEL_D:[213,119,32,12],
+      GRAPH_BG:[0,294,113,19], PRESETS:[224,164,44,12], PRESETS_A:[224,176,44,12],
+    },
+  };
+
+  // EQ window element positions (from equalizer-window.css)
+  var EQ_LAYOUT = {
+    titlebar: { x: 0, y: 0, w: 275, h: 14 },
+    close: { x: 264, y: 3, w: 9, h: 9 },
+    shade: { x: 254, y: 3, w: 9, h: 9 },
+    on:    { x: 14, y: 18, w: 26, h: 12 },
+    auto:  { x: 40, y: 18, w: 32, h: 12 },
+    presets: { x: 217, y: 18, w: 44, h: 12 },
+    graph: { x: 86, y: 17, w: 113, h: 19 },
+    preamp: { x: 21, y: 38 },
+    bandX: [78, 96, 114, 132, 150, 168, 186, 204, 222, 240], bandY: 38,
+    thumbTop: 38, thumbRange: 51,    // thumb top: 38 (+12dB) .. 89 (-12dB)
   };
 
   // Where each element sits on the 275x116 main window (from main-window.css).
@@ -181,7 +203,8 @@
       .then(function (files) {
         // Decode whichever sheets are present (skins may omit some).
         var wanted = ["MAIN", "TITLEBAR", "CBUTTONS", "NUMBERS", "NUMS_EX",
-          "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS"];
+          "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS",
+          "EQMAIN", "EQ_EX"];
         var sheets = {};
         var jobs = wanted.map(function (name) {
           var bytes = files[name + ".BMP"];
@@ -429,5 +452,94 @@
     };
   }
 
-  window.NeoAmpClassic = { loadSkin: loadSkin, mountMain: mountMain, MAIN_W: MAIN_W, MAIN_H: MAIN_H };
+  // =========================================================================
+  // EQUALIZER window renderer. Cosmetic (like the procedural EQ): the 10 bands
+  // + preamp drag vertically and redraw the curve, but don't filter audio yet.
+  // =========================================================================
+  function mountEq(hostEl, skin, hooks) {
+    hooks = hooks || {};
+    var scale = hooks.scale || 2;
+    var canvas = document.createElement("canvas");
+    canvas.width = MAIN_W; canvas.height = MAIN_H;
+    canvas.style.width = (MAIN_W * scale) + "px";
+    canvas.style.height = (MAIN_H * scale) + "px";
+    canvas.style.display = "block"; canvas.style.imageRendering = "pixelated";
+    hostEl.appendChild(canvas);
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 10 band gains, -12..12
+    var preamp = 0;
+    var on = true, dragBand = -1;
+
+    function img() { return skin.sheets.EQMAIN; }
+    function blit(key, dx, dy) {
+      var s = SP.EQMAIN[key]; if (!img() || !s) return;
+      ctx.drawImage(img(), s[0], s[1], s[2], s[3], dx, dy, s[2], s[3]);
+    }
+    function thumbY(v) { return EQ_LAYOUT.thumbTop + ((12 - v) / 24) * EQ_LAYOUT.thumbRange; }
+    function valFromY(y) { return Math.max(-12, Math.min(12, 12 - ((y - EQ_LAYOUT.thumbTop) / EQ_LAYOUT.thumbRange) * 24)); }
+
+    function drawCurve() {
+      var g = EQ_LAYOUT.graph;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(g.x, g.y, g.w, g.h); ctx.clip();
+      ctx.strokeStyle = "#7fe96b"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (var i = 0; i < bands.length; i++) {
+        var x = g.x + (i / (bands.length - 1)) * g.w;
+        var y = g.y + g.h / 2 - (bands[i] / 12) * (g.h / 2 - 1);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    function render() {
+      ctx.clearRect(0, 0, MAIN_W, MAIN_H);
+      if (img()) ctx.drawImage(img(), 0, 0, 275, 116, 0, 0, 275, 116);
+      blit("TITLE_SEL", 0, 0);
+      blit(on ? "ON_SEL" : "ON", EQ_LAYOUT.on.x, EQ_LAYOUT.on.y);
+      blit("AUTO", EQ_LAYOUT.auto.x, EQ_LAYOUT.auto.y);
+      blit("PRESETS", EQ_LAYOUT.presets.x, EQ_LAYOUT.presets.y);
+      blit("GRAPH_BG", EQ_LAYOUT.graph.x, EQ_LAYOUT.graph.y);
+      drawCurve();
+      blit("THUMB", EQ_LAYOUT.preamp.x, thumbY(preamp));
+      for (var i = 0; i < 10; i++) blit(dragBand === i ? "THUMB_A" : "THUMB", EQ_LAYOUT.bandX[i], thumbY(bands[i]));
+    }
+    var raf = 0;
+    function sched() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; render(); }); }
+
+    function pos(e) {
+      var b = canvas.getBoundingClientRect();
+      return { x: (e.clientX - b.left) / scale, y: (e.clientY - b.top) / scale };
+    }
+    function bandAt(p) {
+      if (p.y < EQ_LAYOUT.bandY - 2 || p.y > EQ_LAYOUT.bandY + EQ_LAYOUT.thumbRange + 13) return -1;
+      for (var i = 0; i < 10; i++) if (p.x >= EQ_LAYOUT.bandX[i] - 2 && p.x <= EQ_LAYOUT.bandX[i] + 13) return i;
+      return -1;
+    }
+    canvas.addEventListener("mousedown", function (e) {
+      var p = pos(e);
+      var bi = bandAt(p);
+      if (bi >= 0) { dragBand = bi; bands[bi] = valFromY(p.y); sched(); e.preventDefault(); }
+    });
+    window.addEventListener("mousemove", function (e) {
+      if (dragBand < 0) return; bands[dragBand] = valFromY(pos(e).y); sched();
+    });
+    window.addEventListener("mouseup", function (e) {
+      if (dragBand >= 0) { dragBand = -1; sched(); return; }
+      var p = pos(e);
+      if (p.x >= EQ_LAYOUT.on.x && p.x <= EQ_LAYOUT.on.x + EQ_LAYOUT.on.w && p.y >= EQ_LAYOUT.on.y && p.y <= EQ_LAYOUT.on.y + EQ_LAYOUT.on.h) { on = !on; sched(); }
+      else if (p.x >= EQ_LAYOUT.close.x && p.x <= EQ_LAYOUT.close.x + 9 && p.y >= EQ_LAYOUT.close.y && p.y <= EQ_LAYOUT.close.y + 9) { hooks.onClose && hooks.onClose(); }
+    });
+
+    render();
+    return {
+      el: canvas,
+      dragRegion: { x: 0, y: 0, w: 244 * scale, h: EQ_LAYOUT.titlebar.h * scale },
+      destroy: function () { if (raf) cancelAnimationFrame(raf); canvas.remove(); },
+    };
+  }
+
+  window.NeoAmpClassic = { loadSkin: loadSkin, mountMain: mountMain, mountEq: mountEq, MAIN_W: MAIN_W, MAIN_H: MAIN_H };
 })();
