@@ -1475,6 +1475,167 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Anemone Pulsar ───────────────────────────────────────────────
+  // The emotional center of WMP Alchemy: a dusty rose/magenta furry ANEMONE (a radial
+  // live-waveform scope with a dark pupil) that PULSES with the bass, flanked by the two
+  // orbiters joined by one thin tether — all on a flat SOLID-COLOR background that SNAPS
+  // between muted cobalt / sage / plum (the Alchemy hallmark; a new bg mode for the kit).
+  // This is a MUTED scene (the muting rule applies — dusty, tone-mapped, no neon/white).
+  // Audio: bass -> anemone pulse + bg brightness; mid -> fur amplitude; treb -> tether zig.
+  P["Alchemy v2: Anemone Pulsar"] = (function () {
+    var huePhase = 0, lastT = 0;
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.90, gammaadj: 1.3, zoom: 0.997,  // shorter decay -> compact orb beads, less coil
+        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.05, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var tm = t.time;
+          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          huePhase = (huePhase + dt * (0.015 + 0.05 * ((bass + mid + treb) / 3))) % 1;
+          var th = tm * 0.33;                          // slow flanking orbit
+          t.q1 = 0.5 + 0.34 * Math.cos(th);            // orb A — CIRCULAR orbit, radius 0.34 so both
+          t.q2 = 0.5 + 0.34 * Math.sin(th);            //   orbs sit clearly OUTSIDE the anemone fur
+          t.q3 = 0.5 + 0.34 * Math.cos(th + Math.PI);  // orb B (opposite) — not masked, not in a corner
+          t.q4 = 0.5 + 0.34 * Math.sin(th + Math.PI);
+          t.q5 = 0.016 + 0.012 * bass;                 // orb core radius
+          t.q6 = t.q5 * 2.1 + 0.006;                   // Saturn ring
+          t.q7 = 0.010 + 0.035 * treb;                 // tether lightning amplitude (small)
+          t.q9 = 0.07 + 0.06 * bass;                   // anemone base radius — smaller so the
+          t.q10 = 0.04 + 0.05 * mid;                   //   flanking orbs sit OUTSIDE the fur (PULSAR pulse)
+          t.q11 = huePhase;                            // hue drift (kept in the rose/magenta band below)
+          return t;
+        },
+        warp:
+          "shader_body {\n" +
+          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "ret -= 0.005;\n" +
+          "}\n",
+        // SOLID-COLOR-SNAP background mode: a flat muted color that hard-snaps every few
+        // seconds, with a faint fbm wash for life, a vignette, and a dark central pupil.
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "float idx = mod(floor(time / 6.0), 3.0);\n" +          // snap every 6s
+          "vec3 c0 = vec3(0.09, 0.14, 0.30);\n" +                 // dusty cobalt
+          "vec3 c1 = vec3(0.10, 0.17, 0.12);\n" +                 // dusty sage
+          "vec3 c2 = vec3(0.16, 0.07, 0.18);\n" +                 // dusty plum
+          "vec3 solid = idx < 0.5 ? c0 : (idx < 1.5 ? c1 : c2);\n" +
+          "float wash = 0.85 + 0.30 * fbm(uv * 2.2 + vec2(time * 0.03, -time * 0.02));\n" +
+          "float vig = 1.0 - 0.45 * smoothstep(0.25, 1.1, pr);\n" +
+          "float pupil = smoothstep(0.0, 0.16, pr);\n" +          // dark center -> the anemone's eye
+          "vec3 bg = solid * wash * vig * pupil * (0.9 + 0.15 * bass);\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.30;\n" +
+          "ret = outc / (outc + vec3(0.9));\n" +                  // Reinhard, muted (k=0.9)
+          "}\n"
+      }
+    );
+
+    // the ANEMONE: a radial live-waveform scope, dusty rose/magenta, dark pupil.
+    function anemone(useSecond) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.04, a: 0.7, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var samp = useSecond ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q9 || 0.12) + (a.q10 || 0.06) * (samp || 0);
+          if (rad < 0.03) rad = 0.03;
+          a.x = 0.5 + rad * Math.cos(ang);
+          a.y = 0.5 + rad * Math.sin(ang);
+          var h = 0.90 + 0.10 * Math.sin(6.2832 * (a.q11 || 0));   // dusty rose <-> magenta band
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3, s = 0.55;
+          a.r = (rr * s + l * (1 - s)) * 0.8;
+          a.g = (gg * s + l * (1 - s)) * 0.8;
+          a.b = (bb * s + l * (1 - s)) * 0.8;
+          return a;
+        }
+      };
+    }
+    // single thin lightning tether between the flanking orbs (fainter here so it doesn't
+    // overpower the anemone).
+    function tether() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.03, a: 0.55, thick: 0, r: 0.62, g: 0.85, b: 1.0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ax = a.q1 !== undefined ? a.q1 : 0.4, ay = a.q2 !== undefined ? a.q2 : 0.5;
+          var bx = a.q3 !== undefined ? a.q3 : 0.6, by = a.q4 !== undefined ? a.q4 : 0.5;
+          var dx = bx - ax, dy = by - ay;
+          var len = Math.sqrt(dx * dx + dy * dy) || 1;
+          var nx = -dy / len, ny = dx / len;
+          var s = a.sample;
+          var disp = (a.value1 || 0) * (a.q7 || 0.03);
+          a.x = ax + s * dx + nx * disp;
+          a.y = ay + s * dy + ny * disp;
+          a.r = 0.6; a.g = 0.8; a.b = 1.0;
+          return a;
+        }
+      };
+    }
+    // cr/cg/cb let each orb be tinted (orb B is tinted distinctly as a diagnostic to
+    // confirm it renders; if both show, we'll decide same-color vs distinct).
+    function orbCore(qx, qy, cr, cg, cb) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 80, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.95, thick: 1, r: cr, g: cg, b: cb
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = a.q5 || 0.02; var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = cr; a.g = cg; a.b = cb;
+          return a;
+        }
+      };
+    }
+    function orbRing(qx, qy, cr, cg, cb) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 96, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.25, thick: 0, r: cr, g: cg, b: cb
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = a.q6 || 0.05; var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = cr; a.g = cg; a.b = cb;
+          return a;
+        }
+      };
+    }
+    // 6-wave layout, identical to the known-good Orbiters preset. NOTE: a 7-wave version
+    // (two anemone channels) made the 7th wave (orb B's ring) fail to render — this build
+    // only reliably draws ~6 enabled custom waves. Keep orb waves at low indices.
+    preset.waves[0] = anemone(false);                         // anemone fur
+    preset.waves[1] = tether();                               // thin lightning between the orbs
+    preset.waves[2] = orbCore("q1", "q2", 1.0, 0.72, 0.34);   // orb A core (gold)
+    preset.waves[3] = orbCore("q3", "q4", 1.0, 0.72, 0.34);   // orb B core (gold — matches A)
+    preset.waves[4] = orbRing("q1", "q2", 0.85, 0.92, 1.0);   // orb A ring (white)
+    preset.waves[5] = orbRing("q3", "q4", 0.85, 0.92, 1.0);   // orb B ring (white)
+    return preset;
+  })();
+
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
   //   • Exactly TWO jagged WHITE lightning lines crossing through dead center

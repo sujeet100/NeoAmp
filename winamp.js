@@ -1190,6 +1190,24 @@
   }, true);
 
   ensureLauncher();
+
+  // DEV auto-launch: getDisplayMedia needs a user gesture (and a native share-picker
+  // dialog that can't be auto-dismissed), so a true click-free launch on page load is
+  // impossible. This skips hunting for the button — the FIRST click/keypress anywhere
+  // (e.g. clicking to play a track) auto-starts NeoAmp. Default ON; disable in the page
+  // console with:  localStorage.setItem('neoamp_autostart','0')
+  try {
+    if (localStorage.getItem("neoamp_autostart") !== "0") {
+      var autoStart = function () {
+        document.removeEventListener("pointerdown", autoStart, true);
+        document.removeEventListener("keydown", autoStart, true);
+        if (!NA.isRunning()) NA.start();
+      };
+      document.addEventListener("pointerdown", autoStart, true);
+      document.addEventListener("keydown", autoStart, true);
+    }
+  } catch (_) {}
+
   // YTM is a SPA; re-add the launcher if a navigation wipes it.
   var mo = new MutationObserver(function () {
     if (!document.getElementById("neoamp-launch") && !NA.isRunning()) ensureLauncher();
