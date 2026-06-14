@@ -438,6 +438,283 @@
     return preset;
   })();
 
+  // ── Dance of the Freaky Circles (Fire) ──────────────────────────────────────
+  // The (Mosaic) preset with the BACKGROUND MOSAIC REMOVED: the two orbiting circles
+  // (thin ring core + reactive waveform ring) over a clean black background, tinted
+  // a MULTI-SHADE purple ramp (deep violet -> magenta -> pink-white) for drama. The
+  // comp BLURS the buffer into soft glowing circles (the smoothing the mosaic used to
+  // do, minus the grid). PROCEDURAL PARTICLES (30 additive glows in the comp GLSL)
+  // fire ONLY on a detected bass jump (beat), spawning at the outer-waveform radius
+  // and flying OUT to the screen border on a wavy, flickering fire trajectory.
+  P["Dance of the Freaky Circles (Fire)"] = (function () {
+    // beat-detection state (persists across frames via this closure) — used to fire a
+    // particle burst ONLY when the bass jumps, not continuously.
+    var avgBass = 0.5, lastBurst = -10, burstStr = 0, burstSeed = 0, burstCount = 0;
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.62,           // short fade (also forced in frame_eqs); high decay was only for mosaic
+        gammaadj: 1.5,
+        zoom: 1.0,
+        warp: 0.0,
+        echo_alpha: 0,
+        darken_center: 0,
+        wrap: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var treb = t.treb_att || t.treb || 1;
+          var mid = t.mid_att || t.mid || 1;
+          var th = t.time * 1.0;
+          var orbit = 0.11;
+          t.q1 = 0.5 + orbit * Math.cos(th);
+          t.q2 = 0.5 + orbit * Math.sin(th);
+          t.q3 = 0.5 + orbit * Math.cos(th + Math.PI);
+          t.q4 = 0.5 + orbit * Math.sin(th + Math.PI);
+          t.q5 = 0.052 + 0.004 * bass;   // inner circles nearly STATIC (tiny bass response)
+          // AUDIO GATE on the outer ring (an oscilloscope driven by mid/treb): below a
+          // threshold it fades to ZERO (additive -> invisible) and CONTRACTS toward the
+          // inner circles; it expands + brightens as mid/treb rise. Beat-punch adds on kicks.
+          // (read true _att values; the mid/treb vars above use ||1 which is 1 at silence.)
+          var midA = (t.mid_att !== undefined ? t.mid_att : (t.mid || 0));
+          var trebA = (t.treb_att !== undefined ? t.treb_att : (t.treb || 0));
+          var gate = Math.max(0, Math.min((0.5 * (midA + trebA) - 0.55) * 1.8, 1.3));
+          t.q10 = gate;                          // ring brightness/alpha (0 = gone)
+          t.q6 = 0.07 + 0.13 * gate;             // radius contracts when quiet, expands when active
+          // MODERATE amplitude from the SMOOTHED _att vars -> jagged spikes that bite but
+          // can't explode; peaks AND troughs are also hard-clamped in waveRing point_eqs.
+          t.q8 = 0.03 + 0.08 * Math.min(0.6 * trebA + 0.4 * midA, 2.0);
+          var slot = Math.floor(t.time / 0.55);
+          var rnd = Math.sin(slot * 12.9898) * 43758.5453;
+          rnd = rnd - Math.floor(rnd);
+          var ph = t.time / 0.55 - slot;
+          t.q9 = (rnd < 0.32 && ph < 0.4) ? 0 : 1;
+          // FORCE a short decay every frame (baseVals alone wasn't being applied -> the
+          // rings were stacking into a ball of yarn). High decay was only for the mosaic.
+          t.decay = 0.62;
+          // --- beat detection: fire a particle burst ONLY on a bass jump ---
+          var bi = (t.bass !== undefined ? t.bass : bass);   // instantaneous-ish bass
+          avgBass = avgBass * 0.92 + bi * 0.08;              // slow running baseline
+          if (bi > avgBass * 1.30 + 0.20 && t.time - lastBurst > 0.16) {
+            lastBurst = t.time;
+            burstCount += 1;
+            burstStr = Math.min(bi / Math.max(avgBass, 0.2), 2.2);
+            burstSeed = burstCount * 0.3713;                 // new seed per burst -> fresh spark spread
+          }
+          t.q11 = t.time - lastBurst;                        // seconds since burst (burst age)
+          t.q12 = burstStr;                                  // burst strength
+          t.q13 = burstSeed;                                 // per-burst seed
+          // BEAT PUNCH: a fast-decaying flinch right after each burst -> the rings expand
+          // and flash on the kick (so the whole shape reacts, not just the particles)
+          var punch = burstStr * Math.exp(-(t.time - lastBurst) * 7.0);
+          t.q6 += 0.045 * punch;                             // rings snap outward on the hit
+          t.q10 = Math.min(t.q10 + 0.55 * punch, 1.8);       // and flash brighter
+          return t;
+        },
+        // WARP: trail control + MOTION BLUR. The default warp only does `ret -= 0.004`
+        // (trails last ~forever); decay base-val had no effect in this build. Instead of
+        // fading a STATIC copy (which leaves distinct ring afterimages), we rotate + very
+        // slightly contract the previous frame and add a tiny blur each frame, so trails
+        // SMEAR along the motion (motion blur) and still fade fast (no furball).
+        warp:
+          "shader_body {\n" +
+          "vec2 cc = uv - 0.5;\n" +
+          "float aa = 0.010;\n" +                            // small rotation/frame -> arc smear
+          "mat2 R = mat2(cos(aa), -sin(aa), sin(aa), cos(aa));\n" +
+          "vec2 suv = 0.5 + R * cc * 0.997;\n" +             // rotate + slight inward pull
+          "vec2 wp = 1.0 / resolution;\n" +
+          "vec3 acc = texture2D(sampler_main, suv).rgb * 0.5;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * 1.5, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(wp.x * 1.5, 0.0)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(0.0, wp.y * 1.5)).rgb * 0.125;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(0.0, wp.y * 1.5)).rgb * 0.125;\n" +
+          "ret = acc * 0.88;\n" +                            // phosphor trail (gentle fade; wave is gated+clamped now)
+          "}\n",
+        // COMP: blur the buffer into soft glowing circles (mosaic smoothing, no grid),
+        // colour via a multi-shade purple ramp, then draw PROCEDURAL PARTICLES on top.
+        // Dots are computed in GLSL (custom-wave dots render as connected lines here).
+        // Beat-triggered via q11/q12/q13 set in frame_eqs; wavy fire trajectory.
+        // (Reserved builtin names ang/rad are predeclared in main() -> use pang/pr.)
+        comp:
+          "float pHash(float n) { return fract(sin(n * 78.233) * 43758.5453); }\n" +
+          "vec3 pal(float x) {\n" +                          // multi-shade purple ramp (dramatic, not flat)
+          "  vec3 c1 = vec3(0.05, 0.02, 0.14);\n" +          // deep blue-violet (dim)
+          "  vec3 c2 = vec3(0.40, 0.08, 0.80);\n" +          // violet
+          "  vec3 c3 = vec3(0.82, 0.18, 1.00);\n" +          // magenta-purple
+          "  vec3 c4 = vec3(0.92, 0.38, 1.00);\n" +          // bright magenta peaks (not pure white)
+          "  vec3 c = mix(c1, c2, smoothstep(0.04, 0.34, x));\n" +
+          "  c = mix(c, c3, smoothstep(0.34, 0.66, x));\n" +
+          "  c = mix(c, c4, smoothstep(0.66, 1.0, x));\n" +
+          "  return c;\n" +
+          "}\n" +
+          "shader_body {\n" +
+          // sample with a small MAX-dilation -> THICKER lines, still crisp (max, not blur)
+          "vec2 px = 1.0 / resolution;\n" +
+          "float tk = 1.7;\n" +
+          "vec3 sm = texture2D(sampler_main, uv).rgb;\n" +
+          "sm = max(sm, texture2D(sampler_main, uv + vec2(px.x * tk, 0.0)).rgb);\n" +
+          "sm = max(sm, texture2D(sampler_main, uv - vec2(px.x * tk, 0.0)).rgb);\n" +
+          "sm = max(sm, texture2D(sampler_main, uv + vec2(0.0, px.y * tk)).rgb);\n" +
+          "sm = max(sm, texture2D(sampler_main, uv - vec2(0.0, px.y * tk)).rgb);\n" +
+          "float lum = clamp(max(sm.r, max(sm.g, sm.b)) * 1.05, 0.0, 1.2);\n" +
+          // multi-shade circles (deep violet -> magenta -> pink-white), fade to black
+          "vec3 col = pal(lum) * smoothstep(0.02, 0.25, lum);\n" +
+          // cheap THRESHOLD bloom: ring-sample the buffer, keep only the BRIGHT parts and
+          // add them back as a soft purple halo -> the sharp lines bleed glow into the space
+          "vec3 bloom = vec3(0.0);\n" +
+          "for (int b = 0; b < 8; b++) {\n" +
+          "  float ba = float(b) / 8.0 * 6.2831;\n" +
+          "  vec2 bd = vec2(cos(ba), sin(ba));\n" +
+          "  bloom += max(texture2D(sampler_main, uv + bd * 4.0 * px).rgb - 0.25, 0.0);\n" +
+          "  bloom += max(texture2D(sampler_main, uv + bd * 9.0 * px).rgb - 0.25, 0.0);\n" +
+          "}\n" +
+          "col += pal(0.62) * (bloom.r + bloom.b) * 0.06;\n" +
+          // --- burst particles: fire ONLY on a bass jump (q11=age, q12=strength, q13=seed).
+          //     They spawn at the outer-waveform radius and fly OUT to the border on a
+          //     WAVY (non-linear) fire trajectory: a perpendicular wobble that grows + a
+          //     brightness flicker. When no recent burst, all sparks are dead -> none show.
+          "vec2 p = uv - 0.5; p.x *= resolution.x / resolution.y;\n" +
+          // subtle deep-purple radial vignette so the shapes don't float in a pure-black vacuum
+          "col += vec3(0.05, 0.012, 0.09) * (1.0 - smoothstep(0.10, 0.92, length(p)));\n" +
+          "float bAge = q11;\n" +
+          "float bStr = q12;\n" +
+          "float bSeed = q13;\n" +
+          "vec3 part = vec3(0.0);\n" +
+          "for (int i = 0; i < 44; i++) {\n" +
+          "  float fi = float(i);\n" +
+          "  float h1 = pHash(fi * 1.7 + bSeed * 3.1);\n" +        // launch angle (reseeded each burst)
+          "  float h2 = pHash(fi * 3.1 + bSeed * 1.7 + 2.0);\n" +  // launch speed
+          "  float h3 = pHash(fi * 5.7 + bSeed * 2.3 + 4.0);\n" +  // drag / lifespan
+          "  float life = 0.7 + 0.8 * h3;\n" +
+          "  float age = bAge / life;\n" +                  // 0 at the jump, >1 = spark gone
+          "  if (age < 1.0) {\n" +
+          "    float heat = 1.0 - age;\n" +                 // embers cool over their life
+          "    float pang = h1 * 6.2831;\n" +
+          "    vec2 dir = vec2(cos(pang), sin(pang));\n" +
+          "    vec2 perp = vec2(-dir.y, dir.x);\n" +
+          // ballistic launch + DRAG -> speed is NON-uniform and decelerates toward terminal
+          // velocity (fast off the line, easing out), per-spark v0 and drag constant
+          "    float v0 = 0.45 + 1.05 * h2;\n" +
+          "    float drag = 2.2 + 3.0 * h3;\n" +
+          "    float prog = (1.0 - exp(-age * drag)) / (1.0 - exp(-drag));\n" +   // 0..1 ease-out
+          "    float startR = 0.18 + 0.10 * h2;\n" +
+          // outward velocity surges with the BASS TRANSIENT (kick punch), not a BPM clock
+          "    float pr = startR + (0.30 + 0.50 * v0 + 0.45 * bass_att) * prog;\n" +
+          // BUOYANCY (rises while hot) then GRAVITY arc, + turbulence wobble that grows with age
+          "    float vert = (0.20 * age - 0.26 * age * age) * (0.6 + 0.8 * h2);\n" +
+          "    float wob = (sin(age * 14.0 + h1 * 40.0) + 0.5 * sin(age * 31.0 + fi)) * 0.05 * age;\n" +
+          "    vec2 pp = dir * pr + perp * wob + vec2(0.0, vert);\n" +
+          "    float d = length(p - pp);\n" +
+          "    float flick = 0.65 + 0.35 * sin(age * 34.0 + fi * 2.0);\n" +   // fire flicker
+          // size/brightness FLARE with loudness (vol/treb) instead of changing the count:
+          // loud -> thick blinding sparks, quiet -> tiny dim embers (keeps dynamic range)
+          "    float size = (0.0032 + 0.0038 * heat) * (1.0 + 1.2 * vol_att + 0.6 * treb);\n" +
+          "    float spark = (size * size) / (d * d + size * size);\n" +
+          "    float si = spark * spark * heat * flick;\n" +
+          // colour TEMPERATURE by distance: blinding hot white-pink at the core ->
+          // cools to deep electric violet as it flies to the border (cinematic depth)
+          "    float radT = clamp((pr - 0.18) / 0.85, 0.0, 1.0);\n" +
+          "    vec3 sparkCol = mix(vec3(1.0, 0.80, 1.0), vec3(0.40, 0.0, 1.0), radT);\n" +
+          "    part += sparkCol * si;\n" +
+          "  }\n" +
+          "}\n" +
+          "part *= 1.8 * clamp(bStr, 0.0, 2.0);\n" +         // brightness scales with the jump strength
+          "col += part;\n" +
+          // --- AMBIENT embers: a second layer that is NOT beat-gated. Small, dim, slow
+          //     floating sparks that drift outward + rise continuously so the scene stays
+          //     alive between kicks. Fade in/out over a long life (sin) so they never pop.
+          "for (int j = 0; j < 26; j++) {\n" +
+          "  float fj = float(j);\n" +
+          "  float a1 = pHash(fj * 2.3 + 11.0);\n" +
+          "  float a2 = pHash(fj * 4.1 + 19.0);\n" +
+          "  float a3 = pHash(fj * 6.7 + 5.0);\n" +
+          "  float elife = 4.0 + 3.0 * a2;\n" +              // long life -> slow drift
+          "  float eage = fract(time / elife + a3);\n" +
+          "  float eang = a1 * 6.2831 + 0.25 * sin(time * 0.15 + fj);\n" +
+          "  float er = 0.08 + eage * (0.55 + 0.25 * a2);\n" +   // drift slowly outward (mid-field)
+          "  vec2 edir = vec2(cos(eang), sin(eang));\n" +
+          "  vec2 eperp = vec2(-edir.y, edir.x);\n" +
+          "  float ewob = sin(eage * 6.0 + a1 * 30.0) * 0.04 * eage;\n" +
+          "  vec2 epp = edir * er + eperp * ewob + vec2(0.0, 0.12 * eage - 0.04 * eage * eage);\n" +  // gentle rise
+          "  float ed = length(p - epp);\n" +
+          "  float efade = sin(eage * 3.14159);\n" +         // smooth fade in -> peak -> out
+          "  float esize = 0.0015 + 0.0010 * a2;\n" +        // smaller than the burst sparks
+          "  float espark = (esize * esize) / (ed * ed + esize * esize);\n" +
+          "  float esi = espark * espark * efade * (0.45 + 0.45 * vol_att);\n" +
+          "  col += mix(vec3(0.80, 0.40, 1.0), vec3(0.32, 0.04, 0.85), eage) * esi * 0.55;\n" +  // dim purple, cools out
+          "}\n" +
+          // central CORE glow: a soft radial energy source that pulses with the bass,
+          // anchoring the particle emissions in the middle of the frame
+          "float cr = length(p);\n" +
+          "float core = exp(-cr * cr * 30.0) * (0.08 + 0.30 * bass_att);\n" +   // smaller + dimmer pulse
+          "col += vec3(0.72, 0.22, 1.0) * core;\n" +
+          // fill the two hollow 'eyes': a bass-pulsing purple glow at each circle center
+          // (q1,q2)/(q3,q4) -> centers feel dense + reactive instead of empty
+          "vec2 cA = vec2((q1 - 0.5) * resolution.x / resolution.y, q2 - 0.5);\n" +
+          "vec2 cB = vec2((q3 - 0.5) * resolution.x / resolution.y, q4 - 0.5);\n" +
+          "float dA = length(p - cA);\n" +
+          "float dB = length(p - cB);\n" +
+          "col += vec3(0.55, 0.12, 0.95) * (exp(-dA * dA * 60.0) + exp(-dB * dB * 60.0)) * (0.16 + 0.32 * bass_att);\n" +                            // bright PURPLE, not white
+          "ret = col;\n" +
+          "}\n"
+      }
+    );
+    // Inner circles: clean thin RING outline, mostly STATIC — fixed radius (q5 barely
+    // moves) and FIXED brightness (not tied to the beat-punch q10), so they sit as steady
+    // "eyes" while the outer ring does the reacting.
+    function innerCircle(qx, qy) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.9, a: 0.7, thick: 1, r: 0.80, g: 0.20, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = (a.q5 || 0.05);
+          var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          a.r = 0.72; a.g = 0.26; a.b = 0.92;   // fixed colour/brightness -> steady, no flashing
+          return a;
+        }
+      };
+    }
+    // SPIKEY (not noodly) reactive ring: smoothing 0 (sharp joints, no rounding) + the
+    // audio sample is sharpened (pow) so most of the ring stays tight and only the loud
+    // peaks shoot out as pointed spikes — a spiky star, not a wobbly noodle.
+    function waveRing(qx, qy, useSecondChannel) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.0, a: 0.85, thick: 1, r: 0.80, g: 0.35, b: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          if ((a.q9 !== undefined ? a.q9 : 1) < 0.5) {
+            a.x = -2; a.y = -2; return a;
+          }
+          var ang = a.sample * 6.2832;
+          var samp = useSecondChannel ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q6 || 0.11) + (a.q8 || 0.10) * samp;
+          rad = Math.max(0.05, Math.min(rad, 0.42));   // clamp BOTH ends -> jagged but can't fly off-screen
+          a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+          var v = (a.q10 !== undefined ? a.q10 : 1);
+          a.r = 0.80 * v; a.g = 0.35 * v; a.b = 1.0 * v;
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = innerCircle("q1", "q2");
+    preset.waves[1] = waveRing("q1", "q2", false);
+    preset.waves[2] = innerCircle("q3", "q4");
+    preset.waves[3] = waveRing("q3", "q4", true);
+    return preset;
+  })();
+
   // ── Dance of the Freaky Circles (Classic) ──────────────────────────────────
   // The original, simpler version (kept on its own — it reads well as-is): two
   // magenta circular waveforms orbiting opposite sides of center over a faint slow
