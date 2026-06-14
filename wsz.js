@@ -300,6 +300,17 @@
       drawGlyphs(full, R.x - off + fullW, R.y);   // wrap copy for seamless loop
       ctx.restore();
     }
+    // brand nameplate over the skin's baked "WINAMP" titlebar text (the text is
+    // part of each skin's TITLEBAR.BMP, so we cover it with a small dark plate)
+    function drawBrand() {
+      var label = "neoamp";                 // lowercased for the FONT map
+      var bw = label.length * CHAR_W, pw = bw + 10, ph = 9;
+      var px = Math.round((MAIN_W - pw) / 2), py = 3;
+      ctx.fillStyle = "rgba(8,8,14,0.92)"; ctx.fillRect(px, py, pw, ph);
+      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fillRect(px, py, pw, 1);
+      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(px, py + ph - 1, pw, 1);
+      drawText(label, px + 5, py + 2, bw + 2);
+    }
     // live spectrum analyzer in the main window's visualizer region
     function drawAnalyzer() {
       if (!st.freq) return;
@@ -359,6 +370,7 @@
       if (sheet("MAIN")) ctx.drawImage(sheet("MAIN"), 0, 0);   // 275x116 background
       // titlebar (active look — we treat the window as focused)
       blit("TITLEBAR", "BAR_SEL", 0, 0);
+      drawBrand();      // overlay our brand over the skin's baked "WINAMP" text
       drawAnalyzer();
       // play/pause/stop indicator
       var indKey = st.stopped ? "STOPPED" : (st.paused ? "PAUSED" : "PLAYING");

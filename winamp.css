@@ -306,25 +306,32 @@
 }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--wa-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
-.wa-np-btns .wa-skinsel { max-width: 104px; margin: 0; }
-/* classic Winamp raised silver button; presses in + glows green when active */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+/* VIS/LIB styled like the main window's EQ/PL toggles: small dark button with a
+   green LED that lights when the window is open + green label text */
 .wa-np-btn {
-  height: 20px; padding: 0 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 18px; padding: 0 10px; cursor: pointer;
   font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
-  display: grid; place-items: center; color: var(--wa-btn-fg);
-  background: var(--wa-btn-bg);
-  border: 2px solid;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  color: #8f97a6;
+  background: linear-gradient(180deg, #3c3c46, #2a2a32);
+  border: 1px solid;
+  border-color: rgba(255,255,255,0.18) #15151c #15151c rgba(255,255,255,0.18);
   border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 1px 1px 2px rgba(0,0,0,0.5);
 }
-.wa-np-btn:hover { filter: brightness(1.1); }
-.wa-np-btn.on {
-  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
-  background: var(--wa-btn-active-bg);
-  color: var(--wa-accent); text-shadow: 0 0 4px var(--wa-accent-glow);
-  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.6);
+.wa-np-btn::before {
+  content: ""; width: 6px; height: 6px; border-radius: 1px;
+  background: #16401f; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);   /* LED off */
+}
+.wa-np-btn:hover { filter: brightness(1.12); }
+.wa-np-btn.on { color: var(--wa-accent); text-shadow: 0 0 4px var(--wa-accent-glow); }
+.wa-np-btn.on::before { background: var(--wa-accent); box-shadow: 0 0 5px var(--wa-accent-glow); }  /* LED on */
+/* prominent skin selector (was buried) */
+.wa-np-btns .wa-skinsel {
+  width: 118px; max-width: none; margin: 2px 0 0; padding: 3px 4px;
+  font: 700 10px/1 var(--wa-font); color: #eef3ff;
+  background: linear-gradient(180deg, #3a4ba0, #243070);
+  border: 1px solid #0c0c12; border-radius: 2px; cursor: pointer;
 }
 
 /* =======================================================================
@@ -352,7 +359,7 @@
   image-rendering: pixelated;
 }
 .wa-win.wa-genskin .wa-title {
-  position: absolute; left: 50%; transform: translateX(-50%);
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);  /* top:0 — plaque was floating */
   flex: none; height: 40px; display: flex; align-items: center; padding: 0 48px;
   color: #d6deff; font-size: 11px; letter-spacing: 2px;
   background:
@@ -367,7 +374,7 @@
 .wa-genskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #d6deff; }
 /* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
 #wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body {
-  margin: 0; padding: 6px 18px 30px 24px;
+  margin: 0; padding: 10px 26px 34px 30px;   /* clears the frame borders + breathing room */
   background:
     var(--gen-ml) left top / 22px 58px repeat-y,
     var(--gen-mr) right top / 16px 58px repeat-y,
