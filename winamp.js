@@ -456,9 +456,9 @@
       var d = layout["wa-skin"] || { x: 40, y: 70 };
       el.style.left = (d.x || 40) + "px"; el.style.top = (d.y || 70) + "px";
     }
-    ensureArtWin();
+    ensureNowPlaying();
     classicWin.el.style.display = "";
-    if (wins["wa-art"]) wins["wa-art"].el.style.display = "";
+    if (wins["wa-np"]) wins["wa-np"].el.style.display = "";
     raise(classicWin.el);
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "none";
     NA.storage.set({ neoampSkin: "wsz:" + id });
@@ -473,9 +473,11 @@
       classicWin.drag.style.width = classicApi.dragRegion.w + "px";
       classicWin.drag.style.height = classicApi.dragRegion.h + "px";
       mountClassicEq(skin);
+      dockClassicStack();
       var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
       classicApi.setVolume(NA.control.getVolume());
       classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl"));
+      syncNpButtons();
     }).catch(function (e) {
       classicLoading = false;
       console.error("[NeoAmp] .wsz load failed:", e);
@@ -487,7 +489,7 @@
     if (classicApi) { classicApi.destroy(); classicApi = null; }
     if (classicEqApi) { classicEqApi.destroy(); classicEqApi = null; }
     if (classicWin) classicWin.el.style.display = "none";
-    if (wins["wa-art"]) wins["wa-art"].el.style.display = "none";
+    if (wins["wa-np"]) wins["wa-np"].el.style.display = "none";
     if (wins["wa-eq-skin"]) wins["wa-eq-skin"].el.style.display = "none";
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
   }
@@ -504,8 +506,7 @@
       el.style.display = "none";
       root.appendChild(el);
       w = wins["wa-eq-skin"] = { el: el, body: el, titlebar: drag, drag: drag };
-      var d = layout["wa-eq-skin"] || { x: 40, y: 320 };
-      el.style.left = (d.x || 40) + "px"; el.style.top = (d.y || 320) + "px";
+      // position is set by dockClassicStack() (flush below the Now-Playing panel)
     }
     if (classicEqApi) classicEqApi.destroy();
     classicEqApi = window.NeoAmpClassic.mountEq(w.el, skin, { onClose: function () {
@@ -514,26 +515,62 @@
     w.drag.style.width = classicEqApi.dragRegion.w + "px";
     w.drag.style.height = classicEqApi.dragRegion.h + "px";
   }
-  // Companion album-art window — Winamp 2 has no art region, so we show it in a
-  // small separate framed tile alongside the skinned windows (classic mode only).
-  function ensureArtWin() {
-    if (wins["wa-art"]) return;
-    var img = h("img", { class: "wa-artwin-img", alt: "" });
+  // "Now Playing" panel — our own info window (Winamp 2 has no art region),
+  // docked between Main and EQ, skin-width, with album art + track details.
+  function ensureNowPlaying() {
+    if (wins["wa-np"]) return;
+    var img = h("img", { class: "wa-np-art", alt: "" });
+    var info = h("div", { class: "wa-np-info" }, [
+      (els.npTitle = h("div", { class: "wa-np-title", text: "—" })),
+      (els.npArtist = h("div", { class: "wa-np-artist", text: "" })),
+      (els.npAlbum = h("div", { class: "wa-np-album", text: "" })),
+    ]);
+    // VIS/LIB toggles live here because Winamp's main window has no such buttons
+    function npBtn(label, title, id, after) {
+      var b = h("div", { class: "wa-np-btn", title: title, text: label });
+      b.addEventListener("mousedown", function (e) { e.stopPropagation(); }); // don't start a drag
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleWin(id);
+        b.classList.toggle("on", isShown(id));
+        if (after) after();
+      });
+      els["np" + label] = b;
+      return b;
+    }
+    var btns = h("div", { class: "wa-np-btns" }, [
+      npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
+      npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (els.libInput) els.libInput.focus(); }),
+    ]);
+    var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
-    var el = h("div", { class: "wa-win wa-artwin inactive empty", id: "wa-art" }, [img]);
     el.addEventListener("mousedown", function () { raise(el); }, true);
     makeDraggable(el, el);
     root.appendChild(el);
-    wins["wa-art"] = { el: el, body: el, titlebar: el, img: img };
-    var d = layout["wa-art"] || { x: 598, y: 70 };
-    el.style.left = (d.x || 598) + "px"; el.style.top = (d.y || 70) + "px";
+    wins["wa-np"] = { el: el, body: el, titlebar: el, img: img };
   }
-  function pushClassicArt(t) {
-    var w = wins["wa-art"]; if (!w) return;
+  // Dock the classic stack flush: Main → Now-Playing → EQ (EQ only if shown).
+  function dockClassicStack() {
+    var m = classicWin && classicWin.el; if (!m) return;
+    var np = wins["wa-np"] && wins["wa-np"].el;
+    if (np) { np.style.left = m.offsetLeft + "px"; np.style.top = (m.offsetTop + m.offsetHeight) + "px"; }
+    var anchor = (np && np.style.display !== "none") ? np : m;
+    var eq = wins["wa-eq-skin"] && wins["wa-eq-skin"].el;
+    if (eq && eq.style.display !== "none") { eq.style.left = anchor.offsetLeft + "px"; eq.style.top = (anchor.offsetTop + anchor.offsetHeight) + "px"; }
+  }
+  function syncNpButtons() {
+    if (els.npVIS) els.npVIS.classList.toggle("on", isShown("wa-viz"));
+    if (els.npLIB) els.npLIB.classList.toggle("on", isShown("wa-lib"));
+  }
+  function pushNowPlaying(t) {
+    var w = wins["wa-np"]; if (!w) return;
     var hasArt = !!(t.art && /^https?:\/\//.test(t.art));
     if (hasArt) { if (w.img.src !== t.art) w.img.src = t.art; }
     else w.img.removeAttribute("src");
     w.el.classList.toggle("empty", !hasArt);
+    if (els.npTitle) els.npTitle.textContent = t.title || "—";
+    if (els.npArtist) els.npArtist.textContent = t.artist || "";
+    if (els.npAlbum) els.npAlbum.textContent = t.album || "";
   }
   function isShown(id) { return wins[id] && wins[id].el.style.display !== "none"; }
   function classicHooks() {
@@ -548,7 +585,7 @@
       onVolume: function (v) { NA.control.setVolume(v); if (els.vol) els.vol.value = String(Math.round(v * 100)); },
       onShuffle: function () { NA.control.toggleShuffle(); },
       onRepeat: function () { NA.control.toggleRepeat(); },
-      onToggleEq: function () { toggleWin("wa-eq-skin"); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
+      onToggleEq: function () { toggleWin("wa-eq-skin"); dockClassicStack(); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onToggleViz: function () { toggleWin("wa-viz", els.visTog); },
       onClose: function () { NA.stop(); },
@@ -556,7 +593,7 @@
   }
   // feed live track state into the rendered main window
   function pushClassicTrack(t) {
-    pushClassicArt(t);
+    pushNowPlaying(t);
     if (!classicApi) return;
     classicApi.update({
       elapsed: t.currentTime || 0,

@@ -479,6 +479,14 @@
     }
     function thumbY(v) { return EQ_LAYOUT.thumbTop + ((12 - v) / 24) * EQ_LAYOUT.thumbRange; }
     function valFromY(y) { return Math.max(-12, Math.min(12, 12 - ((y - EQ_LAYOUT.thumbTop) / EQ_LAYOUT.thumbRange) * 24)); }
+    // band trough: one of 28 colored slider-track frames (15x65, 14-col grid at
+    // 13,164 in EQMAIN), chosen by the band value — this is the vertical bar.
+    function trough(x, v) {
+      if (!img()) return;
+      var pct = (v + 12) / 24, num = Math.round(pct * 27);
+      var sx = num % 14, sy = Math.floor(num / 14);
+      ctx.drawImage(img(), 13 + sx * 15, 164 + sy * 65, 15, 63, x, EQ_LAYOUT.bandY, 15, 63);
+    }
 
     function drawCurve() {
       var g = EQ_LAYOUT.graph;
@@ -503,8 +511,11 @@
       blit("PRESETS", EQ_LAYOUT.presets.x, EQ_LAYOUT.presets.y);
       blit("GRAPH_BG", EQ_LAYOUT.graph.x, EQ_LAYOUT.graph.y);
       drawCurve();
-      blit("THUMB", EQ_LAYOUT.preamp.x, thumbY(preamp));
-      for (var i = 0; i < 10; i++) blit(dragBand === i ? "THUMB_A" : "THUMB", EQ_LAYOUT.bandX[i], thumbY(bands[i]));
+      // troughs (vertical bars) first, then the metal thumbs on top
+      trough(EQ_LAYOUT.preamp.x, preamp);
+      for (var i = 0; i < 10; i++) trough(EQ_LAYOUT.bandX[i], bands[i]);
+      blit(dragBand === -2 ? "THUMB_A" : "THUMB", EQ_LAYOUT.preamp.x + 2, thumbY(preamp));
+      for (var k = 0; k < 10; k++) blit(dragBand === k ? "THUMB_A" : "THUMB", EQ_LAYOUT.bandX[k] + 2, thumbY(bands[k]));
     }
     var raf = 0;
     function sched() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; render(); }); }
