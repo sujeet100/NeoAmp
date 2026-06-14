@@ -209,26 +209,24 @@
   // =========================================================================
   // Skin: decoded sheets + a blit() that draws a named sprite.
   // =========================================================================
+  function decodeSkin(files) {
+    // Decode whichever sheets are present (skins may omit some).
+    var wanted = ["MAIN", "TITLEBAR", "CBUTTONS", "NUMBERS", "NUMS_EX",
+      "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS",
+      "EQMAIN", "EQ_EX", "GEN"];
+    var sheets = {};
+    var jobs = wanted.map(function (name) {
+      var bytes = files[name + ".BMP"];
+      if (!bytes) return Promise.resolve();
+      return decodeBmp(bytes).then(function (bmp) { sheets[name] = bmp; })
+        .catch(function () { /* a missing/corrupt sheet just won't draw */ });
+    });
+    return Promise.all(jobs).then(function () { return { sheets: sheets, files: files }; });
+  }
+  // Load from raw .wsz bytes (drag-drop / file picker) — no fetch, no CORS.
+  function loadSkinFromArrayBuffer(buf) { return unzip(buf).then(decodeSkin); }
   function loadSkin(url) {
-    return fetch(url)
-      .then(function (r) { return r.arrayBuffer(); })
-      .then(unzip)
-      .then(function (files) {
-        // Decode whichever sheets are present (skins may omit some).
-        var wanted = ["MAIN", "TITLEBAR", "CBUTTONS", "NUMBERS", "NUMS_EX",
-          "TEXT", "POSBAR", "VOLUME", "BALANCE", "MONOSTER", "SHUFREP", "PLAYPAUS",
-          "EQMAIN", "EQ_EX", "GEN"];
-        var sheets = {};
-        var jobs = wanted.map(function (name) {
-          var bytes = files[name + ".BMP"];
-          if (!bytes) return Promise.resolve();
-          return decodeBmp(bytes).then(function (bmp) { sheets[name] = bmp; })
-            .catch(function () { /* a missing/corrupt sheet just won't draw */ });
-        });
-        return Promise.all(jobs).then(function () {
-          return { sheets: sheets, files: files };
-        });
-      });
+    return fetch(url).then(function (r) { return r.arrayBuffer(); }).then(loadSkinFromArrayBuffer);
   }
 
   // =========================================================================
@@ -603,7 +601,8 @@
   }
 
   window.NeoAmpClassic = {
-    loadSkin: loadSkin, mountMain: mountMain, mountEq: mountEq,
+    loadSkin: loadSkin, loadSkinFromArrayBuffer: loadSkinFromArrayBuffer,
+    mountMain: mountMain, mountEq: mountEq,
     genAssets: genAssets, parsePledit: parsePledit, MAIN_W: MAIN_W, MAIN_H: MAIN_H,
   };
 })();

@@ -52,6 +52,7 @@
     { id: "base-2.91", name: "Winamp Classic", file: "vendor/skins/base-2.91.wsz" },
     { id: "sony-esprit", name: "Sony Esprit", file: "vendor/skins/sony-esprit.wsz" },
     { id: "nucleo-nlog", name: "Nucleo NLog", file: "vendor/skins/nucleo-nlog.wsz" },
+    { id: "winamp3-classified", name: "Winamp3 Classified", file: "vendor/skins/winamp3-classified.wsz" },
   ];
   var classicApi = null;        // mounted Main-window renderer (null = procedural mode)
 
@@ -318,23 +319,95 @@
   // The skin picker appears in two places (procedural main titlebar + classic
   // Now-Playing panel); every instance is registered here so they stay in sync.
   var skinSelectors = [];
+  var DEFAULT_WSZ = "wsz:" + CLASSIC_SKINS[0].id;
+  var activeSkinValue = DEFAULT_WSZ;        // currently applied skin (for reverting the picker)
+  function populateSkinOptions(sel) {
+    sel.innerHTML = "";
+    CLASSIC_SKINS.forEach(function (s) {
+      sel.appendChild(h("option", { value: "wsz:" + s.id, text: s.name + (s.custom ? " ★" : "") }));
+    });
+    sel.appendChild(h("option", { value: "__load__", text: "＋ Load skin…" }));
+  }
   function buildSkinSelect() {
     var sel = h("select", { class: "wa-skinsel", title: "Skin" });
-    // real Winamp .wsz skins only (the procedural CSS themes were the bootstrap
-    // fallback; that engine still exists but is no longer offered in the picker)
-    CLASSIC_SKINS.forEach(function (s) { sel.appendChild(h("option", { value: "wsz:" + s.id, text: s.name })); });
+    populateSkinOptions(sel);
     sel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
     sel.addEventListener("change", function () { selectSkin(sel.value); });
     skinSelectors.push(sel);
     return sel;
   }
-  var DEFAULT_WSZ = "wsz:" + CLASSIC_SKINS[0].id;
+  function refreshSkinOptions() { skinSelectors.forEach(function (s) { populateSkinOptions(s); s.value = activeSkinValue; }); }
   function selectSkin(value) {
-    if (value.indexOf("wsz:") === 0) enableClassic(value.slice(4));
+    if (value === "__load__") { openSkinPicker(); setSkinSelectors(activeSkinValue); return; }
+    if (value.indexOf("wsz:") === 0) { enableClassic(value.slice(4)); activeSkinValue = value; }
     else { disableClassic(); applySkin(value); }
     setSkinSelectors(value);
   }
   function setSkinSelectors(value) { skinSelectors.forEach(function (s) { s.value = value; }); }
+
+  // ---- user-loaded .wsz skins (drag-drop / file picker), persisted -----------
+  function bufToB64(buf) {
+    var u = new Uint8Array(buf), s = "", CH = 0x8000;
+    for (var i = 0; i < u.length; i += CH) s += String.fromCharCode.apply(null, u.subarray(i, i + CH));
+    return btoa(s);
+  }
+  function b64ToBuf(b64) {
+    var s = atob(b64), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u.buffer;
+  }
+  // resolve a skin definition to a decoded skin: vendored file URL, or custom bytes
+  function skinSourcePromise(def) {
+    return def.b64
+      ? window.NeoAmpClassic.loadSkinFromArrayBuffer(b64ToBuf(def.b64))
+      : window.NeoAmpClassic.loadSkin(chrome.runtime.getURL(def.file));
+  }
+  function loadPersistedSkins(done) {
+    NA.storage.get("neoampCustomSkins", function (list) {
+      (list || []).forEach(function (s) {
+        if (!CLASSIC_SKINS.some(function (x) { return x.id === s.id; })) {
+          CLASSIC_SKINS.push({ id: s.id, name: s.name, b64: s.b64, custom: true });
+        }
+      });
+      refreshSkinOptions();
+      if (done) done();
+    });
+  }
+  function persistCustomSkins() {
+    var customs = CLASSIC_SKINS.filter(function (s) { return s.custom; })
+      .map(function (s) { return { id: s.id, name: s.name, b64: s.b64 }; });
+    NA.storage.set({ neoampCustomSkins: customs });
+  }
+  var skinFileInput = null;
+  function openSkinPicker() {
+    if (!skinFileInput) {
+      skinFileInput = h("input", { type: "file", accept: ".wsz,.zip", style: "display:none" });
+      skinFileInput.addEventListener("change", function () { loadSkinFile(skinFileInput.files[0]); skinFileInput.value = ""; });
+      root.appendChild(skinFileInput);
+    }
+    skinFileInput.click();
+  }
+  // Validate + register + apply a dropped/picked .wsz file. Persists it so it
+  // survives reloads and shows up in the picker (marked ★).
+  function loadSkinFile(file) {
+    if (!file) return;
+    var name = file.name.replace(/\.(wsz|zip)$/i, "") || "Custom Skin";
+    file.arrayBuffer().then(function (buf) {
+      return window.NeoAmpClassic.loadSkinFromArrayBuffer(buf).then(function (skin) {
+        if (!skin.sheets.MAIN) { NA.toast("Not a valid Winamp skin (no MAIN.BMP)"); return; }
+        var id = "custom-" + (name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skin");
+        var b64 = bufToB64(buf);
+        var existing = CLASSIC_SKINS.filter(function (s) { return s.id === id; })[0];
+        if (existing) { existing.b64 = b64; existing.name = name; existing.custom = true; }
+        else CLASSIC_SKINS.push({ id: id, name: name, b64: b64, custom: true });
+        persistCustomSkins();
+        refreshSkinOptions();
+        enableClassic(id); activeSkinValue = "wsz:" + id;
+        setSkinSelectors(activeSkinValue);
+        NA.toast("Loaded skin: " + name);
+      });
+    }).catch(function (e) { NA.toast("Couldn't load skin: " + (e && e.message || e)); });
+  }
 
   // =========================================================================
   // MAIN WINDOW
@@ -475,7 +548,7 @@
     NA.storage.set({ neoampSkin: "wsz:" + id });
 
     classicLoading = true;
-    window.NeoAmpClassic.loadSkin(chrome.runtime.getURL(def.file)).then(function (skin) {
+    skinSourcePromise(def).then(function (skin) {
       // Most third-party skins omit GEN.BMP; Winamp uses a default generic frame
       // in that case, so we borrow base-2.91's GEN as the fallback.
       var own = window.NeoAmpClassic.genAssets(skin);
@@ -1064,13 +1137,30 @@
       var w = wins["wa-pl"];
       if (w && w.el.style.display !== "none") refreshQueue();
     }, 1500);
-    NA.storage.get("neoampSkin", function (id) {
-      // procedural skins are retired — default to (and coerce legacy ids onto) a .wsz skin
-      if (!id || id.indexOf("wsz:") !== 0) id = DEFAULT_WSZ;
-      enableClassic(id.slice(4));
-      setSkinSelectors(id);
-    });
     NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); syncToggles(); });
+    setupSkinDrop();
+    // load user-saved skins first so a persisted custom skin id resolves
+    loadPersistedSkins(function () {
+      NA.storage.get("neoampSkin", function (id) {
+        // procedural skins are retired — default to (and coerce legacy ids onto) a .wsz skin
+        if (!id || id.indexOf("wsz:") !== 0 || !CLASSIC_SKINS.some(function (s) { return "wsz:" + s.id === id; })) id = DEFAULT_WSZ;
+        activeSkinValue = id;
+        enableClassic(id.slice(4));
+        setSkinSelectors(id);
+      });
+    });
+  }
+  // drag a .wsz onto the player to load it (classic, Winamp-style gesture)
+  function setupSkinDrop() {
+    root.addEventListener("dragover", function (e) {
+      if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (i) { return i.kind === "file"; })) {
+        e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+      }
+    });
+    root.addEventListener("drop", function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && /\.(wsz|zip)$/i.test(f.name)) { e.preventDefault(); loadSkinFile(f); }
+    });
   }
 
   // reflect each window's visibility on its main-window toggle
