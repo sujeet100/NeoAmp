@@ -188,6 +188,375 @@
     };
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ALCHEMY KIT — composable vocabulary for Alchemy v2 scenes.
+  //
+  // A scene = a CAMERA (the feedback transform — where the trace recedes to) + one
+  // or more MOTIFS (2D shapes redrawn each frame whose feedback TRAIL builds the
+  // structure) + color/tuning. The SAME motif reads as a face-on mandala under the
+  // "top" camera or a receding corridor net under the "side" camera — only the
+  // camera changes. This is the WMP Alchemy mechanism (frame feedback, foundation
+  // #1 in docs/alchemy-v2); see memory wireframe-net-is-crossing-helices.
+  //
+  // Motif convention — scenes drive motifs through shared q-vars set in frame_eqs:
+  //   q2,q3 = head position (where the motif is drawn) | q5 = star radius
+  //   q6 = waveform edge jaggedness | q7 = orb radius | q8 = hue phase | q9 = self-spin
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Glow from ADDITIVE overdraw + soft bloom (NOT motion smear), tone-mapped
+  // (Reinhard) so colors stay muted and never blow to white. Shared by Alchemy scenes.
+  var ALC_COMP =
+    "shader_body {\n" +
+    "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+    "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+    "vec3 outc = g + bloom * 0.20;\n" +
+    "ret = outc / (outc + vec3(0.85));\n" +
+    "}\n";
+
+  // CAMERA: the feedback baseVals for a named viewpoint. Spread into build()'s
+  // overrides. The camera is literally "where does the previous frame shrink toward":
+  //   top  = toward center  -> face-on spinning mandala (the trace stays centered)
+  //   side = toward a right-edge VP -> the motif (drawn left) recedes into a corridor
+  //   orbit= toward center + a steady spin -> swirling galaxy
+  function alcCamera(kind) {
+    // "side": SINGLE-SIDED corridor — NO sx/sy stretch (that is symmetric about center and
+    // always tapers both ends). Instead isotropic zoom<1 toward a VP near the RIGHT EDGE
+    // (cx≈0.92): the trace RECEDES left→right into that one point. Source is drawn on the LEFT
+    // (big near-end), so the corridor opens at the left and converges at the right. One VP only.
+    // Corridor: the EXPLICIT orb row carries depth/motion (it marches via q14), so the feedback
+    // does NOT need zoom>1 (that runs away to a white-out). zoom=1 + LOW decay (0.6) = crisp
+    // short trails only; a tiny leftward dx adds gentle drift. VP for the explicit orbs is the
+    // right edge (handled in alcOrbRow), so the corridor reads left->right.
+    // Corridor: feedback recedes the NET toward the SAME off-center VP the explicit orbs use
+    // (cx 0.86 / cy 0.62, down-right), so net + orbs share one corridor. Moderate decay -> the
+    // net gets its trace and the (explicit, redrawn) shape orbs get a slight glow-trail, not a tube.
+    if (kind === "side")  return { wave_a: 0, gammaadj: 1.2, decay: 0.42, zoom: 0.95, sx: 1.0, sy: 1.0, cx: 0.86, cy: 0.62, dx: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+    if (kind === "orbit") return { wave_a: 0, gammaadj: 1.5, decay: 0.93, zoom: 0.972, cx: 0.50, cy: 0.50, rot: 0.06, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+    /* top */             return { wave_a: 0, gammaadj: 1.5, decay: 0.93, zoom: 0.955, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+  }
+
+  // Muted teal/green family for the net lines (hue h cycles slowly). `warm` (0..1)
+  // pulls it toward amber/gold (used for orbs). Kept low-saturation per the Alchemy rule.
+  function alcSetColor(a, h, warm, gain) {
+    var rr = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.50 - 0.30 * warm));
+    var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.40 - 0.10 * warm));
+    var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.30 + 0.10 * warm));
+    var l = (rr + gg + bb) / 3, sat = 0.78;            // saturated -> colored fills (orbs) + multi-color traces
+    a.r = (rr * sat + l * (1 - sat)) * gain;
+    a.g = (gg * sat + l * (1 - sat)) * gain * (1 - 0.1 * warm);
+    a.b = (bb * sat + l * (1 - sat)) * gain * (1 - 0.3 * warm);
+  }
+
+  // MOTIF — one triangle whose 3 edges are the LIVE waveform displaced PERPENDICULAR
+  // (the jagged wireframe line). Drawn at head (q2,q3), radius q5, self-rotated by q9.
+  // Use one for a single-triangle scene, or two at 60deg apart for the hexagram star.
+  // (Kept one-triangle-per-wave: packing both in one wave draws a connector chord.)
+  function alcTriangle(rotOffset, hueOff) {
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.1, a: 1.0, thick: 1                 // thick=1 + brighter -> the net lines read clearly
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var hx = (a.q2 !== undefined ? a.q2 : 0.5), hy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var sz = (a.q5 || 0.26), amp = (a.q6 || 0.05), spin = (a.q9 || 0);
+        var s = a.sample * 3.0;
+        var e = Math.floor(s); if (e >= 3) e = 2;
+        var f = s - e;
+        var a0 = rotOffset + spin + e * 2.0944;
+        var a1 = rotOffset + spin + (e + 1) * 2.0944;
+        var x0 = Math.cos(a0), y0 = Math.sin(a0), x1 = Math.cos(a1), y1 = Math.sin(a1);
+        var vx = x0 + (x1 - x0) * f, vy = y0 + (y1 - y0) * f;
+        var ex = x1 - x0, ey = y1 - y0, el = Math.hypot(ex, ey) || 1;
+        var nx = -ey / el, ny = ex / el;
+        var disp = (a.value1 || 0) * amp;
+        a.x = hx + sz * vx + nx * disp;
+        a.y = hy + sz * vy + ny * disp;
+        alcSetColor(a, (a.q8 || 0) + hueOff, 0, 1.5);
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — a star of `tris` overlapping triangles (1 = triangle, 2 = Star of David).
+  // Returns an ARRAY of waves; spread into preset.waves.
+  function alcStarWaves(tris, hueOff) {
+    var arr = [];
+    for (var i = 0; i < tris; i++) arr.push(alcTriangle(i * 2.0944 / tris, hueOff + i * 0.40));  // distinct hue per triangle -> multi-color net
+    return arr;
+  }
+
+  // MOTIF — one waveform RAY: a straight line of the live waveform through the head
+  // (q2,q3) at angle `rayOffset`, self-rotating by q9 (the "waveform lines rotating
+  // around the center axis"). Half-length q5, perpendicular displacement q6.
+  function alcRay(rayOffset, hueOff, lenScale) {
+    lenScale = lenScale || 1.0;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.05, a: 1.0, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var hx = (a.q2 !== undefined ? a.q2 : 0.5), hy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var len = (a.q5 || 0.26) * lenScale, amp = (a.q6 || 0.05), spin = (a.q9 || 0);
+        var th = rayOffset + spin;
+        var ct = Math.cos(th), st = Math.sin(th);
+        var s = a.sample * 2.0 - 1.0;                // -1..1 along the ray (through the head)
+        var disp = (a.value1 || 0) * amp;
+        a.x = hx + s * len * ct - disp * st;
+        a.y = hy + s * len * st + disp * ct;
+        alcSetColor(a, (a.q8 || 0) + hueOff, 0, 1.5);
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — `n` waveform rays evenly spaced around the head, rotating together (an
+  // asterisk of live-waveform lines). Returns an ARRAY of waves.
+  function alcRayWaves(n, hueOff, lenScale) {
+    var arr = [];
+    for (var i = 0; i < n; i++) arr.push(alcRay(i * 3.14159 / n, hueOff + i * 0.04, lenScale));
+    return arr;
+  }
+
+  // MOTIF — an orb: a COLOR-FILLED glow disc with a THICK ring border, drawn at head (q2,q3),
+  // radius q7. Under a camera's feedback it leaves the receding trail of shrinking orbs.
+  //   fillHueOff   — fill hue offset (added to the cycling q8).
+  //   borderHueOff — outline hue offset: undefined => bright cool-WHITE ring; a number =>
+  //                  colored ring at (q8 + borderHueOff). Equal to fillHueOff = same color;
+  //                  fillHueOff+0.5 = complementary/contrast. (See alcOrb* wrappers below.)
+  function alcOrb(hueOff, borderHueOff) {
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.0, a: 0.85, thick: 1                       // thick=1 -> fatter, more visible ring
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var hx = (a.q2 !== undefined ? a.q2 : 0.5), hy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var rad = (a.q7 || 0.05);
+        if (a.sample < 0.55) {                                  // FILL: dense sqrt-spiral -> solid colored disc
+          var f = a.sample / 0.55;
+          var rf = rad * Math.sqrt(f), af = f * 6.2832 * 14.0;
+          a.x = hx + rf * Math.cos(af);
+          a.y = hy + rf * Math.sin(af);
+          alcSetColor(a, (a.q8 || 0) + hueOff, 0.85, 1.0);      // warm amber/gold FILL
+        } else {                                                // BORDER: THICK ring band, DIFFERENT color
+          var fb = (a.sample - 0.55) / 0.45;
+          var rb = rad * (0.90 + 0.16 * fb);                    // spiral across an annulus 0.90..1.06 r = thick ring
+          var ab = fb * 6.2832 * 6.0;
+          a.x = hx + rb * Math.cos(ab);
+          a.y = hy + rb * Math.sin(ab);
+          if (borderHueOff !== undefined) {                     // colored outline (tracks the hue cycle)
+            alcSetColor(a, (a.q8 || 0) + borderHueOff, 0.2, 2.2);
+          } else {                                              // default: bright cool-white ring
+            a.r = 1.3; a.g = 1.55; a.b = 2.0;
+          }
+        }
+        return a;
+      }
+    };
+  }
+
+  // Orb VARIATIONS (pick per scene): white ring, same-color ring, or contrast (complementary).
+  function alcOrbWhite(hueOff)    { return alcOrb(hueOff); }                 // colored fill + cool-white ring
+  function alcOrbSame(hueOff)     { return alcOrb(hueOff, hueOff); }         // ring same hue as fill (mono glow)
+  function alcOrbContrast(hueOff) { return alcOrb(hueOff, hueOff + 0.5); }   // ring complementary hue (e.g. orange fill + blue ring)
+
+  function sm01(x) { x = x < 0 ? 0 : (x > 1 ? 1 : x); return x * x * (3 - 2 * x); }
+
+  // MOTIF — an EXPLICIT ROW of `n` distinct orbs receding into a corridor (Gemini's recipe):
+  // each orb sits at a flowing depth z (wrapping with q14 so the row is infinite) and is
+  // PERSPECTIVE-PROJECTED to an off-center vanishing point — so orbs bunch + shrink toward the
+  // VP exactly like real depth, and span the full corridor on frame 1. Drawn directly (NOT a
+  // feedback trail), so each orb is a crisp disc: colored fill + bright ring, fading into the
+  // dark at the VP. nearX/nearY = lateral position of the near (camera) end; vpx/vpy = the VP.
+  function alcOrbRow(n, fillHueOff, ringHueOff, nearX, nearY, vpx, vpy) {
+    nearX = (nearX === undefined ? 0.12 : nearX); nearY = (nearY === undefined ? 0.50 : nearY);
+    vpx = (vpx === undefined ? 0.90 : vpx); vpy = (vpy === undefined ? 0.50 : vpy);
+    var K = 4.0;                                               // perspective strength (FOV)
+    return {
+      // NON-additive (additive:0): a SOLID colored disc + bright ring just PAINT their color,
+      // they can't accumulate to white no matter how bright -> filled colored orb, no blowout.
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1,
+        smoothing: 0.0, a: 1.0, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var seg = a.sample * n;
+        var k = Math.floor(seg); if (k >= n) k = n - 1;
+        var f = seg - k;                                       // 0..1 within this orb
+        var raw = (k / n) + (a.q14 || 0);
+        raw = raw - Math.floor(raw);                           // flowing depth (wraps -> infinite row)
+        var proj = 1.0 / (1.0 + K * raw);
+        var jx = (a.value1 || 0) * 0.02;
+        var ccx = (nearX + jx - vpx) * proj + vpx;
+        var ccy = (nearY - vpy) * proj + vpy;
+        var rad = Math.min((a.q7 || 0.1) * proj, 0.08);        // bigger cap -> not too thin
+        var fade = (1.0 - raw) * sm01(raw / 0.05);             // bright near, fade into the dark VP
+        var rl, ang;
+        if (f < 0.62) {                                        // FILL: dense spiral, SOFT gradient core
+          var ff = f / 0.62; rl = rad * Math.sqrt(ff); ang = ff * 6.2832 * 16.0;
+          a.r = 0.15; a.g = 0.30; a.b = 0.85;                  // deep-blue core (neon-tube look)
+          a.a = 0.75 * fade * (1.0 - 0.85 * ff);               // bright center -> transparent edge: blends, no harsh blob
+        } else {                                               // BORDER: bright cyan ring
+          var fb = (f - 0.62) / 0.38; rl = rad * (0.92 + 0.12 * fb); ang = fb * 6.2832 * 3.0;
+          a.r = 0.10; a.g = 1.0; a.b = 1.0;                    // bright cyan edge
+          a.a = 0.9 * fade;
+        }
+        a.x = ccx + rl * Math.cos(ang);
+        a.y = ccy + rl * Math.sin(ang);
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — an EXPLICIT corridor net: `nRings` concentric wavy rings drawn at flowing depths
+  // and PERSPECTIVE-PROJECTED to the right VP (same math as alcOrbRow), redrawn every frame so
+  // the mesh is crisp and controllable — NOT a busy feedback smear. The live waveform makes the
+  // rings wavy; q9 slowly spins them; q14 flows them toward the VP. Ring-to-ring connectors run
+  // radially -> they double as faint longitudinal corridor wires.
+  function alcMeshRings(nRings, hueOff) {
+    var K = 4.0, vpx = 0.90, vpy = 0.50, nearX = 0.16, nearY = 0.50;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.25, a: 0.6, thick: 0
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var s = a.sample * nRings;
+        var k = Math.floor(s); if (k >= nRings) k = nRings - 1;
+        var f = s - k;                                         // 0..1 around this ring
+        var raw = ((k + 0.5) / nRings) + (a.q14 || 0);
+        raw = raw - Math.floor(raw);                           // flowing depth (wraps)
+        var proj = 1.0 / (1.0 + K * raw);
+        var ccx = (nearX - vpx) * proj + vpx;                  // ring center recedes to the VP
+        var ccy = (nearY - vpy) * proj + vpy;
+        var th = f * 6.2832 + (a.q9 || 0) * 0.15;              // around the ring (slow spin)
+        var jit = (a.value1 || 0) * 0.06;                      // waveform makes the ring wavy
+        var R = ((a.q5 || 0.4) + jit) * proj;                  // ring radius shrinks with depth
+        a.x = ccx + R * Math.cos(th);
+        a.y = ccy + R * Math.sin(th);
+        var fade = (1.0 - raw) * sm01(raw / 0.05);             // bright near, fade into the dark VP
+        alcSetColor(a, (a.q8 || 0) + hueOff, 0, 1.2 * fade);
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — ONE explicit orb at a flowing depth (q14 + depthOffset), projected to the right VP.
+  // Each orb is its OWN wave: a dense spiral FILL + thick ring BORDER drawn with usedots:0, so
+  // it's a clean filled glow disc with NO connecting line to other orbs (the row is several of
+  // these at staggered depthOffsets). Fill/border colors as in alcOrb. Crisp, not a beam/dots.
+  function alcOrbAt(depthOffset, fillHueOff, borderHueOff) {
+    var K = 4.0, vpx = 0.90, vpy = 0.50, nearX = 0.12, nearY = 0.50;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 256, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.0, a: 0.85, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var raw = (a.q14 || 0) + depthOffset; raw = raw - Math.floor(raw);  // this orb's flowing depth
+        var proj = 1.0 / (1.0 + K * raw);
+        var ccx = (nearX - vpx) * proj + vpx;
+        var ccy = (nearY - vpy) * proj + vpy;
+        var rad = Math.min((a.q7 || 0.1) * proj, 0.07);
+        var fade = (1.0 - raw) * sm01(raw / 0.05);
+        var rl, ang, isB;
+        if (a.sample < 0.6) {                                  // FILL: dense spiral disc
+          var ff = a.sample / 0.6; rl = rad * Math.sqrt(ff); ang = ff * 6.2832 * 14.0; isB = false;
+        } else {                                               // BORDER: thick ring
+          var fb = (a.sample - 0.6) / 0.4; rl = rad * (0.92 + 0.13 * fb); ang = fb * 6.2832 * 4.0; isB = true;
+        }
+        a.x = ccx + rl * Math.cos(ang);
+        a.y = ccy + rl * Math.sin(ang);
+        if (isB) {
+          if (borderHueOff !== undefined) alcSetColor(a, (a.q8 || 0) + borderHueOff, 0.2, 1.6 * fade);
+          else { a.r = 1.1 * fade; a.g = 1.3 * fade; a.b = 1.6 * fade; }
+        } else {
+          alcSetColor(a, (a.q8 || 0) + fillHueOff, 0.85, 0.7 * fade);
+        }
+        return a;
+      }
+    };
+  }
+
+  // MOTIF (custom SHAPES) — the comet/marching-orb trail done RIGHT: `count` real filled
+  // circles at flowing depths, projected to the right VP. Each is a native disc with a soft
+  // gradient core (center opaque -> edge transparent via a2=0, so it glows and blends) + a
+  // bright ring border, shrinking + fading into the distance. NOT a wave spiral (tube) and NOT
+  // additive (no white blowout). Returns an ARRAY for preset.shapes. q7 = base radius, q14 = flow.
+  function makeOrbTrailShapes(count) {
+    // Path recedes from the near HEAD (top-left) to the VP (lower-right), with a gentle WAVY
+    // wobble — matching the reference: a filled head sphere trailing hollow shrinking rings
+    // along a curving path. Color hue-cycles over time (q8). q7=base radius, q14=flow, q19=time.
+    var K = 2.0, nearX = 0.14, nearY = 0.40, vpx = 0.86, vpy = 0.62;
+    var arr = [];
+    for (var i = 0; i < count; i++) {
+      (function (idx) {
+        arr.push({
+          baseVals: Object.assign({}, SHAPE_BASE, {
+            enabled: 1, sides: 28, additive: 0, thickoutline: 1, textured: 0
+          }),
+          init_eqs: passthrough,
+          frame_eqs: function (s) {
+            var raw = (idx / count) + (s.q14 || 0);
+            raw = raw - Math.floor(raw);                       // this orb's flowing depth (wraps)
+            var proj = 1.0 / (1.0 + K * raw);
+            var tm = (s.q19 !== undefined ? s.q19 : (s.time || 0));
+            var wob = 0.11 * Math.sin(raw * 6.2832 * 1.3 + tm * 0.8) * proj;  // WAVY path (less wobble far)
+            s.x = (nearX - vpx) * proj + vpx;                  // recede toward the VP (down-right)
+            s.y = (nearY - vpy) * proj + vpy + wob;
+            s.rad = Math.min((s.q7 || 0.1) * proj, 0.055);     // later circles smaller (perspective)
+            var fade = (1.0 - raw) * sm01(raw / 0.015);        // bright at the HEAD (near), fade into distance; tiny in-ramp hides the recycle
+            var h = (s.q8 || 0) + raw * 0.15;                  // hue CYCLES (q8) + slight shift along the trail
+            var cr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+            var cg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.32));
+            var cb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.62));
+            var fillA = 0.85 * fade * sm01((0.18 - raw) / 0.18);  // HEAD (near) is FILLED; trail rings are HOLLOW
+            s.r = cr; s.g = cg; s.b = cb; s.a = fillA;
+            s.r2 = cr * 0.5; s.g2 = cg * 0.5; s.b2 = cb * 0.5; s.a2 = fillA * 0.4;
+            s.border_r = 0.9; s.border_g = 0.95; s.border_b = 1.0; s.border_a = 0.85 * fade;  // bright white-ish ring (the gap edge)
+            return s;
+          }
+        });
+      })(i);
+    }
+    return arr;
+  }
+
+  // Shared per-frame driver for net scenes: cycles hue, accumulates the star's
+  // self-spin, sets the motif q-vars, and breathes zoom on the beat. `headFn(time,
+  // beat)` returns the [x,y] head position (camera-specific: centered for top,
+  // left for side). `baseZoom` is the camera's resting feedback zoom.
+  function alcNetFrame(headFn, baseZoom) {
+    var hue = 0, lastT = 0, spin = 0, march = 0;
+    return function (t) {
+      var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+      var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+      var bn = Math.max(0, Math.min(bass - 1, 1));
+      hue = (hue + dt * (0.02 + 0.05 * ((bass + mid) / 2))) % 1;
+      spin = spin + dt * (1.25 + 0.8 * bn);                        // lively spin (trace kept sparse via short decay)
+      march = march + dt * (0.04 + 0.05 * bn);                     // SLOW orb-row flow -> circles read separately as they crawl
+      var hp = headFn(tm, bn);
+      t.q2 = hp[0]; t.q3 = hp[1];
+      t.q5 = 0.38 + 0.06 * bn;                                    // star radius (bigger -> fills frame, less blank space)
+      t.q6 = 0.03 + 0.11 * Math.min(0.6 * treb + 0.5 * mid, 2.0); // edge jaggedness (live waveform)
+      t.q7 = 0.11 + 0.035 * bn;                                   // orb radius (big enough to read as the marching row)
+      t.q8 = hue;                                                 // hue phase
+      t.q9 = spin;                                                // star self-rotation
+      t.q14 = march;                                              // orb-row march phase
+      t.q19 = tm;                                                 // time clock (orb-trail wavy path)
+      t.zoom = baseZoom - 0.025 * bn;                             // beats deepen the dive
+      return t;
+    };
+  }
+
   var P = {};
 
   // ── Dance of the Freaky Circles (Nebula) ────────────────────────────────────
@@ -1760,94 +2129,73 @@
   })();
 
   // ── Alchemy v2: Wireframe Net ────────────────────────────────────────────────
-  // The WMP "3D wireframe corridor": a funnel/tunnel of thin line-coils receding to an
-  // OFF-CENTER vanishing point (camera low-left), built by a fake-perspective divide in
-  // point_eqs. The net morphs ORDERED (clean funnel) <-> TANGLE (chaotic) on bass, with the
-  // chaos driven by the live waveform (a.value1). Muted teal/green over a dark corridor
-  // background (depth rings + a VP glow). New capability: the 3D off-center camera.
-  // Audio: bass -> tangle amount + VP glow; mid -> hue drift; treb -> fine jitter.
+  // Built from the ALCHEMY KIT. The woven net is FRAME FEEDBACK (docs foundation #1): a 2D
+  // STAR (two waveform triangles) is redrawn each frame and its feedback TRAIL builds the
+  // structure. Two scenes, SAME motifs, different CAMERA — the vocabulary-and-camera idea:
+  //   • Wireframe Net  = "top" camera (trace shrinks to center) -> face-on spinning mandala.
+  //   • Net Corridor   = "side" camera (trace recedes to a right VP) -> the fish-bone corridor.
+  // Both add an orb (fill + bright border) whose feedback trail is the receding row of orbs.
   P["Alchemy v2: Wireframe Net"] = (function () {
-    var huePhase = 0, lastT = 0;
-    var VPX = 0.62, VPY = 0.45;          // off-center vanishing point
-    var NCX = 0.50, NCY = 0.54;          // near-plane axis center (camera sits low-left)
-
-    // fake perspective: depth d (0 near .. 1 far at the VP), lateral world offset (lu,lv).
-    function project(d, lu, lv) {
-      var sc = 1.0 - 0.85 * d;                 // rings shrink with depth
-      var cx = NCX + (VPX - NCX) * d;          // axis drifts toward the VP
-      var cy = NCY + (VPY - NCY) * d;
-      return [cx + lu * sc, cy + lv * sc];
-    }
-
     var preset = build(
-      {
-        wave_a: 0, decay: 0.82, gammaadj: 1.3,   // SHORT trail so the wireframe lines read (not smeared to a rose)
-        zoom: 1.0, cx: 0.5, cy: 0.5,             // no feedback pull -> the coil geometry shows, not concentric arcs
-        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
-      },
-      {
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          var mid = t.mid_att || t.mid || 1;
-          var treb = t.treb_att || t.treb || 1;
-          var tm = t.time;
-          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
-          huePhase = (huePhase + dt * (0.015 + 0.04 * ((bass + mid + treb) / 3))) % 1;
-          t.q17 = Math.max(0, Math.min((bass - 0.7) * 1.2, 1.2));   // tangle amount (bass-gated)
-          t.q18 = 0.10 + 0.20 * treb;                              // fine jitter scale
-          t.q11 = huePhase;
-          t.q19 = tm;                                              // phase clock for slow undulation
-          return t;
-        },
-        comp:
-          "shader_body {\n" +
-          "vec2 vp = vec2(" + VPX + ", " + VPY + ");\n" +
-          "vec2 dv = uv - vp; dv.x *= resolution.x / resolution.y;\n" +
-          "float rv = length(dv);\n" +
-          "float bands = 0.5 + 0.5 * sin(rv * 24.0 - time * 1.0);\n" +          // depth rings around the VP
-          "vec3 bg = mix(vec3(0.010, 0.030, 0.040), vec3(0.020, 0.065, 0.055), bands);\n" +
-          "bg *= smoothstep(0.0, 0.9, rv) * 0.5;\n" +                           // darker toward the VP
-          "bg += vec3(0.05, 0.10, 0.09) * exp(-rv * rv * 6.0) * (0.5 + 0.5 * bass);\n" +  // VP glow
-          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
-          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "vec3 outc = bg + g + glow * 0.30;\n" +
-          "ret = outc / (outc + vec3(0.85));\n" +
-          "}\n"
-      }
+      alcCamera("top"),                                  // trace shrinks to center -> face-on mandala
+      { frame: alcNetFrame(function () { return [0.5, 0.5]; }, 0.955), comp: ALC_COMP }
     );
+    var star = alcStarWaves(2, 0.0);                     // two waveform triangles -> hexagram
+    preset.waves[0] = star[0];
+    preset.waves[1] = star[1];
+    preset.waves[2] = alcOrbSame(0.0);                   // mono glow core (ring same hue as fill)
+    return preset;
+  })();
 
-    // one net coil: a 3D spring/cone (winds `loops` times from near->far) projected to the
-    // off-center VP. R gets live-waveform jitter scaled by bass -> ordered<->tangle morph.
-    function netCoil(phase, loops, hueOff) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.2, a: 0.5, thick: 0
-        }),
-        init_eqs: passthrough, frame_eqs: passthrough,
-        point_eqs: function (a) {
-          var t = a.sample;                                   // 0 near .. 1 far
-          var th = t * 6.2832 * loops + phase + (a.q19 || 0) * 0.2;   // slow undulation
-          var jit = (a.value1 || 0) * (0.16 * (a.q17 || 0) + 0.04 * (a.q18 || 0.1));
-          var R = 0.36 + jit;
-          var p = project(t, R * Math.cos(th), R * Math.sin(th));
-          a.x = p[0]; a.y = p[1];
-          var h = 0.45 + (hueOff - 0.36) * 0.4 + 0.04 * Math.sin(6.2832 * (a.q11 || 0));  // teal/green band, slight drift
-          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-          var l = (rr + gg + bb) / 3, sat = 0.5;              // muted teal/green family
-          var fade = 0.35 + 0.65 * (1.0 - t);                 // far end dimmer (depth cue)
-          a.r = (rr * sat + l * (1 - sat)) * 0.7 * fade;
-          a.g = (gg * sat + l * (1 - sat)) * 0.7 * fade;
-          a.b = (bb * sat + l * (1 - sat)) * 0.7 * fade;
-          return a;
-        }
-      };
-    }
-    preset.waves[0] = netCoil(0.0, 7, 0.30);          // teal-ish
-    preset.waves[1] = netCoil(2.094, 7, 0.42);        // 120 deg, greener
-    preset.waves[2] = netCoil(4.188, 6, 0.36);        // 240 deg, different loop count -> mesh
+  // ── Alchemy v2: Net Corridor ─────────────────────────────────────────────────
+  // Same star + orb motifs as Wireframe Net, but the "side" camera: the head sits near the
+  // camera on the LEFT and the feedback marches its trace toward a right-edge VP, so the
+  // spinning-star trace reads as the horizontal fish-bone corridor and the orb leaves the
+  // receding row of marching orbs (reference @0:09–0:14, side view).
+  P["Alchemy v2: Net Corridor"] = (function () {
+    var preset = build(
+      alcCamera("side"),                                 // fly INTO corridor (zoom>1), VP anchored right
+      { frame: alcNetFrame(function () { return [0.42, 0.50]; }, 0.95), comp: ALC_COMP }
+    );
+    var star = alcStarWaves(2, 0.0);                     // the woven net (feedback trace)
+    preset.waves[0] = star[0];
+    preset.waves[1] = star[1];
+    // orb trail = 10 real SHAPES (blue core / cyan ring) receding to the VP — distinct circles
+    preset.shapes = makeOrbTrailShapes(8);               // filled head + hollow shrinking rings, wavy, hue-cycling
+    return preset;
+  })();
+
+  // ── Alchemy v2: Waveform Sheet ───────────────────────────────────────────────
+  // The SINGLE-LINE motif: ONE live-waveform line (alcRayWaves with n=1), slowly rotating,
+  // over the spindle camera so its feedback trace spreads into a single rippling sheet seen
+  // from a side angle (the "single waveform line leaving a trace" look). One line, not a fan.
+  P["Alchemy v2: Waveform Sheet"] = (function () {
+    var preset = build(
+      alcCamera("side"),                                 // fly INTO corridor (zoom>1), VP anchored right
+      { frame: alcNetFrame(function () { return [0.42, 0.50]; }, 0.95), comp: ALC_COMP }
+    );
+    var ray = alcRayWaves(1, 0.0, 2.6);                  // ONE long waveform line
+    preset.waves[0] = ray[0];
+    preset.waves[1] = alcOrbRow(1, 0.0, 0.5, 0.12, 0.50, 0.90, 0.50);  // ONE ring orb
+    return preset;
+  })();
+
+  // ── Alchemy v2: Ray Burst ────────────────────────────────────────────────────
+  // Demonstrates the RAY motif: 5 live-waveform lines through the center, rotating around
+  // the axis (q9), over the "top" camera so their feedback trail blooms into a spinning
+  // asterisk/net burst with an orb core. Same kit, different motif.
+  P["Alchemy v2: Ray Burst"] = (function () {
+    var preset = build(
+      alcCamera("top"),
+      { frame: alcNetFrame(function () { return [0.5, 0.5]; }, 0.955), comp: ALC_COMP }
+    );
+    var rays = alcRayWaves(5, 0.0, 3.0);                 // 5 rotating waveform lines, LONG (span the screen)
+    preset.waves[0] = rays[0];
+    preset.waves[1] = rays[1];
+    preset.waves[2] = rays[2];
+    preset.waves[3] = rays[3];
+    preset.waves[4] = rays[4];
+    preset.waves[5] = alcOrbWhite(0.0);                  // orb core, white ring (6 waves total — at the cap)
     return preset;
   })();
 

@@ -1,75 +1,88 @@
 # Alchemy v2 — Resume / handoff note
 
-Snapshot for picking up the Alchemy v2 build in a fresh session. Read this + `README.md`
-+ `v2-implementation-plan.md` and you're current. (Auto-memory `MEMORY.md` also loads the
-key gotchas.)
+Snapshot for picking up Alchemy v2 in a fresh session. Read this + `README.md` +
+`v2-implementation-plan.md`. Auto-memory `MEMORY.md` loads the key gotchas.
 
-## Status (as of this note)
+## The big shift this session: the COMPOSABLE KIT
 
-**Committed + pushed to `main`** (4 scenes, all in `wmp-presets.js`, with `FAVORITES` rows
-in `viz.js`):
-- `Alchemy v2: Orbiters` — small ringed orbs + ONE thin lightning tether + central
-  live-waveform flower, over a dusty fbm fluid bg. The approved reference for the kit.
-- `Alchemy v2: Kaleidoscope` — central waveform burst mirrored 4-fold over a complex
-  colored lens-arc bg; dark pupil center (no drawn flower). Vivid allowed here.
-- `Alchemy v2: Anemone Pulsar` — dusty rose anemone (pulses on bass) + 2 flanking orbs,
-  over the SOLID-COLOR-SNAP bg mode (cobalt/sage/plum). Muted.
-- `Alchemy v2: Vortex` — feedback-generated spiral galaxy (inward pull + radius twist in
-  warp); orbs are small glow-discs that streak into spiral arms. Slowed so spin is calm.
+Alchemy is **vocabulary × camera × feedback**, recomposed per scene (the user's framing,
+matches `README.md` foundations). We built a reusable **Alchemy kit** in `wmp-presets.js`
+(just before `var P = {}`). A scene is now ~6 lines: pick a camera + motifs + colors.
 
-**WIP — NOT committed, currently the default startup preset:**
-- `Alchemy v2: Wireframe Net` — fake-3D corridor: 3 `netCoil` waveLines forming a funnel
-  that converges to an OFF-CENTER vanishing point (`project()` helper, VP 0.62/0.45, camera
-  low-left), morphing ordered↔tangle on bass via live-waveform jitter. First render was a
-  flat pink "rose" (full-rainbow hue + heavy feedback smear). Last edit: biased hue to
-  teal/green and cut feedback (`decay 0.82`, `zoom 1.0`, center 0.5) so the wireframe lines
-  show. **Awaiting a screenshot to confirm it reads as a 3D funnel, not a flat whirl.**
-  - If it's good → commit it.
-  - If still off → likely need a stronger perspective read (e.g. fewer loops, bigger near
-    radius, or draw connecting radial spokes between rings), and consider adding the
-    orbiters-riding-the-axis (dotted receding trail toward the VP) which v1 omitted.
-  - Either way, if leaving it unfinished, set `DEFAULT_PRESET` in `viz.js` back to a
-    committed scene (e.g. `"Alchemy v2: Vortex"`).
+**Kit pieces (all in `wmp-presets.js`):**
+- `alcCamera(kind)` — the camera = the FEEDBACK transform. `top` (shrink to center → face-on
+  mandala), `side` (corridor; currently feedback recedes to an off-center down-right VP
+  cx 0.86/cy 0.62, decay 0.42, zoom 0.95), `orbit`.
+- `alcTriangle` / `alcStarWaves(tris)` — waveform triangle/star motif (1=triangle, 2=hexagram).
+- `alcRay` / `alcRayWaves(n, hueOff, lenScale)` — n waveform lines through center, rotating (q9).
+- `alcMeshRings(nRings, hueOff)` — EXPLICIT wavy depth-ring net projected to a VP (built, but
+  Net Corridor currently uses the feedback star net, not this).
+- `alcOrb` / `alcOrbWhite/Same/Contrast`, `alcOrbRow` — WAVE-based orbs. **Mostly superseded**
+  by shapes (see below); kept for reference.
+- **`makeOrbTrailShapes(count)`** — the GOOD orb trail: custom **SHAPES** (real filled circles).
+  Filled hue-cycling HEAD + hollow shrinking RINGS on a WAVY path receding to a VP. This is the
+  current orb in Net Corridor. **Custom shapes RENDER in this build** (confirmed this session —
+  a big unblock; the orb fight was because custom *waves* can't draw a clean filled circle).
+- `alcSetColor`, `sm01`, `ALC_COMP` (additive+bloom, tone-mapped; bloom now 0.20), `alcNetFrame`
+  (shared per-frame driver: sets q2/q3 head, q5 star-radius, q6 jaggedness, q7 orb-radius,
+  q8 hue, q9 spin, q14 orb-flow, q19 time; zoom on beat).
 
-**Conventions in play:**
-- `viz.js` has `DEFAULT_PRESET` — bump it to whatever scene is being actively iterated.
-- Dev auto-launch is ON by default (`winamp.js`): first click/keypress starts NeoAmp; the
-  getDisplayMedia share dialog still requires that gesture. Disable: `localStorage
-  neoamp_autostart=0`.
+## Scenes (in `viz.js` FAVORITES dropdown), all committed
+- **Wireframe Net** — `top` camera, spinning 2-triangle star + orb core (face-on mandala).
+- **Net Corridor** — `side` camera; feedback star net receding down-right + **8 shape-orbs**
+  (filled head + hollow wavy ring trail, hue-cycling). The most-worked scene; "good progress,
+  refine later" per the user.
+- **Waveform Sheet** — single waveform line (alcRayWaves n=1) + shape-orb, side camera.
+- **Ray Burst** — 5 rotating waveform rays + orb core, top camera.
 
-## Remaining scenes (from the plan)
-Supernova (radial urchin, raw-bass extrusion, optional 1-frame color invert), Glowing Ring
-+ Fluid (luminous torus over fbm), 3D Ribbon (needs the `project()` camera), Mandala
-(nested polygons, hard-edged), orbiters-riding-the-corridor. Optional `Journey` sequencer.
+## Pending (kit perspective)
+- **Orbs**: refine — distinct circles still bunch a bit toward the VP; head/trail balance; the
+  feedback (decay 0.42) gives a slight glow that can still tube if pushed. Consider an explicit
+  comet (Gemini's delayed-time idea) instead of relying on feedback at all.
+- **Net**: decide feedback-star vs explicit `alcMeshRings`. The corridor net + orbs should share
+  one VP (they do now via feedback). Explicit net (alcMeshRings) would be crisper/controllable
+  but the user reverted it once (looked like face-on concentric circles — needs the off-center
+  down-right VP to read as a corridor, not a target).
+- **Motifs still to add** (from `README.md` Part II + Gemini's 5-primitive list):
+  - Radial **Spindle/Anemone** (lines from a point, twist→vortex) — harvest the existing
+    `Anemone Pulsar` preset into a kit motif. Highest reuse (≈6 scenes).
+  - **N-gon generalization** (sides + inner/outer radius → triangle/diamond/octagon/star) — Gemini's idea.
+  - **Mandala** (nested polygons), **Ribbon** (3D waving plane), **dotted fine trail** (the small
+    blue dots under the orbs in the reference).
+  - **Backgrounds** (comp/warp shaders): solid-color snap, fluid marble, moiré stripes,
+    oscilloscope band, kaleidoscope mirror.
+- **Colors**: orb fill hue-cycles; net is teal+amber. Keep the muted rule for these families.
+- Optional `Journey` sequencer to crossfade scenes.
 
-## Hard-won gotchas (don't relearn)
-- **≤6 enabled custom waves** render reliably in this build; a 7th silently dropped a wave
-  (see `MEMORY` butterchurn-custom-wave-cap). Mirror the 6-wave Orbiters layout; combine
-  elements rather than adding waves.
-- **Orb trail recipe** (proven in Vortex): a circle-orb makes a chain of rings; a 1px point
-  makes a faint *dotted* line (aliased by warp resampling); a small **filled glow-disc**
-  (`usedots:1`, ~48 samples filling a ~0.016 disc) makes a continuous bright streak.
-- **Muting rule** is HARD for the orb/anemone/net families (dusty + Reinhard tone-map);
-  relaxed only for kaleidoscope/supernova. Don't reflexively thicken/brighten on feedback —
-  validate against the reference first (see `MEMORY` validate-dont-reflexively-agree).
-- **GLSL reserved names**: never declare `ang`/`rad`/`ret`/`uv`/`q*` as locals in
-  `shader_body` (use `pr`, `pa`, `pang`, etc.).
+## Hard-won learnings THIS session (don't relearn)
+1. **Feedback is for glow/motion-blur, NOT structure** (Gemini's rule, proven repeatedly). The
+   corridor/net never reached the VP and the orbs smeared because we leaned on feedback decay
+   for structure. Draw structure EXPLICITLY; use feedback only for a short glow.
+2. **Custom waves can't draw a clean filled circle** — spiral fill = a tube of concentric rings;
+   usedots = a sparse halftone grid; line-mode multi-orb = a connecting beam. Dead ends.
+3. **Custom SHAPES work in this build** and are the right primitive for orbs (filled disc +
+   gradient core via r2/g2/b2 + border ring). `makeShapes()` creates 4; we set `preset.shapes`
+   to an arbitrary-length array and 8–10 render fine.
+4. **Additive + bright filled discs accumulate to WHITE** (the "white sausage"). Orbs must be
+   **non-additive** (additive:0) so color just paints and can't blow out.
+5. **zoom>1 feedback runs away to a white-out.** Keep zoom ≤1 unless decay is very low.
+6. The reference orb trail (`~/Downloads/YouTube 1080p 60fps Download.mp4`, and screenshots): a
+   FILLED hue-cycling head + HOLLOW shrinking rings on a slightly WAVY path; later circles
+   smaller; a separate fine dotted trail underneath.
+7. **One change at a time; prove ONE orb before scaling.** Over-batching (rings+orbs at once,
+   60 instances) repeatedly cost rounds. The user pushed back hard on overconfidence — heed it.
+8. The corridor camera-angle direction was the single biggest time-sink — the user wants a
+   **single-sided corridor receding to one VP** (not a symmetric spindle). `sx>1` about center
+   is ALWAYS symmetric; use off-center zoom feedback (or explicit projection) instead.
 
-## Validation workflow (do BEFORE every reload)
-1. `node --check wmp-presets.js && node --check viz.js`
-2. Runtime: load the preset, run `frame_eqs` once and sweep every enabled wave's `point_eqs`
-   over `sample` 0..1, asserting no NaN in x/y/r.
-3. **ANGLE pre-check for shaders** (GLSL can't compile in Node). In Node, wrap the preset's
-   `comp`/`warp`: split on `shader_body`, put the pre-`shader_body` part as global helpers,
-   splice the body into a `main()` that PREDECLARES the MilkDrop builtins as locals
-   (`vec3 ret; vec2 uv=gl_FragCoord.xy/resolution; float rad=...; float ang=...; vec3
-   hue_shader; float q1..q32;`) under uniforms `sampler_main, sampler_blur1, sampler_blur2,
-   time, bass, bass_att, mid, mid_att, treb, treb_att, frame, fps, resolution`. Then via the
-   chrome-devtools MCP (a blank page is fine), create a WebGL context, compile the fragment +
-   a trivial vertex shader, `linkProgram`, and read COMPILE_STATUS / LINK_STATUS / info logs.
-   This reproduces the reserved-name redefinition trap that a bare wrap would hide.
+## Conventions
+- `viz.js` `DEFAULT_PRESET` — set to the actively-iterated scene.
+- Validate before reload: `node --check wmp-presets.js && node --check viz.js`, then run
+  frame_eqs + sweep wave point_eqs / shape frame_eqs for NaN (see prior commands in history).
+- Custom-wave cap ≈6 enabled. Shapes: 8–10 fine.
+- We can't see the live render — iterate from the user's screenshots.
 
 ## Where the user is
-Building the composable Alchemy framework (motifs + feedback + bg modes + camera), iterating
-each scene from screenshots (we can't see live render). The reference clip is ONE example —
-scenes recompose freely; match *character*, not a fixed storyboard.
+Building the composable kit; Net Corridor is the lead scene. "Good progress, refine later."
+Next session: refine orbs (maybe fully-explicit comet), decide net approach, then start adding
+the remaining motifs (Anemone first).
