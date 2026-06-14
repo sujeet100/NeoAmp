@@ -1658,7 +1658,7 @@
           var tm = t.time;
           var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           huePhase = (huePhase + dt * (0.02 + 0.05 * ((bass + mid + treb) / 3))) % 1;
-          var th = tm * 0.5;                           // orbs being pulled around the vortex
+          var th = tm * 0.3;                           // orbs being pulled around the vortex (slower)
           t.q1 = 0.5 + 0.30 * Math.cos(th);
           t.q2 = 0.5 + 0.30 * Math.sin(th);
           t.q3 = 0.5 + 0.30 * Math.cos(th + Math.PI);
@@ -1676,8 +1676,10 @@
           "shader_body {\n" +
           "vec2 c = uv - 0.5;\n" +
           "float pr = length(c);\n" +
-          "float tw = 0.07 + 0.07 * mid + 0.18 / (pr * 6.0 + 1.0);\n" +   // tighter swirl (more rotation toward center)
-          "float sc = 0.982 - 0.012 * bass;\n" +
+          // Halve BOTH twist and inward-pull vs the first tight version: spiral pitch
+          // (tightness ~ tw/(1-sc)) is preserved, but spin + inward flow run ~half speed.
+          "float tw = 0.035 + 0.035 * mid + 0.09 / (pr * 6.0 + 1.0);\n" +
+          "float sc = 0.991 - 0.006 * bass;\n" +
           "float s = sin(tw), co = cos(tw);\n" +
           "vec2 sd = vec2(c.x * co - c.y * s, c.x * s + c.y * co) * sc + 0.5;\n" +
           "ret = texture2D(sampler_main, sd).rgb;\n" +
@@ -1728,18 +1730,23 @@
         }
       };
     }
-    // small orb cores being dragged into the vortex (their trails become spiral arms).
+    // orb = a small FILLED glow-disc (samples fill a tiny disc, drawn as dots). Big enough
+    // (~16px) to survive the warp resampling, so its per-frame feedback stamps merge into a
+    // continuous bright spiral STREAK — not a chain of rings (circle orb) and not a faint
+    // dotted line (single-point orb).
     function orbCore(qx, qy) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 64, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.9, a: 0.9, thick: 1, r: 1.0, g: 0.78, b: 0.4
+          enabled: 1, samples: 48, additive: 1, usedots: 1, scaling: 1,
+          smoothing: 0, a: 1.0, thick: 1, r: 1.0, g: 0.78, b: 0.4
         }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
-          var r = a.q5 || 0.02; var ang = a.sample * 6.2832;
-          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
-          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var fr = a.sample;
+          var rr = 0.008 * Math.sqrt(fr);          // fill a small disc (dense center -> glow)
+          var ang = fr * 6.2832 * 9.0;             // sunflower spread
+          a.x = (a[qx] || 0.5) + rr * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + rr * Math.sin(ang);
           a.r = 1.0; a.g = 0.78; a.b = 0.4;
           return a;
         }
