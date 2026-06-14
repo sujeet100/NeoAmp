@@ -570,8 +570,11 @@
   // tiles them so the framed windows stay resizable). Returns null if the skin
   // omits GEN.BMP. Coordinates from skinSprites.ts (GEN, *_SELECTED variants).
   // =========================================================================
+  // Titlebar (top row, selected y=0): gold corners + LR_FILL ridges fill the
+  // bar; the title sits on the plain CENTER_FILL plaque flanked by END caps.
   var GEN = {
-    TL: [0, 0, 25, 20], TFILL: [52, 0, 25, 20], TR: [130, 0, 25, 20],
+    TL: [0, 0, 25, 20], LEND: [26, 0, 25, 20], CFILL: [52, 0, 25, 20],
+    REND: [78, 0, 25, 20], GOLD: [104, 0, 25, 20], TR: [130, 0, 25, 20],
     ML: [127, 42, 11, 29], MR: [139, 42, 8, 29],
     BL: [0, 42, 125, 14], BR: [0, 57, 125, 14], BFILL: [127, 72, 25, 14],
     CLOSE: [148, 42, 9, 9],

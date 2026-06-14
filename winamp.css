@@ -339,18 +339,32 @@
   image-rendering: pixelated;
 }
 /* .wa-win.wa-genskin (3 classes) so it beats `.wa-win.inactive .wa-titlebar`
-   — skinned windows always show the active gold titlebar, even when unfocused */
+   — skinned windows always show the active gold titlebar, even when unfocused.
+   Layout: gold corners + LR_FILL ridges fill the bar; the title sits centered
+   on the plain CENTER_FILL plaque flanked by LEFT_END/RIGHT_END caps. */
 .wa-win.wa-genskin .wa-titlebar {
-  height: 40px; padding: 0 30px; border: 0; box-shadow: none;
+  height: 40px; padding: 0; border: 0; box-shadow: none;
+  position: relative; display: flex; align-items: center; justify-content: flex-end;
   background:
     var(--gen-tl) left top / 50px 40px no-repeat,
     var(--gen-tr) right top / 50px 40px no-repeat,
-    var(--gen-tfill) left top / 50px 40px repeat-x;
+    var(--gen-gold) left top / 50px 40px repeat-x;
   image-rendering: pixelated;
 }
-.wa-genskin .wa-title { color: #c8d2e8; font-size: 11px; }
+.wa-win.wa-genskin .wa-title {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  flex: none; height: 40px; display: flex; align-items: center; padding: 0 48px;
+  color: #d6deff; font-size: 11px; letter-spacing: 2px;
+  background:
+    var(--gen-lend) left top / 50px 40px no-repeat,
+    var(--gen-rend) right top / 50px 40px no-repeat,
+    var(--gen-cfill) left top / 50px 40px repeat-x;
+  image-rendering: pixelated;
+}
 .wa-genskin .wa-title .wa-logo { display: none; }
-.wa-genskin .wa-tbtn { background: rgba(0,0,0,0.25); border-color: rgba(0,0,0,0.5); }
+/* keep the close/fullscreen buttons clear of the gold right-corner cap */
+.wa-win.wa-genskin .wa-tbtns { position: relative; z-index: 2; margin-right: 54px; }
+.wa-genskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #d6deff; }
 /* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
 #wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body {
   margin: 0; padding: 6px 18px 30px 24px;

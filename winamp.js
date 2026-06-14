@@ -513,7 +513,8 @@
   function applyGenChrome(skin) {
     var g = window.NeoAmpClassic.genAssets(skin);
     if (g) {
-      var map = { TL: "tl", TFILL: "tfill", TR: "tr", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
+      var map = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend",
+        ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
       Object.keys(map).forEach(function (k) { root.style.setProperty("--gen-" + map[k], "url(" + g[k] + ")"); });
     }
     var p = window.NeoAmpClassic.parsePledit(skin);
