@@ -8,7 +8,7 @@
   "content_scripts": [
     {
       "matches": ["https://music.youtube.com/*"],
-      "js": ["skins.js", "content.js", "winamp.js"],
+      "js": ["skins.js", "content.js", "wsz.js", "winamp.js"],
       "css": ["overlay.css", "winamp.css"],
       "run_at": "document_idle"
     }
@@ -29,7 +29,8 @@
         "vendor/butterchurn.min.js",
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",
-        "vendor/butterchurnPresetsExtra2.min.js"
+        "vendor/butterchurnPresetsExtra2.min.js",
+        "vendor/skins/base-2.91.wsz"
       ],
       "matches": ["https://music.youtube.com/*"]
     }

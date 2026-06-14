@@ -47,6 +47,10 @@
   var currentSkin = (window.NeoAmpSkins && window.NeoAmpSkins.DEFAULT_ID) || "classic";
   var layout = {};              // id -> {x,y,w,h}
 
+  // real Winamp skins (.wsz) rendered by wsz.js. id -> vendored resource path.
+  var CLASSIC_SKINS = [{ id: "base-2.91", name: "Winamp Classic", file: "vendor/skins/base-2.91.wsz" }];
+  var classicApi = null;        // mounted Main-window renderer (null = procedural mode)
+
   // ---- tiny DOM helper -----------------------------------------------------
   function h(tag, attrs, kids) {
     var el = document.createElement(tag);
@@ -312,12 +316,22 @@
   function buildMain() {
     // skin picker gadget in the titlebar
     var skinSel = h("select", { class: "wa-skinsel", title: "Skin" });
+    var cssGroup = h("optgroup", { label: "Procedural (themeable)" });
     (window.NeoAmpSkins ? window.NeoAmpSkins.list : []).forEach(function (s) {
-      var o = h("option", { value: s.id, text: s.name });
-      skinSel.appendChild(o);
+      cssGroup.appendChild(h("option", { value: s.id, text: s.name }));
     });
+    skinSel.appendChild(cssGroup);
+    // real Winamp .wsz skins, rendered by the sprite engine (wsz.js)
+    var wszGroup = h("optgroup", { label: "Real Winamp skin (.wsz)" });
+    CLASSIC_SKINS.forEach(function (s) {
+      wszGroup.appendChild(h("option", { value: "wsz:" + s.id, text: s.name }));
+    });
+    skinSel.appendChild(wszGroup);
     skinSel.value = currentSkin;
-    skinSel.addEventListener("change", function () { applySkin(skinSel.value); });
+    skinSel.addEventListener("change", function () {
+      if (skinSel.value.indexOf("wsz:") === 0) enableClassic(skinSel.value.slice(4));
+      else { disableClassic(); applySkin(skinSel.value); }
+    });
     skinSel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
 
     var win = makeWindow("wa-main", "NeoAmp", { gadget: skinSel, onClose: function () { NA.stop(); } });
@@ -415,6 +429,116 @@
     var pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
     input.style.background =
       "linear-gradient(90deg, var(--wa-accent) " + pct + "%, transparent " + pct + "%), var(--wa-track-bg)";
+  }
+
+  // =========================================================================
+  // CLASSIC SKIN (.wsz) — real Winamp Main window rendered by wsz.js, shown in
+  // a chrome-less host window in place of the procedural #wa-main. Opt-in via
+  // the skin picker; selecting a procedural skin switches back.
+  // =========================================================================
+  var classicWin = null, classicLoading = false;
+  function enableClassic(id) {
+    if (!window.NeoAmpClassic) { NA.toast("Classic skin engine not loaded"); return; }
+    var def = null;
+    CLASSIC_SKINS.forEach(function (s) { if (s.id === id) def = s; });
+    if (!def || classicLoading) return;
+
+    // host window: no procedural chrome — the skin paints its own titlebar.
+    if (!classicWin) {
+      var el = h("div", { class: "wa-win wa-skinwin inactive", id: "wa-skin" });
+      var drag = h("div", { class: "wa-skin-drag" });   // invisible titlebar grab strip
+      el.appendChild(drag);
+      el.addEventListener("mousedown", function () { raise(el); }, true);
+      makeDraggable(el, drag);
+      root.appendChild(el);
+      classicWin = { el: el, body: el, titlebar: drag, drag: drag };
+      wins["wa-skin"] = classicWin;
+      var d = layout["wa-skin"] || { x: 40, y: 70 };
+      el.style.left = (d.x || 40) + "px"; el.style.top = (d.y || 70) + "px";
+    }
+    ensureArtWin();
+    classicWin.el.style.display = "";
+    if (wins["wa-art"]) wins["wa-art"].el.style.display = "";
+    raise(classicWin.el);
+    if (wins["wa-main"]) wins["wa-main"].el.style.display = "none";
+    NA.storage.set({ neoampSkin: "wsz:" + id });
+
+    classicLoading = true;
+    window.NeoAmpClassic.loadSkin(chrome.runtime.getURL(def.file)).then(function (skin) {
+      classicLoading = false;
+      if (classicApi) classicApi.destroy();
+      classicApi = window.NeoAmpClassic.mountMain(classicWin.el, skin, classicHooks());
+      // size the drag strip to the rendered titlebar
+      classicWin.drag.style.width = classicApi.dragRegion.w + "px";
+      classicWin.drag.style.height = classicApi.dragRegion.h + "px";
+      var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
+      classicApi.setVolume(NA.control.getVolume());
+      classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl"));
+    }).catch(function (e) {
+      classicLoading = false;
+      console.error("[NeoAmp] .wsz load failed:", e);
+      NA.toast("Skin failed to load: " + (e && e.message || e));
+      disableClassic();
+    });
+  }
+  function disableClassic() {
+    if (classicApi) { classicApi.destroy(); classicApi = null; }
+    if (classicWin) classicWin.el.style.display = "none";
+    if (wins["wa-art"]) wins["wa-art"].el.style.display = "none";
+    if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
+  }
+  // Companion album-art window — Winamp 2 has no art region, so we show it in a
+  // small separate framed tile alongside the skinned windows (classic mode only).
+  function ensureArtWin() {
+    if (wins["wa-art"]) return;
+    var img = h("img", { class: "wa-artwin-img", alt: "" });
+    img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
+    var el = h("div", { class: "wa-win wa-artwin inactive empty", id: "wa-art" }, [img]);
+    el.addEventListener("mousedown", function () { raise(el); }, true);
+    makeDraggable(el, el);
+    root.appendChild(el);
+    wins["wa-art"] = { el: el, body: el, titlebar: el, img: img };
+    var d = layout["wa-art"] || { x: 598, y: 70 };
+    el.style.left = (d.x || 598) + "px"; el.style.top = (d.y || 70) + "px";
+  }
+  function pushClassicArt(t) {
+    var w = wins["wa-art"]; if (!w) return;
+    var hasArt = !!(t.art && /^https?:\/\//.test(t.art));
+    if (hasArt) { if (w.img.src !== t.art) w.img.src = t.art; }
+    else w.img.removeAttribute("src");
+    w.el.classList.toggle("empty", !hasArt);
+  }
+  function isShown(id) { return wins[id] && wins[id].el.style.display !== "none"; }
+  function classicHooks() {
+    return {
+      onPrev: function () { NA.control.prev(); },
+      onPlay: function () { NA.control.playPause(); },
+      onPause: function () { NA.control.playPause(); },
+      onStop: function () { NA.control.stop(); },
+      onNext: function () { NA.control.next(); },
+      onEject: function () { focusYtSearch(); },
+      onSeek: function (t) { NA.control.seek(t); },
+      onVolume: function (v) { NA.control.setVolume(v); if (els.vol) els.vol.value = String(Math.round(v * 100)); },
+      onShuffle: function () { NA.control.toggleShuffle(); },
+      onRepeat: function () { NA.control.toggleRepeat(); },
+      onToggleEq: function () { toggleWin("wa-eq", els.eqTog); classicApi && classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl")); },
+      onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); classicApi && classicApi.setToggles(isShown("wa-eq"), isShown("wa-pl")); },
+      onToggleViz: function () { toggleWin("wa-viz", els.visTog); },
+      onClose: function () { NA.stop(); },
+    };
+  }
+  // feed live track state into the rendered main window
+  function pushClassicTrack(t) {
+    pushClassicArt(t);
+    if (!classicApi) return;
+    classicApi.update({
+      elapsed: t.currentTime || 0,
+      duration: t.duration || 0,
+      title: t.title ? (t.title + (t.artist ? " - " + t.artist : "")) : "NeoAmp",
+      stopped: !t.title,
+      paused: !!t.paused,
+      playing: !t.paused && !!t.title,
+    });
   }
 
   // =========================================================================
@@ -653,6 +777,7 @@
   // live data → UI
   // =========================================================================
   function onTrack(t) {
+    if (classicApi) pushClassicTrack(t);   // classic skin mirrors the same state
     if (els.clock && !seeking) els.clock.textContent = fmt(t.currentTime);
     if (els.playBtn) els.playBtn.innerHTML = icon(t.paused ? "play" : "pause");
     trackDur = t.duration || 0;
@@ -705,6 +830,7 @@
   function onAudio(frame) {
     postViz({ type: "audio", data: frame.time }); // feed Butterchurn
     drawAnalyzer(frame.freq);
+    if (classicApi) classicApi.pushAudio(frame.freq);   // classic skin's in-window analyzer
   }
 
   // classic Winamp-style bar analyzer with falling peak caps
@@ -805,7 +931,13 @@
       var w = wins["wa-pl"];
       if (w && w.el.style.display !== "none") refreshQueue();
     }, 1500);
-    NA.storage.get("neoampSkin", function (id) { if (id) { currentSkin = id; applySkin(id); var ss = root.querySelector(".wa-skinsel"); if (ss) ss.value = id; } });
+    NA.storage.get("neoampSkin", function (id) {
+      if (!id) return;
+      var ss = root.querySelector(".wa-skinsel");
+      if (id.indexOf("wsz:") === 0) { enableClassic(id.slice(4)); }
+      else { currentSkin = id; applySkin(id); }
+      if (ss) ss.value = id;
+    });
     NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); syncToggles(); });
   }
 

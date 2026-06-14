@@ -269,6 +269,38 @@
 }
 
 /* =======================================================================
+   CLASSIC SKIN HOST (.wsz canvas) — no procedural chrome; the skin's own
+   bitmap titlebar/bezel is painted into the canvas, so strip our window styling
+   ======================================================================= */
+.wa-skinwin {
+  background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
+  width: auto; line-height: 0;       /* kill inline-canvas descender gap */
+}
+.wa-skin-drag {
+  position: absolute; top: 0; left: 0; cursor: move; z-index: 2;
+  /* sized in JS to the rendered titlebar; transparent grab strip */
+}
+
+/* companion album-art tile shown in classic (.wsz) mode */
+.wa-artwin {
+  width: 168px; height: 168px; padding: 3px; cursor: move;
+  background: #0a0a10;
+  /* recessed screen bezel: dark top-left, light bottom-right */
+  border: 2px solid;
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9), var(--wa-win-shadow);
+}
+.wa-artwin-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  image-rendering: pixelated; filter: saturate(1.05) contrast(1.02);
+}
+.wa-artwin.empty .wa-artwin-img { display: none; }
+.wa-artwin.empty::after {
+  content: "no art"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--wa-fg-dim); font: 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
+}
+
+/* =======================================================================
    EQUALIZER WINDOW (cosmetic)
    ======================================================================= */
 /* same width as the main + playlist windows so the stack aligns (classic
