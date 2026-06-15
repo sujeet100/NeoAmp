@@ -3056,22 +3056,16 @@
       // QUAD-MIRROR the WAVES too: sample from the mirrored UV so the oscilloscope band and
       // diamond are reflected L/R + T/B. The T/B mirror of the oscilloscope creates the
       // butterfly/diamond shape at center (positive wiggles appear both above AND below center).
-      "vec2 muv = vec2(abs(uv.x - 0.5) + 0.5, abs(uv.y - 0.5) + 0.5);\n" +
-      "vec3 g = texture2D(sampler_main, muv).rgb;\n" +   // mirrored wave content
-      "vec3 bloom = (texture2D(sampler_blur1,muv).rgb+texture2D(sampler_blur2,muv).rgb)*0.5;\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1,uv).rgb+texture2D(sampler_blur2,uv).rgb)*0.5;\n" +
       "vec3 outc = barCol + g * 1.8 + bloom * 0.28;\n" +
       "ret = outc / (outc + vec3(0.90));\n" +
       "}\n";
 
-    // WARP: QUAD-MIRROR fold + fade. This is the core of the kaleidoscope effect:
-    // each frame the previous buffer is folded L/R + T/B and faded. The fresh waves (oscilloscope,
-    // diamond) are drawn on top. Over a few frames the mirrored copies accumulate into the full
-    // kaleidoscopic symmetric pattern. This is how MilkDrop kaleidoscopes work.
-    var MOIRE_WARP =
-      "shader_body {\n" +
-      "vec2 wuv = vec2(abs(uv.x - 0.5) + 0.5, abs(uv.y - 0.5) + 0.5);\n" +
-      "ret = texture2D(sampler_main, wuv).rgb * 0.88;\n" +
-      "}\n";
+    // WARP: clear each frame — bars are drawn fresh in comp, waves are crisp.
+    // The kaleidoscope fold approach (warp-mirror + accumulate) creates ghost artifacts
+    // because the bars in comp also get fed back. TODO: proper fix needs bars out of comp.
+    var MOIRE_WARP = ALC_CLEAR_WARP;
 
     var preset = build(
       { wave_a: 0, gammaadj: 1.3, decay: 0.88, zoom: 1.0, cx: 0.5, cy: 0.5,
@@ -3111,7 +3105,7 @@
       }),
       init_eqs: passthrough, frame_eqs: passthrough,
       point_eqs: function (a) {
-        var amp = 0.30 + 0.15 * Math.abs(a.value1 || 0);  // 0.30-0.45 screen height — large butterfly after T/B mirror
+        var amp = (a.q6 !== undefined ? a.q6 : 0.05) * 2.5;  // moderate oscilloscope height
         a.x = a.sample;                               // 0..1 full width
         a.y = 0.5 + (a.value1 || 0) * amp;
         var ph = (a.q12 !== undefined ? a.q12 : 0);   // -1..1 hue phase
