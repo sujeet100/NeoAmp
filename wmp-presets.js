@@ -441,19 +441,22 @@
   // low-slope chords at the L/R extremities pile up additively into the two bright "eye" nodes
   // (emergent, not drawn). `dir` is a signed SPEED multiplier so layers counter-rotate at
   // slightly different rates (the spirograph breathing). 12 polygons packed `perWave` to a wave.
+  // EVEN-N polygons sit rotate:0 so their angle-0/π vertices pile up at the L/R extremes
+  // (0.5 ± radius·aspectX, 0.5) → the bright "eye" nodes emerge there. ODD-N star-polygons keep
+  // small rotate offsets for spirograph variety (they have no clean L/R vertex pair anyway).
   var ALC_MANDALA_SPECS = [
     { sides: 10, skip: 1, radius: 0.34, dir:  1.0, rotate: 0.00, hueOff: 0.00 }, // decagon — outer envelope
-    { sides: 8,  skip: 1, radius: 0.32, dir: -0.8, rotate: 0.20, hueOff: 0.12 }, // octagon — envelope
-    { sides: 12, skip: 5, radius: 0.34, dir:  1.2, rotate: 0.10, hueOff: 0.24 }, // {12/5} — dense crossing star
+    { sides: 8,  skip: 1, radius: 0.32, dir: -0.8, rotate: 0.00, hueOff: 0.12 }, // octagon — envelope
+    { sides: 12, skip: 5, radius: 0.34, dir:  1.2, rotate: 0.00, hueOff: 0.24 }, // {12/5} — dense crossing star
     { sides: 7,  skip: 3, radius: 0.33, dir: -0.6, rotate: 0.30, hueOff: 0.40 }, // {7/3} — heptagram
-    { sides: 9,  skip: 4, radius: 0.34, dir:  0.9, rotate: 0.00, hueOff: 0.55 }, // {9/4} — near-diameter chords
+    { sides: 9,  skip: 4, radius: 0.34, dir:  0.9, rotate: 0.17, hueOff: 0.55 }, // {9/4} — near-diameter chords
     { sides: 5,  skip: 2, radius: 0.32, dir: -1.1, rotate: 0.15, hueOff: 0.70 }, // {5/2} — pentagram
-    { sides: 8,  skip: 3, radius: 0.33, dir:  0.7, rotate: 0.25, hueOff: 0.05 }, // {8/3} — octagram
+    { sides: 8,  skip: 3, radius: 0.33, dir:  0.7, rotate: 0.00, hueOff: 0.05 }, // {8/3} — octagram
     { sides: 9,  skip: 2, radius: 0.34, dir: -1.0, rotate: 0.12, hueOff: 0.46 }, // {9/2} — enneagram
-    { sides: 10, skip: 3, radius: 0.33, dir:  1.1, rotate: 0.08, hueOff: 0.62 }, // {10/3} — decagram
-    { sides: 6,  skip: 1, radius: 0.35, dir: -0.5, rotate: 0.18, hueOff: 0.30 }, // hexagon — envelope
+    { sides: 10, skip: 3, radius: 0.33, dir:  1.1, rotate: 0.00, hueOff: 0.62 }, // {10/3} — decagram
+    { sides: 6,  skip: 1, radius: 0.35, dir: -0.5, rotate: 0.00, hueOff: 0.30 }, // hexagon — envelope
     { sides: 16, skip: 7, radius: 0.32, dir:  0.8, rotate: 0.00, hueOff: 0.78 }, // {16/7} — dense rim star
-    { sides: 12, skip: 5, radius: 0.35, dir: -0.9, rotate: 0.40, hueOff: 0.18 }  // {12/5} — rotated overlay
+    { sides: 12, skip: 5, radius: 0.35, dir: -0.9, rotate: 0.00, hueOff: 0.18 }  // {12/5} — rotated overlay
   ];
   function alcNgonStack(aspectX, specs, perWave) {
     specs = specs || ALC_MANDALA_SPECS;
@@ -2598,8 +2601,8 @@
           var bass = t.bass_att || t.bass || 1, treb = t.treb_att || t.treb || 1;
           var bn = Math.max(0, Math.min(bass - 1, 1));
           t.q2 = 0.5; t.q3 = 0.5;
-          t.q5 = 0.6 + 0.5 * bn;                          // breathing: stays LARGE (fills ~70% width), blooms wider on bass
-          t.q6 = 0.006 + 0.012 * Math.min(treb, 1.5);     // FINE edge jitter (live waveform) — small vs the chords, never shreds the polygons
+          t.q5 = 0.45 + 0.28 * bn;                        // breathing: ~55-85% width, blooms on bass but stays INSIDE the frame
+          t.q6 = 0.02 + 0.04 * Math.min(treb, 1.2);       // JAGGED edge displacement (live waveform) — chords read as zigzag oscilloscope lines, not straight
           t.q8 = (t.time * 0.04) % 1;                     // slow hue drift over the scene
           t.q9 = t.time * 0.5;                            // slow base spin (rad); per-layer dir scales/flips it
           return t;
