@@ -63,10 +63,26 @@ Per-instance parameters:
   on a transient then snaps back.
 
 ## Build order (respect "prove ONE before scaling")
-1. `alcNgon(opts)` primitive — one clean configurable polygon as a packed-capable wave.
-2. Prove ONE polygon on screen (a diamond), confirm aspectX gives the elliptical stretch.
-3. Add star (inner/outer radius) + jagged waveform displacement; confirm one star.
-4. Pack the stack (K polygons in one wave, seam blanking); add counter-rotation + bass-breathing.
-5. Add the separate diagonal waveform line with inverse-opacity coupling.
-6. Wire a `P["Alchemy v2: Mandala"]` scene (flat camera + flat-blue comp). Validate, screenshot, tune.
-7. (Later) the diamond-anchor scene reuses `alcNgon` with N=4 over the moiré bg.
+1. ✅ `alcNgon(opts)` primitive — configurable {N/skip} star-polygon wave.
+2. ✅ Proved ONE polygon (`P["Alchemy v2: N-gon Proof"]`), aspectX ellipse confirmed.
+3. ✅ Star geometry — used **{N/skip}** (connect every skip-th vertex → center-crossing chords),
+   NOT inner/outer radius (that gives an empty-center spiky ring — rejected on screen). Jagged
+   edges = perpendicular-to-chord waveform displacement.
+4. ✅ Packed stack — `alcNgonPacked` packs K polygons per wave (seam-blank a.a=0); 12 polygons in
+   4 waves. Counter-rotation via signed `dir`; bass-breathing.
+5. ✅ Diagonal line as its OWN motif `alcDiagonalLine` (corner-to-corner, q10 inverse opacity).
+6. ✅ `P["Alchemy v2: Mandala"]` scene wired (clear-warp + flat-blue comp).
+7. ✅ Polish: collapse-to-line dropout + energy-gated density (per-spec `tier` + q11) + eye-node
+   glow + thin line, all driven by reusable `alcMandalaFrame()`.
+8. (Later) diamond-anchor scene reuses `alcNgon`/`alcDiagonalLine` over the moiré bg (section_F).
+
+## Hard-won notes (don't relearn)
+- **{N/skip}, not inner/outer radius** — only skipping vertices produces the center-crossing
+  spirograph chords + central knot. Gemini suggested inner/outer; we validated skip is right.
+- **Jaggedness = perpendicular to the chord**, not radial — keeps the zigzag riding the straight
+  chord (oscilloscope look). Radial would bow the chords.
+- **Eye nodes are emergent** — aspectX horizontal stretch piles low-slope chords additively at L/R;
+  even-N polygons at rotate:0 share the exact L/R vertices to strengthen it.
+- **Last wave is silently dropped in this build** — put the must-see motif (the line) at index 0.
+  See memory butterchurn-custom-wave-cap.
+- Feedback must be cleared each frame (ALC_CLEAR_WARP) — `decay` base-val has no effect here.

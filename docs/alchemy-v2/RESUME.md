@@ -46,7 +46,10 @@ matches `README.md` foundations). We built a reusable **Alchemy kit** in `wmp-pr
 - **Motifs still to add** (from `README.md` Part II + Gemini's 5-primitive list):
   - Radial **Spindle/Anemone** (lines from a point, twist→vortex) — harvest the existing
     `Anemone Pulsar` preset into a kit motif. Highest reuse (≈6 scenes).
-  - **N-gon generalization** (sides + inner/outer radius → triangle/diamond/octagon/star) — Gemini's idea.
+  - ~~**N-gon generalization**~~ ✅ DONE — `alcNgon` ({N/skip} star-polygon) + `alcNgonPacked` +
+    `alcNgonStack` + `alcDiagonalLine` + `alcMandalaFrame`; scene `Alchemy v2: Mandala` (and
+    `N-gon Proof`). Full spec/notes in `docs/alchemy-v2/ngon-spec.md`. Used {N/skip} (center-crossing
+    chords), NOT inner/outer radius. Has collapse-dropout, energy-gated density tiers, eye-node glow.
   - **Mandala** (nested polygons), **Ribbon** (3D waving plane), **dotted fine trail** (the small
     blue dots under the orbs in the reference).
   - **Backgrounds** (comp/warp shaders): solid-color snap, fluid marble, moiré stripes,
