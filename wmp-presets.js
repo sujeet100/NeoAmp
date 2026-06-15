@@ -430,7 +430,18 @@
         var poly = polys[pi];
         ngonPoint(a, poly, local, aspectX);
         alcSetColor(a, (a.q8 || 0) + (poly.hueOff || 0), 0, 1.3);
-        a.a = (local < seam || local > 1.0 - seam) ? 0 : 1;  // blank seams -> no bridge chord
+        // EYE-NODE boost: chords crossing the L/R horizontal extremes (y≈center, |x| large) pile
+        // up there — brighten them so the two focal "eyes" glow (tone-map keeps it from blowing out).
+        var ny = 1 - Math.min(Math.abs(a.y - 0.5) / 0.10, 1);
+        var nx = Math.min(Math.max((Math.abs(a.x - 0.5) - 0.18) / 0.22, 0), 1);
+        var eye = 1 + 1.3 * ny * nx;
+        // DENSITY TIER: tier-0 polygons (envelopes) always show; higher tiers fade in as the
+        // energy gate q11 rises -> the lattice densifies on loud/structural passages.
+        var tier = poly.tier || 0;
+        var vis = tier === 0 ? 1 : sm01(((a.q11 === undefined ? 1 : a.q11) - (tier * 0.4 - 0.15)) / 0.30);
+        var k = eye * vis;
+        a.r *= k; a.g *= k; a.b *= k;
+        a.a = (local < seam || local > 1.0 - seam) ? 0 : vis;  // blank seams -> no bridge chord
         return a;
       }
     };
@@ -444,19 +455,21 @@
   // EVEN-N polygons sit rotate:0 so their angle-0/π vertices pile up at the L/R extremes
   // (0.5 ± radius·aspectX, 0.5) → the bright "eye" nodes emerge there. ODD-N star-polygons keep
   // small rotate offsets for spirograph variety (they have no clean L/R vertex pair anyway).
+  // tier: 0 = always on (outer envelopes + one anchor star), 1 = fades in at moderate energy,
+  // 2 = only on loud/structural passages -> the lattice densifies with the music (N-jump feel).
   var ALC_MANDALA_SPECS = [
-    { sides: 10, skip: 1, radius: 0.34, dir:  1.0, rotate: 0.00, hueOff: 0.00 }, // decagon — outer envelope
-    { sides: 8,  skip: 1, radius: 0.32, dir: -0.8, rotate: 0.00, hueOff: 0.12 }, // octagon — envelope
-    { sides: 12, skip: 5, radius: 0.34, dir:  1.2, rotate: 0.00, hueOff: 0.24 }, // {12/5} — dense crossing star
-    { sides: 7,  skip: 3, radius: 0.33, dir: -0.6, rotate: 0.30, hueOff: 0.40 }, // {7/3} — heptagram
-    { sides: 9,  skip: 4, radius: 0.34, dir:  0.9, rotate: 0.17, hueOff: 0.55 }, // {9/4} — near-diameter chords
-    { sides: 5,  skip: 2, radius: 0.32, dir: -1.1, rotate: 0.15, hueOff: 0.70 }, // {5/2} — pentagram
-    { sides: 8,  skip: 3, radius: 0.33, dir:  0.7, rotate: 0.00, hueOff: 0.05 }, // {8/3} — octagram
-    { sides: 9,  skip: 2, radius: 0.34, dir: -1.0, rotate: 0.12, hueOff: 0.46 }, // {9/2} — enneagram
-    { sides: 10, skip: 3, radius: 0.33, dir:  1.1, rotate: 0.00, hueOff: 0.62 }, // {10/3} — decagram
-    { sides: 6,  skip: 1, radius: 0.35, dir: -0.5, rotate: 0.00, hueOff: 0.30 }, // hexagon — envelope
-    { sides: 16, skip: 7, radius: 0.32, dir:  0.8, rotate: 0.00, hueOff: 0.78 }, // {16/7} — dense rim star
-    { sides: 12, skip: 5, radius: 0.35, dir: -0.9, rotate: 0.00, hueOff: 0.18 }  // {12/5} — rotated overlay
+    { sides: 10, skip: 1, radius: 0.34, dir:  1.0, rotate: 0.00, hueOff: 0.00, tier: 0 }, // decagon — outer envelope
+    { sides: 8,  skip: 1, radius: 0.32, dir: -0.8, rotate: 0.00, hueOff: 0.12, tier: 0 }, // octagon — envelope
+    { sides: 12, skip: 5, radius: 0.34, dir:  1.2, rotate: 0.00, hueOff: 0.24, tier: 0 }, // {12/5} — anchor crossing star
+    { sides: 7,  skip: 3, radius: 0.33, dir: -0.6, rotate: 0.30, hueOff: 0.40, tier: 1 }, // {7/3} — heptagram
+    { sides: 9,  skip: 4, radius: 0.34, dir:  0.9, rotate: 0.17, hueOff: 0.55, tier: 1 }, // {9/4} — near-diameter chords
+    { sides: 5,  skip: 2, radius: 0.32, dir: -1.1, rotate: 0.15, hueOff: 0.70, tier: 1 }, // {5/2} — pentagram
+    { sides: 8,  skip: 3, radius: 0.33, dir:  0.7, rotate: 0.00, hueOff: 0.05, tier: 1 }, // {8/3} — octagram
+    { sides: 9,  skip: 2, radius: 0.34, dir: -1.0, rotate: 0.12, hueOff: 0.46, tier: 2 }, // {9/2} — enneagram
+    { sides: 10, skip: 3, radius: 0.33, dir:  1.1, rotate: 0.00, hueOff: 0.62, tier: 2 }, // {10/3} — decagram
+    { sides: 6,  skip: 1, radius: 0.35, dir: -0.5, rotate: 0.00, hueOff: 0.30, tier: 0 }, // hexagon — envelope
+    { sides: 16, skip: 7, radius: 0.32, dir:  0.8, rotate: 0.00, hueOff: 0.78, tier: 2 }, // {16/7} — dense rim star
+    { sides: 12, skip: 5, radius: 0.35, dir: -0.9, rotate: 0.00, hueOff: 0.18, tier: 2 }  // {12/5} — rotated overlay
   ];
   function alcNgonStack(aspectX, specs, perWave) {
     specs = specs || ALC_MANDALA_SPECS;
@@ -484,7 +497,7 @@
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-        smoothing: 0.03, a: 1.0, thick: 1                 // BOLDER than the thin net chords so it reads as a separate element
+        smoothing: 0.03, a: 1.0, thick: 0                 // thin ~1px (reference); brightness (q10) makes it read, esp. when the net collapses
       }),
       init_eqs: passthrough, frame_eqs: passthrough,
       point_eqs: function (a) {
@@ -496,6 +509,33 @@
         a.r = r * la; a.g = g * la; a.b = b * la; a.a = la;
         return a;
       }
+    };
+  }
+
+  // DRIVER — shared per-frame audio-routing for the Mandala (the scene's "behavior" layer, like
+  // alcNetFrame). Tracks a smoothed energy envelope and emits the q-vars the motifs read:
+  //   q2,q3 center | q5 breathing scale (COLLAPSES toward ~0 on quiet bars -> the dropout, leaving
+  //   only the diagonal) | q6 edge jaggedness | q8 hue drift | q9 spin | q10 diagonal opacity
+  //   (bright when the net collapses) | q11 density gate (rises with energy -> higher polygon tiers
+  //   fade in, the N-jump densification).
+  function alcMandalaFrame() {
+    var lastT = 0, egyS = 1.0, q11s = 0.4;
+    return function (t) {
+      var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+      var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+      var egy = 0.6 * bass + 0.4 * mid;                  // overall energy (~0 silent, ~1 baseline, ~1.6 loud)
+      egyS += (egy - egyS) * 0.15;                       // smooth so the collapse/bloom isn't jittery
+      var lvl = Math.max(0, Math.min((egyS - 0.5) / 1.0, 1));   // 0..1 -> breathing scale
+      var q11 = Math.max(0, Math.min((egyS - 0.6) / 0.9, 1));   // 0..1 -> density gate
+      q11s += (q11 - q11s) * 0.08;
+      t.q2 = 0.5; t.q3 = 0.5;
+      t.q5 = 0.06 + 0.62 * lvl;                          // COLLAPSE to ~0.06 when quiet, bloom to ~0.68 loud
+      t.q6 = 0.02 + 0.04 * Math.min(treb, 1.2);          // jagged edge displacement (live waveform)
+      t.q8 = (tm * 0.04) % 1;                            // slow hue drift
+      t.q9 = tm * 0.5;                                   // slow base spin (rad); per-layer dir scales/flips
+      t.q10 = 0.5 + 0.5 * (1 - q11s);                    // diagonal opacity: full when net collapsed, half when dense
+      t.q11 = q11s;                                      // density tier gate
+      return t;
     };
   }
 
@@ -2627,21 +2667,7 @@
   P["Alchemy v2: Mandala"] = (function () {
     var preset = build(
       { wave_a: 0, gammaadj: 1.3, decay: 0.30, zoom: 1.0, cx: 0.5, cy: 0.5, dx: 0.0, dy: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 },
-      {
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1, treb = t.treb_att || t.treb || 1;
-          var bn = Math.max(0, Math.min(bass - 1, 1));
-          t.q2 = 0.5; t.q3 = 0.5;
-          t.q5 = 0.45 + 0.28 * bn;                        // breathing: ~55-85% width, blooms on bass but stays INSIDE the frame
-          t.q6 = 0.02 + 0.04 * Math.min(treb, 1.2);       // JAGGED edge displacement (live waveform) — chords read as zigzag oscilloscope lines, not straight
-          t.q8 = (t.time * 0.04) % 1;                     // slow hue drift over the scene
-          t.q9 = t.time * 0.5;                            // slow base spin (rad); per-layer dir scales/flips it
-          t.q10 = 0.7 + 0.3 * (1 - bn);                   // diagonal-line opacity INVERSE to net density (bright, dips a little when dense)
-          return t;
-        },
-        warp: ALC_CLEAR_WARP,
-        comp: ALC_FLATBLUE_COMP
-      }
+      { frame: alcMandalaFrame(), warp: ALC_CLEAR_WARP, comp: ALC_FLATBLUE_COMP }
     );
     // Diagonal at index 0 (drawn FIRST) so it can't be the silently-dropped last wave; mandala follows.
     // corner-to-corner so its ends stick out BEYOND the net (reads as a separate slash, not a net chord).
