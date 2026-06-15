@@ -539,6 +539,44 @@
     };
   }
 
+  // KIT — RIBBON warp: each frame, the previous buffer is sampled from a position slightly
+  // AHEAD along the ribbon axis (uv + axis*push), so content appears to drift DOWN-LEFT (the
+  // reference's "dx/dy push along the ribbon axis"). The waveform line drawn each frame
+  // accumulates into a long diagonal streak as older copies pile up drifting away.
+  //   angle — ribbon axis direction (rad). push — per-frame offset (0.002..0.005).
+  function alcRibbonWarp(angle, push) {
+    push = push || 0.003;
+    var rc = Math.cos(angle).toFixed(5), rs = Math.sin(angle).toFixed(5);
+    return "shader_body {\n" +
+      "vec2 puv = uv + vec2(" + rc + ", " + rs + ") * " + push.toFixed(5) + ";\n" +
+      "ret = texture2D(sampler_main, puv).rgb * 0.955;\n" +  // 0.955 multiplier = ~0.3s half-life @60fps
+      "}\n";
+  }
+
+  // KIT — RIBBON comp: dark near-black background + iridescent rainbow tint along the ribbon
+  // axis (matching the reference's cyan→green→magenta→gold gradient) + bloom + Reinhard.
+  // `angle` must match the warp angle so the tint aligns with the streak direction.
+  function alcRibbonComp(angle) {
+    var rc = Math.cos(angle).toFixed(5), rs = Math.sin(angle).toFixed(5);
+    // Magenta/green duotone palette: offsets (0, 0.42, -0.08) make t=0→MAGENTA, t=0.5→GREEN.
+    // Standard (0,0.33,0.67) has no magenta at all — R and B peaks are never simultaneous.
+    return "vec3 rib_pal(float t){\n" +
+      "return vec3(0.55)+vec3(0.45)*cos(6.2832*(t+vec3(0.0,0.42,-0.08)));\n" +
+      "}\n" +
+      "shader_body {\n" +
+      "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+      "float ribX = d.x * " + rc + " + d.y * " + rs + ";\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1,uv).rgb+texture2D(sampler_blur2,uv).rgb)*0.5;\n" +
+      "vec3 rib_tint = rib_pal(ribX * 1.2 + time * 0.05);\n" +    // 1.2 = ~1.5 colors across ribbon; slow drift
+      "float rib_lum = dot(g, vec3(0.33));\n" +
+      "vec3 rib_col = mix(vec3(rib_lum), rib_tint, 0.70) * max(rib_lum, 0.0);\n" +
+      "vec3 bg = vec3(0.02, 0.01, 0.03);\n" +
+      "vec3 outc = bg + rib_col * 1.4 + g * 0.5 + bloom * 0.35;\n" +
+      "ret = outc / (outc + vec3(0.85));\n" +
+      "}\n";
+  }
+
   // MOTIF — one waveform RAY: a straight line of the live waveform through the head
   // (q2,q3) at angle `rayOffset`, self-rotating by q9 (the "waveform lines rotating
   // around the center axis"). Half-length q5, perpendicular displacement q6.
@@ -2951,6 +2989,41 @@
       a.b = (0.52 * mix + 0.74 * (1 - mix)) * 0.85;
     };
     preset.waves[0] = alcSpindle(PAL_ROSE);
+    return preset;
+  })();
+
+  // ── Alchemy v2: Ribbon ───────────────────────────────────────────────────────
+  // The 3D iridescent rainbow ribbon plane (ref 1:55–2:11, sections F4 + G1-G2). Implementation:
+  // a bold diagonal waveform line (alcDiagonalLine) with heavy perpendicular waveform amplitude;
+  // a directional warp that smears each frame ALONG the ribbon axis (lower-left drift) building
+  // up the long diagonal rainbow streaks; a comp shader that tints the accumulation with an
+  // iridescent rainbow along the axis. The "band width" is the waveform displacement; the
+  // "streak length" is the feedback persistence. Near-black backdrop.
+  //
+  // Kit functions: alcRibbonWarp(angle, push) + alcRibbonComp(angle) — both reusable for any
+  // diagonal band scene (e.g. the moiré "X" of two crossing ribbons in section_F3).
+  P["Alchemy v2: Ribbon"] = (function () {
+    var lastT = 0;
+    var ANGLE = 0.65;                                             // ~37° — lower-left→upper-right (matches ref G2)
+    var preset = build(
+      { wave_a: 0, gammaadj: 1.5, decay: 0.96, zoom: 0.999,
+        cx: 0.5, cy: 0.5, dx: 0.0, dy: 0.0, rot: 0.0, warp: 0.0,
+        wrap: 0, darken_center: 0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          t.q10 = 1.0;                                           // diagonal line: full opacity always
+          t.q6_wave = 0.14 + 0.10 * Math.min(treb, 1.5);        // perpendicular waveform amplitude (ribbon width)
+          return t;
+        },
+        warp: alcRibbonWarp(ANGLE, 0.0015),   // slower drift -> band stays centered longer
+        comp: alcRibbonComp(ANGLE)
+      }
+    );
+    // Bold gold-white waveform line — the raw element that accumulates into the ribbon.
+    // thick:1 + heavy amp so each fresh frame draws a visible wide band; the warp does the rest.
+    preset.waves[0] = alcDiagonalLine(ANGLE, 0.82, 0.18, 1.0, 0.90, 0.65);
     return preset;
   })();
 
