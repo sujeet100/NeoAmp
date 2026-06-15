@@ -3027,6 +3027,112 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Moiré ────────────────────────────────────────────────────────
+  // Scene F3 (ref 1:48–2:00): vertical green/black panning moiré stripes + quad mirror + central
+  // horizontal oscilloscope band + diagonal X waveform lines + CENTRAL DIAMOND ANCHOR (the N=4
+  // alcNgon pulsing at center, the user's requested element). Reference frames: /tmp/moire_frames/.
+  //
+  // Architecture: comp shader draws the moiré FRESH every frame (it's not feedback-accumulated);
+  // warp just fades wave trails quickly (0.85 per frame). Four waves: diamond (idx 0 — FIRST per
+  // last-wave-drop rule), oscilloscope, X line 1, X line 2.
+  P["Alchemy v2: Moiré"] = (function () {
+    var lastT = 0, spin = 0;
+
+    // COMP: vertical panning moiré stripes, quad-mirrored, hue-cycling green/olive/magenta.
+    // `abs(mp.x - 0.5) + 0.5` folds both halves onto [0.5,1.0] → L/R mirror.
+    // `abs(mp.y - 0.5) + 0.5` → T/B mirror. Bars drawn fresh each frame — no feedback needed.
+    var MOIRE_COMP =
+      "vec3 pal_m(float t){\n" +
+      "return vec3(0.5)+vec3(0.5)*cos(6.2832*(t+vec3(0.0,0.33,0.67)));}\n" +
+      "shader_body {\n" +
+      // Bars: L/R mirror via abs(uv.x-0.5)+0.5
+      "float mBarX = abs(uv.x - 0.5) + 0.5;\n" +
+      "float moirePan = time * 0.15 + bass * 0.4;\n" +
+      "float moirePitch = 20.0 + 5.0 * sin(time * 0.2);\n" +
+      "float mBars = 0.5 + 0.5 * cos((mBarX * moirePitch + moirePan) * 6.2832);\n" +
+      "mBars = pow(mBars, 2.5);\n" +
+      "vec3 barHue = pal_m(time * 0.05 + 0.67);\n" +   // +0.67 = green start (cos peak at g offset 0.33)
+      "vec3 barCol = mix(vec3(0.01,0.03,0.01), barHue * (0.38 + 0.20 * bass), mBars);\n" +
+      // QUAD-MIRROR the WAVES too: sample from the mirrored UV so the oscilloscope band and
+      // diamond are reflected L/R + T/B. The T/B mirror of the oscilloscope creates the
+      // butterfly/diamond shape at center (positive wiggles appear both above AND below center).
+      "vec2 muv = vec2(abs(uv.x - 0.5) + 0.5, abs(uv.y - 0.5) + 0.5);\n" +
+      "vec3 g = texture2D(sampler_main, muv).rgb;\n" +   // mirrored wave content
+      "vec3 bloom = (texture2D(sampler_blur1,muv).rgb+texture2D(sampler_blur2,muv).rgb)*0.5;\n" +
+      "vec3 outc = barCol + g * 1.8 + bloom * 0.28;\n" +
+      "ret = outc / (outc + vec3(0.90));\n" +
+      "}\n";
+
+    // WARP: QUAD-MIRROR fold + fade. This is the core of the kaleidoscope effect:
+    // each frame the previous buffer is folded L/R + T/B and faded. The fresh waves (oscilloscope,
+    // diamond) are drawn on top. Over a few frames the mirrored copies accumulate into the full
+    // kaleidoscopic symmetric pattern. This is how MilkDrop kaleidoscopes work.
+    var MOIRE_WARP =
+      "shader_body {\n" +
+      "vec2 wuv = vec2(abs(uv.x - 0.5) + 0.5, abs(uv.y - 0.5) + 0.5);\n" +
+      "ret = texture2D(sampler_main, wuv).rgb * 0.88;\n" +
+      "}\n";
+
+    var preset = build(
+      { wave_a: 0, gammaadj: 1.3, decay: 0.88, zoom: 1.0, cx: 0.5, cy: 0.5,
+        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          spin = (spin + dt * (0.5 + 1.5 * bn)) % 6.2832;
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.10 + 0.10 * bn;                   // diamond radius — small, pulses on bass
+          t.q6 = 0.02 + 0.04 * Math.min(treb, 1.2);  // waveform jaggedness (diamond edges + X lines)
+          t.q8 = (tm * 0.10) % 1;                    // slow hue cycling
+          t.q9 = spin;                               // diamond slow spin
+          t.q10 = 1.0;                               // diagonal lines: full opacity
+          t.q12 = Math.sin(tm * 0.35);               // oscilloscope hue phase (-1..1): magenta→red→green
+          return t;
+        },
+        warp: MOIRE_WARP,
+        comp: MOIRE_COMP
+      }
+    );
+
+    // Wave 0 — DIAMOND ANCHOR (alcNgon N=4, centered, small, bass-pulsing). NON-additive so the
+    // small spinning shape stays a crisp wireframe (additive would pile into a white glow blob).
+    var diamond = alcNgon({ sides: 4, skip: 1, radius: 0.15, aspectX: 1.2, dir: 1, hueOff: 0.0 });
+    diamond.baseVals.additive = 0;
+    preset.waves[0] = diamond;
+
+    // Wave 1 — horizontal OSCILLOSCOPE BAND: full-width, y = 0.5 + value1*amp. Color cycles
+    // magenta (q12=1) → red (q12=0) → green (q12=-1) matching the reference band color sequence.
+    preset.waves[1] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.05, a: 0.9, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var amp = 0.30 + 0.15 * Math.abs(a.value1 || 0);  // 0.30-0.45 screen height — large butterfly after T/B mirror
+        a.x = a.sample;                               // 0..1 full width
+        a.y = 0.5 + (a.value1 || 0) * amp;
+        var ph = (a.q12 !== undefined ? a.q12 : 0);   // -1..1 hue phase
+        a.r = ph > 0 ? 0.80 : 0.80 * (1 + ph);       // magenta→red: r stays high; red→green: r drops
+        a.g = ph < 0 ? 0.65 * (-ph) : 0.05;          // green phase only
+        a.b = ph > 0 ? 0.60 * ph : 0.04;             // magenta phase only
+        var ll = (a.r + a.g + a.b) / 3, sat = 0.75;
+        a.r = (a.r * sat + ll * (1 - sat)) * 1.1;
+        a.g = (a.g * sat + ll * (1 - sat)) * 1.1;
+        a.b = (a.b * sat + ll * (1 - sat)) * 1.1;
+        return a;
+      }
+    };
+
+    // NOTE: no explicit diagonal X waves. The "X feel" comes from the quad-mirrored moiré
+    // bars converging at the mirror fold lines — confirmed from the reference frames (1:49-1:52).
+    // The explicit diagonal waveform lines only appear prominently LATER in the scene (~1:54+).
+
+    return preset;
+  })();
+
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
   //   • Exactly TWO jagged WHITE lightning lines crossing through dead center

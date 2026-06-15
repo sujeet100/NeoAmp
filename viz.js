@@ -77,6 +77,7 @@
     { label: "Alchemy v2: Anemone (Mandala)", wmp: "Alchemy v2: Anemone (Mandala)" },
     { label: "Alchemy v2: Spindle", wmp: "Alchemy v2: Spindle" },
     { label: "Alchemy v2: Ribbon", wmp: "Alchemy v2: Ribbon" },
+    { label: "Alchemy v2: Moiré", wmp: "Alchemy v2: Moiré" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
     { label: "Ambience Water", wmp: "Ambience Water" },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },
@@ -254,7 +255,7 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Ribbon";
+    var DEFAULT_PRESET = "Alchemy v2: Moiré";
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });
