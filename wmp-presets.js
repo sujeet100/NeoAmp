@@ -468,6 +468,37 @@
     return waves;
   }
 
+  // MOTIF — the persistent DIAGONAL waveform line: a real oscilloscope line locked at a fixed
+  // angle, displaced perpendicular by the live waveform (the jagged "lightning" slice that
+  // recurs in the mandala (section_E) and the moiré "X" (section_F)). Its OWN motif so scenes
+  // compose it (one for the mandala, a crossing pair for the moiré). Opacity reads q10 so a
+  // scene can fade it INVERSELY to the mandala density — bright when the net collapses, subtle
+  // when the net is dense (per the reference: something always carries the rhythm).
+  //   angleRad — line tilt (e.g. 0.30 ≈ 17° off horizontal, bottom-left→top-right)
+  //   halfLen  — half length along the line (0.6 spans most of the frame)
+  //   amp      — perpendicular waveform displacement (jaggedness)
+  //   [r,g,b]  — base color (default pink-white)
+  function alcDiagonalLine(angleRad, halfLen, amp, r, g, b) {
+    var ct = Math.cos(angleRad), st = Math.sin(angleRad);
+    r = r === undefined ? 1.0 : r; g = g === undefined ? 0.72 : g; b = b === undefined ? 0.88 : b;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.03, a: 1.0, thick: 1                 // BOLDER than the thin net chords so it reads as a separate element
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var s = a.sample * 2.0 - 1.0;                     // -1..1 along the line
+        var disp = (a.value1 || 0) * amp;                 // perpendicular waveform -> jagged slice
+        a.x = 0.5 + s * halfLen * ct - disp * st;
+        a.y = 0.5 + s * halfLen * st + disp * ct;
+        var la = (a.q10 === undefined ? 1.0 : a.q10);     // opacity (scene drives inverse to net density)
+        a.r = r * la; a.g = g * la; a.b = b * la; a.a = la;
+        return a;
+      }
+    };
+  }
+
   // MOTIF — one waveform RAY: a straight line of the live waveform through the head
   // (q2,q3) at angle `rayOffset`, self-rotating by q9 (the "waveform lines rotating
   // around the center axis"). Half-length q5, perpendicular displacement q6.
@@ -2605,14 +2636,18 @@
           t.q6 = 0.02 + 0.04 * Math.min(treb, 1.2);       // JAGGED edge displacement (live waveform) — chords read as zigzag oscilloscope lines, not straight
           t.q8 = (t.time * 0.04) % 1;                     // slow hue drift over the scene
           t.q9 = t.time * 0.5;                            // slow base spin (rad); per-layer dir scales/flips it
+          t.q10 = 0.7 + 0.3 * (1 - bn);                   // diagonal-line opacity INVERSE to net density (bright, dips a little when dense)
           return t;
         },
         warp: ALC_CLEAR_WARP,
         comp: ALC_FLATBLUE_COMP
       }
     );
-    var stack = alcNgonStack(1.7);                        // 6 nested counter-rotating polygons (at the wave cap)
-    for (var i = 0; i < stack.length; i++) preset.waves[i] = stack[i];
+    // Diagonal at index 0 (drawn FIRST) so it can't be the silently-dropped last wave; mandala follows.
+    // corner-to-corner so its ends stick out BEYOND the net (reads as a separate slash, not a net chord).
+    preset.waves[0] = alcDiagonalLine(0.62, 0.85, 0.10, 1.0, 0.85, 0.95);  // persistent BOLD jagged pink-white diagonal
+    var stack = alcNgonStack(1.7, ALC_MANDALA_SPECS, 3);  // 12 polygons packed 3/wave -> 4 waves
+    for (var i = 0; i < stack.length; i++) preset.waves[i + 1] = stack[i];  // mandala at indices 1..4 (5 waves total)
     return preset;
   })();
 
