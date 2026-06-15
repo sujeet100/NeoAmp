@@ -213,6 +213,24 @@
     "ret = outc / (outc + vec3(0.85));\n" +
     "}\n";
 
+  // MANDALA backdrop: flat muted-blue + the crisp wireframe additively on top + soft bloom,
+  // tone-mapped so it stays muted (the 2D star-polygon mandala scene, ref 1:14–1:28).
+  var ALC_FLATBLUE_COMP =
+    "shader_body {\n" +
+    "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+    "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+    "vec3 bg = vec3(0.10, 0.22, 0.38);\n" +              // flat muted blue (the mandala backdrop)
+    "vec3 outc = bg + g + bloom * 0.15;\n" +
+    "ret = outc / (outc + vec3(0.85));\n" +              // Reinhard -> muted, no white-out
+    "}\n";
+
+  // CRISP feedback: clear the buffer every frame. In THIS build the `decay` base-val has NO
+  // effect — feedback is the WARP shader, and the default (`ret -= 0.004`) keeps the trail
+  // nearly forever (the receding-diamond field). Returning black = motifs are redrawn fresh
+  // each frame; glow still comes from the comp bloom. (learning #1: feedback is for glow, NOT
+  // structure — the mandala lattice must be drawn explicitly.)
+  var ALC_CLEAR_WARP = "shader_body {\nret = vec3(0.0);\n}\n";
+
   // CAMERA: the feedback baseVals for a named viewpoint. Spread into build()'s
   // overrides. The camera is literally "where does the previous frame shrink toward":
   //   top  = toward center  -> face-on spinning mandala (the trace stays centered)
@@ -326,6 +344,125 @@
     var arr = [];
     for (var i = 0; i < tris; i++) arr.push(alcTriangle(i * 2.0944 / tris, hueOff + i * 0.40));  // distinct hue per triangle -> multi-color net
     return arr;
+  }
+
+  // MOTIF — N-gon: ONE configurable closed polygon drawn as a waveform wave. Generalizes
+  // alcTriangle (which is a hardcoded 3-gon). Builds the nested star-polygon MANDALA (ref
+  // 1:14–1:28) by stacking instances with different `sides` + counter-rotation. See
+  // docs/alchemy-v2/ngon-spec.md.
+  //   opts.sides       N (3..16). 3=triangle, 4=diamond, 8=octagon.
+  //   opts.radius      instance base radius fraction (multiplied by the global breathing scale q5).
+  //   opts.innerRatio  inner/outer radius ratio. >=1 (default) => regular polygon (N verts);
+  //                    <1 => N-POINT STAR (2N verts alternating outer/inner; ~0.6 is spiky).
+  //   opts.aspectX     horizontal stretch of the bounding box (1=circular, ~1.7=ref ellipse).
+  //                    The stretch is what makes the two bright "eye" nodes EMERGE at the L/R
+  //                    extremities (low-slope chords pile up additively) — they are not drawn.
+  //   opts.rotate      static phase offset (rad).
+  //   opts.dir         counter-rotation direction (+1/-1); spin = q9*dir + rotate.
+  //   opts.hueOff      hue offset added to the cycling q8.
+  // Driven by shared q-vars: q2,q3 center | q5 global breathing scale | q6 edge jaggedness
+  // (live waveform) | q8 hue phase | q9 spin base.
+  // Shared vertex math: place point `a` on STAR-POLYGON {N/skip} `poly` at parameter `local`
+  // (0..1 around the closed polyline), stretched by `aspectX`, jittered perpendicular by the
+  // live waveform. The polyline connects every `skip`-th of N vertices on a circle — skip=1 is a
+  // convex polygon (the outer envelope), skip>=2 makes long chords that span ACROSS the interior
+  // and cross through the center (the spirograph knot + the central density of the reference
+  // mandala). Pick skip coprime to N for one continuous path. Reads q2,q3 (center), q5 (breathing
+  // scale), q6 (jitter amp), q9 (spin base). Used by alcNgon and alcNgonPacked.
+  function ngonPoint(a, poly, local, aspectX) {
+    var N = poly.sides || 4;
+    var skip = poly.skip || 1;
+    var scale = (a.q5 !== undefined ? a.q5 : 1.0);
+    var amp = (a.q6 || 0.0);
+    var spin = (a.q9 || 0) * (poly.dir === undefined ? 1 : poly.dir) + (poly.rotate || 0);
+    var R = (poly.radius === undefined ? 0.30 : poly.radius) * scale;
+    var s = local * N;                                    // 0..N across the N chords of the {N/skip} path
+    var e = Math.floor(s), f = s - e;
+    var i0 = (e * skip) % N, i1 = ((e + 1) * skip) % N;   // connect every skip-th vertex
+    var ang0 = spin + i0 / N * 6.2832, ang1 = spin + i1 / N * 6.2832;
+    var x0 = Math.cos(ang0) * R, y0 = Math.sin(ang0) * R;
+    var x1 = Math.cos(ang1) * R, y1 = Math.sin(ang1) * R;
+    var vx = x0 + (x1 - x0) * f, vy = y0 + (y1 - y0) * f;
+    var ex = x1 - x0, ey = y1 - y0, el = Math.hypot(ex, ey) || 1;
+    var nx = -ey / el, ny = ex / el;                      // perpendicular -> jagged waveform edges
+    var disp = (a.value1 || 0) * amp;
+    var cx = (a.q2 !== undefined ? a.q2 : 0.5), cy = (a.q3 !== undefined ? a.q3 : 0.5);
+    a.x = cx + (vx + nx * disp) * aspectX;                // aspectX stretches X only -> ellipse
+    a.y = cy + (vy + ny * disp);
+  }
+
+  function alcNgon(opts) {
+    opts = opts || {};
+    var aspectX = opts.aspectX === undefined ? 1.0 : opts.aspectX;
+    var hueOff = opts.hueOff || 0;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.1, a: 1.0, thick: 0                  // thin ~1px crisp wireframe (mandala look)
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        ngonPoint(a, opts, a.sample, aspectX);
+        alcSetColor(a, (a.q8 || 0) + hueOff, 0, 1.3);
+        return a;
+      }
+    };
+  }
+
+  // ONE wave that packs K polygons by slicing a.sample into K segments (the same trick
+  // alcTriangle uses to pack 3 edges into one wave). Lets the mandala have 10–12 polygons
+  // while staying within the ~6-wave cap (memory butterchurn-custom-wave-cap). The straight
+  // connector chord between packed polygons (and each polygon's closing edge) is BLANKED by
+  // setting a.a = 0 for the ~2 samples at each segment boundary, so no stray bridge is drawn.
+  function alcNgonPacked(polys, aspectX) {
+    var K = polys.length;
+    var seam = 2.0 * K / 512;                             // ~2 samples (in per-polygon local units)
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.1, a: 1.0, thick: 0
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var gi = a.sample * K;
+        var pi = Math.floor(gi); if (pi >= K) pi = K - 1;
+        var local = gi - pi;
+        var poly = polys[pi];
+        ngonPoint(a, poly, local, aspectX);
+        alcSetColor(a, (a.q8 || 0) + (poly.hueOff || 0), 0, 1.3);
+        a.a = (local < seam || local > 1.0 - seam) ? 0 : 1;  // blank seams -> no bridge chord
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — the nested star-polygon MANDALA: a stack of N-gons with different `sides`, radii and
+  // counter-rotation, sharing one horizontal-ellipse envelope (aspectX). The overlapping
+  // low-slope chords at the L/R extremities pile up additively into the two bright "eye" nodes
+  // (emergent, not drawn). `dir` is a signed SPEED multiplier so layers counter-rotate at
+  // slightly different rates (the spirograph breathing). 12 polygons packed `perWave` to a wave.
+  var ALC_MANDALA_SPECS = [
+    { sides: 10, skip: 1, radius: 0.34, dir:  1.0, rotate: 0.00, hueOff: 0.00 }, // decagon — outer envelope
+    { sides: 8,  skip: 1, radius: 0.32, dir: -0.8, rotate: 0.20, hueOff: 0.12 }, // octagon — envelope
+    { sides: 12, skip: 5, radius: 0.34, dir:  1.2, rotate: 0.10, hueOff: 0.24 }, // {12/5} — dense crossing star
+    { sides: 7,  skip: 3, radius: 0.33, dir: -0.6, rotate: 0.30, hueOff: 0.40 }, // {7/3} — heptagram
+    { sides: 9,  skip: 4, radius: 0.34, dir:  0.9, rotate: 0.00, hueOff: 0.55 }, // {9/4} — near-diameter chords
+    { sides: 5,  skip: 2, radius: 0.32, dir: -1.1, rotate: 0.15, hueOff: 0.70 }, // {5/2} — pentagram
+    { sides: 8,  skip: 3, radius: 0.33, dir:  0.7, rotate: 0.25, hueOff: 0.05 }, // {8/3} — octagram
+    { sides: 9,  skip: 2, radius: 0.34, dir: -1.0, rotate: 0.12, hueOff: 0.46 }, // {9/2} — enneagram
+    { sides: 10, skip: 3, radius: 0.33, dir:  1.1, rotate: 0.08, hueOff: 0.62 }, // {10/3} — decagram
+    { sides: 6,  skip: 1, radius: 0.35, dir: -0.5, rotate: 0.18, hueOff: 0.30 }, // hexagon — envelope
+    { sides: 16, skip: 7, radius: 0.32, dir:  0.8, rotate: 0.00, hueOff: 0.78 }, // {16/7} — dense rim star
+    { sides: 12, skip: 5, radius: 0.35, dir: -0.9, rotate: 0.40, hueOff: 0.18 }  // {12/5} — rotated overlay
+  ];
+  function alcNgonStack(aspectX, specs, perWave) {
+    specs = specs || ALC_MANDALA_SPECS;
+    perWave = perWave || 2;                               // 12 specs / 2 = 6 packed waves (at the cap)
+    var waves = [];
+    for (var i = 0; i < specs.length; i += perWave) {
+      waves.push(alcNgonPacked(specs.slice(i, i + perWave), aspectX));
+    }
+    return waves;
   }
 
   // MOTIF — one waveform RAY: a straight line of the live waveform through the head
@@ -2410,6 +2547,69 @@
     preset.waves[3] = rays[3];
     preset.waves[4] = rays[4];
     preset.waves[5] = alcOrbWhite(0.0);                  // orb core, white ring (6 waves total — at the cap)
+    return preset;
+  })();
+
+  // ── Alchemy v2: N-gon Proof ──────────────────────────────────────────────────
+  // STEP 1–2 of the N-gon build (docs/alchemy-v2/ngon-spec.md): prove ONE configurable
+  // polygon on screen before scaling to the nested mandala. A single diamond (N=4), stretched
+  // horizontally (aspectX 1.7 -> the reference ellipse), slowly spinning, BREATHING with bass
+  // (collapses small when quiet, blooms wide when loud), jagged edges from the live waveform,
+  // over a FLAT-BLUE background (the muted Alchemy mandala bg) with crisp short-decay feedback.
+  P["Alchemy v2: N-gon Proof"] = (function () {
+    var preset = build(
+      // NEAR-ZERO feedback: draw the polygon CRISP every frame (glow comes from the comp bloom,
+      // NOT from feedback). A rotating shape under any real decay smears its echoes into a
+      // receding-diamond tunnel (the "feedback = structure" trap, learning #1) — so decay is tiny
+      // and zoom is exactly 1.0 (no tunnel) and the center isn't darkened.
+      { wave_a: 0, gammaadj: 1.3, decay: 0.30, zoom: 1.0, cx: 0.5, cy: 0.5, dx: 0.0, dy: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, treb = t.treb_att || t.treb || 1;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.3 + 0.7 * bn;                          // breathing: collapse when quiet, bloom on bass
+          t.q6 = 0.02 + 0.035 * Math.min(treb, 2.0);      // edge jaggedness (live waveform) — light, so the 4 edges read
+          t.q8 = (t.time * 0.05) % 1;                     // slow hue drift
+          t.q9 = t.time * 0.9;                            // slow self-rotation (rad)
+          return t;
+        },
+        warp: ALC_CLEAR_WARP,
+        comp: ALC_FLATBLUE_COMP
+      }
+    );
+    preset.waves[0] = alcNgon({ sides: 4, radius: 0.28, aspectX: 1.7, dir: 1, hueOff: 0.0 });
+    return preset;
+  })();
+
+  // ── Alchemy v2: Mandala ──────────────────────────────────────────────────────
+  // STEP 4 of the N-gon build: the nested star-polygon mandala (ref 1:14–1:28). A STACK of 6
+  // counter-rotating N-gons (diamond/hexagon/octagon + 5- & 8-point stars + 12-gon) sharing a
+  // horizontal-ellipse envelope (aspectX 1.7) over flat blue, drawn crisp each frame. BREATHES
+  // with bass (collapses toward nothing on quiet bars, blooms wide on loud) and the edges are
+  // jagged by the live waveform. The two bright "eye" nodes at L/R emerge from the stretch.
+  // (Step 5 will add the persistent diagonal waveform line — dropping to 5 polygons to stay
+  // within the ~6-wave cap.)
+  P["Alchemy v2: Mandala"] = (function () {
+    var preset = build(
+      { wave_a: 0, gammaadj: 1.3, decay: 0.30, zoom: 1.0, cx: 0.5, cy: 0.5, dx: 0.0, dy: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, treb = t.treb_att || t.treb || 1;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.6 + 0.5 * bn;                          // breathing: stays LARGE (fills ~70% width), blooms wider on bass
+          t.q6 = 0.006 + 0.012 * Math.min(treb, 1.5);     // FINE edge jitter (live waveform) — small vs the chords, never shreds the polygons
+          t.q8 = (t.time * 0.04) % 1;                     // slow hue drift over the scene
+          t.q9 = t.time * 0.5;                            // slow base spin (rad); per-layer dir scales/flips it
+          return t;
+        },
+        warp: ALC_CLEAR_WARP,
+        comp: ALC_FLATBLUE_COMP
+      }
+    );
+    var stack = alcNgonStack(1.7);                        // 6 nested counter-rotating polygons (at the wave cap)
+    for (var i = 0; i < stack.length; i++) preset.waves[i] = stack[i];
     return preset;
   })();
 
