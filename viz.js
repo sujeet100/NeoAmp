@@ -71,6 +71,7 @@
     { label: "Alchemy v2: Ray Burst", wmp: "Alchemy v2: Ray Burst" },
     { label: "Alchemy v2: N-gon Proof", wmp: "Alchemy v2: N-gon Proof" },
     { label: "Alchemy v2: Mandala", wmp: "Alchemy v2: Mandala" },
+    { label: "Alchemy v2: Nested Mandala", wmp: "Alchemy v2: Nested Mandala" },
     { label: "Alchemy v2: Anemone", wmp: "Alchemy v2: Anemone" },
     { label: "Alchemy v2: Anemone (Petals)", wmp: "Alchemy v2: Anemone (Petals)" },
     { label: "Alchemy v2: Anemone (Mandala)", wmp: "Alchemy v2: Anemone (Mandala)" },
@@ -251,7 +252,7 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Mandala";
+    var DEFAULT_PRESET = "Alchemy v2: Nested Mandala";
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });

@@ -398,7 +398,7 @@
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-        smoothing: 0.1, a: 1.0, thick: 0                  // thin ~1px crisp wireframe (mandala look)
+        smoothing: 0.1, a: 1.0, thick: 1
       }),
       init_eqs: passthrough, frame_eqs: passthrough,
       point_eqs: function (a) {
@@ -420,7 +420,7 @@
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-        smoothing: 0.1, a: 1.0, thick: 0
+        smoothing: 0.1, a: 1.0, thick: 1
       }),
       init_eqs: passthrough, frame_eqs: passthrough,
       point_eqs: function (a) {
@@ -497,7 +497,7 @@
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-        smoothing: 0.03, a: 1.0, thick: 0                 // thin ~1px (reference); brightness (q10) makes it read, esp. when the net collapses
+        smoothing: 0.03, a: 1.0, thick: 1
       }),
       init_eqs: passthrough, frame_eqs: passthrough,
       point_eqs: function (a) {
@@ -2674,6 +2674,58 @@
     preset.waves[0] = alcDiagonalLine(0.62, 0.85, 0.10, 1.0, 0.85, 0.95);  // persistent BOLD jagged pink-white diagonal
     var stack = alcNgonStack(1.7, ALC_MANDALA_SPECS, 3);  // 12 polygons packed 3/wave -> 4 waves
     for (var i = 0; i < stack.length; i++) preset.waves[i + 1] = stack[i];  // mandala at indices 1..4 (5 waves total)
+    return preset;
+  })();
+
+  // ── Alchemy v2: Nested Mandala ───────────────────────────────────────────────
+  // CONCENTRIC nested polygon rings: each ring a convex N-gon (skip=1) at a different radius,
+  // stacked from outer (16-gon) to inner (triangle), counter-rotating. Unlike the spirograph
+  // Mandala (crossing-chord star-polygons at the same radius), this reads as a TARGET/ROSETTE
+  // — each ring's shape is clearly distinct, the center is the focal point (not L/R eye-nodes).
+  // A few {N/skip} star overlays add crossing-chord depth within the outer rings. Circular
+  // (aspectX=1), centered glow comp.
+  var ALC_NESTED_SPECS = [
+    // Outer concentric ring envelopes — tier 0, always on, packed into wave 0 first
+    { sides: 16, skip: 1, radius: 0.38, dir:  1.0, rotate: 0.00, hueOff: 0.00, tier: 0 },
+    { sides: 12, skip: 1, radius: 0.31, dir: -0.9, rotate: 0.13, hueOff: 0.10, tier: 0 },
+    { sides: 10, skip: 1, radius: 0.25, dir:  1.1, rotate: 0.25, hueOff: 0.20, tier: 0 },
+    // Star overlays at outer/mid radius — crossing chords add depth to the outer ring layer
+    { sides: 12, skip: 5, radius: 0.36, dir:  0.7, rotate: 0.08, hueOff: 0.55, tier: 1 },
+    { sides: 8,  skip: 3, radius: 0.26, dir: -0.6, rotate: 0.00, hueOff: 0.65, tier: 1 },
+    { sides: 8,  skip: 1, radius: 0.20, dir: -1.0, rotate: 0.00, hueOff: 0.33, tier: 1 },
+    // Mid/inner concentric rings
+    { sides: 7,  skip: 1, radius: 0.15, dir:  1.2, rotate: 0.20, hueOff: 0.44, tier: 1 },
+    { sides: 6,  skip: 1, radius: 0.11, dir: -0.8, rotate: 0.00, hueOff: 0.70, tier: 2 },
+    { sides: 5,  skip: 1, radius: 0.08, dir:  0.9, rotate: 0.10, hueOff: 0.80, tier: 2 },
+    // Inner star overlays
+    { sides: 6,  skip: 2, radius: 0.13, dir: -1.1, rotate: 0.05, hueOff: 0.26, tier: 2 },
+    { sides: 5,  skip: 2, radius: 0.09, dir:  0.8, rotate: 0.00, hueOff: 0.87, tier: 2 },
+    // Tiny central anchor — a square/diamond at the center
+    { sides: 4,  skip: 1, radius: 0.05, dir: -1.0, rotate: 0.00, hueOff: 0.15, tier: 2 }
+  ];
+  // Comp for the Nested Mandala: flat-blue bg + soft radial core glow (pulsing on bass — the center
+  // is the focal point of this scene, not the L/R eyes) + Reinhard tone-map.
+  var ALC_NESTED_COMP =
+    "shader_body {\n" +
+    "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+    "float pr = length(d);\n" +
+    "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+    "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+    "vec3 bg = vec3(0.08, 0.18, 0.32);\n" +              // slightly deeper blue than the spirograph Mandala
+    "float core = exp(-pr * pr * 18.0);\n" +             // tight gaussian at center
+    "vec3 coreCol = vec3(0.18, 0.35, 0.60) * core * (0.5 + 0.8 * bass);\n" + // muted blue-teal core glow, bass-driven
+    "vec3 outc = bg + g + bloom * 0.18 + coreCol;\n" +
+    "ret = outc / (outc + vec3(0.85));\n" +              // Reinhard — muted, never blows to white
+    "}\n";
+  P["Alchemy v2: Nested Mandala"] = (function () {
+    var preset = build(
+      { wave_a: 0, gammaadj: 1.3, decay: 0.30, zoom: 1.0, cx: 0.5, cy: 0.5, dx: 0.0, dy: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 },
+      { frame: alcMandalaFrame(), warp: ALC_CLEAR_WARP, comp: ALC_NESTED_COMP }
+    );
+    // 12 specs packed 3/wave -> 4 waves (well under cap). Tier-0 specs are FIRST so wave 0
+    // always has the outer ring envelopes (gracefully degrades if the last wave drops).
+    var stack = alcNgonStack(1.0, ALC_NESTED_SPECS, 3);  // aspectX=1.0 -> circular (rosette not ellipse)
+    for (var i = 0; i < stack.length; i++) preset.waves[i] = stack[i];
     return preset;
   })();
 
