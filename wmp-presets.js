@@ -808,6 +808,43 @@
     };
   }
 
+  // MOTIF — SPINDLE / radial urchin: 512 samples sweep the full circle (ang = sample*2π); the
+  // radius at each sample = eye (dark center floor) + spike * abs(value1) → wherever the live
+  // waveform has energy, a bristle/spike protrudes. With additive mode the spiky ring glows;
+  // with moderate feedback (default warp, not ALC_CLEAR_WARP) the spikes leave a soft glow trail.
+  // This is the RING URCHIN geometry (circlewave-based), distinct from alcAnemone's triangle starburst.
+  // Reference: section_C3 "fine radial filaments" pulsar; r = eye + spike * abs(value1).
+  //   colorize — an ALC_PAL palette function, keyed by spike index (0=whole element; pass
+  //              a function that uses a.sample for hue variation over the ring).
+  // Q-var convention (same as alcAnemone):
+  //   q2,q3 = center | q5 = overall radius scale (breathing) | q8 = hue phase | q9 = spin
+  //   q10 = vortex shear (angular offset proportional to how far the bristle protrudes)
+  function alcSpindle(colorize) {
+    colorize = colorize || ALC_PAL.twoTone;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.02, a: 0.8, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var cx = (a.q2 !== undefined ? a.q2 : 0.5), cy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var R = (a.q5 || 0.35);                           // radius scale (breathing scale from frame)
+        var spin = (a.q9 || 0);
+        var twist = (a.q10 || 0);
+        var samp = Math.abs(a.value1 || 0);               // abs waveform → bristle length (always +)
+        // r = dark eye floor (15% of R, always present) + spike proportional to waveform energy
+        var r = R * (0.15 + samp);
+        var ang = a.sample * 6.2832 + spin;
+        ang += twist * (r - R * 0.15);                    // vortex: protruding bristles curve into spiral
+        a.x = cx + r * Math.cos(ang);
+        a.y = cy + r * Math.sin(ang);
+        colorize(a, 0);
+        return a;
+      }
+    };
+  }
+
   // KIT ELEMENT — TETHER: a thin jagged live-waveform line linking two points (the "lightning"
   // strung between a flanking ORBITER PAIR, as in the canonical Pulsar). Endpoints are read from
   // q-var FIELDS (e.g. "q21","q22" -> node A, "q23","q24" -> node B) that the scene's frame sets;
@@ -2862,6 +2899,58 @@
       }
     );
     preset.waves[0] = alcTriMandala(9, ALC_PAL.twoTone);         // 9 overlapping equilateral triangles, two-tone palette, shared center
+    return preset;
+  })();
+
+  // ── Alchemy v2: Spindle ──────────────────────────────────────────────────────
+  // The RING URCHIN / radial pulsar motif (kitified from the Anemone Pulsar's local anemone()):
+  // 512 samples sweep the full circle, radius = eye + spike*abs(waveform) → bristles protrude
+  // wherever the live audio has energy. On loud bass the spikes bloom long; on a quiet bar the
+  // urchin contracts to a small pulsing ring (the dark pupil). q10 vortex shear curves the
+  // bristles into a spiral on heavy transients. Distinct from alcAnemone (triangle starburst) —
+  // this is a continuous glow ring whose profile IS the waveform mapped radially.
+  // Reference: section_C3, 0:52-1:06 (canonical cobalt-blue background, pink→magenta color).
+  P["Alchemy v2: Spindle"] = (function () {
+    var hue = 0, lastT = 0, spin = 0;
+    var SPINDLE_COMP =
+      "shader_body {\n" +
+      "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+      "float pr = length(d);\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+      "float pupil = smoothstep(0.0, 0.14, pr);\n" +              // DARK CENTER pupil (the eye) — deepens at center
+      "vec3 bg = vec3(0.06, 0.11, 0.28) * pupil * (0.85 + 0.22 * bass);\n" + // cobalt-blue (pulses with bass)
+      "vec3 outc = bg + g + bloom * 0.30;\n" +
+      "ret = outc / (outc + vec3(0.85));\n" +                     // Reinhard — muted, no white-out
+      "}\n";
+    var preset = build(
+      Object.assign({}, alcCamera("flat"), { decay: 0.88 }),      // flat + moderate decay: urchin redrawn crisp but soft glow trail
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          hue = (hue + dt * (0.015 + 0.04 * bn)) % 1;
+          spin = spin + dt * (0.5 + 3.0 * bn);                    // slow spin, whips on the beat
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.22 + 0.20 * bass;                              // radius: breathes strongly with bass
+          t.q8 = hue;                                             // slow hue (pink→magenta→cyan band)
+          t.q9 = spin;                                            // self-rotation
+          t.q10 = 0.7 * Math.max(0, Math.min((bass - 1.2) / 0.6, 1));  // vortex on heavy transients
+          return t;
+        },
+        comp: SPINDLE_COMP
+      }
+    );
+    // Pink↔cyan slow mix: at q8=0 → dusty rose; q8=0.5 → muted cyan (matches ref "pink→cyan").
+    // Hardcoded rather than alcPalette because the 3-offset cosine palette has no clean magenta.
+    var PAL_ROSE = function (a) {
+      var mix = 0.5 + 0.5 * Math.cos(6.2832 * (a.q8 || 0));   // 1 = pink phase, 0 = cyan phase
+      a.r = (0.70 * mix + 0.18 * (1 - mix)) * 0.85;
+      a.g = (0.28 * mix + 0.60 * (1 - mix)) * 0.85;
+      a.b = (0.52 * mix + 0.74 * (1 - mix)) * 0.85;
+    };
+    preset.waves[0] = alcSpindle(PAL_ROSE);
     return preset;
   })();
 
