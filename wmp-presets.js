@@ -232,6 +232,10 @@
     // net gets its trace and the (explicit, redrawn) shape orbs get a slight glow-trail, not a tube.
     if (kind === "side")  return { wave_a: 0, gammaadj: 1.2, decay: 0.42, zoom: 0.95, sx: 1.0, sy: 1.0, cx: 0.86, cy: 0.62, dx: 0.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
     if (kind === "orbit") return { wave_a: 0, gammaadj: 1.5, decay: 0.93, zoom: 0.972, cx: 0.50, cy: 0.50, rot: 0.06, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+    // "flat": NEAR-ZERO feedback (decay 0.88, zoom 0.998) -> the motif is redrawn crisp each
+    // frame with only a faint glow trail, NOT smeared into rings. Right for pulsing centered
+    // motifs (anemone, mandala) where the reference is sharp fur, not echoey concentric ghosts.
+    if (kind === "flat")  return { wave_a: 0, gammaadj: 1.3, decay: 0.88, zoom: 0.998, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0 };
     /* top */             return { wave_a: 0, gammaadj: 1.5, decay: 0.93, zoom: 0.955, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
   }
 
@@ -246,6 +250,43 @@
     a.g = (gg * sat + l * (1 - sat)) * gain * (1 - 0.1 * warm);
     a.b = (bb * sat + l * (1 - sat)) * gain * (1 - 0.3 * warm);
   }
+
+  // ── KIT COLORS ───────────────────────────────────────────────────────────────
+  // A PALETTE is a function colorize(a, idx) that sets a.r/g/b for element `idx` (triangle /
+  // spike number), using a.q8 as the slow hue-drift phase. Scenes PICK a palette and pass it to
+  // a motif, so color is composed at scene-assembly time — NOT hardcoded in the motif. This is
+  // what makes "single colour vs two colours" a scene CONFIG rather than a motif rewrite.
+  // alcPalette(spec):
+  //   base  — base hue (0..1)        step  — per-element hue offset:
+  //   sat   — saturation (muted <1)            0 = MONO (single colour), 0.5 = DUO (two tones),
+  //   gain  — brightness                       ~0.04 = multicolour SPREAD
+  //   cycle — if 0, q8 won't drift the hue (a fixed colour); default 1 (slow cycle)
+  function alcPalette(spec) {
+    spec = spec || {};
+    var base = spec.base || 0;
+    var step = spec.step === undefined ? 0.5 : spec.step;
+    var sat = spec.sat === undefined ? 0.78 : spec.sat;
+    var gain = spec.gain === undefined ? 0.9 : spec.gain;
+    var cycle = spec.cycle === undefined ? 1 : spec.cycle;
+    return function (a, idx) {
+      var h = base + (cycle ? (a.q8 || 0) : 0) + (idx || 0) * step;
+      var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+      var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+      var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+      var l = (rr + gg + bb) / 3;
+      a.r = (rr * sat + l * (1 - sat)) * gain;
+      a.g = (gg * sat + l * (1 - sat)) * gain;
+      a.b = (bb * sat + l * (1 - sat)) * gain;
+    };
+  }
+  // Named palettes scenes can grab directly off the kit (or build their own with alcPalette).
+  var ALC_PAL = {
+    twoTone:   alcPalette({ step: 0.5 }),                       // two complementary muted tones
+    mono:      alcPalette({ step: 0.0, sat: 0.72 }),            // single drifting hue
+    spread:    alcPalette({ step: 0.04, sat: 0.82, gain: 1.0 }),// multicolour spread
+    roseGreen: alcPalette({ step: 0.5, base: 0.28 }),           // green ↔ magenta (the canonical anemone)
+    redCyan:   alcPalette({ step: 0.5, base: 0.00 })            // red ↔ cyan (the dahlia)
+  };
 
   // MOTIF — one triangle whose 3 edges are the LIVE waveform displaced PERPENDICULAR
   // (the jagged wireframe line). Drawn at head (q2,q3), radius q5, self-rotated by q9.
@@ -443,6 +484,179 @@
         a.y = ccy + R * Math.sin(th);
         var fade = (1.0 - raw) * sm01(raw / 0.05);             // bright near, fade into the dark VP
         alcSetColor(a, (a.q8 || 0) + hueOff, 0, 1.2 * fade);
+        return a;
+      }
+    };
+  }
+
+  // MOTIF — the ANEMONE / STARBURST (README Motif C): a STARBURST of thin triangular SPIKES.
+  // Each spike is a thin triangle whose BASE sits on a small inner CIRCLE (the bases tile the
+  // circle -> the dark central eye) and whose APEX points OUTWARD, its length set by the LIVE
+  // waveform so the rim is spiky/jagged (the urchin fur). The wave traces one continuous
+  // zig-zag: base-left -> apex -> base-right -> next base-left ... so the ONLY connectors run
+  // along the inner base circle, NEVER between the outer peaks. Each spike a distinct COLOR;
+  // NON-additive so colors paint cleanly (no white pile-up). Spins (q9), pulses size on bass
+  // (q5), shears to a vortex on peaks (q10). Face-on ("flat" camera). Drawn at (q2,q3).
+  //   spikes   — number of tilted copies around the circle (~30). tilt = 2π/spikes; since the
+  //              base (24°) is WIDER than the tilt (12° at 30), consecutive triangles OVERLAP.
+  //   colorize — a PALETTE picked from the kit (alcPalette / ALC_PAL.*); sets each triangle's
+  //              colour by its index. Defaults to the two-tone palette.
+  function alcAnemone(spikes, colorize) {
+    spikes = spikes || 30;
+    colorize = colorize || ALC_PAL.twoTone;
+    var baseHalf = 0.21;                                      // FIXED ~12° -> base spans ~24° (independent of count)
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1,
+        smoothing: 0.02, a: 0.85, thick: 0
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var hx = (a.q2 !== undefined ? a.q2 : 0.5), hy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var R = (a.q5 || 0.42), spin = (a.q9 || 0), twist = (a.q10 || 0), jag = (a.q6 || 0.03);
+        var innerR = R * 0.16;                                // base circle radius -> the dark central eye
+        var tilt = 6.2832 / spikes;                           // rotation between successive copies (< base -> OVERLAP)
+        var seg = a.sample * spikes;
+        var k = Math.floor(seg); if (k >= spikes) k = spikes - 1;
+        var f = seg - k;                                      // 0..1 across THIS triangle
+        var baseAng = k * tilt + spin;
+        var aL = baseAng - baseHalf, aR = baseAng + baseHalf;
+        var samp = a.value1 || 0;
+        var spikeLen = R * (0.45 + 0.55 * Math.abs(samp));    // waveform sets apex length -> spiky rim (acute triangle)
+        // CLOSED triangle (3 edges): base-left -> base-right (the base, on the inner circle) ->
+        // apex (out) -> back to base-left. The base edges of all spikes draw the inner circle.
+        var ang, r, onSide = 0;
+        if (f < 0.34) {                                       // BASE edge (along inner circle)
+          var u = f / 0.34; ang = aL + (aR - aL) * u; r = innerR;
+        } else if (f < 0.67) {                                // base-RIGHT -> APEX
+          var u = (f - 0.34) / 0.33; ang = aR + (baseAng - aR) * u; r = innerR + spikeLen * u; onSide = 1;
+        } else {                                              // APEX -> base-LEFT (close the triangle)
+          var u = (f - 0.67) / 0.33; ang = baseAng + (aL - baseAng) * u; r = innerR + spikeLen * (1 - u); onSide = 1;
+        }
+        if (onSide) ang += (samp * jag) / Math.max(r, 0.08);  // live waveform makes the slanted EDGES jagged (the "sound wave")
+        ang += twist * (r - innerR);                          // vortex shear: outer parts lean more
+        a.x = hx + r * Math.cos(ang);
+        a.y = hy + r * Math.sin(ang);
+        colorize(a, k);                                       // colour comes from the scene's palette (kit), keyed by spike index
+        return a;
+      }
+    };
+  }
+
+  // MOTIF (variant) — ANEMONE built the OTHER way: full EQUILATERAL triangles centered on the
+  // SAME point (q2,q3) and overlapping, each rotated by a small tilt -> a star-polygon MANDALA
+  // with a natural center hole (the edges are chords at the inradius). Edges are jagged by the
+  // LIVE waveform (q6). NON-additive colored outlines (no white pile-up). Spins (q9), pulses
+  // size on bass (q5), shears on peaks (q10). The "overlap of equilateral triangles at the
+  // center" look, distinct from alcAnemone's base-on-a-circle starburst.
+  //   count    — number of overlapping triangles (~9).
+  //   colorize — a PALETTE picked from the kit (alcPalette / ALC_PAL.*); keyed by triangle index.
+  function alcTriMandala(count, colorize) {
+    count = count || 9;
+    colorize = colorize || ALC_PAL.twoTone;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1,
+        smoothing: 0.05, a: 0.82, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var hx = (a.q2 !== undefined ? a.q2 : 0.5), hy = (a.q3 !== undefined ? a.q3 : 0.5);
+        var sz = (a.q5 || 0.40), amp = (a.q6 || 0.04), spin = (a.q9 || 0), twist = (a.q10 || 0);
+        var seg = a.sample * count;
+        var ti = Math.floor(seg); if (ti >= count) ti = count - 1;
+        var f = seg - ti;                                     // 0..1 around THIS triangle
+        var rot = spin + ti * 6.2832 / count;                 // each equilateral triangle rotated about the shared center
+        // Trace 5 segments: center->c0, c0->c1, c1->c2, c2->c0, c0->center. The two SPOKE
+        // segments (center<->c0) are drawn at alpha 0 (invisible) so the connector between
+        // triangles is a zero-length center->center hop -> NO chord between outer peaks.
+        var sp = 0.05, E = (1 - 2 * sp) / 3;                  // spoke fraction + edge fraction
+        var ax, ay, bx, by, u, isEdge = 0;
+        function cxj(j) { return Math.cos(rot + j * 2.0944); }
+        function cyj(j) { return Math.sin(rot + j * 2.0944); }
+        if (f < sp) { u = f / sp; ax = 0; ay = 0; bx = cxj(0); by = cyj(0); }                       // center -> c0 (spoke)
+        else if (f < sp + E) { u = (f - sp) / E; ax = cxj(0); ay = cyj(0); bx = cxj(1); by = cyj(1); isEdge = 1; }
+        else if (f < sp + 2 * E) { u = (f - sp - E) / E; ax = cxj(1); ay = cyj(1); bx = cxj(2); by = cyj(2); isEdge = 1; }
+        else if (f < sp + 3 * E) { u = (f - sp - 2 * E) / E; ax = cxj(2); ay = cyj(2); bx = cxj(0); by = cyj(0); isEdge = 1; }
+        else { u = (f - sp - 3 * E) / sp; ax = cxj(0); ay = cyj(0); bx = 0; by = 0; }               // c0 -> center (spoke)
+        var vx = ax + (bx - ax) * u, vy = ay + (by - ay) * u;
+        var px = sz * vx, py = sz * vy;
+        if (isEdge) {                                         // live waveform displaces the edge -> jagged triangle line
+          var ex = bx - ax, ey = by - ay, el = Math.hypot(ex, ey) || 1;
+          var disp = (a.value1 || 0) * amp;
+          px = sz * vx + (-ey / el) * disp; py = sz * vy + (ex / el) * disp;
+        }
+        var rad = Math.hypot(vx, vy) || 1, sh = twist * (rad - 0.5);
+        var cs = Math.cos(sh), sn = Math.sin(sh);
+        a.x = hx + px * cs - py * sn;
+        a.y = hy + px * sn + py * cs;
+        a.a = isEdge ? 0.85 : 0.0;                            // spokes invisible -> connectors hidden
+        colorize(a, ti);                                      // colour from the scene's palette (kit), keyed by triangle index
+        return a;
+      }
+    };
+  }
+
+  // KIT ELEMENT — TETHER: a thin jagged live-waveform line linking two points (the "lightning"
+  // strung between a flanking ORBITER PAIR, as in the canonical Pulsar). Endpoints are read from
+  // q-var FIELDS (e.g. "q21","q22" -> node A, "q23","q24" -> node B) that the scene's frame sets;
+  // `qamp` field is the displacement amplitude. One custom WAVE. colorize optional (kit palette);
+  // defaults to a cool-white bolt.
+  function alcTether(qax, qay, qbx, qby, qamp, colorize) {
+    qamp = qamp || "q26";
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, // NON-additive -> crisp bolt, no feedback bloom band
+        smoothing: 0.03, a: 0.9, thick: 1, r: 0.72, g: 0.85, b: 1.0
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ax = (a[qax] !== undefined ? a[qax] : 0.4), ay = (a[qay] !== undefined ? a[qay] : 0.5);
+        var bx = (a[qbx] !== undefined ? a[qbx] : 0.6), by = (a[qby] !== undefined ? a[qby] : 0.5);
+        var dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+        var nx = -dy / len, ny = dx / len;
+        // window the displacement to ZERO at both ends (sin(0)=sin(π)=0) so the bolt's tips land
+        // EXACTLY on the two orbiter nodes (otherwise value1 at the ends floats them off-centre).
+        var win = Math.sin(a.sample * 3.14159);
+        var disp = (a.value1 || 0) * (a[qamp] || 0.03) * win; // live waveform -> jagged lightning, tied to the nodes
+        a.x = ax + a.sample * dx + nx * disp;
+        a.y = ay + a.sample * dy + ny * disp;
+        if (colorize) colorize(a, 0); else { a.r = 0.72; a.g = 0.85; a.b = 1.0; }
+        return a;
+      }
+    };
+  }
+
+  // KIT ELEMENT — ORBITER NODE: a glowing ringed disc (a "Saturn" orb) at a q-var position, used
+  // in flanking PAIRS joined by alcTether. Returns a WAVE — NOT a shape: Butterchurn positions a
+  // custom WAVE with invAspect ((2x-1)*invAspectx) but a custom SHAPE WITHOUT ((2x-1)), so a
+  // shape orb and the wave tether at the SAME (qx,qy) land at different screen points and the
+  // bolt won't touch the orb. As a wave it shares the tether's exact space -> always connected.
+  // (At node size a spiral-fill disc reads cleanly; the tube problem only bites at large scale.)
+  // The CENTRE is a bright warm-white (distinct from the trail); the RING takes a kit PALETTE
+  // keyed by q8, so the ring/halo (and its feedback trail) CYCLE colour. qr = radius field.
+  function alcOrbiterNode(qx, qy, qr, ringPal) {
+    ringPal = ringPal || ALC_PAL.mono;                        // cycling single hue for the ring/halo
+    qr = qr || "q25";
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 256, additive: 0, usedots: 0, scaling: 1,  // NON-additive -> paints, can't bloom to a white blob
+        smoothing: 0.0, a: 0.9, thick: 1
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var cx = (a[qx] !== undefined ? a[qx] : 0.5), cy = (a[qy] !== undefined ? a[qy] : 0.5);
+        var rad = (a[qr] || 0.04);
+        if (a.sample < 0.62) {                                // FILL: dense sqrt-spiral -> bright white CORE (≠ trail)
+          var f = a.sample / 0.62, rf = rad * Math.sqrt(f), af = f * 6.2832 * 16.0;
+          a.x = cx + rf * Math.cos(af); a.y = cy + rf * Math.sin(af);
+          a.r = 1.0; a.g = 0.96; a.b = 0.9;
+        } else {                                              // RING: cycling colour (palette via q8)
+          var c = { q8: a.q8 }; ringPal(c, 0);
+          var fb = (a.sample - 0.62) / 0.38, rb = rad * (0.96 + 0.12 * fb), ab = fb * 6.2832 * 5.0;
+          a.x = cx + rb * Math.cos(ab); a.y = cy + rb * Math.sin(ab);
+          a.r = c.r; a.g = c.g; a.b = c.b;
+        }
         return a;
       }
     };
@@ -2196,6 +2410,142 @@
     preset.waves[3] = rays[3];
     preset.waves[4] = rays[4];
     preset.waves[5] = alcOrbWhite(0.0);                  // orb core, white ring (6 waves total — at the cap)
+    return preset;
+  })();
+
+  // ── Alchemy v2: Anemone ──────────────────────────────────────────────────────
+  // A rosette of a FEW (6) rotated COLORED waveform triangles (kit Motif C, corridor technique)
+  // on the low-feedback "flat" camera: distinct colored jagged triangle lines, NON-additive so
+  // they never blow to white, over a soft COLORED CORE that fills the center (not a black hole)
+  // and pulses on bass. PULSES size on bass (q5), spins (q9), shears to a vortex on peaks (q10).
+  // Reference @0:52–1:06 (Anemone Pulsar). Composable like the other kit scenes.
+  P["Alchemy v2: Anemone"] = (function () {
+    var hue = 0, lastT = 0, spin = 0;
+    // Custom comp: fills the central triangle-hole with a soft dusty-magenta CORE glow (pulses
+    // on bass) so the middle isn't black, plus a mild bloom around the colored lines, tone-mapped.
+    var ANEMONE_COMP =
+      "shader_body {\n" +
+      "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+      "float pr = length(d);\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+      "float core = exp(-pr * pr * 16.0);\n" +                    // soft gaussian, brightest at center
+      "vec3 coreCol = vec3(0.55, 0.18, 0.42) * core * (0.75 + 0.55 * bass);\n" + // dusty magenta center fill
+      "vec3 outc = g + bloom * 0.12 + coreCol;\n" +
+      "ret = outc / (outc + vec3(0.85));\n" +                     // Reinhard tone-map -> muted, no white-out
+      "}\n";
+    var preset = build(
+      // flat camera, moderate decay (0.5): anemone lines redrawn crisp each frame; the soft
+      // radial bleed + the comp core/bloom give the glow.
+      Object.assign({}, alcCamera("flat"), { decay: 0.5 }),
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          hue = (hue + dt * (0.02 + 0.04 * bn)) % 1;
+          // ROTATION LINKED TO INTENSITY: slow drift when quiet, whips around on the beat.
+          spin = spin + dt * (0.5 + 4.0 * bn);                   // anemone self-spin (bass-driven)
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.40 + 0.10 * bn;                               // PULSAR pulse: starburst radius (big -> fills screen)
+          t.q6 = 0.02 + 0.04 * Math.min(mid + 0.5 * treb, 2.0);  // edge jaggedness (live waveform on the triangle sides)
+          t.q8 = hue;                                            // two-tone hue drift
+          t.q9 = spin;                                           // rotation
+          // vortex: 0 at rest; shears the spikes into a swirl on STRONG bass (>~1.2)
+          t.q10 = 0.8 * Math.max(0, Math.min((bass - 1.2) / 0.6, 1));
+          return t;
+        },
+        comp: ANEMONE_COMP
+      }
+    );
+    preset.waves[0] = alcAnemone(30, ALC_PAL.roseGreen);         // 30 overlapping ~24° waveform triangles; green↔magenta palette
+    // NOTE: orbiter pair + tether (alcTether / alcOrbiterNode, driven by q21..q26) are DEFERRED —
+    // they smeared under feedback on this scene. The kit elements remain for a low-feedback host.
+    return preset;
+  })();
+
+  // ── Alchemy v2: Anemone (Petals) ─────────────────────────────────────────────
+  // Same base-on-a-circle starburst as Anemone, but SMOOTH edges (q6=0), a SLOW spin and a
+  // longer color-bleed feedback (decay 0.82) -> the clean overlapping-petal "dahlia" look
+  // (crisp twin-tone petals washing color into the background) rather than the frizzy fast one.
+  P["Alchemy v2: Anemone (Petals)"] = (function () {
+    var hue = 0, lastT = 0, spin = 0;
+    var ANEMONE_COMP =
+      "shader_body {\n" +
+      "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+      "float pr = length(d);\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+      "float core = exp(-pr * pr * 16.0);\n" +
+      "vec3 coreCol = vec3(0.55, 0.18, 0.42) * core * (0.75 + 0.55 * bass);\n" +
+      "vec3 outc = g + bloom * 0.16 + coreCol;\n" +
+      "ret = outc / (outc + vec3(0.85));\n" +
+      "}\n";
+    var preset = build(
+      Object.assign({}, alcCamera("flat"), { decay: 0.82 }),   // long bleed -> petals wash color into the bg
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          hue = (hue + dt * (0.02 + 0.04 * bn)) % 1;
+          spin = spin + dt * (0.10 + 0.18 * bn);                 // SLOW spin (clean, coherent petals)
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.40 + 0.10 * bn;                               // pulse size on bass
+          t.q6 = 0;                                              // SMOOTH edges (no waveform frizz) -> clean petals
+          t.q8 = hue;
+          t.q9 = spin;
+          t.q10 = 0.6 * Math.max(0, Math.min((bass - 1.2) / 0.6, 1));
+          return t;
+        },
+        comp: ANEMONE_COMP
+      }
+    );
+    // Palette picked from the kit: redCyan (two-tone). Swap to ALC_PAL.mono for a single colour,
+    // or ALC_PAL.spread for multicolour — colour is a scene CONFIG, not baked into the motif.
+    preset.waves[0] = alcAnemone(30, ALC_PAL.redCyan);           // clean overlapping ~24° petals (smooth)
+    return preset;
+  })();
+
+  // ── Alchemy v2: Anemone (Mandala) ────────────────────────────────────────────
+  // The SECOND construction: full EQUILATERAL triangles overlapping at their shared CENTER,
+  // each rotated by a small tilt -> a spinning star-polygon mandala with a dark center hole.
+  // Same kit feel (flat camera, colored non-additive outlines, waveform-jagged edges, color
+  // bleed to bg), different geometry from the base-on-a-circle Anemone.
+  P["Alchemy v2: Anemone (Mandala)"] = (function () {
+    var hue = 0, lastT = 0, spin = 0;
+    var ANEMONE_COMP =
+      "shader_body {\n" +
+      "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+      "float pr = length(d);\n" +
+      "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+      "vec3 bloom = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+      "float core = exp(-pr * pr * 16.0);\n" +
+      "vec3 coreCol = vec3(0.30, 0.20, 0.52) * core * (0.75 + 0.55 * bass);\n" + // dusty indigo center
+      "vec3 outc = g + bloom * 0.16 + coreCol;\n" +
+      "ret = outc / (outc + vec3(0.85));\n" +
+      "}\n";
+    var preset = build(
+      Object.assign({}, alcCamera("flat"), { decay: 0.5 }),
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var bn = Math.max(0, Math.min(bass - 1, 1));
+          hue = (hue + dt * (0.02 + 0.04 * bn)) % 1;
+          spin = spin + dt * (0.85 + 1.1 * bn);                  // FAST rotation
+          t.q2 = 0.5; t.q3 = 0.5;
+          t.q5 = 0.40 + 0.10 * bn;                               // mandala radius (fills screen)
+          t.q6 = 0.03 + 0.05 * Math.min(mid + 0.5 * treb, 2.0);  // edge jaggedness (live waveform on the triangle edges)
+          t.q8 = hue;                                            // two-tone hue drift
+          t.q9 = spin;
+          t.q10 = 0.8 * Math.max(0, Math.min((bass - 1.2) / 0.6, 1)); // vortex shear on peaks
+          return t;
+        },
+        comp: ANEMONE_COMP
+      }
+    );
+    preset.waves[0] = alcTriMandala(9, ALC_PAL.twoTone);         // 9 overlapping equilateral triangles, two-tone palette, shared center
     return preset;
   })();
 
