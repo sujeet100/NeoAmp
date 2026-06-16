@@ -3065,24 +3065,17 @@
     var hue = 0, lastT = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.985, gammaadj: 1.5,   // VERY long trace -> slow sweep accumulates the fine fan
-        zoom: 0.992,                               // gentle inward -> slight depth + dark pupil (no spiral)
+        wave_a: 0, decay: 0.94, gammaadj: 1.5,    // MODERATE trace -> fan refreshes so the sweep is VISIBLE
+        zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
         rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || 1, mid = t.mid_att || 1, treb = t.treb_att || 1;
+          var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;
-          t.q1 = tm * (0.9 + 0.6 * mid);                 // SLOW pivot of the line fan (a fraction of a rev/s)
+          t.q1 = tm * (5.0 + 3.0 * mid);                 // CLEARLY rotating (~0.8-1.3 rev/s, mid speeds it)
           t.q8 = hue;
-          // the two antipodal gold bullseye orbiters, joined through center by a tether
-          var R = 0.32 + 0.03 * Math.max(0, bass - 1);
-          var oa = tm * 0.20;
-          t.q21 = 0.5 + R * Math.cos(oa); t.q22 = 0.5 + R * Math.sin(oa);
-          t.q23 = 0.5 - R * Math.cos(oa); t.q24 = 0.5 - R * Math.sin(oa);
-          t.q7  = 0.045 + 0.02 * Math.max(0, bass - 1);
-          t.q26 = 0.03 + 0.05 * Math.max(0, treb - 1);
           return t;
         },
         comp:
@@ -3091,49 +3084,43 @@
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = g + glow * 0.35;\n" +
-          "outc += vec3(1.0, 0.55, 0.45) * exp(-dot(d,d) * 70.0) * 0.18;\n" +  // warm pink center glow (the focus)
-          "vec2 pe = d - vec2(0.10, -0.02);\n" +
-          "outc *= 1.0 - 0.6 * exp(-dot(pe,pe) * 130.0);\n" +                  // off-center dark pupil
+          "outc += vec3(1.0, 0.55, 0.45) * exp(-dot(d,d) * 80.0) * 0.15;\n" +  // warm center focus
           "float vig = smoothstep(1.2, 0.25, length(d));\n" +
           "outc = outc * vig;\n" +
           "ret = outc / (outc + vec3(0.85));\n" +                              // Reinhard tone-map
           "}\n"
       }
     );
-    // FINE diameter-lines through center, slowly pivoting; the LONG feedback trace builds
-    // the fan. Thin + pale + nearly straight (small waveform jiggle), so hundreds read as
-    // delicate threads, not coarse spokes. angOff offsets the 2nd line.
+    // Diameter-lines through center, ROTATING visibly; the feedback trace fans out behind
+    // the sweep. (Orbiters intentionally omitted for now — get the rotating fan right first.)
     function rotLine(angOff) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
           enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.06, a: 0.55, thick: 0          // THIN + faint -> fine threads accumulate, don't blow out
+          smoothing: 0.06, a: 0.8, thick: 0
         }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
           var th = (a.q1 || 0) + angOff;
           var ct = Math.cos(th), st = Math.sin(th);
           var s = a.sample * 2.0 - 1.0;                 // -1..1 along the diameter line
-          var disp = (a.value1 || 0) * 0.035;           // SMALL jiggle -> nearly straight fine lines
+          var disp = (a.value1 || 0) * 0.04;            // small jiggle -> nearly straight fine lines
           a.x = 0.5 + s * 0.70 * ct - disp * st;
           a.y = 0.5 + s * 0.70 * st + disp * ct;
-          var h = a.q8 || 0, sat = 0.45;                // DESATURATED pale lines (chromatic spread over the fan)
+          var h = a.q8 || 0, sat = 0.55;
           var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
           var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
           var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
           var l = (rr + gg + bb) / 3;
-          a.r = (rr * sat + l * (1 - sat)) * 0.9;
-          a.g = (gg * sat + l * (1 - sat)) * 0.9;
-          a.b = (bb * sat + l * (1 - sat)) * 0.9;
+          a.r = (rr * sat + l * (1 - sat));
+          a.g = (gg * sat + l * (1 - sat));
+          a.b = (bb * sat + l * (1 - sat));
           return a;
         }
       };
     }
     preset.waves[0] = rotLine(0.0);
-    preset.waves[1] = rotLine(Math.PI / 2);                         // second perpendicular line (denser fan)
-    preset.waves[2] = alcOrbTarget("q21", "q22", 2, ALC_PAL.warm);  // gold bullseye orbiter A
-    preset.waves[3] = alcOrbTarget("q23", "q24", 2, ALC_PAL.warm);  // gold bullseye orbiter B (antipodal)
-    preset.waves[4] = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm);  // tether through center
+    preset.waves[1] = rotLine(Math.PI / 2);   // second perpendicular line
     return preset;
   })();
 
