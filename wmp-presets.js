@@ -2702,29 +2702,34 @@
     preset.waves[1] = star[1];
 
     // Tether: live audio waveform line connecting the two head orbs.
-    // Samples run A (top head) → B (bottom head); displacement is perpendicular
-    // to the AB vector so the waveform squiggles sideways like a lightning bolt.
-    preset.waves[2] = {
-      baseVals: Object.assign({}, WAVE_BASE, {
-        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-        smoothing: 0.04, a: 0.9
-      }),
-      init_eqs: passthrough,
-      frame_eqs: passthrough,
-      point_eqs: function (a) {
-        var ax = a.q21 || nearX, ay = a.q22 || nearYT;
-        var bx = a.q23 || nearX, by = a.q24 || nearYB;
-        var dx = bx - ax, dy = by - ay;
-        var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
-        var px = -dy / len, py = dx / len;               // perpendicular unit vector
-        var disp = 0.10 * (a.value1 || 0);               // audio waveform displacement
-        a.x = ax + a.sample * dx + disp * px;
-        a.y = ay + a.sample * dy + disp * py;
-        // warm amber — matches ALC_PAL.warm top row
-        a.r = 0.9; a.g = 0.72; a.b = 0.18;
-        return a;
-      }
-    };
+    // Two parallel passes (waves[2] + waves[3]) offset ±0.004 in the perpendicular
+    // direction — gives physical width without extra geometry.  Overbright white/ice
+    // (r/g/b > 1.0 in additive mode) creates a bright bloom that reads as a thick line.
+    function makeTether(perpOffset) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.04, a: 1.0
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ax = a.q21 || nearX, ay = a.q22 || nearYT;
+          var bx = a.q23 || nearX, by = a.q24 || nearYB;
+          var dx = bx - ax, dy = by - ay;
+          var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
+          var px = -dy / len, py = dx / len;
+          var disp = 0.12 * (a.value1 || 0) + perpOffset;  // audio displacement + static offset
+          a.x = ax + a.sample * dx + disp * px;
+          a.y = ay + a.sample * dy + disp * py;
+          // overbright white/ice — additive > 1 blooms to a thick glowing line
+          a.r = 2.8; a.g = 2.8; a.b = 3.5;
+          return a;
+        }
+      };
+    }
+    preset.waves[2] = makeTether(-0.004);
+    preset.waves[3] = makeTether(+0.004);
 
     preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm);
     return preset;
