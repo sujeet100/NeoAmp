@@ -114,6 +114,22 @@
     "float hx = step(0.5, fract((uv.x + uv.y) * resolution.y * 0.5));\n" +
     "ret *= mix(0.97, 1.0, hx);\n";
 
+  // Alchemy v2 BG (aurora color-bleed) — a vivid domain-warped fbm SPECTRAL field: patchy
+  // green/yellow/red/purple color washes that drift and bleed (the colour bleeding behind the
+  // Net Tunnel in the original, section G ~2:15). A SEPARATE reusable motif — composite it UNDER
+  // other motifs (e.g. the line tunnel) in a comp. Vivid (a documented muting-rule exception).
+  // `d` = aspect-corrected centered coord; `t` = time; `b` = bass (lifts brightness on beats).
+  // Needs NOISE_GLSL (fbm) + PAL_GLSL (pal) prepended.
+  var ALC_AURORA_GLSL =
+    "vec3 alcAurora(vec2 d, float t, float b){\n" +
+    "  vec2 q = d*1.6 + vec2(fbm(d*1.4 + t*0.05), fbm(d*1.4 + 5.0 - t*0.04));\n" +  // domain warp
+    "  float n  = fbm(q*1.8 + t*0.03);\n" +
+    "  float n2 = fbm(q*2.6 - t*0.025);\n" +
+    "  vec3 c = pal(n*1.2 + t*0.04);\n" +                       // spectral hue driven by the noise
+    "  c *= smoothstep(0.25, 0.9, n2);\n" +                     // PATCHY bleed (not a uniform wash)
+    "  return c * (0.5 + 0.5*b);\n" +
+    "}\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -3188,14 +3204,18 @@
         // just UNDER one rotation period (~0.9s) -> the oldest spokes vanish before the line laps
         // back, so a FULL CIRCLE never accumulates (per user). Much faster than the old `ret-=0.004`.
         warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.91;\n}\n",
+        // Composition: aurora color-bleed motif (UNDER) + the line tunnel (sampler_main) + bloom.
         comp:
+          NOISE_GLSL + PAL_GLSL + ALC_AURORA_GLSL +
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "vec3 aur = alcAurora(d, time, bass) * smoothstep(0.05, 0.7, pr) * 0.6;\n" +  // color bleed, stronger toward edges
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "vec3 outc = g + glow * 0.35;\n" +
-          "outc += vec3(1.0, 0.55, 0.45) * exp(-dot(d,d) * 80.0) * 0.15;\n" +  // warm center focus
-          "float vig = smoothstep(1.2, 0.25, length(d));\n" +
+          "vec3 outc = aur + g + glow * 0.35;\n" +
+          "outc += vec3(1.0, 0.55, 0.45) * exp(-pr * pr * 80.0) * 0.15;\n" +   // warm center focus
+          "float vig = smoothstep(1.25, 0.2, pr);\n" +
           "outc = outc * vig;\n" +
           "ret = outc / (outc + vec3(0.85));\n" +                              // Reinhard tone-map
           "}\n"
