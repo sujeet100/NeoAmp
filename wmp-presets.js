@@ -3245,13 +3245,21 @@
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || 1;
+          var bass = t.bass_att || 1, treb = t.treb_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;   // hue still drifts with music; rotation does NOT
           t.q1 = tm * 3.4;                               // CONSTANT spin (~0.5 rev/s) — NOT audio-driven, per user
           t.q8 = hue;
           // STROBE: stamp a spoke ~every 0.03s -> denser discrete spokes (still gaps between them).
           if (tm - lastStamp >= 0.03) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
+          // two antipodal gold orbiters (the "worms"): the fade warp leaves a short bead trail
+          // along their slow orbit -> the gold-worm look from the original. Joined by a tether.
+          var R = 0.34 + 0.03 * Math.max(0, bass - 1);
+          var oa = tm * 0.18;
+          t.q21 = 0.5 + R * Math.cos(oa); t.q22 = 0.5 + R * Math.sin(oa);
+          t.q23 = 0.5 - R * Math.cos(oa); t.q24 = 0.5 - R * Math.sin(oa);
+          t.q7  = 0.03 + 0.015 * Math.max(0, bass - 1);  // orbiter head radius (small)
+          t.q26 = 0.03 + 0.05 * Math.max(0, treb - 1);   // tether jaggedness (treble)
           return t;
         },
         // FADE is here (decay baseVal does nothing in this build): multiplicative fade in place
@@ -3270,6 +3278,8 @@
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = aur + g + glow * 0.35;\n" +
           "outc += vec3(1.0, 0.55, 0.45) * exp(-pr * pr * 80.0) * 0.15;\n" +   // warm center focus
+          "vec2 pe = d - vec2(0.12, -0.03);\n" +
+          "outc *= 1.0 - 0.55 * exp(-dot(pe,pe) * 120.0);\n" +                 // off-center dark hole (the teardrop pupil)
           "float vig = smoothstep(1.25, 0.2, pr);\n" +
           "outc = outc * vig;\n" +
           "ret = outc / (outc + vec3(0.85));\n" +                              // Reinhard tone-map
@@ -3285,6 +3295,11 @@
     preset.waves[0] = lines[0];
     preset.waves[1] = lines[1];
     preset.waves[2] = lines[2];
+    // two gold orbiter "worms" + tether (6 waves total = the reliable cap). The fade warp
+    // leaves each a short bead trail along its orbit -> the gold worms in the original.
+    preset.waves[3] = alcOrbiterNode("q21", "q22", "q7", ALC_PAL.warm);
+    preset.waves[4] = alcOrbiterNode("q23", "q24", "q7", ALC_PAL.warm);
+    preset.waves[5] = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm);
     return preset;
   })();
 
