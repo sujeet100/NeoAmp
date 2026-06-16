@@ -118,11 +118,26 @@ Wave budget: 4 waves used (star[0], star[1], tether[2], dotTrail[3]). 2 spare.
 
 ---
 
+## Background analysis (NEW 2026-06-16)
+
+Full frame-by-frame background analysis done — see `background-motifs-reference.md`
+(companion to `orb-motifs-reference.md`). 9 subagents (one per section A–I) +
+synthesis, confirming/refuting 8 Gemini "background architecture" hypotheses.
+**10 real bg mechanisms** identified; key reframings: "feedback tunnel" is mostly
+directional smear / perspective geometry (feedback = glow not structure); "CRT
+scanlines" is actually a subtle STATIC dither/hatch; "aurora ribbons" = the fbm
+fluid we already have. Muted-rule exceptions: kaleido/fountain/net/supernova run vivid.
+
 ## Pending work (not done)
 
+- **Background kit helpers (NEW — from bg analysis):** extend `alcFluid` with
+  iso-contour ridges + green↔magenta marble (BG4, highest leverage, 90% built);
+  `bgNetTunnel()` radial-ray shader (BG8, G section has no bg shader); 1-line
+  `bgHatch()` static dither (BG10); extract `bgKaleido()`/`bgMoire()` + finish
+  butterfly; `bgFountain()`/vortex (BG7); `bgWaveHorizon()` (BG9); `bgSolidSnap`.
 - **Gradient Orbs scene** needs screenshot validation after latest fix (orbit R 0.26→0.18,
   q5 0.04). First result showed blobs clipped at edges — needs user screenshot confirmation.
 - **Moiré kaleidoscope** — bars-as-wave approach confirmed correct; butterfly look needs tuning.
 - **Journey sequencer** — crossfade between scenes (deferred).
-- **Fluid marble background** — reusable fbm/domain-warp comp shader.
+- **Fluid marble background** — reusable fbm/domain-warp comp shader (now spec'd as BG4 ridge extension).
 - All Ambience/Battery presets tuning from screenshots (ongoing as-needed).
