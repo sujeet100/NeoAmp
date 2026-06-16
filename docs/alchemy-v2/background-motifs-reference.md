@@ -278,8 +278,18 @@ moiré**, not a CRT overlay.
 = bass "breathing"; rotation = mid; VP brightness = bass. *Flagged.*
 **Transitions:** crossfade/morph (horizon ribbon densifies into the net); continuous
 evolution net→spray→X-burst.
-**Butterchurn (EXPLICIT shader, not feedback — a zoom artifact gives mush, not crisp
-rays):**
+> **CORRECTION (user verified against the original, section G 2:11-2:25):** the net
+> tunnel is **NOT** a drawn shader. It is **1-2 LINES through center rotating FAST**,
+> whose feedback **trace** accumulates into the radial net; **inward zoom** (zoom<1)
+> converges the trace to a VP (depth + concentric ring banding) and a **fast hue cycle**
+> paints the rainbow rings (each radius = a different trace age = a different hue). Same
+> mechanism as Dance / Waveform Sheet. The explicit-ray recipe below is SUPERSEDED —
+> see `P["Alchemy v2: Net Tunnel"]` for the real implementation (rotating `rotLine`
+> waves + decay 0.985 + zoom 0.972). The earlier "perspective convergence not feedback
+> zoom" verdict was wrong; the rings/depth ARE feedback zoom of the rotating-line trace.
+
+**Butterchurn (SUPERSEDED — explicit-ray sketch; the rotating-line+trace version above
+is correct):**
 ```
 baseVals: decay 0.94 (line glow only), zoom 1.0 (convergence in-shader), rot 0.004,
           warp 0, wrap 0, darken_center 0 (VP is BRIGHT), cx 0.46 cy 0.50 (VP drifts)
