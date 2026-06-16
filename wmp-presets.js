@@ -406,7 +406,78 @@
     // frame with only a faint glow trail, NOT smeared into rings. Right for pulsing centered
     // motifs (anemone, mandala) where the reference is sharp fur, not echoey concentric ghosts.
     if (kind === "flat")  return { wave_a: 0, gammaadj: 1.3, decay: 0.88, zoom: 0.998, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0 };
+    // ── NEW camera presets (camera-motifs-reference.md). A per-frame DRIVER (alcCam*) usually
+    // animates these; the static baseVals here set the resting pose.
+    // "hold": dead-air — no transform, faint glow only (intros/lulls). CAM0.
+    if (kind === "hold")  return { wave_a: 0, gammaadj: 1.4, decay: 0.90, zoom: 1.0, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+    // "plunge": fly INTO the scene — zoom>1 (content blooms outward from the VP). Drive zoom/cx/cy
+    // with alcCamPlunge for bass-speed + a drifting vanishing point. CAM1.
+    if (kind === "plunge") return { wave_a: 0, gammaadj: 1.5, decay: 0.94, zoom: 1.015, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+    // "vortex": spin + inward suction toward the VP. Drive with alcCamVortex (rot + zoom<1). The
+    // signature Alchemy camera. CAM3. (A custom warp shader gives the cleanest spiral — see Vortex scene.)
+    if (kind === "vortex") return { wave_a: 0, gammaadj: 1.5, decay: 0.94, zoom: 0.985, cx: 0.50, cy: 0.50, rot: 0.03, warp: 0.0, wrap: 0, darken_center: 0.06, echo_alpha: 0 };
+    // "tiltFloor": pseudo-isometric — vertical squash (sy<sx) + a high horizon (cy) so a drawn
+    // floor grid recedes to a horizon band. CAM5. The grid itself is drawn geometry; this is the pose.
+    if (kind === "tiltFloor") return { wave_a: 0, gammaadj: 1.4, decay: 0.90, zoom: 1.0, sx: 1.0, sy: 0.6, cx: 0.50, cy: 0.34, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
     /* top */             return { wave_a: 0, gammaadj: 1.5, decay: 0.93, zoom: 0.955, cx: 0.50, cy: 0.50, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0 };
+  }
+
+  // ── CAMERA DRIVERS (camera-motifs-reference.md) — call in a scene's frame_eqs to ANIMATE the
+  // camera with audio. Each sets independent feedback fields (zoom vs rot vs dx/dy) so they STACK.
+  // Work with the default warp (which applies zoom/rot/cx/cy/dx/dy/sx/sy to the warp mesh); scenes
+  // with a custom uv-sampling warp do their transform in-shader instead. ─────────────────────────
+
+  // CAM1 — Z-PLUNGE: fly into the scene. zoom>1 scaled by bass; optional drifting off-center VP.
+  //   opts.base (rest zoom >1) | opts.gain (bass->speed) | opts.vpDrift (VP wander radius, 0=centered) | opts.vpRate
+  function alcCamPlunge(t, opts) {
+    opts = opts || {};
+    var bass = t.bass_att || t.bass || 1;
+    t.zoom = (opts.base === undefined ? 1.012 : opts.base) + (opts.gain === undefined ? 0.05 : opts.gain) * Math.max(0, bass - 1);
+    if (opts.vpDrift) {
+      var rate = opts.vpRate === undefined ? 0.1 : opts.vpRate;
+      t.cx = 0.5 + opts.vpDrift * Math.cos(t.time * rate);
+      t.cy = 0.5 + opts.vpDrift * Math.sin(t.time * rate * 1.3);
+    }
+    return t;
+  }
+
+  // CAM3 — VORTEX: continuous spin + inward suction toward the VP. mid speeds the swirl, bass deepens suction.
+  //   opts.zoom (rest <1) | opts.spin (rad/frame) | opts.midGain | opts.bassGain
+  function alcCamVortex(t, opts) {
+    opts = opts || {};
+    var mid = t.mid_att || t.mid || 1, bass = t.bass_att || t.bass || 1;
+    t.zoom = (opts.zoom === undefined ? 0.985 : opts.zoom) - (opts.bassGain === undefined ? 0.01 : opts.bassGain) * Math.max(0, bass - 1);
+    t.rot = (opts.spin === undefined ? 0.02 : opts.spin) * (1 + (opts.midGain === undefined ? 0.6 : opts.midGain) * Math.max(0, mid - 1));
+    return t;
+  }
+
+  // CAM4 — ROLL / bank: continuous Z rotation. For the beat-SNAP variant, pass a flash (alcBeatFlash)
+  // and a snapStep (rad) — the bank jumps by snapStep on a transient.  opts.rate | opts.snapStep
+  function alcCamRoll(t, opts, flash) {
+    opts = opts || {};
+    t.rot = (opts.rate === undefined ? 0.01 : opts.rate);
+    if (opts.snapStep && flash) t.rot += opts.snapStep * flash;   // beat-snap kick (decays with flash)
+    return t;
+  }
+
+  // CAM6 — FLOAT: smooth low-frequency handheld pan-drift (a gentle glide, NOT a shake).
+  //   opts.amp (drift radius) | opts.rx/opts.ry (drift rates)
+  function alcCamFloat(t, opts) {
+    opts = opts || {};
+    var amp = opts.amp === undefined ? 0.004 : opts.amp;
+    t.dx = amp * Math.sin(t.time * (opts.rx === undefined ? 0.23 : opts.rx));
+    t.dy = amp * Math.cos(t.time * (opts.ry === undefined ? 0.19 : opts.ry));
+    return t;
+  }
+
+  // CAM6 jitter (per Gemini; NOT seen in the clip — use as a rare accent): transient XY shake.
+  // Pass `flash` from alcBeatFlash so it only fires on a beat, then snaps back to 0.  opts.amt
+  function alcCamJitter(t, flash, opts) {
+    opts = opts || {};
+    var amt = (opts.amt === undefined ? 0.012 : opts.amt) * (flash || 0);
+    t.dx = (t.dx || 0) + (Math.random() - 0.5) * amt;
+    t.dy = (t.dy || 0) + (Math.random() - 0.5) * amt;
+    return t;
   }
 
   // Muted teal/green family for the net lines (hue h cycles slowly). `warm` (0..1)
