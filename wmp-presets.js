@@ -84,6 +84,36 @@
     "  return c * (0.55 + 0.5 * b);\n" +
     "}\n";
 
+  // Alchemy v2 BG4: green<->magenta "marble / aurora" field — domain-warped fbm with
+  // bright iso-contour RIDGE lines (the signature texture from section E-late of the
+  // reference; see docs/alchemy-v2/background-motifs-reference.md). The ridges
+  // (abs(fract(fbm*k)-0.5) thresholded) are what make it read as marble, not generic
+  // noise. The field SWIRLS IN PLACE (a slow rotation matrix) — it is NOT a feedback
+  // zoom. `d` = aspect-corrected centered coord (0 at center); `t` = time; `b` = bass
+  // (brightens the ridges on beats). Needs NOISE_GLSL (fbm) prepended.
+  var ALC_MARBLE_GLSL =
+    "vec3 alcMarble(vec2 d, float t, float b){\n" +
+    "  vec2 q = d + 0.15*vec2(sin(t*0.20), cos(t*0.17));\n" +
+    "  float cs = cos(t*0.05), sn = sin(t*0.05);\n" +
+    "  q = mat2(cs, -sn, sn, cs) * q;\n" +                            // slow in-place swirl (NOT feedback-zoom)
+    "  float f = fbm(q*3.0 + t*0.05);\n" +
+    "  float rdg = abs(fract(f*5.0 + t*0.10) - 0.5);\n" +
+    "  float ridge = smoothstep(0.06, 0.0, rdg) * (0.6 + 0.6*b);\n" +  // bright iso-contour lines, bass-lifted
+    "  vec3 base = mix(vec3(0.16,0.40,0.27), vec3(0.42,0.24,0.46), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta
+    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.45,0.85,0.55);\n" +
+    "  c *= mix(1.0, smoothstep(0.0, 0.45, length(d)), 0.6);\n" +      // soft INVERTING vignette (center darker, per frames)
+    "  return c;\n" +
+    "}\n";
+
+  // Alchemy v2 BG10: a barely-visible (~3%) STATIC fine cross-hatch / ordered-dither.
+  // Adds "tooth" to flat washes — the texture seen even on the reference's plain field
+  // (NOT animated CRT scanlines; it does not scroll or tear). Splice into a comp
+  // shader_body AFTER `ret` is set, BEFORE the closing brace. Reads uv/resolution/ret
+  // only (all valid there); keep the modulation tiny or it reads as noise.
+  var ALC_HATCH =
+    "float hx = step(0.5, fract((uv.x + uv.y) * resolution.y * 0.5));\n" +
+    "ret *= mix(0.97, 1.0, hx);\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -2966,6 +2996,58 @@
     preset.waves[1] = alcOrbTarget("q23", "q24", 2, ALC_PAL.warm);   // orb B: 2 concentric rings
     preset.waves[2] = alcTether("q21", "q22", "q23", "q24", "q26",   // golden waveform tether
       function (a, i) { ALC_PAL.warm(a, 0); a.r = Math.min(1.5, a.r * 1.4); a.g = Math.min(1.5, a.g * 1.3); });
+    return preset;
+  })();
+
+  // ── Alchemy v2: Marble ───────────────────────────────────────────────────────
+  // BG4 showcase: the green<->magenta domain-warped "marble / aurora" field (section
+  // E-late of the reference) — fbm with bright iso-contour ridges swirling in place,
+  // plus the faint static dither (BG10). Two bullseye orbs on a slow antipodal orbit
+  // joined by a live-waveform tether sit over it (orbs-over-marble, per the frames).
+  // This is a CALM "rest" scene — muted, near-zero feedback so the marble stays crisp.
+  P["Alchemy v2: Marble"] = (function () {
+    var hue = 0, lastT = 0;
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.90, gammaadj: 1.35,
+        zoom: 1.0, rot: 0.006,        // tiny global swirl; the marble swirl is in-shader
+        warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || 1, mid = t.mid_att || 1, treb = t.treb_att || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          hue = (hue + dt * (0.015 + 0.03 * ((bass + mid) / 2))) % 1;
+
+          var R = 0.30 + 0.03 * Math.max(0, bass - 1);  // slow antipodal orbit
+          var ang = tm * 0.16;
+          t.q21 = 0.5 + R * Math.cos(ang);              // orb A
+          t.q22 = 0.5 + R * Math.sin(ang);
+          t.q23 = 0.5 - R * Math.cos(ang);              // orb B (antipodal)
+          t.q24 = 0.5 - R * Math.sin(ang);
+          t.q7  = 0.05 + 0.02 * Math.max(0, bass - 1);  // bullseye ring radius
+          t.q8  = hue;
+          t.q26 = 0.03 + 0.05 * Math.max(0, treb - 1);  // tether jaggedness (treble)
+          return t;
+        },
+        // BG4 marble + crisp geometry + soft bloom + Reinhard tone-map + BG10 hatch.
+        comp:
+          NOISE_GLSL + ALC_MARBLE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "vec3 bg = alcMarble(d, time, bass);\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + sharp + glow * 0.28;\n" +
+          "ret = outc / (outc + vec3(0.80));\n" +        // Reinhard: muted, no white-out
+          ALC_HATCH +
+          "}\n"
+      }
+    );
+    // orbs-over-marble: two bullseye orbs joined by a live-waveform tether (green<->magenta).
+    preset.waves[0] = alcOrbTarget("q21", "q22", 2, ALC_PAL.roseGreen);
+    preset.waves[1] = alcOrbTarget("q23", "q24", 2, ALC_PAL.roseGreen);
+    preset.waves[2] = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.roseGreen);
     return preset;
   })();
 
