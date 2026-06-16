@@ -3179,8 +3179,8 @@
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;   // hue still drifts with music; rotation does NOT
           t.q1 = tm * 3.4;                               // CONSTANT spin (~0.5 rev/s) — NOT audio-driven, per user
           t.q8 = hue;
-          // STROBE: stamp a spoke ~every 0.06s -> discrete spaced spokes (gaps between them).
-          if (tm - lastStamp >= 0.06) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
+          // STROBE: stamp a spoke ~every 0.03s -> denser discrete spokes (still gaps between them).
+          if (tm - lastStamp >= 0.03) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
           return t;
         },
         // FADE is here (decay baseVal does nothing in this build): multiplicative fade in place
@@ -3203,10 +3203,13 @@
     );
     // Compose the reusable BG8 fan motif (rotating diameter-lines). The scene drives q1/q8
     // and supplies the feedback camera above; alcRotLines is the drop-in seed primitive.
-    // ONE plain (no-waveform) straight line, Butterchurn thick flag. Strobed -> discrete spokes;
-    // the warp fade clears them within a rotation so no full circle accumulates.
-    var lines = alcRotLines(1, { len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1, strobeVar: "q15" });
+    // ONE thick plain (no-waveform) line. Thickness = 3 TIGHT parallel copies (gap 0.0012)
+    // that MERGE into a single fat stroke (not 3 separate lines — that earlier bug used 5x the
+    // gap). Strobed -> discrete spokes; the warp fade clears them within a rotation (no full circle).
+    var lines = alcRotLines(3, { parallel: true, gap: 0.0012, len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.95, thick: 1, strobeVar: "q15" });
     preset.waves[0] = lines[0];
+    preset.waves[1] = lines[1];
+    preset.waves[2] = lines[2];
     return preset;
   })();
 
