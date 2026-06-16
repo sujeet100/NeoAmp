@@ -660,11 +660,12 @@
     var sat = opts.sat === undefined ? 0.55 : opts.sat;
     var alpha = opts.alpha === undefined ? 0.8 : opts.alpha;
     var hueOff = opts.hueOff || 0;
+    var thick = opts.thick === undefined ? 0 : opts.thick;   // 1 = fatter, more visible lines
     function line(angOff) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
           enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.06, a: alpha, thick: 0
+          smoothing: 0.06, a: alpha, thick: thick
         }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
@@ -3155,7 +3156,7 @@
     var hue = 0, lastT = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.955, gammaadj: 1.5,   // trace dense enough for a full fan, still visibly sweeping
+        wave_a: 0, decay: 0.965, gammaadj: 1.5,   // tail fades BEFORE the line closes the circle -> partial sweeping comet-arc
         zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
         rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
@@ -3164,7 +3165,7 @@
           var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;
-          t.q1 = tm * (5.0 + 3.0 * mid);                 // CLEARLY rotating (~0.8-1.3 rev/s, mid speeds it)
+          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.4 rev/s) so you see the sweep + fading tail
           t.q8 = hue;
           return t;
         },
@@ -3183,9 +3184,10 @@
     );
     // Compose the reusable BG8 fan motif (rotating diameter-lines). The scene drives q1/q8
     // and supplies the feedback camera above; alcRotLines is the drop-in seed primitive.
-    var lines = alcRotLines(2, { len: 0.70, jiggle: 0.012, sat: 0.55, alpha: 0.8 });
+    // ONE thick, nearly ruler-straight line; low decay -> a visible rotating line with a
+    // comet-tail that fades before it closes the circle (per the user's read of the original).
+    var lines = alcRotLines(1, { len: 0.70, jiggle: 0.005, sat: 0.6, alpha: 0.9, thick: 1 });
     preset.waves[0] = lines[0];
-    preset.waves[1] = lines[1];
     return preset;
   })();
 
