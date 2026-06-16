@@ -660,8 +660,12 @@
     var sat = opts.sat === undefined ? 0.55 : opts.sat;
     var alpha = opts.alpha === undefined ? 0.8 : opts.alpha;
     var hueOff = opts.hueOff || 0;
-    var thick = opts.thick === undefined ? 0 : opts.thick;   // 1 = fatter, more visible lines
-    function line(angOff) {
+    var thick = opts.thick === undefined ? 0 : opts.thick;   // 1 = fatter butterchurn line
+    // parallel mode: the n lines share ONE angle but are offset perpendicular by `gap` -> a
+    // single THICK band (vs. the default angular spread of n distinct lines around center).
+    var parallel = opts.parallel || false;
+    var gap = opts.gap === undefined ? 0.005 : opts.gap;
+    function line(angOff, perpOff) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
           enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
@@ -672,9 +676,9 @@
           var th = (a.q1 || 0) + angOff;
           var ct = Math.cos(th), st = Math.sin(th);
           var s = a.sample * 2.0 - 1.0;                 // -1..1 along the diameter line
-          var disp = (a.value1 || 0) * jig;             // small jiggle -> nearly straight fine lines
-          a.x = 0.5 + s * len * ct - disp * st;
-          a.y = 0.5 + s * len * st + disp * ct;
+          var off = (a.value1 || 0) * jig + perpOff;    // jig=0 -> plain straight line; perpOff = thickness offset
+          a.x = 0.5 + s * len * ct - off * st;
+          a.y = 0.5 + s * len * st + off * ct;
           var h = (a.q8 || 0) + hueOff;
           var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
           var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
@@ -688,7 +692,10 @@
       };
     }
     var arr = [];
-    for (var i = 0; i < n; i++) arr.push(line(i * Math.PI / n));
+    for (var i = 0; i < n; i++) {
+      if (parallel) arr.push(line(0, (i - (n - 1) / 2) * gap));   // n parallel copies -> thick band
+      else arr.push(line(i * Math.PI / n, 0));                    // n distinct lines spread around center
+    }
     return arr;
   }
 
@@ -3156,7 +3163,7 @@
     var hue = 0, lastT = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.965, gammaadj: 1.5,   // tail fades BEFORE the line closes the circle -> partial sweeping comet-arc
+        wave_a: 0, decay: 0.93, gammaadj: 1.5,   // SHORT trace: traces disappear quickly so the sweep stays sparse, not messy
         zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
         rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
@@ -3184,10 +3191,13 @@
     );
     // Compose the reusable BG8 fan motif (rotating diameter-lines). The scene drives q1/q8
     // and supplies the feedback camera above; alcRotLines is the drop-in seed primitive.
-    // ONE thick, nearly ruler-straight line; low decay -> a visible rotating line with a
-    // comet-tail that fades before it closes the circle (per the user's read of the original).
-    var lines = alcRotLines(1, { len: 0.70, jiggle: 0.005, sat: 0.6, alpha: 0.9, thick: 1 });
+    // ONE thick PLAIN (no-waveform) straight line as 3 parallel copies; short decay -> a
+    // visible rotating line leaving a sparse, quickly-fading trace (per the user's read of the
+    // original). jiggle:0 keeps it ruler-straight even with music (waveform jag was the mess).
+    var lines = alcRotLines(3, { parallel: true, gap: 0.006, len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1 });
     preset.waves[0] = lines[0];
+    preset.waves[1] = lines[1];
+    preset.waves[2] = lines[2];
     return preset;
   })();
 
