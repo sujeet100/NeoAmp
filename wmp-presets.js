@@ -642,6 +642,96 @@
     return arr;
   }
 
+  // MOTIF (BG8 net tunnel) — `n` DIAMETER-lines through center, all sharing the rotation
+  // angle q1 (set by the scene's frame_eqs) and evenly spread by π/n. Under a feedback
+  // TRACE the rotating lines sweep into a dense FAN crossing at center — the mechanism the
+  // user confirmed from the original (rotating lines + persistence, NOT a drawn shader). The
+  // scene supplies the rotation (q1), hue (q8) and the feedback camera (decay/zoom); this
+  // builder is just the seed primitive, so any scene can drop the fan in. Returns an ARRAY.
+  //   opts.len    half-length of each line (0..~0.7)
+  //   opts.jiggle live-waveform perpendicular displacement (0 = ruler-straight)
+  //   opts.sat    colour saturation (low = pale threads)
+  //   opts.alpha  per-line alpha (modest so the trace accumulates without blowing out)
+  //   opts.hueOff hue offset added to the cycling q8
+  function alcRotLines(n, opts) {
+    n = n || 2; opts = opts || {};
+    var len = opts.len === undefined ? 0.70 : opts.len;
+    var jig = opts.jiggle === undefined ? 0.04 : opts.jiggle;
+    var sat = opts.sat === undefined ? 0.55 : opts.sat;
+    var alpha = opts.alpha === undefined ? 0.8 : opts.alpha;
+    var hueOff = opts.hueOff || 0;
+    function line(angOff) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.06, a: alpha, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var th = (a.q1 || 0) + angOff;
+          var ct = Math.cos(th), st = Math.sin(th);
+          var s = a.sample * 2.0 - 1.0;                 // -1..1 along the diameter line
+          var disp = (a.value1 || 0) * jig;             // small jiggle -> nearly straight fine lines
+          a.x = 0.5 + s * len * ct - disp * st;
+          a.y = 0.5 + s * len * st + disp * ct;
+          var h = (a.q8 || 0) + hueOff;
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3;
+          a.r = rr * sat + l * (1 - sat);
+          a.g = gg * sat + l * (1 - sat);
+          a.b = bb * sat + l * (1 - sat);
+          return a;
+        }
+      };
+    }
+    var arr = [];
+    for (var i = 0; i < n; i++) arr.push(line(i * Math.PI / n));
+    return arr;
+  }
+
+  // MOTIF (BG7 fountain/vortex) — a fine RADIAL live-waveform burst around center: each
+  // sample is a spoke whose radius = q9 (base) + q10*sample-value. On its own it's a spiky
+  // flower; under a feedback warp that streams outward it becomes a fountain pinwheel, or
+  // under an inward-spiral warp a vortex. The scene supplies q8 (hue), q9/q10 (radius/amp)
+  // and the feedback camera; this builder is the reusable seed. Returns ONE wave.
+  //   opts.useSecond use value2 instead of value1 (a second decorrelated copy for density)
+  //   opts.hueOff    hue offset added to q8
+  //   opts.sat       saturation (1 = vivid magenta/lime/cyan; lower = dustier)
+  //   opts.gain      brightness
+  function alcRadialBurst(opts) {
+    opts = opts || {};
+    var useSecond = opts.useSecond || false;
+    var hueOff = opts.hueOff || 0;
+    var sat = opts.sat === undefined ? 1.0 : opts.sat;
+    var gain = opts.gain === undefined ? 1.0 : opts.gain;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.04, a: 0.85, thick: 0
+      }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ang = a.sample * 6.2832;
+        var samp = useSecond ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+        var rad = (a.q9 || 0.04) + (a.q10 || 0.06) * (samp || 0);
+        if (rad < 0.02) rad = 0.02;
+        a.x = 0.5 + rad * Math.cos(ang);
+        a.y = 0.5 + rad * Math.sin(ang);
+        var h = (a.q8 || 0) + hueOff + a.sample * 0.5;   // hue varies around the ring
+        var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+        var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+        var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+        var l = (rr + gg + bb) / 3;
+        a.r = (rr * sat + l * (1 - sat)) * gain;
+        a.g = (gg * sat + l * (1 - sat)) * gain;
+        a.b = (bb * sat + l * (1 - sat)) * gain;
+        return a;
+      }
+    };
+  }
+
   // MOTIF — an orb: a COLOR-FILLED glow disc with a THICK ring border, drawn at head (q2,q3),
   // radius q7. Under a camera's feedback it leaves the receding trail of shrinking orbs.
   //   fillHueOff   — fill hue offset (added to the cycling q8).
@@ -3065,7 +3155,7 @@
     var hue = 0, lastT = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.94, gammaadj: 1.5,    // MODERATE trace -> fan refreshes so the sweep is VISIBLE
+        wave_a: 0, decay: 0.955, gammaadj: 1.5,   // trace dense enough for a full fan, still visibly sweeping
         zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
         rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
@@ -3091,36 +3181,11 @@
           "}\n"
       }
     );
-    // Diameter-lines through center, ROTATING visibly; the feedback trace fans out behind
-    // the sweep. (Orbiters intentionally omitted for now — get the rotating fan right first.)
-    function rotLine(angOff) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.06, a: 0.8, thick: 0
-        }),
-        init_eqs: passthrough, frame_eqs: passthrough,
-        point_eqs: function (a) {
-          var th = (a.q1 || 0) + angOff;
-          var ct = Math.cos(th), st = Math.sin(th);
-          var s = a.sample * 2.0 - 1.0;                 // -1..1 along the diameter line
-          var disp = (a.value1 || 0) * 0.04;            // small jiggle -> nearly straight fine lines
-          a.x = 0.5 + s * 0.70 * ct - disp * st;
-          a.y = 0.5 + s * 0.70 * st + disp * ct;
-          var h = a.q8 || 0, sat = 0.55;
-          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-          var l = (rr + gg + bb) / 3;
-          a.r = (rr * sat + l * (1 - sat));
-          a.g = (gg * sat + l * (1 - sat));
-          a.b = (bb * sat + l * (1 - sat));
-          return a;
-        }
-      };
-    }
-    preset.waves[0] = rotLine(0.0);
-    preset.waves[1] = rotLine(Math.PI / 2);   // second perpendicular line
+    // Compose the reusable BG8 fan motif (rotating diameter-lines). The scene drives q1/q8
+    // and supplies the feedback camera above; alcRotLines is the drop-in seed primitive.
+    var lines = alcRotLines(2, { len: 0.70, jiggle: 0.012, sat: 0.55, alpha: 0.8 });
+    preset.waves[0] = lines[0];
+    preset.waves[1] = lines[1];
     return preset;
   })();
 
@@ -3180,33 +3245,10 @@
       }
     );
 
-    // SEED: a fine radial live-waveform burst near center (vivid). The feedback warp
-    // streams these spikes outward into the fountain filaments. Two offset copies for density.
-    function fountainBurst(useSecond, hueOff) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.04, a: 0.85, thick: 0
-        }),
-        init_eqs: passthrough, frame_eqs: passthrough,
-        point_eqs: function (a) {
-          var ang = a.sample * 6.2832;
-          var samp = useSecond ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
-          var rad = (a.q9 || 0.04) + (a.q10 || 0.06) * (samp || 0);
-          if (rad < 0.02) rad = 0.02;
-          a.x = 0.5 + rad * Math.cos(ang);
-          a.y = 0.5 + rad * Math.sin(ang);
-          // vivid spread palette (magenta/lime/cyan) keyed by angle + hue cycle
-          var h = (a.q8 || 0) + (hueOff || 0) + a.sample * 0.5;
-          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 1.0;
-          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 1.0;
-          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 1.0;
-          return a;
-        }
-      };
-    }
-    preset.waves[0] = fountainBurst(false, 0.0);
-    preset.waves[1] = fountainBurst(true, 0.33);
+    // Compose the reusable radial-burst motif (two decorrelated copies for filament density).
+    // The feedback warp above streams these spikes outward into the fountain.
+    preset.waves[0] = alcRadialBurst({ useSecond: false, hueOff: 0.0, sat: 1.0 });
+    preset.waves[1] = alcRadialBurst({ useSecond: true, hueOff: 0.33, sat: 1.0 });
     return preset;
   })();
 
