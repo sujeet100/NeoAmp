@@ -124,10 +124,14 @@
     "vec3 alcNetTunnel(vec2 d, float t, float b){\n" +
     "  float pang = atan(d.y, d.x);\n" +                                // NOT 'ang' (reserved in main())
     "  float pr = length(d);\n" +                                      // NOT 'rad' (reserved)
-    "  float rays = abs(fract(pang*28.0/6.2832 + t*0.05) - 0.5);\n" +   // 28 spokes, slow roll
-    "  float line = smoothstep(0.05, 0.0, rays) * (0.22/(pr+0.16));\n" +  // thin rays, brighter near VP
+    "  float rays = abs(fract(pang*28.0/6.2832 + t*0.05) - 0.5);\n" +   // 28 radial spokes (longitudinal wires)
+    "  float spoke = smoothstep(0.05, 0.0, rays) * (0.22/(pr+0.16));\n" +  // thin rays, brighter near VP
+    "  float lr = log(pr + 0.05);\n" +                                 // log radius -> rings bunch toward VP (perspective)
+    "  float rg = abs(fract(lr*2.6 - t*0.25) - 0.5);\n" +              // concentric depth rings, flowing INWARD = forward motion
+    "  float ring = smoothstep(0.06, 0.0, rg) * smoothstep(0.02, 0.18, pr) * 0.9;\n" +  // fade rings out near the VP
+    "  float net = max(spoke, ring);\n" +                              // spokes + rings = wireframe NET tunnel
     "  vec3 c = pal(pr*0.6 + t*0.04 + pang*0.05);\n" +                  // slow rainbow drift along depth
-    "  c *= line * (1.1 + b*1.4);\n" +                                  // bass lifts the VP glow
+    "  c *= net * (1.1 + b*1.4);\n" +                                   // bass lifts the VP glow
     "  return c;\n" +
     "}\n";
 
