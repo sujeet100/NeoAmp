@@ -96,11 +96,11 @@
     "  vec2 q = d + 0.15*vec2(sin(t*0.20), cos(t*0.17));\n" +
     "  float cs = cos(t*0.05), sn = sin(t*0.05);\n" +
     "  q = mat2(cs, -sn, sn, cs) * q;\n" +                            // slow in-place swirl (NOT feedback-zoom)
-    "  float f = fbm(q*4.4 + t*0.05);\n" +                            // finer-grained marble cells
-    "  float rdg = abs(fract(f*7.0 + t*0.10) - 0.5);\n" +             // more, thinner iso-contour veins
-    "  float ridge = smoothstep(0.022, 0.0, rdg) * (0.32 + 0.40*b);\n" +  // THIN lines, dimmer (no white blowout)
-    "  vec3 base = mix(vec3(0.15,0.38,0.26), vec3(0.34,0.20,0.40), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta (less hot)
-    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.34,0.68,0.42);\n" +  // veins stay COLORED (sage-lime), not pale white
+    "  float f = fbm(q*3.0 + t*0.05);\n" +
+    "  float rdg = abs(fract(f*5.0 + t*0.10) - 0.5);\n" +
+    "  float ridge = smoothstep(0.06, 0.0, rdg) * (0.6 + 0.6*b);\n" +  // bold bright iso-contour veins (user preferred this)
+    "  vec3 base = mix(vec3(0.16,0.40,0.27), vec3(0.42,0.24,0.46), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta
+    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.45,0.85,0.55);\n" +
     "  c *= mix(1.0, smoothstep(0.0, 0.45, length(d)), 0.6);\n" +      // soft INVERTING vignette (center darker, per frames)
     "  return c;\n" +
     "}\n";
@@ -113,6 +113,23 @@
   var ALC_HATCH =
     "float hx = step(0.5, fract((uv.x + uv.y) * resolution.y * 0.5));\n" +
     "ret *= mix(0.97, 1.0, hx);\n";
+
+  // Alchemy v2 BG8: perspective wireframe TUNNEL — fine radial rays converging to a
+  // vanishing point (section G of the reference). This is an EXPLICIT shader, NOT a
+  // feedback zoom (a zoom artifact gives mush, not crisp converging rays); the rays
+  // brighten toward the VP and carry a slow rainbow hue drift. `d` = aspect-corrected
+  // centered coord (0 at the VP); `t` = time; `b` = bass (brightens the VP on beats).
+  // Needs PAL_GLSL (pal) prepended. Caller adds the warm corner vignette + tone-map.
+  var ALC_NETTUNNEL_GLSL =
+    "vec3 alcNetTunnel(vec2 d, float t, float b){\n" +
+    "  float pang = atan(d.y, d.x);\n" +                                // NOT 'ang' (reserved in main())
+    "  float pr = length(d);\n" +                                      // NOT 'rad' (reserved)
+    "  float rays = abs(fract(pang*28.0/6.2832 + t*0.05) - 0.5);\n" +   // 28 spokes, slow roll
+    "  float line = smoothstep(0.05, 0.0, rays) * (0.22/(pr+0.16));\n" +  // thin rays, brighter near VP
+    "  vec3 c = pal(pr*0.6 + t*0.04 + pang*0.05);\n" +                  // slow rainbow drift along depth
+    "  c *= line * (1.1 + b*1.4);\n" +                                  // bass lifts the VP glow
+    "  return c;\n" +
+    "}\n";
 
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
