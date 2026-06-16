@@ -3443,7 +3443,8 @@
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
           "float pr = length(d);\n" +
           "float yb = d.y * 4.0 + time * 0.06;\n" +
-          "vec3 bands = pal(fract(yb) + q8);\n" +
+          "float bb = 0.5 + 0.5 * sin(fract(yb) * 6.2832);\n" +
+          "vec3 bands = mix(vec3(1.0, 0.18, 0.18), vec3(0.18, 0.95, 0.35), bb);\n" +   // red↔green bands (no rainbow)
           "bands *= exp(-pow(d.y * 3.0, 2.0));\n" +
           "vec3 bg = bands * clamp(q14, 0.0, 1.0) * (0.5 + 0.5 * q16);\n" +
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
@@ -3464,10 +3465,12 @@
           var disp = (a.value1 || 0) * 0.05 * ff;       // waveform jag grows outward along each spoke
           a.x = 0.5 + rad * Math.cos(ang) - disp * Math.sin(ang);
           a.y = 0.5 + rad * Math.sin(ang) + disp * Math.cos(ang);
-          var h = (a.q8 || 0) + k * 0.04;               // vivid rainbow spread
-          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 0.8;
-          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 0.8;
-          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 0.8;
+          // RED↔GREEN two-tone (the reference X-tunnel is red/green, NOT a rainbow);
+          // parity splits spokes into the two hues, the duo drifts slowly with q8.
+          var h = (k % 2 ? 0.0 : 0.65) + 0.05 * Math.sin(6.2832 * (a.q8 || 0));
+          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 0.85;
+          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 0.85;
+          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 0.85;
           return a;
         }
       };
@@ -3502,7 +3505,7 @@
   // L3 flat-blue ↔ marble bg crossfade (q14) · L4 diagonal-line + orbiter fade (q17).
   P["Alchemy v2: Era — Mandala/Fluid"] = (function () {
     var huePhase = 0, lastT = 0, bgPhase = 0, linePhase = 0, spin = 0;
-    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.85, gain: 1.3 }); // bright neon green↔magenta lines
+    var linePal = alcPalette({ base: 0.55, step: 0.15, sat: 0.5, gain: 1.6 }); // bright pale cyan/white lines that POP on the saturated blue
     var preset = build(
       { wave_a: 0, decay: 0.5, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
       {
@@ -3526,17 +3529,16 @@
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
           "float pr = length(d);\n" +
-          "vec3 flatbg = vec3(0.10, 0.22, 0.38);\n" +              // flat muted blue
+          "vec3 flatbg = vec3(0.08, 0.26, 0.60) * (1.0 - 0.45 * pr);\n" +  // RICH saturated blue backdrop (the reference is vivid, NOT muted)
           "vec2 fq = d + 0.15 * vec2(sin(time * 0.2), cos(time * 0.17));\n" +
           "float fv = fbm(fq * 3.0 + time * 0.05);\n" +
           "float rdg = abs(fract(fv * 5.0) - 0.5);\n" +
-          "float ridge = smoothstep(0.06, 0.0, rdg);\n" +
-          "vec3 marble = mix(vec3(0.05, 0.12, 0.07), vec3(0.14, 0.04, 0.13), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.12, 0.34, 0.18);\n" +
+          "float ridge = smoothstep(0.05, 0.0, rdg);\n" +
+          "vec3 marble = mix(vec3(0.06, 0.20, 0.10), vec3(0.28, 0.05, 0.24), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.20, 0.70, 0.35);\n" +  // luminous green↔magenta fluid + bright veins
           "vec3 bg = mix(flatbg, marble, clamp(q14, 0.0, 1.0));\n" +
-          "bg *= (1.0 - 0.3 * pr) * 0.55;\n" +                           // dimmer bg so the crisp mandala lines read on top
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "vec3 outc = bg + g + glow * 0.18;\n" +
+          "vec3 outc = bg + g + glow * 0.30;\n" +
           "ret = outc / (outc + vec3(0.85));\n" +
           "}\n"
       }
@@ -3547,12 +3549,11 @@
         baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 1.0, thick: 1 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
-          var th = a.sample * 6.2832, seg = 6.2832 / sides;
+          var th = a.sample * 6.2832;
           var phi = (a.q9 || 0) * dir;
-          var w = ((th - phi) % seg + seg) % seg - seg / 2;        // angle within one polygon edge
-          var rad = R * Math.cos(seg / 2) / Math.cos(w) + 0.025 * (a.value1 || 0);
+          var rad = R * (1.0 + 0.25 * Math.cos(sides * (th - phi))) + 0.02 * (a.value1 || 0); // N-petal rose → ornate mandala (not a flat polygon)
           a.x = 0.5 + rad * Math.cos(th); a.y = 0.5 + rad * Math.sin(th);
-          rosePal(a, sides % 2);                                   // alternate the two-tone by polygon
+          linePal(a, sides % 2);                                   // bright pale lines, alternating two pale tones
           return a;
         }
       };
@@ -3664,7 +3665,9 @@
           var ang = (k / n) * 6.2832 + (a.q9 || 0);
           var rad = ff * ((a.q18 || 0.16) + (a.q19 || 0)) + (a.value1 || 0) * 0.04 * ff;  // RAW-bass spike + waveform fur
           a.x = 0.5 + rad * Math.cos(ang); a.y = 0.5 + rad * Math.sin(ang);
-          var h = (a.q8 || 0) + k * 0.05;               // vivid rainbow per spike
+          // GREEN↔MAGENTA two-tone (canonical Alchemy; NOT a rainbow). Parity-split spikes,
+          // duo drifts with the q8 clock.
+          var h = (k % 2 ? 0.2 : 0.65) + 0.05 * Math.sin(6.2832 * (a.q8 || 0));
           a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
           a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
           a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
