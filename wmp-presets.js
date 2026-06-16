@@ -170,6 +170,47 @@
     "  return c * (0.6 + 0.4*b);\n" +
     "}\n";
 
+  // bgKaleido (BG5) — n-FOLD radial kaleidoscope coordinate FOLD. Returns folded centered
+  // coords; sample any field/motif at the result to mirror it into an n-fold mandala. (For a
+  // plain 4-quadrant mirror just use abs(d).) Reusable transform — extracted from the inline
+  // Kaleidoscope scene so any scene can fold any field. `d` = aspect-corrected centered coord.
+  var ALC_KALEIDO_GLSL =
+    "vec2 alcKaleido(vec2 d, float n){\n" +
+    "  float a = atan(d.y, d.x);\n" +
+    "  float r = length(d);\n" +
+    "  float seg = 6.2832 / n;\n" +
+    "  a = abs(a - seg * floor(a / seg + 0.5));\n" +            // fold angle into one mirrored wedge
+    "  return vec2(cos(a), sin(a)) * r;\n" +
+    "}\n";
+
+  // bgMoire (BG6) — quad-mirrored MOIRÉ stripe colour field. PRODUCT of two mirrored stripe
+  // sets (x AND y) -> the diamond/BUTTERFLY interference (fixes the standing moiré TODO; the
+  // old inline version only had x-stripes). `uv` = raw 0..1 uv; `t` time; `b` bass (pan+bright).
+  // Needs PAL_GLSL (pal). Returns the bar colour to composite.
+  var ALC_MOIRE_GLSL =
+    "vec3 alcMoire(vec2 uv, float t, float b){\n" +
+    "  vec2 m = abs(uv - 0.5) + 0.5;\n" +                       // quad mirror (L/R + T/B) -> butterfly symmetry
+    "  float pan = t * 0.15 + b * 0.4;\n" +
+    "  float pitch = 20.0 + 5.0 * sin(t * 0.2);\n" +
+    "  float bx = 0.5 + 0.5 * cos((m.x * pitch + pan) * 6.2832);\n" +
+    "  float by = 0.5 + 0.5 * cos((m.y * pitch * 0.6 - pan) * 6.2832);\n" +  // second axis -> butterfly moiré
+    "  float bars = pow(bx * by, 2.5);\n" +                     // product of two mirrored stripe sets
+    "  vec3 hue = pal(t * 0.05 + 0.67);\n" +                    // green-start
+    "  return mix(vec3(0.01,0.03,0.01), hue * (0.4 + 0.2*b), bars);\n" +
+    "}\n";
+
+  // bgSolidSnap (T2.5) — instant SOLID-COLOUR flip background: returns one of N dusty preset
+  // colours by index. The scene flips `sel` on a beat/timer (and runs decay≈0 / clear warp) so
+  // the whole field SNAPS to a new solid colour with no fade — the discrete scene-change events.
+  var ALC_SOLIDSNAP_GLSL =
+    "vec3 alcSolidSnap(float sel){\n" +
+    "  float i = mod(floor(sel), 4.0);\n" +
+    "  if (i < 0.5) return vec3(0.30, 0.42, 0.28);\n" +         // sage green
+    "  if (i < 1.5) return vec3(0.16, 0.22, 0.45);\n" +         // cobalt blue
+    "  if (i < 2.5) return vec3(0.45, 0.20, 0.40);\n" +         // mauve
+    "  return vec3(0.40, 0.34, 0.14);\n" +                      // olive gold
+    "}\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -814,6 +855,48 @@
         return a;
       }
     };
+  }
+
+  // MOTIF (BG9) — REFLECTED-WAVEFORM HORIZON ("waveform on water", section G1): the live audio
+  // waveform drawn as a near-horizontal line across the screen at horizon `cy`, plus a second
+  // copy MIRRORED about that horizon (same samples, opposite displacement) -> the on-water
+  // reflection. Returns an ARRAY of 2 waves. Scene may tilt the horizon via q13. Config:
+  //   opts.cy horizon y (0..1) | opts.amp waveform amplitude | opts.len half-span across width
+  //   opts.sat saturation | opts.alpha | opts.hueOff (hue from cycling q8)
+  function bgWaveHorizon(opts) {
+    opts = opts || {};
+    var cy = opts.cy === undefined ? 0.5 : opts.cy;
+    var amp = opts.amp === undefined ? 0.12 : opts.amp;
+    var len = opts.len === undefined ? 0.95 : opts.len;
+    var sat = opts.sat === undefined ? 0.6 : opts.sat;
+    var alpha = opts.alpha === undefined ? 0.8 : opts.alpha;
+    var hueOff = opts.hueOff || 0;
+    function horizonWave(mirror) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.06, a: alpha, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0;                 // -1..1 across the width
+          var tilt = (a.q13 || 0);                      // optional horizon tilt (scene drives q13)
+          var disp = (a.value1 || 0) * amp;
+          a.x = 0.5 + s * len;
+          a.y = cy + s * len * tilt + (mirror ? -disp : disp);   // reflect displacement about horizon
+          var h = (a.q8 || 0) + hueOff;
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3;
+          a.r = rr * sat + l * (1 - sat);
+          a.g = gg * sat + l * (1 - sat);
+          a.b = bb * sat + l * (1 - sat);
+          return a;
+        }
+      };
+    }
+    return [horizonWave(false), horizonWave(true)];
   }
 
   // MOTIF — an orb: a COLOR-FILLED glow disc with a THICK ring border, drawn at head (q2,q3),

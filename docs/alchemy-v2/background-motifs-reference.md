@@ -392,28 +392,30 @@ rays or the iso-contour ridges.
 
 What exists in `wmp-presets.js` today vs. what these backgrounds need:
 
-| Background motif | Kit status | Action |
-|---|---|---|
-| BG4 fbm fluid (teal↔purple) | ✅ `ALC_FLUID_GLSL` / `alcFluid()` | extend: add **iso-contour ridges** + **green↔magenta** + **marble** variant |
-| Reinhard tone-map | ✅ `ALC_COMP`, `tintComp()` | reuse |
-| BG3 flat wash + hue cycle | ⚠️ ad-hoc per scene | extract `bgWash(colA,colB,...)` helper |
-| BG5 kaleidoscope fold | ⚠️ inline (Kaleidoscope scene) | extract `bgKaleido(folds)` helper |
-| BG6 moiré stripes | ⚠️ `MOIRE_COMP` inline; butterfly TODO | extract `bgMoire()` + finish 4-fold |
-| BG8 perspective net/tunnel | ⚠️ via `alcCamera("side")` only | add explicit `bgNetTunnel()` radial-ray shader |
-| **BG2 directional smear** | ❌ | feedback-baseVals recipe only — document as `fb.bands` preset |
-| **BG7 fountain/vortex** | ❌ | add `bgFountain()` / vortex feedback preset |
-| **BG9 reflected-waveform horizon** | ❌ | add `bgWaveHorizon()` (mirrored `waveLine`) |
-| **BG10 static dither/hatch** | ❌ | add a 1-line `bgHatch()` comp tail (≤3%) |
-| **bgSolidSnap** (instant solid flip) | ❌ | the discrete-event snap (still pending from the plan) |
+**ALL background motifs are now built as reusable kit pieces** (2026-06-16):
 
-**Genuinely missing background motifs to build** (in rough priority):
-1. **BG4 ridge/marble extension** — highest leverage; the green↔magenta marble
-   (E-late) is one of the most beautiful backgrounds in the clip and is 90% built.
-2. **BG8 `bgNetTunnel()`** — the G section is a whole scene with no proper bg shader.
-3. **BG10 `bgHatch()`** — one line, adds the authentic "tooth" everywhere.
-4. **BG5 `bgKaleido()` extraction** + finish BG6 butterfly.
-5. **BG7 `bgFountain()` / vortex** and **BG9 `bgWaveHorizon()`**.
-6. **bgSolidSnap** + **BG3 `bgWash()`** extraction.
+| BG | Motif (in `wmp-presets.js`) | Kind |
+|---|---|---|
+| BG1 void | (trivial — cleared/decayed buffer) | — |
+| BG2 directional smear | feedback recipe: `decay`-warp + `dx` drift, `wrap` | baseVals/warp |
+| BG3 flat wash | `alcWash` (`ALC_WASH_GLSL`) | colour field |
+| BG4 fluid / marble | `alcFluid` (`ALC_FLUID_GLSL`), `alcMarble` (`ALC_MARBLE_GLSL`) | colour field |
+| BG5 kaleidoscope fold | `alcKaleido` (`ALC_KALEIDO_GLSL`) — n-fold coord fold | transform |
+| BG6 moiré stripes | `alcMoire` (`ALC_MOIRE_GLSL`) — quad-mirror, **butterfly fixed** | colour field |
+| BG7 fountain/vortex | `alcRadialBurst` (+ Vortex/Fountain warps) | wave seed + transform |
+| BG8 net tunnel | `alcRotLines` (rotating-line fan) | wave seed |
+| BG9 wave horizon | `bgWaveHorizon` — reflected-waveform on water | wave pair |
+| BG10 dither/hatch | `ALC_HATCH` | comp tail |
+| (aurora bleed) | `alcAurora` (`ALC_AURORA_GLSL`) | colour field |
+| (radial bloom) | `alcRadialBloom` (`ALC_RADIALBLOOM_GLSL`) | colour field |
+| (horizon bands) | `alcHorizonBands` (`ALC_HORIZONBANDS_GLSL`) | colour field |
+| (chromatic aberration) | `alcChroma(amt)` | comp transform |
+| (solid snap) | `alcSolidSnap` (`ALC_SOLIDSNAP_GLSL`) | colour field (flip) |
+| tone-map | `ALC_COMP`, `tintComp()` | comp |
+
+**Nothing pending on the background-motif kit.** Remaining is composition/tuning work:
+demo scenes for the not-yet-showcased motifs (`alcWash`, `alcRadialBloom`, `alcHorizonBands`,
+`alcChroma`, `alcKaleido`, `bgWaveHorizon`, `alcSolidSnap`) and per-scene screenshot tuning.
 
 ---
 
