@@ -211,6 +211,17 @@
     "  return vec3(0.40, 0.34, 0.14);\n" +                      // olive gold
     "}\n";
 
+  // CB8 (color) — depth/vignette FOG: pull a colour toward a dark jewel-tone `fog` by `depth`
+  // (0=near/bright, 1=far) and darken toward frame edges. The universal Alchemy background
+  // depth behavior (never pure black; fog hue tracks the current scene hue at low sat/lightness).
+  // `d` = aspect-corrected centered coord. Reusable across any field motif.
+  var ALC_FOG_GLSL =
+    "vec3 alcFog(vec3 col, float depth, vec3 fog, vec2 d){\n" +
+    "  col = mix(col, fog, clamp(depth, 0.0, 1.0));\n" +
+    "  col *= smoothstep(1.25, 0.2, length(d));\n" +            // vignette to dark edges
+    "  return col;\n" +
+    "}\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -448,6 +459,46 @@
     redCyan:   alcPalette({ step: 0.5, base: 0.00 }),           // red ↔ cyan (the dahlia)
     warm:      alcPalette({ base: 0.86, step: 0.04, sat: 0.78, gain: 0.95, cycle: 0 }) // amber/gold (base 0.86 in cosine wheel); row 0=amber, row 1=orange; no hue drift keeps contrast against teal nets
   };
+
+  // ═══ COLOR BEHAVIOR KIT ═══════════════════════════════════════════════════════════
+  // SCHEME (which hues) = ALC_PAL above. BEHAVIOR (how they move/react) = these helpers,
+  // called in a scene's frame_eqs. See docs/alchemy-v2/color-motifs-reference.md.
+  //   The dominant Alchemy color scheme is COMPLEMENTARY TWO-TONE PING-PONG (green<->magenta /
+  //   green<->red), NOT a rainbow scroll. Drive ALC_PAL.roseGreen/redCyan with a SLOW alcHueClock
+  //   for the duo swing; use ALC_PAL.spread + a faster clock for the rainbow phases (A-C, I).
+
+  // CB1/CB2 — advance the shared hue accumulator (0..1). Slow base drift + optional energy
+  // coupling (louder = a little faster). Dedupes the `huePhase += dt*(...)` pattern repeated in
+  // every scene. base/gain in cycles-per-second-ish units. Returns the new hue.
+  function alcHueClock(hue, dt, energy, base, gain) {
+    base = base === undefined ? 0.02 : base;
+    gain = gain === undefined ? 0.05 : gain;
+    return (hue + dt * (base + gain * (energy || 0))) % 1;
+  }
+
+  // CB9 — smoothed loudness envelope from the audio bands (for GATING saturation/brightness,
+  // never hue). Pass the frame `t`; returns ~0..2 (1 = nominal). Cheap per-frame, stateless.
+  function alcEnergy(t) {
+    var b = t.bass_att || t.bass || 1, m = t.mid_att || t.mid || 1, r = t.treb_att || t.treb || 1;
+    return (b + m + r) / 3;
+  }
+
+  // CB10 — beat-flash detector FACTORY. `var flash = alcBeatFlash();` then each frame
+  // `var f = flash(energy, dt)` returns a 0..1 value that JUMPS to 1 on a transient (energy
+  // spiking above its running average) and decays fast — multiply brightness by (1+k*f) or
+  // advance hue by f for the supernova re-bloom / axis flares. NOT a colour inversion.
+  function alcBeatFlash(opts) {
+    opts = opts || {};
+    var rise = opts.rise === undefined ? 1.22 : opts.rise;   // ratio over running avg = a beat
+    var decay = opts.decay === undefined ? 6.0 : opts.decay;  // flash decay (per second)
+    var avg = 1, level = 0;
+    return function (energy, dt) {
+      avg += (energy - avg) * Math.min(1, (dt || 0.016) * 3.0);
+      if (energy > avg * rise) level = 1;
+      level = Math.max(0, level - decay * (dt || 0.016));
+      return level;
+    };
+  }
 
   // MOTIF — one triangle whose 3 edges are the LIVE waveform displaced PERPENDICULAR
   // (the jagged wireframe line). Drawn at head (q2,q3), radius q5, self-rotated by q9.
