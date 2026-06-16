@@ -2692,11 +2692,14 @@
       baseFrame(t);
       var raw = (t.q14 || 0) - Math.floor(t.q14 || 0);
       var proj = 1.0 / (1.0 + K * raw);
+      // wobble must match makeOrbTrailShapes exactly (same raw, proj, and q19 time clock)
+      var tm = t.q19 !== undefined ? t.q19 : (t.time || 0);
+      var wob = 0.05 * Math.sin(raw * 6.2832 * 1.3 + tm * 0.8) * proj;
       var orbRad = 0.11 * proj * 0.65;                    // matches makeOrbTrailShapes s.rad
       t.q21 = (nearX  - vpx) * proj + vpx;               // head X (both rows same)
-      t.q22 = (nearYT - vpy) * proj + vpy + orbRad;      // BOTTOM edge of top orb
+      t.q22 = (nearYT - vpy) * proj + vpy + wob + orbRad; // bottom edge of top orb (tracks wobble)
       t.q23 = t.q21;
-      t.q24 = (nearYB - vpy) * proj + vpy - orbRad;      // TOP edge of bottom orb
+      t.q24 = (nearYB - vpy) * proj + vpy + wob - orbRad; // top edge of bottom orb (tracks wobble)
       return t;
     };
 
