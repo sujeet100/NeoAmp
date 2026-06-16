@@ -3068,6 +3068,51 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Net Tunnel ─────────────────────────────────────────────────────
+  // BG8 showcase: a perspective wireframe TUNNEL — fine radial rays converging to a
+  // central vanishing point (section G of the reference), slow rainbow drift along
+  // depth, warm maroon corner vignette, bright VP that lifts on bass. A thin live-
+  // waveform tether slices through the throat. Explicit shader (NOT feedback zoom — the
+  // rays stay crisp). Vivid is correct here (a documented muting-rule exception).
+  P["Alchemy v2: Net Tunnel"] = (function () {
+    var hue = 0, lastT = 0;
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.94, gammaadj: 1.5,
+        zoom: 1.0, rot: 0.004, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || 1, mid = t.mid_att || 1, treb = t.treb_att || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          hue = (hue + dt * (0.02 + 0.04 * ((bass + mid) / 2))) % 1;
+          t.q8 = hue;
+          // thin tether across the tunnel throat, slowly tilting; treble -> jaggedness
+          var tilt = 0.06 * Math.sin(tm * 0.25);
+          t.q21 = 0.16; t.q22 = 0.5 + tilt;
+          t.q23 = 0.84; t.q24 = 0.5 - tilt;
+          t.q26 = 0.03 + 0.05 * Math.max(0, treb - 1);
+          return t;
+        },
+        comp:
+          PAL_GLSL + ALC_NETTUNNEL_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - vec2(0.5); d.x *= resolution.x / resolution.y;\n" +
+          "vec3 bg = alcNetTunnel(d, time, bass);\n" +
+          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + sharp + glow * 0.30;\n" +
+          "float vig = smoothstep(1.15, 0.25, length(d));\n" +   // bright VP (center), dark corners
+          "outc = outc * vig + vec3(0.10, 0.02, 0.05) * (1.0 - vig) * 0.5;\n" +  // warm maroon corner tint
+          "ret = outc / (outc + vec3(0.85));\n" +                // Reinhard tone-map
+          "}\n"
+      }
+    );
+    // thin live-waveform tether through the throat (rainbow-spread, cycles with q8)
+    preset.waves[0] = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.spread);
+    return preset;
+  })();
+
   // ── Alchemy v2: Waveform Sheet ───────────────────────────────────────────────
   // The SINGLE-LINE motif: ONE live-waveform line (alcRayWaves with n=1), slowly rotating,
   // over the spindle camera so its feedback trace spreads into a single rippling sheet seen
