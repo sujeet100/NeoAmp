@@ -441,7 +441,38 @@ fbm iso-contour ridge (the marble signature): abs(fract(fbm*k)-0.5) -> smoothste
 
 ---
 
+## 6. Color-bleed motif kit (whole-video catalogue, 2026-06-16)
+
+Color-bleed has **two independent axes** — compose any background as **field × transform**:
+
+**A. Color FIELD** (the *what* — colour/spatial pattern; reusable GLSL helpers in `wmp-presets.js`):
+| Field motif | Look | Where in video | Status |
+|---|---|---|---|
+| `alcFluid` (`ALC_FLUID_GLSL`) | dusty teal↔purple domain-warp fluid | Orbiters bg | ✅ |
+| `alcMarble` (`ALC_MARBLE_GLSL`) | green↔magenta fbm + iso-contour ridge veins | E-late, D, F-cyan | ✅ |
+| `alcAurora` (`ALC_AURORA_GLSL`) | vivid patchy spectral bleed | G (~2:15) | ✅ |
+| `alcWash` (`ALC_WASH_GLSL`) | flat MUTED hue-cycling pastel wash + vignette | C, D→E breather | ✅ NEW |
+| `alcRadialBloom` (`ALC_RADIALBLOOM_GLSL`) | central magenta↔lime bloom, bass-pulsing | I finale, D burst | ✅ NEW |
+| `alcHorizonBands` (`ALC_HORIZONBANDS_GLSL`) | horizontal stratified spectral bands → bright horizon | A horizon, F prism | ✅ NEW |
+| (green nebula/fur) | green radial flow tendrils | E-late, I floor | compose: alcAurora/alcMarble w/ green palette + radial mask |
+
+**B. Feedback TRANSFORM** (the *how it bleeds/moves* — Gemini's 5; warp camera or comp tail):
+| Transform | Mechanism | Kit location |
+|---|---|---|
+| Radial expansion (tunnel) | warp samples scaled toward center (content blooms outward) | Fountain warp pattern; `zoom` camera |
+| Rotational swirl (galaxy) | warp rotates the buffer | Vortex / Fountain warp |
+| Wind smear (waterfall) | `dx`/`dy` drift in feedback | BG2 (`fb.bands` recipe) |
+| Additive plasma (white-hot) | additive blend + Reinhard tone-map | the standard `additive:1` + `c/(c+k)` |
+| **Chromatic aberration** | re-sample buffer with R/B split radially | `alcChroma(amt)` comp snippet ✅ NEW |
+
+**Compose:** a scene picks a field, composites it under geometry in the comp (`outc = field + geometry + glow`), and the warp/baseVals provide the transform. Reinhard tone-map on muted fields; keep vivid fields (aurora, bloom, G/I) bright. Example: Net Tunnel = `alcAurora` (field) under `alcRotLines` (geometry) with a fade warp (transform).
+
+**Reconciliation with Gemini:** Gemini framed color-bleed purely as feedback-loop transforms (axis B) — correct for the *motion*, but the *colour/pattern* (axis A) is a separate field layer. Both are needed; the kit separates them so any field can ride any transform.
+
+---
+
 *Source: empirical frame-by-frame analysis of `YouTube 1080p 60fps Download.mp4`
 (9 sections A–I, 0:00–3:06, 1.5fps extraction), one subagent per section, each
 confirming/refuting the 8 Gemini "background architecture" hypotheses — cross-checked
-against the existing kit in `wmp-presets.js`. 2026-06-16.*
+against the existing kit in `wmp-presets.js`. Color-bleed motif kit (§6) added 2026-06-16
+from a focused 3-subagent whole-video color-bleed pass + Gemini's feedback-loop notes.*

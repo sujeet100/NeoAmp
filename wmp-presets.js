@@ -130,6 +130,46 @@
     "  return c * (0.5 + 0.5*b);\n" +
     "}\n";
 
+  // ── Color-bleed FIELD motifs (catalogued from the whole video; see background-motifs-
+  // reference.md). Each returns a vec3 color field to composite UNDER geometry in a comp.
+  // Two axes: these are the FIELD (what colour/pattern); the feedback warp/camera is the
+  // TRANSFORM (how it bleeds). All need the noted helpers prepended. ─────────────────────
+
+  // alcWash (BG3): flat MUTED hue-cycling pastel wash + soft vignette — the calm Alchemy
+  // backdrop (section C sage->olive, D->E steel-blue). colA/colB = two dusty colours it
+  // drifts between; `speed` = drift rate. Heavily desaturated so it never goes neon.
+  var ALC_WASH_GLSL =
+    "vec3 alcWash(vec2 d, float t, vec3 colA, vec3 colB, float speed){\n" +
+    "  vec3 c = mix(colA, colB, 0.5 + 0.5*sin(t*speed));\n" +
+    "  float luma = dot(c, vec3(0.33));\n" +
+    "  c = mix(vec3(luma), c, 0.6);\n" +                        // desaturate -> dusty pastel
+    "  c *= 1.0 - 0.28*dot(d,d);\n" +                           // soft vignette
+    "  return c;\n" +
+    "}\n";
+
+  // alcRadialBloom: a central colour BLOOM radiating from center, hue-cycling magenta<->lime,
+  // bass-pulsing (the supernova/burst colour field — section I, and D's radial burst). Needs no helper.
+  var ALC_RADIALBLOOM_GLSL =
+    "vec3 alcRadialBloom(vec2 d, float t, float b){\n" +
+    "  float r = length(d);\n" +
+    "  float bloom = exp(-r*r*(3.0 - 1.5*b));\n" +              // tightens/expands with bass
+    "  vec3 c = mix(vec3(0.85,0.18,0.62), vec3(0.78,0.85,0.22), 0.5+0.5*sin(t*0.4));\n" +  // magenta<->lime
+    "  c = c*bloom + smoothstep(0.55,0.45,r)*vec3(0.5,0.15,0.7)*0.3;\n" +  // faint outer purple ring
+    "  return c;\n" +
+    "}\n";
+
+  // alcHorizonBands: horizontal stratified spectral bands pinched to a bright horizon line
+  // (section A perspective horizon; F prism plane). Muted spectrum, slow vertical drift.
+  // Needs PAL_GLSL (pal). `d` centered so the horizon sits at d.y=0.
+  var ALC_HORIZONBANDS_GLSL =
+    "vec3 alcHorizonBands(vec2 d, float t, float b){\n" +
+    "  float y = d.y*4.0 + t*0.06;\n" +
+    "  vec3 c = pal(fract(y));\n" +
+    "  float luma = dot(c, vec3(0.33)); c = mix(vec3(luma), c, 0.55);\n" +  // desaturate -> dusty bands
+    "  c *= exp(-pow(d.y*3.0, 2.0));\n" +                       // pinch to a bright horizon
+    "  return c * (0.6 + 0.4*b);\n" +
+    "}\n";
+
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -143,6 +183,21 @@
       "float d = distance(uv, vec2(0.5));\n" +
       "ret += tint * exp(-d*d*8.0) * (0.10 + 0.35*bass);\n" +
       "}\n";
+  }
+
+  // alcChroma (color-bleed TRANSFORM — chromatic aberration, Gemini bleed #5): returns a comp
+  // snippet that re-samples the feedback buffer with the R/B channels split radially OUTWARD
+  // (stronger toward the rim) -> trails separate into RGB ghosts / prism fringing at the edges.
+  // Splice into a comp shader_body where you'd normally do `vec3 g = texture2D(sampler_main,uv)`;
+  // it SETS the local `g`. `amt` (GLSL literal string) scales the split. Reusable across scenes.
+  function alcChroma(amt) {
+    return "vec2 cad = uv - 0.5;\n" +
+      "float caR = length(cad) * (" + amt + ");\n" +
+      "vec2 caDir = cad / (length(cad) + 1e-5);\n" +
+      "vec3 g = vec3(\n" +
+      "  texture2D(sampler_main, uv + caDir*caR).r,\n" +
+      "  texture2D(sampler_main, uv).g,\n" +
+      "  texture2D(sampler_main, uv - caDir*caR).b);\n";
   }
 
   function build(overrides, opts) {
