@@ -1008,7 +1008,7 @@
     // Per-row near-Y positions symmetric around the VP y.  rows=1 → single centred track.
     var nearYs = rows === 1
       ? [0.42]
-      : [0.32, 0.52];                                        // top then bottom track
+      : [0.26, 0.54];                                        // top then bottom track (wider separation)
     var perRow = count / rows;                               // depth steps per track
     var arr = [];
     for (var i = 0; i < count; i++) {
@@ -1034,10 +1034,12 @@
             // apply the scene's palette for this row
             colorize(s, row);                                // sets s.r, s.g, s.b
             var cr = s.r, cg = s.g, cb = s.b;
-            // head only (raw<0.12) gets a filled disc; trail positions are HOLLOW rings
-            var fillA = 0.85 * fade * sm01((0.12 - raw) / 0.12);
+            // head only (raw<0.15) gets a filled disc; trail positions are HOLLOW rings.
+            // fillA goes to 1.0 at raw=0 so the head is fully opaque and stands out from the net.
+            var fillA = Math.min(1.0, fade) * sm01((0.15 - raw) / 0.15);
             s.a  = fillA;
-            s.r2 = cr * 0.5; s.g2 = cg * 0.5; s.b2 = cb * 0.5; s.a2 = fillA * 0.4;
+            // bright warm center (r2/g2/b2 > r/g/b) makes the disc glow from inside out
+            s.r2 = Math.min(1, cr * 2.2); s.g2 = Math.min(1, cg * 1.8); s.b2 = Math.min(1, cb * 2.0); s.a2 = fillA;
             // border ring: same hue, boosted so it reads as a bright ring outline
             s.border_r = Math.min(1.5, cr * 1.6 + 0.1);
             s.border_g = Math.min(1.5, cg * 1.6 + 0.1);
@@ -2676,7 +2678,7 @@
   P["Alchemy v2: Net Corridor"] = (function () {
     // Head orb geometry — must match makeOrbTrailShapes constants so the tether
     // endpoints land exactly on the head rings.
-    var K = 1.4, nearX = 0.14, nearYT = 0.32, nearYB = 0.52, vpx = 0.86, vpy = 0.62;
+    var K = 1.4, nearX = 0.14, nearYT = 0.26, nearYB = 0.54, vpx = 0.86, vpy = 0.62;
 
     var preset = build(
       alcCamera("side"),
@@ -2719,7 +2721,10 @@
           var dx = bx - ax, dy = by - ay;
           var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
           var px = -dy / len, py = dx / len;
-          var disp = 0.12 * (a.value1 || 0) + perpOffset;  // audio displacement + static offset
+          // end-fade: waveform displacement tapers to 0 at both endpoints so the
+          // tether anchors at each orb center rather than crossing through it
+          var ef = Math.min(a.sample * 18, 1.0) * Math.min((1.0 - a.sample) * 18, 1.0);
+          var disp = 0.12 * (a.value1 || 0) * ef + perpOffset;
           a.x = ax + a.sample * dx + disp * px;
           a.y = ay + a.sample * dy + disp * py;
           // overbright white/ice — additive > 1 blooms to a thick glowing line
