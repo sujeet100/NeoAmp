@@ -96,11 +96,11 @@
     "  vec2 q = d + 0.15*vec2(sin(t*0.20), cos(t*0.17));\n" +
     "  float cs = cos(t*0.05), sn = sin(t*0.05);\n" +
     "  q = mat2(cs, -sn, sn, cs) * q;\n" +                            // slow in-place swirl (NOT feedback-zoom)
-    "  float f = fbm(q*3.0 + t*0.05);\n" +
-    "  float rdg = abs(fract(f*5.0 + t*0.10) - 0.5);\n" +
-    "  float ridge = smoothstep(0.06, 0.0, rdg) * (0.6 + 0.6*b);\n" +  // bright iso-contour lines, bass-lifted
-    "  vec3 base = mix(vec3(0.16,0.40,0.27), vec3(0.42,0.24,0.46), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta
-    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.45,0.85,0.55);\n" +
+    "  float f = fbm(q*4.4 + t*0.05);\n" +                            // finer-grained marble cells
+    "  float rdg = abs(fract(f*7.0 + t*0.10) - 0.5);\n" +             // more, thinner iso-contour veins
+    "  float ridge = smoothstep(0.022, 0.0, rdg) * (0.32 + 0.40*b);\n" +  // THIN lines, dimmer (no white blowout)
+    "  vec3 base = mix(vec3(0.15,0.38,0.26), vec3(0.34,0.20,0.40), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta (less hot)
+    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.34,0.68,0.42);\n" +  // veins stay COLORED (sage-lime), not pale white
     "  c *= mix(1.0, smoothstep(0.0, 0.45, length(d)), 0.6);\n" +      // soft INVERTING vignette (center darker, per frames)
     "  return c;\n" +
     "}\n";
