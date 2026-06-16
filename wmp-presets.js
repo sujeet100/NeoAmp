@@ -3168,22 +3168,26 @@
     var hue = 0, lastT = 0, lastStamp = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.5, gammaadj: 1.5,    // ~10x faster fade than 0.93 -> spokes vanish quickly, very sparse
-        zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
-        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+        // NOTE: `decay` is IGNORED in this Butterchurn build — the fade is the WARP shader
+        // below (a fast multiplicative fade), NOT this value. See WARP_DEFAULT gotcha in CLAUDE.md.
+        wave_a: 0, gammaadj: 1.5, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
       {
         frame: function (t) {
           var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;
-          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.4 rev/s); kept per user
+          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.5 rev/s); kept per user
           t.q8 = hue;
-          // STROBE: stamp a spoke ~every 0.06s -> discrete spaced spokes (gaps between them),
-          // not a continuous fan. q15 is 1 on a stamp frame, 0 otherwise.
+          // STROBE: stamp a spoke ~every 0.06s -> discrete spaced spokes (gaps between them).
           if (tm - lastStamp >= 0.06) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
           return t;
         },
+        // FADE is here (decay baseVal does nothing in this build): multiplicative fade in place
+        // (no movement — we sample uv directly). 0.85/frame -> a stamped spoke is ~gone in ~0.45s,
+        // which is LESS than one rotation period (~0.9s) -> the oldest spokes vanish before the
+        // line laps back, so a FULL CIRCLE never accumulates. ~9x faster than the old `ret-=0.004`.
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.85;\n}\n",
         comp:
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
