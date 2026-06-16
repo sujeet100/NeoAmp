@@ -1,29 +1,72 @@
 # Alchemy v2 — Resume / handoff note
 
-Snapshot for picking up Alchemy v2 in a fresh session. Read this + `README.md` +
-`v2-implementation-plan.md` + `orb-motifs-reference.md`. Auto-memory `MEMORY.md` loads
-the key gotchas.
+Snapshot for picking up Alchemy v2 in a fresh session. Auto-memory `MEMORY.md` loads the
+key gotchas. The four **reference docs** in this folder are the source of truth:
+`orb-motifs-reference.md` (foreground), `background-motifs-reference.md`,
+`color-motifs-reference.md`, `camera-motifs-reference.md`. Also `README.md` +
+`v2-implementation-plan.md`.
 
-## This session: Orb Motif Completion
+## ▶ NEXT SESSION: compose VISUALIZATIONS (scenes) from the motif kit
 
-The entire orb motif kit is now built and tested. All 18 variants from the frame-by-frame
-reference analysis (`orb-motifs-reference.md`) are either implemented as kit functions or
+**The entire MOTIF KIT is now built, configurable, and node-validated.** Foreground (orbs/
+lines/flowers), backgrounds (10 BG mechanisms), color behaviors, and cameras all exist as
+reusable, parameterized helpers in `wmp-presets.js` (before `var P = {}`). The next phase is
+**assembling scenes** (`P["Alchemy v2: <name>"]`) by composing kit pieces — NOT building new
+primitives.
+
+**A scene = CAMERA × MOTIF(s) × COLOR × BACKGROUND-FIELD, composed thinly:**
+1. `build(alcCamera(kind), { frame, warp, comp })` — pick a camera preset.
+2. In `frame_eqs`: drive color (`alcHueClock`/`alcEnergy`/`alcBeatFlash`), camera
+   (`alcCamPlunge`/`alcCamVortex`/`alcCamRoll`/`alcCamFloat`), and the q-vars motifs read
+   (q1 angle, q7 radius, q8 hue, q21–q24 orb positions, q26 tether, …).
+3. `preset.waves[i] = <motif builder>(…, colorize)` — foreground geometry (pass an `ALC_PAL`).
+4. `comp:` = `NOISE_GLSL + PAL_GLSL + <field GLSL helpers> + shader_body{ field + sampler_main +
+   bloom + alcFog + Reinhard tone-map + ALC_HATCH }`.
+5. Add to `FAVORITES` in `viz.js`; set `DEFAULT_PRESET` to it for screenshot iteration.
+6. **Validate** (`node --check` + the frame/point-eqs runtime check) BEFORE asking for a reload;
+   GLSL can't be node-checked — rely on the in-browser `[WMP-viz shader]` hook.
+
+**Hard-won iteration lessons from this session (READ before composing):**
+- **`decay` baseVal is DEAD in this build** — fade is the WARP shader (`ret *= k` or `ret -= x`).
+  Default warp keeps trails ~forever. To control trail life, write a custom warp.
+- **Reload cadence:** make ONE focused change, state it, ask for ONE screenshot. The user iterates
+  hard on look — don't batch many visual changes (hard to attribute).
+- **The user's eye wins over guidelines** (e.g. bold marble veins beat the muting "fix"). Confirm
+  muted-vs-vivid from the section's own frames; muting rule has documented exceptions (kaleido/
+  fountain/net/supernova run vivid).
+- **Match the original's MECHANISM, not just the look** — the user will check the source video
+  (e.g. Net Tunnel = rotating line + feedback trace, NOT a drawn shader; strobe for discrete spokes).
+
+---
+
+## Earlier session: Orb Motif Completion
+
+All 18 orb variants from `orb-motifs-reference.md` are implemented as kit functions or
 composable from existing pieces.
 
 ---
 
 ## Complete Kit (all in `wmp-presets.js`, before `var P = {}`)
 
-### Cameras
-- `alcCamera(kind)` — `top` / `side` / `orbit` / `flat`
+### Cameras (`camera-motifs-reference.md`)
+- `alcCamera(kind)` — static presets: `top`/`side`/`orbit`/`flat` + `hold`/`plunge`/`vortex`/`tiltFloor`
+- per-frame drivers (call in `frame_eqs`, fields stack): `alcCamPlunge` (zoom>1 + drifting VP),
+  `alcCamVortex` (inward zoom + spin — the signature camera), `alcCamRoll` (bank + beat-snap),
+  `alcCamFloat` (smooth pan-drift), `alcCamJitter` (transient shake accent)
 
-### Palettes
-- `ALC_PAL.twoTone / mono / spread / roseGreen / redCyan / warm`
-  - `warm`: base 0.86 in cosine wheel = amber/gold, cycle:0 stays warm against teal nets
+### Color: SCHEME × BEHAVIOR (`color-motifs-reference.md`)
+- SCHEME palettes (keyed by q8 hue): `ALC_PAL.twoTone / mono / spread / roseGreen / redCyan / warm`
+  - dominant scheme is **complementary two-tone ping-pong** (roseGreen green↔magenta), NOT rainbow scroll
+- BEHAVIOR drivers: `alcHueClock(hue,dt,energy,base,gain)` (shared hue accumulator),
+  `alcEnergy(t)` (loudness envelope → gate sat/brightness, not hue), `alcBeatFlash()` (transient flash),
+  `ALC_FOG_GLSL`/`alcFog` (depth/vignette jewel fog), `alcChroma(amt)` (chromatic aberration)
+- `alcSetColor(a,h,warm,gain)`, `alcPalette(spec)` — low-level color helpers
 
-### Color helpers
-- `alcSetColor(a, h, warm, gain)` — muted warm-shifted color for waves
-- `alcPalette(spec)` — build custom palette
+### Background FIELD motifs (`background-motifs-reference.md` — all configurable now)
+- GLSL fields: `alcFluid(…,deep,mids,hi)`, `alcMarble(…,colA,colB,vein)`, `alcAurora`, `alcWash(…,colA,colB)`,
+  `alcRadialBloom(…,colA,colB)`, `alcHorizonBands`, `alcMoire(…,barCol)`, `alcSolidSnap`
+  (prepend `NOISE_GLSL`/`PAL_GLSL` as noted); transforms `alcKaleido` (n-fold fold), `ALC_HATCH` (dither)
+- wave/feedback fields: `alcRotLines` (net tunnel), `alcRadialBurst` (fountain/vortex), `bgWaveHorizon`
 
 ### Net / Line motifs
 - `alcStarWaves(tris, hueOff)` — waveform triangle star (1=triangle, 2=hexagram)
@@ -128,16 +171,26 @@ directional smear / perspective geometry (feedback = glow not structure); "CRT
 scanlines" is actually a subtle STATIC dither/hatch; "aurora ribbons" = the fbm
 fluid we already have. Muted-rule exceptions: kaleido/fountain/net/supernova run vivid.
 
-## Pending work (not done)
+## Status: MOTIF KIT COMPLETE ✓
 
-- **Background kit helpers (NEW — from bg analysis):** extend `alcFluid` with
-  iso-contour ridges + green↔magenta marble (BG4, highest leverage, 90% built);
-  `bgNetTunnel()` radial-ray shader (BG8, G section has no bg shader); 1-line
-  `bgHatch()` static dither (BG10); extract `bgKaleido()`/`bgMoire()` + finish
-  butterfly; `bgFountain()`/vortex (BG7); `bgWaveHorizon()` (BG9); `bgSolidSnap`.
-- **Gradient Orbs scene** needs screenshot validation after latest fix (orbit R 0.26→0.18,
-  q5 0.04). First result showed blobs clipped at edges — needs user screenshot confirmation.
-- **Moiré kaleidoscope** — bars-as-wave approach confirmed correct; butterfly look needs tuning.
+All four motif families are built, **configurable** (every motif takes color as a param/
+palette), and node-validated: foreground orbs (`orb-motifs-reference.md`), backgrounds
+(`background-motifs-reference.md`), color behaviors (`color-motifs-reference.md`), cameras
+(`camera-motifs-reference.md`). 62 presets load clean.
+
+## ▶ Next phase: compose scenes (the handoff goal — see top of this file)
+
+Build `P["Alchemy v2: <name>"]` scenes by composing kit pieces. Candidate scenes to author
+(each maps to a video section; use the section's reference frames + the mechanism notes):
+- **Net Tunnel** — already mostly done this session (rotating-line fan + aurora bleed + gold
+  orbiters + dark hole); confirm/finish from screenshots. The reference build pattern for
+  feedback + composed motifs.
+- **Marble** (done — bold green↔magenta veins), **Fountain** (built, never screenshotted — verify),
+  **Bullseye Orbiters**, **Gradient Orbs** (needs screenshot validation).
+- **Not yet wired into scenes** (kit pieces exist, no demo): `alcWash`, `alcRadialBloom`,
+  `alcHorizonBands`, `alcChroma`, `alcKaleido`, `bgWaveHorizon`, `alcSolidSnap`, and the camera
+  drivers (`alcCamPlunge/Vortex/Roll/Float/Jitter`). Each could anchor a scene.
+- **Moiré scene** still uses its old x-only inline comp; point it at the new `alcMoire` (butterfly).
 - **Journey sequencer** — crossfade between scenes (deferred).
-- **Fluid marble background** — reusable fbm/domain-warp comp shader (now spec'd as BG4 ridge extension).
-- All Ambience/Battery presets tuning from screenshots (ongoing as-needed).
+
+Ongoing as-needed: Ambience/Battery preset tuning from screenshots.
