@@ -3242,10 +3242,10 @@
     var camPhase = 0, bgPhase = 0, orbPhase = 0;   // independent layer clocks
     var bgSel = 0, lastSnap = -10;
     var flash = alcBeatFlash();
-    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.6, gain: 0.82 }); // muted green↔magenta band
+    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.75, gain: 1.0 }); // green↔magenta band (brighter fur)
 
     var preset = build(
-      { wave_a: 0, decay: 0.95, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.06, echo_alpha: 0 },
+      { wave_a: 0, decay: 0.95, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
       {
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
@@ -3279,13 +3279,13 @@
 
           // motif geometry (the anemone fur + the two flanking orbiters on opposing orbits)
           var th = tm * 0.30;
-          t.q1 = 0.5 + 0.32 * Math.cos(th);            t.q2 = 0.5 + 0.32 * Math.sin(th);
-          t.q3 = 0.5 + 0.32 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.32 * Math.sin(th + Math.PI);
-          t.q5 = 0.015 + 0.012 * bass;                 // orb core radius
+          t.q1 = 0.5 + 0.24 * Math.cos(th);            t.q2 = 0.5 + 0.24 * Math.sin(th); // orbs pulled IN closer
+          t.q3 = 0.5 + 0.24 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.24 * Math.sin(th + Math.PI);
+          t.q5 = 0.018 + 0.014 * bass;                 // orb core radius
           t.q6 = t.q5 * 2.1 + 0.006;                   // Saturn ring radius
           t.q7 = 0.010 + 0.035 * treb;                 // tether lightning amplitude (small)
-          t.q9 = 0.07 + 0.06 * bass;                   // anemone base radius
-          t.q10 = 0.04 + 0.05 * mid;                   // anemone fur amplitude (PULSAR pulse)
+          t.q9 = 0.11 + 0.10 * bass;                   // anemone base radius (bigger fur, fills the centre)
+          t.q10 = 0.06 + 0.07 * mid;                   // anemone fur amplitude (PULSAR pulse)
           return t;
         },
         // CAMERA (L2) lives here: a twist that GROWS toward centre + inward suction, both
@@ -3300,7 +3300,7 @@
           "float sn = sin(tw), cs = cos(tw);\n" +
           "vec2 sd = vec2(c.x*cs - c.y*sn, c.x*sn + c.y*cs) * sc + 0.5;\n" +
           "ret = texture2D(sampler_main, sd).rgb;\n" +
-          "ret -= mix(0.012, 0.004, q12);\n" +                             // fast fade when flat, long trails in the vortex
+          "ret -= mix(0.022, 0.005, q12);\n" +                             // short tight orb trails when flat, long spiral arms in the vortex
           "}\n",
         // BACKGROUND (L3) lives here: crossfade a snapping SOLID colour (q15) with a domain-
         // warped FLUID wash by q14, brightness q16, dark central pupil + vignette, then the
@@ -3317,7 +3317,7 @@
           "vec3 flu = mix(vec3(0.05,0.03,0.10), vec3(0.04,0.12,0.08), clamp(n*1.3, 0.0, 1.0));\n" +  // purple↔green fluid
           "vec3 bg = mix(sol, flu, clamp(q14, 0.0, 1.0));\n" +
           "float vig = 1.0 - 0.45*smoothstep(0.25, 1.1, pr);\n" +
-          "float pupil = smoothstep(0.0, 0.14, pr);\n" +                   // dark anemone eye
+          "float pupil = smoothstep(0.0, 0.05, pr);\n" +                   // SMALL dark anemone eye (was a huge hole)
           "bg *= vig * pupil * (0.6 + 0.5*q16);\n" +
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
@@ -3502,7 +3502,7 @@
   // L3 flat-blue ↔ marble bg crossfade (q14) · L4 diagonal-line + orbiter fade (q17).
   P["Alchemy v2: Era — Mandala/Fluid"] = (function () {
     var huePhase = 0, lastT = 0, bgPhase = 0, linePhase = 0, spin = 0;
-    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.7, gain: 0.9 });
+    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.85, gain: 1.3 }); // bright neon green↔magenta lines
     var preset = build(
       { wave_a: 0, decay: 0.5, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
       {
@@ -3531,9 +3531,9 @@
           "float fv = fbm(fq * 3.0 + time * 0.05);\n" +
           "float rdg = abs(fract(fv * 5.0) - 0.5);\n" +
           "float ridge = smoothstep(0.06, 0.0, rdg);\n" +
-          "vec3 marble = mix(vec3(0.06, 0.18, 0.10), vec3(0.20, 0.05, 0.18), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.25, 0.7, 0.35);\n" +
+          "vec3 marble = mix(vec3(0.05, 0.12, 0.07), vec3(0.14, 0.04, 0.13), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.12, 0.34, 0.18);\n" +
           "vec3 bg = mix(flatbg, marble, clamp(q14, 0.0, 1.0));\n" +
-          "bg *= 1.0 - 0.3 * pr;\n" +
+          "bg *= (1.0 - 0.3 * pr) * 0.55;\n" +                           // dimmer bg so the crisp mandala lines read on top
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = bg + g + glow * 0.18;\n" +
@@ -3544,7 +3544,7 @@
     // a regular N-gon drawn as a closed waveform polygon, rotated by q9 * dir, jagged by value1.
     function ngon(sides, R, dir) {
       return {
-        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 0.7, thick: 0 }),
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 1.0, thick: 1 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
           var th = a.sample * 6.2832, seg = 6.2832 / sides;
@@ -3559,7 +3559,7 @@
     }
     function diagonal() {
       return {
-        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.03, a: 0.6, thick: 0 }),
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.03, a: 0.85, thick: 1 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
           var s = a.sample, disp = (a.value1 || 0) * 0.08;
