@@ -303,7 +303,8 @@
     mono:      alcPalette({ step: 0.0, sat: 0.72 }),            // single drifting hue
     spread:    alcPalette({ step: 0.04, sat: 0.82, gain: 1.0 }),// multicolour spread
     roseGreen: alcPalette({ step: 0.5, base: 0.28 }),           // green ↔ magenta (the canonical anemone)
-    redCyan:   alcPalette({ step: 0.5, base: 0.00 })            // red ↔ cyan (the dahlia)
+    redCyan:   alcPalette({ step: 0.5, base: 0.00 }),           // red ↔ cyan (the dahlia)
+    warm:      alcPalette({ base: 0.86, step: 0.04, sat: 0.78, gain: 0.95, cycle: 0 }) // amber/gold (base 0.86 in cosine wheel); row 0=amber, row 1=orange; no hue drift keeps contrast against teal nets
   };
 
   // MOTIF — one triangle whose 3 edges are the LIVE waveform displaced PERPENDICULAR
@@ -991,37 +992,57 @@
   // gradient core (center opaque -> edge transparent via a2=0, so it glows and blends) + a
   // bright ring border, shrinking + fading into the distance. NOT a wave spiral (tube) and NOT
   // additive (no white blowout). Returns an ARRAY for preset.shapes. q7 = base radius, q14 = flow.
-  function makeOrbTrailShapes(count) {
-    // Path recedes from the near HEAD (top-left) to the VP (lower-right), with a gentle WAVY
-    // wobble — matching the reference: a filled head sphere trailing hollow shrinking rings
-    // along a curving path. Color hue-cycles over time (q8). q7=base radius, q14=flow, q19=time.
-    var K = 2.0, nearX = 0.14, nearY = 0.40, vpx = 0.86, vpy = 0.62;
+  // makeOrbTrailShapes(count, rows, colorize)
+  //   count    — total shape count (must be divisible by rows)
+  //   rows     — 1 or 2 parallel corridor tracks (default 2)
+  //   colorize — ALC_PAL palette fn for fill/border color (default ALC_PAL.spread)
+  //
+  // Each track recedes from the near HEAD toward the VP.  Pairs share depth, so
+  // at rows=2 the head is always a matched pair (top+bottom) at the same distance.
+  // q7=base radius, q14=flow, q19=time, q8=hue phase (from alcNetFrame).
+  function makeOrbTrailShapes(count, rows, colorize) {
+    rows     = rows     || 2;
+    colorize = colorize || ALC_PAL.spread;
+    // K=1.4: spread orbs evenly rather than bunching at VP.  VP matches alcCamera("side").
+    var K = 1.4, nearX = 0.14, vpx = 0.86, vpy = 0.62;
+    // Per-row near-Y positions symmetric around the VP y.  rows=1 → single centred track.
+    var nearYs = rows === 1
+      ? [0.42]
+      : [0.32, 0.52];                                        // top then bottom track
+    var perRow = count / rows;                               // depth steps per track
     var arr = [];
     for (var i = 0; i < count; i++) {
       (function (idx) {
+        var row   = idx % rows;                              // which track (0=top, 1=bottom)
+        var depth = Math.floor(idx / rows);                  // depth index within track
+        var nearY = nearYs[row];
         arr.push({
           baseVals: Object.assign({}, SHAPE_BASE, {
             enabled: 1, sides: 28, additive: 0, thickoutline: 1, textured: 0
           }),
           init_eqs: passthrough,
           frame_eqs: function (s) {
-            var raw = (idx / count) + (s.q14 || 0);
-            raw = raw - Math.floor(raw);                       // this orb's flowing depth (wraps)
+            var raw = (depth / perRow) + (s.q14 || 0);
+            raw = raw - Math.floor(raw);                     // 0..1 depth
             var proj = 1.0 / (1.0 + K * raw);
             var tm = (s.q19 !== undefined ? s.q19 : (s.time || 0));
-            var wob = 0.11 * Math.sin(raw * 6.2832 * 1.3 + tm * 0.8) * proj;  // WAVY path (less wobble far)
-            s.x = (nearX - vpx) * proj + vpx;                  // recede toward the VP (down-right)
-            s.y = (nearY - vpy) * proj + vpy + wob;
-            s.rad = Math.min((s.q7 || 0.1) * proj, 0.055);     // later circles smaller (perspective)
-            var fade = (1.0 - raw) * sm01(raw / 0.015);        // bright at the HEAD (near), fade into distance; tiny in-ramp hides the recycle
-            var h = (s.q8 || 0) + raw * 0.15;                  // hue CYCLES (q8) + slight shift along the trail
-            var cr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-            var cg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.32));
-            var cb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.62));
-            var fillA = 0.85 * fade * sm01((0.18 - raw) / 0.18);  // HEAD (near) is FILLED; trail rings are HOLLOW
-            s.r = cr; s.g = cg; s.b = cb; s.a = fillA;
+            var wob = 0.05 * Math.sin(raw * 6.2832 * 1.3 + tm * 0.8) * proj;
+            s.x   = (nearX - vpx) * proj + vpx;
+            s.y   = (nearY - vpy) * proj + vpy + wob;
+            s.rad = (s.q7 || 0.1) * proj * 0.65;            // perspective shrink, no hard cap
+            var fade = (1.0 - raw) * sm01(raw / 0.015);     // dim far; tiny in-ramp hides recycle
+            // apply the scene's palette for this row
+            colorize(s, row);                                // sets s.r, s.g, s.b
+            var cr = s.r, cg = s.g, cb = s.b;
+            // head only (raw<0.12) gets a filled disc; trail positions are HOLLOW rings
+            var fillA = 0.85 * fade * sm01((0.12 - raw) / 0.12);
+            s.a  = fillA;
             s.r2 = cr * 0.5; s.g2 = cg * 0.5; s.b2 = cb * 0.5; s.a2 = fillA * 0.4;
-            s.border_r = 0.9; s.border_g = 0.95; s.border_b = 1.0; s.border_a = 0.85 * fade;  // bright white-ish ring (the gap edge)
+            // border ring: same hue, boosted so it reads as a bright ring outline
+            s.border_r = Math.min(1.5, cr * 1.6 + 0.1);
+            s.border_g = Math.min(1.5, cg * 1.6 + 0.1);
+            s.border_b = Math.min(1.5, cb * 1.6 + 0.1);
+            s.border_a = 0.9 * fade;
             return s;
           }
         });
@@ -2661,7 +2682,7 @@
     preset.waves[0] = star[0];
     preset.waves[1] = star[1];
     // orb trail = 10 real SHAPES (blue core / cyan ring) receding to the VP — distinct circles
-    preset.shapes = makeOrbTrailShapes(8);               // filled head + hollow shrinking rings, wavy, hue-cycling
+    preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm); // 2-row corridor, amber/gold orbs (contrast with teal net)
     return preset;
   })();
 
