@@ -2674,15 +2674,59 @@
   // spinning-star trace reads as the horizontal fish-bone corridor and the orb leaves the
   // receding row of marching orbs (reference @0:09–0:14, side view).
   P["Alchemy v2: Net Corridor"] = (function () {
+    // Head orb geometry — must match makeOrbTrailShapes constants so the tether
+    // endpoints land exactly on the head rings.
+    var K = 1.4, nearX = 0.14, nearYT = 0.32, nearYB = 0.52, vpx = 0.86, vpy = 0.62;
+
     var preset = build(
-      alcCamera("side"),                                 // fly INTO corridor (zoom>1), VP anchored right
+      alcCamera("side"),
       { frame: alcNetFrame(function () { return [0.42, 0.50]; }, 0.95), comp: ALC_COMP }
     );
-    var star = alcStarWaves(2, 0.0);                     // the woven net (feedback trace)
+
+    // Wrap frame_eqs: after alcNetFrame runs, compute head-orb screen positions
+    // (depth-0 shapes) and publish them to q21–q24 for the tether wave.
+    var baseFrame = preset.frame_eqs;
+    preset.frame_eqs = function (t) {
+      baseFrame(t);
+      var raw = (t.q14 || 0) - Math.floor(t.q14 || 0);  // depth-0 raw = march phase
+      var proj = 1.0 / (1.0 + K * raw);
+      t.q21 = (nearX  - vpx) * proj + vpx;               // head X (same for both rows)
+      t.q22 = (nearYT - vpy) * proj + vpy;               // top head Y
+      t.q23 = t.q21;                                      // same X
+      t.q24 = (nearYB - vpy) * proj + vpy;               // bottom head Y
+      return t;
+    };
+
+    var star = alcStarWaves(2, 0.0);
     preset.waves[0] = star[0];
     preset.waves[1] = star[1];
-    // orb trail = 10 real SHAPES (blue core / cyan ring) receding to the VP — distinct circles
-    preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm); // 2-row corridor, amber/gold orbs (contrast with teal net)
+
+    // Tether: live audio waveform line connecting the two head orbs.
+    // Samples run A (top head) → B (bottom head); displacement is perpendicular
+    // to the AB vector so the waveform squiggles sideways like a lightning bolt.
+    preset.waves[2] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.04, a: 0.9
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ax = a.q21 || nearX, ay = a.q22 || nearYT;
+        var bx = a.q23 || nearX, by = a.q24 || nearYB;
+        var dx = bx - ax, dy = by - ay;
+        var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
+        var px = -dy / len, py = dx / len;               // perpendicular unit vector
+        var disp = 0.10 * (a.value1 || 0);               // audio waveform displacement
+        a.x = ax + a.sample * dx + disp * px;
+        a.y = ay + a.sample * dy + disp * py;
+        // warm amber — matches ALC_PAL.warm top row
+        a.r = 0.9; a.g = 0.72; a.b = 0.18;
+        return a;
+      }
+    };
+
+    preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm);
     return preset;
   })();
 
