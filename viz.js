@@ -61,6 +61,7 @@
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
+    { label: "Alchemy v2: Era — Anemone/Vortex", wmp: "Alchemy v2: Era — Anemone/Vortex" },
     { label: "Alchemy v2: Orbiters", wmp: "Alchemy v2: Orbiters" },
     { label: "Alchemy v2: Kaleidoscope", wmp: "Alchemy v2: Kaleidoscope" },
     { label: "Alchemy v2: Anemone Pulsar", wmp: "Alchemy v2: Anemone Pulsar" },
@@ -127,6 +128,116 @@
   var latest = new Uint8Array(FFT_SIZE);
   var audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
 
+  var nowMs = function () { return (window.performance && performance.now) ? performance.now() : Date.now(); };
+
+  // --- The Director — Tier-2 era sequencer (the composition "when-to-change" brain)
+  //
+  // WMP Alchemy composes visuals as a DECOUPLED STATE MACHINE: color, background,
+  // motif and camera evolve on independent clocks, punctuated by rare hard CUTS
+  // between "eras" (verified frame-by-frame — see docs/alchemy-v2). The continuous
+  // decoupled morphing lives INSIDE each era-preset's frame_eqs (Tier 1:
+  // alcHueClock / alcEnergy / alcBeatFlash). This Director owns Tier 2 — the rare
+  // cuts: it tracks audio ENERGY (a slow rolling "vibe" + a transient/beat onset)
+  // and, on an energy-scaled dwell timer, crossfades to the next era-preset,
+  // aligning the cut to a beat when one lands so it feels musical.
+  //
+  // Energy/beat are derived here from the time-domain bytes we already receive
+  // (overall-loudness onset detection, AGC-normalized so pacing works on quiet and
+  // loud tracks alike). Future refinement: pass bass-band energy from content.js
+  // for kick-aligned cuts. Disabled by default — single-preset screenshot iteration
+  // is the normal workflow; press "d" (or postMessage director:toggle) to engage.
+  var Director = (function () {
+    var cfg = {
+      enabled: false,
+      dwellCalmMs: 30000,    // dwell between cuts when the track is calm
+      dwellLoudMs: 14000,    // dwell when energetic (shorter → more frequent cuts)
+      maxBeatWaitMs: 2500,   // once dwell elapses, wait this long for a beat, else cut anyway
+      blendCalmS: 3.0,       // crossfade length when calm (morphier)
+      blendLoudS: 1.6,       // crossfade length when energetic (snappier)
+      beatSens: 1.45,        // onset ratio (energy / local-average) to call a beat
+      beatFloor: 0.015,      // ignore "beats" below this RMS (treat as silence)
+      beatRefractoryMs: 220, // minimum gap between beats
+      energyTauMs: 6000,     // "vibe" EMA time-constant (macro pacing)
+    };
+
+    // audio-derived state
+    var energy = 0;          // instantaneous RMS of the centered waveform
+    var energyNorm = 0;      // AGC-normalized energy, 0..1
+    var vibe = 0;            // slow EMA of energyNorm, 0..1 — the macro pacing signal
+    var runningMax = 1e-2;   // adaptive gain reference (decays slowly)
+    var beat = false;        // a transient fired THIS frame
+    var beatStrength = 0;
+    var lastBeatAt = -1e9;
+    var hist = new Float32Array(32), histN = 0, histI = 0, histSum = 0; // ~0.5s onset window
+
+    // sequencer state
+    var eras = [];           // preset names this Director cycles among
+    var lastTickAt = 0, dwellElapsed = 0, pending = false, pendingSince = 0;
+    var onSwitch = null, curName = null;
+
+    function feed(bytes, now) {
+      var n = bytes.length, sum = 0, i, x;
+      for (i = 0; i < n; i++) { x = (bytes[i] - 128) / 128; sum += x * x; }
+      energy = Math.sqrt(sum / n);
+
+      // adaptive normalization so quiet and loud tracks pace the same way
+      runningMax = Math.max(energy, runningMax * 0.999, 1e-4);
+      energyNorm = Math.min(1, energy / runningMax);
+
+      // short-window local average for transient/onset detection
+      histSum -= hist[histI]; hist[histI] = energy; histSum += energy;
+      histI = (histI + 1) % hist.length; if (histN < hist.length) histN++;
+      var localAvg = histN ? histSum / histN : 0;
+
+      beat = false;
+      beatStrength = localAvg > 1e-6 ? energy / localAvg : 0;
+      if (energy > cfg.beatFloor && beatStrength > cfg.beatSens && (now - lastBeatAt) > cfg.beatRefractoryMs) {
+        beat = true; lastBeatAt = now;
+      }
+    }
+
+    function dwellMs() { return cfg.dwellCalmMs + (cfg.dwellLoudMs - cfg.dwellCalmMs) * vibe; }
+    function blendS() { return cfg.blendCalmS + (cfg.blendLoudS - cfg.blendCalmS) * vibe; }
+
+    function pickNext() {
+      if (!eras.length) return null;
+      if (eras.length === 1) return eras[0];
+      var next, guard = 0;
+      do { next = eras[Math.floor(Math.random() * eras.length)]; } while (next === curName && ++guard < 8);
+      return next;
+    }
+
+    function tick(now) {
+      var dt = lastTickAt ? (now - lastTickAt) : 0;
+      lastTickAt = now;
+      // advance the "vibe" envelope every frame (even while disabled, so it's warm when engaged)
+      var a = dt > 0 ? Math.min(1, dt / cfg.energyTauMs) : 0;
+      vibe += (energyNorm - vibe) * a;
+      if (!cfg.enabled || eras.length < 2 || !onSwitch) return;
+
+      dwellElapsed += dt;
+      if (!pending && dwellElapsed >= dwellMs()) { pending = true; pendingSince = now; }
+      if (pending && (beat || (now - pendingSince) > cfg.maxBeatWaitMs)) {
+        var name = pickNext();
+        if (name) onSwitch(name, blendS()); // onSwitch → loadByName → noteLoaded resets the clock
+      }
+    }
+
+    return {
+      feed: feed, tick: tick, cfg: cfg,
+      setEras: function (list) { eras = (list || []).slice(); },
+      setOnSwitch: function (fn) { onSwitch = fn; },
+      // every preset load (manual OR director) resets the dwell clock so a manual
+      // pick gets its full dwell before the Director cuts away from it.
+      noteLoaded: function (name, now) { curName = name; dwellElapsed = 0; pending = false; lastTickAt = now; },
+      setEnabled: function (on, now) { cfg.enabled = !!on; dwellElapsed = 0; pending = false; lastTickAt = now; },
+      isEnabled: function () { return cfg.enabled; },
+      eraCount: function () { return eras.length; },
+      status: function () { return { enabled: cfg.enabled, energy: energy, vibe: vibe, beat: beat, dwellMs: dwellMs(), eras: eras.length, current: curName }; },
+    };
+  })();
+  window.Director = Director; // exposed for debugging / a future UI toggle
+
   var canvas = document.getElementById("c");
   var starEl = document.getElementById("star");
   var bar = document.getElementById("bar");
@@ -151,17 +262,18 @@
     viz.setRendererSize(d.bw, d.bh, { pixelRatio: 1, textureRatio: 1 });
   }
 
-  function loadByIndex(i) {
+  function loadByIndex(i, blend) {
     if (!names.length) return;
     idx = ((i % names.length) + names.length) % names.length;
     var key = names[idx];
-    try { viz.loadPreset(presets[key], 2.0); } catch (e) { fail("loadPreset: " + e.message); return; }
+    try { viz.loadPreset(presets[key], blend == null ? 2.0 : blend); } catch (e) { fail("loadPreset: " + e.message); return; }
     syncSelect(key);
     updateStar();
     showBar();
+    Director.noteLoaded(key, nowMs());
     post({ type: "preset:changed", name: key });
   }
-  function loadByName(name) { var i = names.indexOf(name); if (i >= 0) loadByIndex(i); else console.warn("[WMP-viz] preset not found:", name); }
+  function loadByName(name, blend) { var i = names.indexOf(name); if (i >= 0) loadByIndex(i, blend); else console.warn("[WMP-viz] preset not found:", name); }
   var step = function (d) { loadByIndex(idx + d); };
   var randomPreset = function () { loadByIndex(Math.floor(Math.random() * names.length)); };
 
@@ -235,6 +347,9 @@
 
   function renderLoop() {
     rafId = requestAnimationFrame(renderLoop);
+    var now = nowMs();
+    Director.feed(latest, now); // read the live audio energy/beat…
+    Director.tick(now);         // …and (if engaged) advance the era sequencer
     try { viz.render({ audioLevels: audioLevels }); }
     catch (e) { cancelAnimationFrame(rafId); fail("render: " + e.message); }
   }
@@ -255,12 +370,27 @@
     catch (e) { fail("createVisualizer: " + e.message); return; }
 
     buildBar();
+
+    // Stand-in era playlist for the Director until the four purpose-built
+    // era-presets exist: cycle the strongest existing Alchemy v2 scenes, one per
+    // macro era (corridor / anemone-vortex / mandala-fluid / ribbon). Filtered to
+    // those actually present; falls back to every Alchemy v2 preset.
+    var ERA_PLAYLIST = [
+      "Alchemy v2: Era — Anemone/Vortex", // real Tier-1 era-preset (covers anemone+vortex internally)
+      "Alchemy v2: Net Tunnel", "Alchemy v2: Mandala", "Alchemy v2: Marble",
+      "Alchemy v2: Ribbon", "Alchemy v2: Kaleidoscope", "Alchemy v2: Moiré",
+    ];
+    var eraList = ERA_PLAYLIST.filter(function (n) { return presets[n]; });
+    if (eraList.length < 2) eraList = names.filter(function (n) { return /^Alchemy v2:/.test(n); });
+    Director.setEras(eraList);
+    Director.setOnSwitch(function (name, blend) { loadByName(name, blend); });
+
     window.addEventListener("resize", sizeCanvas);
     requestAnimationFrame(sizeCanvas);
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Net Tunnel";  // rebuilt: rotating-line + feedback trace
+    var DEFAULT_PRESET = "Alchemy v2: Era — Anemone/Vortex";  // Step-3 era-preset — actively iterating
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });
@@ -278,13 +408,23 @@
     else if (m.type === "preset:load" && m.name) loadByName(m.name);
     else if (m.type === "preset:step") step(m.dir || 1);
     else if (m.type === "preset:random") randomPreset();
+    else if (m.type === "director:toggle") setDirector(!Director.isEnabled());
+    else if (m.type === "director:set") setDirector(!!m.enabled);
   });
+
+  function setDirector(on) {
+    Director.setEnabled(on, nowMs());
+    console.log("[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras");
+    post({ type: "director", enabled: Director.isEnabled(), eras: Director.eraCount() });
+    showBar();
+  }
 
   window.addEventListener("keydown", function (e) {
     if (e.key === "ArrowRight") step(1);
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "r" || e.key === "R") randomPreset();
     else if (e.key === "f" || e.key === "F") toggleFav();
+    else if (e.key === "d" || e.key === "D") setDirector(!Director.isEnabled());
   });
 
   try { init(); } catch (e) { fail("init: " + (e && e.message ? e.message : e)); }

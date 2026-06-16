@@ -3219,6 +3219,176 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Era — Anemone/Vortex ─────────────────────────────────────────
+  // The FIRST true ERA-PRESET (Tier-1 of the Director architecture; see
+  // docs/alchemy-v2 + memory). Recreates the reference's emotional centre (0:40–1:16)
+  // NOT as a fixed scene but as a DECOUPLED STATE MACHINE running inside one preset:
+  // four layers each advance on their OWN clock (verified composition model — WMP
+  // Alchemy evolves colour/background/camera/motif independently, not in lockstep):
+  //   L1 COLOUR  — energy-coupled hue drift, ping-ponging green↔magenta (q8).
+  //   L2 CAMERA  — a vortex dive that ramps in/out on its own ~26s clock (q12/q13 →
+  //                warp twist+suction); deeper when the music is loud. Independent of
+  //                the motif: the anemone fur SMEARS into spiral arms when it engages.
+  //   L3 BG      — crossfades solid-snap ↔ fluid on a ~17s clock (q14); the solid
+  //                COLOUR snaps to a new dusty tone on a strong beat (q15 — a discrete,
+  //                decoupled event, like the sage→cobalt snaps in the reference).
+  //   L4 MOTIF   — the two tethered orbiters fade in/out on a ~22s clock (q17); the
+  //                anemone is the constant primary.
+  // q1..q32 reach the warp+comp shaders in this build (#define q1 _qa.x …), so every
+  // layer is data-driven from frame_eqs. Muted + Reinhard tone-mapped per the Alchemy
+  // rule. <=6 custom waves (the build's reliable cap).
+  P["Alchemy v2: Era — Anemone/Vortex"] = (function () {
+    var huePhase = 0, lastT = 0;
+    var camPhase = 0, bgPhase = 0, orbPhase = 0;   // independent layer clocks
+    var bgSel = 0, lastSnap = -10;
+    var flash = alcBeatFlash();
+    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.6, gain: 0.82 }); // muted green↔magenta band
+
+    var preset = build(
+      { wave_a: 0, decay: 0.95, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.06, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time;
+          var dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3;
+          var f = flash(energy, dt);                 // 0..1 beat flash (discrete events)
+
+          // L1 — COLOUR: slow energy-coupled hue clock (faster only when LOUDER than nominal).
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.012, 0.06);
+          t.q8 = huePhase;
+
+          // L2 — CAMERA: vortex dive ramps on its OWN ~26s clock, deepened by loudness.
+          camPhase += dt / 26;
+          var vortexAmt = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);          // smooth 0→1→0
+          vortexAmt = Math.min(1, vortexAmt * (0.6 + 0.6 * Math.max(0, energy - 1)));
+          t.q12 = vortexAmt;                          // warp twist gate
+          t.q13 = vortexAmt;                          // warp inward-suction gate
+
+          // L3 — BACKGROUND: solid↔fluid crossfade on its OWN ~17s clock; solid colour
+          // SNAPS to the next dusty tone on a strong beat (≥4s apart) — a discrete event.
+          bgPhase += dt / 17;
+          t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);                   // 0=solid, 1=fluid
+          if (f > 0.6 && (tm - lastSnap) > 4) { bgSel = (bgSel + 1) % 4; lastSnap = tm; }
+          t.q15 = bgSel;
+          t.q16 = 0.5 + 0.6 * f + 0.2 * Math.max(0, bass - 1);             // bg brightness lifts on beats
+
+          // L4 — MOTIF: orbiter pair fades in/out on its OWN ~22s clock.
+          orbPhase += dt / 22;
+          t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832));  // orb visibility 0.35..1
+
+          // motif geometry (the anemone fur + the two flanking orbiters on opposing orbits)
+          var th = tm * 0.30;
+          t.q1 = 0.5 + 0.32 * Math.cos(th);            t.q2 = 0.5 + 0.32 * Math.sin(th);
+          t.q3 = 0.5 + 0.32 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.32 * Math.sin(th + Math.PI);
+          t.q5 = 0.015 + 0.012 * bass;                 // orb core radius
+          t.q6 = t.q5 * 2.1 + 0.006;                   // Saturn ring radius
+          t.q7 = 0.010 + 0.035 * treb;                 // tether lightning amplitude (small)
+          t.q9 = 0.07 + 0.06 * bass;                   // anemone base radius
+          t.q10 = 0.04 + 0.05 * mid;                   // anemone fur amplitude (PULSAR pulse)
+          return t;
+        },
+        // CAMERA (L2) lives here: a twist that GROWS toward centre + inward suction, both
+        // GATED by q12/q13 (vortexAmt). At rest (q12=0) the warp is identity + a fast fade
+        // → crisp anemone; as it engages, the fur smears into spiral arms (slow fade).
+        warp:
+          "shader_body {\n" +
+          "vec2 c = uv - 0.5;\n" +
+          "float pr = length(c);\n" +
+          "float tw = q12 * (0.05 + 0.05*mid + 0.10/(pr*6.0 + 1.0));\n" +   // twist tightens toward centre
+          "float sc = 1.0 - q13 * (0.012 + 0.006*bass);\n" +               // inward suction
+          "float sn = sin(tw), cs = cos(tw);\n" +
+          "vec2 sd = vec2(c.x*cs - c.y*sn, c.x*sn + c.y*cs) * sc + 0.5;\n" +
+          "ret = texture2D(sampler_main, sd).rgb;\n" +
+          "ret -= mix(0.012, 0.004, q12);\n" +                             // fast fade when flat, long trails in the vortex
+          "}\n",
+        // BACKGROUND (L3) lives here: crossfade a snapping SOLID colour (q15) with a domain-
+        // warped FLUID wash by q14, brightness q16, dark central pupil + vignette, then the
+        // feedback buffer (motif glow) + bloom, Reinhard tone-mapped so it stays muted.
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "float si = mod(floor(q15), 4.0);\n" +
+          "vec3 sol = si < 0.5 ? vec3(0.10,0.17,0.12) : si < 1.5 ? vec3(0.09,0.14,0.30) : si < 2.5 ? vec3(0.16,0.07,0.18) : vec3(0.18,0.16,0.07);\n" +  // sage / cobalt / plum / olive
+          "vec2 fq = vec2(fbm(uv*1.8 + vec2(time*0.04, -time*0.03)), fbm(uv*1.8 + 5.0 - time*0.035));\n" +
+          "float n = fbm(uv*1.6 + fq*1.3);\n" +
+          "vec3 flu = mix(vec3(0.05,0.03,0.10), vec3(0.04,0.12,0.08), clamp(n*1.3, 0.0, 1.0));\n" +  // purple↔green fluid
+          "vec3 bg = mix(sol, flu, clamp(q14, 0.0, 1.0));\n" +
+          "float vig = 1.0 - 0.45*smoothstep(0.25, 1.1, pr);\n" +
+          "float pupil = smoothstep(0.0, 0.14, pr);\n" +                   // dark anemone eye
+          "bg *= vig * pupil * (0.6 + 0.5*q16);\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.30;\n" +
+          "ret = outc / (outc + vec3(0.9));\n" +                           // Reinhard, muted (k=0.9)
+          "}\n"
+      }
+    );
+
+    // L4 motif waves — the anemone fur (constant) + a fading orbiter pair joined by a tether.
+    // The anemone hue PING-PONGS green↔magenta off the q8 colour clock (a band, not a full
+    // wheel sweep — the reference's two-tone behaviour). Orbs/tether fade via q17.
+    function anemone() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 0.7, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var rad = (a.q9 || 0.12) + (a.q10 || 0.06) * (a.value1 || 0);
+          if (rad < 0.03) rad = 0.03;
+          a.x = 0.5 + rad * Math.cos(ang);
+          a.y = 0.5 + rad * Math.sin(ang);
+          rosePal(a, 0);                              // muted green↔magenta band keyed by a.q8
+          return a;
+        }
+      };
+    }
+    function tether() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.03, a: 0.55, thick: 0, r: 0.6, g: 0.8, b: 1.0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ax = a.q1 !== undefined ? a.q1 : 0.4, ay = a.q2 !== undefined ? a.q2 : 0.5;
+          var bx = a.q3 !== undefined ? a.q3 : 0.6, by = a.q4 !== undefined ? a.q4 : 0.5;
+          var dx = bx - ax, dy = by - ay;
+          var len = Math.sqrt(dx * dx + dy * dy) || 1;
+          var nx = -dy / len, ny = dx / len;
+          var disp = (a.value1 || 0) * (a.q7 || 0.03);
+          a.x = ax + a.sample * dx + nx * disp;
+          a.y = ay + a.sample * dy + ny * disp;
+          var vis = a.q17 === undefined ? 1 : a.q17;  // L4 fade
+          a.r = 0.6 * vis; a.g = 0.8 * vis; a.b = 1.0 * vis; a.a = 0.55 * vis;
+          return a;
+        }
+      };
+    }
+    function orb(qx, qy, isRing) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: isRing ? 96 : 80, additive: 1, usedots: 0, scaling: 1, smoothing: 0.9, a: isRing ? 0.25 : 0.95, thick: isRing ? 0 : 1 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = (isRing ? (a.q6 || 0.05) : (a.q5 || 0.02));
+          var ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang);
+          a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var vis = a.q17 === undefined ? 1 : a.q17;  // L4 fade
+          if (isRing) { a.r = 0.85 * vis; a.g = 0.92 * vis; a.b = 1.0 * vis; a.a = 0.25 * vis; }   // white Saturn ring
+          else { a.r = 1.0 * vis; a.g = 0.72 * vis; a.b = 0.34 * vis; a.a = 0.95 * vis; }          // gold core
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = anemone();                 // anemone fur (constant primary)
+    preset.waves[1] = tether();                  // lightning tether between the orbs
+    preset.waves[2] = orb("q1", "q2", false);    // orb A core (gold)
+    preset.waves[3] = orb("q3", "q4", false);    // orb B core (gold)
+    preset.waves[4] = orb("q1", "q2", true);     // orb A ring (white)
+    preset.waves[5] = orb("q3", "q4", true);     // orb B ring (white)
+    return preset;
+  })();
+
   // ── Alchemy v2: Wireframe Net ────────────────────────────────────────────────
   // Built from the ALCHEMY KIT. The woven net is FRAME FEEDBACK (docs foundation #1): a 2D
   // STAR (two waveform triangles) is redrawn each frame and its feedback TRAIL builds the
