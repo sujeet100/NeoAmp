@@ -2685,17 +2685,18 @@
       { frame: alcNetFrame(function () { return [0.42, 0.50]; }, 0.95), comp: ALC_COMP }
     );
 
-    // Wrap frame_eqs: after alcNetFrame runs, compute head-orb screen positions
-    // (depth-0 shapes) and publish them to q21–q24 for the tether wave.
+    // Wrap frame_eqs: publish head-orb ring EDGES (not centers) to q21–q24 so the
+    // tether wave spans exactly the gap between the two rings without crossing them.
     var baseFrame = preset.frame_eqs;
     preset.frame_eqs = function (t) {
       baseFrame(t);
-      var raw = (t.q14 || 0) - Math.floor(t.q14 || 0);  // depth-0 raw = march phase
+      var raw = (t.q14 || 0) - Math.floor(t.q14 || 0);
       var proj = 1.0 / (1.0 + K * raw);
-      t.q21 = (nearX  - vpx) * proj + vpx;               // head X (same for both rows)
-      t.q22 = (nearYT - vpy) * proj + vpy;               // top head Y
-      t.q23 = t.q21;                                      // same X
-      t.q24 = (nearYB - vpy) * proj + vpy;               // bottom head Y
+      var orbRad = 0.11 * proj * 0.65;                    // matches makeOrbTrailShapes s.rad
+      t.q21 = (nearX  - vpx) * proj + vpx;               // head X (both rows same)
+      t.q22 = (nearYT - vpy) * proj + vpy + orbRad;      // BOTTOM edge of top orb
+      t.q23 = t.q21;
+      t.q24 = (nearYB - vpy) * proj + vpy - orbRad;      // TOP edge of bottom orb
       return t;
     };
 
@@ -2703,38 +2704,28 @@
     preset.waves[0] = star[0];
     preset.waves[1] = star[1];
 
-    // Tether: live audio waveform line connecting the two head orbs.
-    // Two parallel passes (waves[2] + waves[3]) offset ±0.004 in the perpendicular
-    // direction — gives physical width without extra geometry.  Overbright white/ice
-    // (r/g/b > 1.0 in additive mode) creates a bright bloom that reads as a thick line.
-    function makeTether(perpOffset) {
-      return {
-        baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.04, a: 1.0
-        }),
-        init_eqs: passthrough,
-        frame_eqs: passthrough,
-        point_eqs: function (a) {
-          var ax = a.q21 || nearX, ay = a.q22 || nearYT;
-          var bx = a.q23 || nearX, by = a.q24 || nearYB;
-          var dx = bx - ax, dy = by - ay;
-          var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          var px = -dy / len, py = dx / len;
-          // end-fade: waveform displacement tapers to 0 at both endpoints so the
-          // tether anchors at each orb center rather than crossing through it
-          var ef = Math.min(a.sample * 18, 1.0) * Math.min((1.0 - a.sample) * 18, 1.0);
-          var disp = 0.12 * (a.value1 || 0) * ef + perpOffset;
-          a.x = ax + a.sample * dx + disp * px;
-          a.y = ay + a.sample * dy + disp * py;
-          // overbright white/ice — additive > 1 blooms to a thick glowing line
-          a.r = 2.8; a.g = 2.8; a.b = 3.5;
-          return a;
-        }
-      };
-    }
-    preset.waves[2] = makeTether(-0.004);
-    preset.waves[3] = makeTether(+0.004);
+    // Tether: single live-waveform line spanning the gap between the two head rings.
+    preset.waves[2] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+        smoothing: 0.04, a: 1.0
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ax = a.q21 || nearX, ay = a.q22 || (nearYT + 0.07);
+        var bx = a.q23 || nearX, by = a.q24 || (nearYB - 0.07);
+        var dx = bx - ax, dy = by - ay;
+        var len = Math.sqrt(dx * dx + dy * dy) || 0.001;
+        var px = -dy / len, py = dx / len;
+        // ef tapers displacement to 0 at both endpoints — line stays attached to ring edges
+        var ef = sm01(Math.min(a.sample * 6, 1.0)) * sm01(Math.min((1.0 - a.sample) * 6, 1.0));
+        a.x = ax + a.sample * dx + 0.12 * (a.value1 || 0) * ef * px;
+        a.y = ay + a.sample * dy + 0.12 * (a.value1 || 0) * ef * py;
+        a.r = 2.8; a.g = 2.8; a.b = 3.5;
+        return a;
+      }
+    };
 
     preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm);
     return preset;
