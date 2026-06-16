@@ -2897,17 +2897,17 @@
           t.q22 = 0.5 + R * Math.sin(omega * tm);       // orb A y
           t.q23 = 0.5 - R * Math.cos(omega * tm);       // orb B x
           t.q24 = 0.5 - R * Math.sin(omega * tm);       // orb B y
-          t.q5  = 0.18 + 0.04 * Math.max(0, bass - 1); // feathery ring radius
+          t.q5  = 0.09 + 0.02 * Math.max(0, bass - 1); // feathery ring radius (small — accent, not dominant)
           t.q7  = 0.065 + 0.02 * Math.max(0, bass - 1);// orb base radius
           t.q8  = hue;
           t.q9  = tm * 0.25;                             // feathery ring slow rotation
           return t;
         }, comp: ALC_COMP }
     );
-    // waves: feathery ring at center + dot columns accent
+    // waves: feathery ring at center (accent only — small radius)
+    // alcOrbTarget dropped: it uses wave space while blobs use shape space → misaligned
     preset.waves[0] = alcOrbFeathery(0.5, 0.5, ALC_PAL.spread);
-    preset.waves[1] = alcOrbTarget("q21", "q22", 2, ALC_PAL.mono);  // bullseye around orb A (wave space ≠ shape space; positions are approximate)
-    // shapes: two gradient blob orbs
+    // shapes: two gradient blob orbs + dot column accents
     var blobA = alcOrbGradBlob("q21", "q22", ALC_PAL.mono);
     var blobB = alcOrbGradBlob("q23", "q24", ALC_PAL.mono);
     preset.shapes = blobA.concat(blobB).concat(alcOrbDotColumns(2, ALC_PAL.twoTone));
