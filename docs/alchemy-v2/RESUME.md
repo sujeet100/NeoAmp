@@ -36,24 +36,27 @@ matches `README.md` foundations). We built a reusable **Alchemy kit** in `wmp-pr
 - **Ray Burst** — 5 rotating waveform rays + orb core, top camera.
 
 ## Pending (kit perspective)
-- **Orbs**: refine — distinct circles still bunch a bit toward the VP; head/trail balance; the
-  feedback (decay 0.42) gives a slight glow that can still tube if pushed. Consider an explicit
-  comet (Gemini's delayed-time idea) instead of relying on feedback at all.
-- **Net**: decide feedback-star vs explicit `alcMeshRings`. The corridor net + orbs should share
-  one VP (they do now via feedback). Explicit net (alcMeshRings) would be crisper/controllable
-  but the user reverted it once (looked like face-on concentric circles — needs the off-center
-  down-right VP to read as a corridor, not a target).
-- **Motifs still to add** (from `README.md` Part II + Gemini's 5-primitive list):
-  - Radial **Spindle/Anemone** (lines from a point, twist→vortex) — harvest the existing
-    `Anemone Pulsar` preset into a kit motif. Highest reuse (≈6 scenes).
-  - ~~**N-gon generalization**~~ ✅ DONE — `alcNgon` ({N/skip} star-polygon) + `alcNgonPacked` +
-    `alcNgonStack` + `alcDiagonalLine` + `alcMandalaFrame`; scene `Alchemy v2: Mandala` (and
-    `N-gon Proof`). Full spec/notes in `docs/alchemy-v2/ngon-spec.md`. Used {N/skip} (center-crossing
-    chords), NOT inner/outer radius. Has collapse-dropout, energy-gated density tiers, eye-node glow.
-  - **Mandala** (nested polygons), **Ribbon** (3D waving plane), **dotted fine trail** (the small
-    blue dots under the orbs in the reference).
-  - **Backgrounds** (comp/warp shaders): solid-color snap, fluid marble, moiré stripes,
-    oscilloscope band, kaleidoscope mirror.
+
+### 🔜 Next session: Orb refinement (Net Corridor lead scene)
+- Circles still bunch toward VP; head/trail balance off. Consider explicit comet (Gemini's
+  delayed-time idea) instead of relying on feedback for trail.
+- Net: decide feedback-star vs explicit `alcMeshRings`.
+
+### Motifs built this session (2026-06-15/16)
+- ~~**N-gon generalization**~~ ✅ — `alcNgon`/`alcNgonPacked`/`alcNgonStack` + `alcDiagonalLine` +
+  `alcMandalaFrame`. Scenes: Mandala + Nested Mandala + N-gon Proof.
+- ~~**Spindle/Anemone**~~ ✅ — `alcSpindle` (circlewave ring urchin). Scene: Alchemy v2: Spindle.
+- ~~**Ribbon**~~ ✅ — `alcRibbonWarp` + `alcRibbonComp`. Scene: Alchemy v2: Ribbon.
+- ~~**Moiré diamond anchor**~~ ✅ (partial) — `P["Alchemy v2: Moiré"]` has bars + diamond + oscilloscope.
+  **Kaleidoscope TODO**: warp-mirror approach confirmed correct but bars must be a wave (not comp)
+  to avoid ghost artifact. See memory `moire-kaleidoscope-todo`.
+
+### Still to do
+- **Dotted fine trail** — small dots under orbs. `usedots:1` short waveLine.
+- **Fluid marble background** — fbm/domain-warp comp shader, reusable.
+- **Solid-color snap background** — named kit comp.
+- **Kaleidoscope mirror** — needs bars-as-wave approach (see TODO in memory).
+- **Journey sequencer** — crossfade between scenes.
 - **Colors**: orb fill hue-cycles; net is teal+amber. Keep the muted rule for these families.
 - Optional `Journey` sequencer to crossfade scenes.
 
@@ -85,7 +88,8 @@ matches `README.md` foundations). We built a reusable **Alchemy kit** in `wmp-pr
 - Custom-wave cap ≈6 enabled. Shapes: 8–10 fine.
 - We can't see the live render — iterate from the user's screenshots.
 
-## Where the user is
-Building the composable kit; Net Corridor is the lead scene. "Good progress, refine later."
-Next session: refine orbs (maybe fully-explicit comet), decide net approach, then start adding
-the remaining motifs (Anemone first).
+## Where the user is (2026-06-16)
+Kit motifs are largely built. **Next session: Orb refinement on Net Corridor** — the lead scene.
+- Orbs bunch toward VP; consider explicit comet approach (Gemini: delayed-time depth cue)
+- Net decision: feedback-star vs alcMeshRings
+After that: remaining motifs (dotted trail, fluid marble bg), then moiré kaleidoscope fix.
