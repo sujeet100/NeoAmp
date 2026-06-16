@@ -3389,6 +3389,328 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Era — Corridor ───────────────────────────────────────────────
+  // Macro era 1 (reference 0:00–0:40): a wireframe NET of radial waveform spokes +
+  // the orbiter pair over a 3D-corridor camera that FOLDS into a red/green kaleido "X"
+  // tunnel and back. Energetic, vivid (the kaleido muting-rule exception). Decoupled
+  // layers in frame_eqs: L1 fast rainbow hue (q8) · L2 camera = kaleido-fold amount on a
+  // ~24s clock + bass zoom (q12/q13 → warp) · L3 horizon-bands ↔ black bg (q14, beat-lit
+  // q16) · L4 orbiter fade (q17). Net spokes are the constant primary.
+  P["Alchemy v2: Era — Corridor"] = (function () {
+    var huePhase = 0, lastT = 0, camPhase = 0, bgPhase = 0, orbPhase = 0;
+    var flash = alcBeatFlash();
+    var preset = build(
+      { wave_a: 0, decay: 0.95, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3, f = flash(energy, dt);
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.03, 0.10); t.q8 = huePhase; // L1 fast/rainbow
+          camPhase += dt / 24; t.q12 = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);   // L2 kaleido-fold 0..1
+          t.q13 = Math.max(0, bass - 1);                                          // L2 corridor zoom pulse
+          bgPhase += dt / 15; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);     // L3 bands↔black
+          t.q16 = 0.5 + 0.6 * f + 0.2 * Math.max(0, bass - 1);
+          orbPhase += dt / 20; t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832)); // L4
+          var th = tm * 0.30;
+          t.q1 = 0.5 + 0.34 * Math.cos(th);            t.q2 = 0.5 + 0.34 * Math.sin(th);
+          t.q3 = 0.5 + 0.34 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.34 * Math.sin(th + Math.PI);
+          t.q5 = 0.015 + 0.012 * bass; t.q6 = t.q5 * 2.1 + 0.006; t.q7 = 0.010 + 0.035 * treb;
+          t.q9 = tm * 0.10;                            // net spin
+          t.q18 = 0.40;                                // net spoke length
+          return t;
+        },
+        // L2 CAMERA: fold the FEEDBACK into a 4-fold mirror by q12 (the kaleido X tunnel)
+        // and recede it slightly; at q12=0 it's a plain corridor.
+        warp:
+          "shader_body {\n" +
+          "vec2 c = uv - 0.5;\n" +
+          "float pa = atan(c.y, c.x);\n" +
+          "float pr = length(c);\n" +
+          "float seg = 6.2832 / 4.0;\n" +
+          "float fa = abs(pa - seg * floor(pa / seg + 0.5));\n" +
+          "float ua = mix(pa, fa, clamp(q12, 0.0, 1.0));\n" +
+          "float z = 0.992 - 0.012 * q13;\n" +
+          "vec2 sd = vec2(cos(ua), sin(ua)) * pr * z + 0.5;\n" +
+          "ret = texture2D(sampler_main, sd).rgb;\n" +
+          "ret -= 0.006;\n" +
+          "}\n",
+        // L3 BACKGROUND: spectral horizon bands (hue-shifted by the q8 clock) faded to black
+        // by q14; less muting (k=0.7) so the kaleido era reads vivid.
+        comp:
+          NOISE_GLSL + PAL_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "float yb = d.y * 4.0 + time * 0.06;\n" +
+          "vec3 bands = pal(fract(yb) + q8);\n" +
+          "bands *= exp(-pow(d.y * 3.0, 2.0));\n" +
+          "vec3 bg = bands * clamp(q14, 0.0, 1.0) * (0.5 + 0.5 * q16);\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.35;\n" +
+          "ret = outc / (outc + vec3(0.7));\n" +
+          "}\n"
+      }
+    );
+    function rays(n) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, a: 0.5, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var seg = 1 / n, k = Math.floor(a.sample / seg), ff = (a.sample - k * seg) / seg;
+          var ang = (k / n) * 6.2832 + (a.q9 || 0);
+          var rad = ff * (a.q18 || 0.4);
+          var disp = (a.value1 || 0) * 0.05 * ff;       // waveform jag grows outward along each spoke
+          a.x = 0.5 + rad * Math.cos(ang) - disp * Math.sin(ang);
+          a.y = 0.5 + rad * Math.sin(ang) + disp * Math.cos(ang);
+          var h = (a.q8 || 0) + k * 0.04;               // vivid rainbow spread
+          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 0.8;
+          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 0.8;
+          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 0.8;
+          return a;
+        }
+      };
+    }
+    function orb(qx, qy, isRing) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: isRing ? 96 : 80, additive: 1, usedots: 0, scaling: 1, smoothing: 0.9, a: isRing ? 0.25 : 0.95, thick: isRing ? 0 : 1 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = isRing ? (a.q6 || 0.05) : (a.q5 || 0.02), ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang); a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var vis = a.q17 === undefined ? 1 : a.q17;
+          if (isRing) { a.r = 0.85 * vis; a.g = 0.92 * vis; a.b = 1.0 * vis; a.a = 0.25 * vis; }
+          else { a.r = 1.0 * vis; a.g = 0.85 * vis; a.b = 0.5 * vis; a.a = 0.95 * vis; }
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = rays(18);                  // the wireframe net of radial waveform spokes
+    preset.waves[1] = orb("q1", "q2", false);    // orb A core
+    preset.waves[2] = orb("q3", "q4", false);    // orb B core
+    preset.waves[3] = orb("q1", "q2", true);     // orb A ring
+    preset.waves[4] = orb("q3", "q4", true);     // orb B ring
+    return preset;
+  })();
+
+  // ── Alchemy v2: Era — Mandala/Fluid ──────────────────────────────────────────
+  // Macro era 3 (reference 1:16–2:00): nested counter-rotating star-polygon mandalas with
+  // a persistent diagonal waveform line, over a flat-blue backdrop that crossfades to a
+  // green↔magenta marbled-fluid field. Crisp lines (cleared feedback → no smear). Decoupled
+  // layers: L1 green↔magenta hue (q8) · L2 camera = mandala spin rate (q9, its own clock) ·
+  // L3 flat-blue ↔ marble bg crossfade (q14) · L4 diagonal-line + orbiter fade (q17).
+  P["Alchemy v2: Era — Mandala/Fluid"] = (function () {
+    var huePhase = 0, lastT = 0, bgPhase = 0, linePhase = 0, spin = 0;
+    var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.7, gain: 0.9 });
+    var preset = build(
+      { wave_a: 0, decay: 0.5, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3;
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.012, 0.05); t.q8 = huePhase; // L1
+          spin += dt * (0.15 + 0.25 * Math.max(0, treb - 1)); t.q9 = spin;          // L2 mandala spin (own clock)
+          bgPhase += dt / 18; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);        // L3 flat-blue↔marble
+          linePhase += dt / 21; t.q17 = 0.3 + 0.7 * (0.5 - 0.5 * Math.cos(linePhase * 6.2832)); // L4
+          t.q5 = 0.018 + 0.012 * bass; t.q6 = t.q5 * 2.1 + 0.006;                    // orb radii
+          var th = tm * 0.22;
+          t.q1 = 0.5 + 0.36 * Math.cos(th);            t.q2 = 0.5 + 0.36 * Math.sin(th);
+          t.q3 = 0.5 + 0.36 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.36 * Math.sin(th + Math.PI);
+          return t;
+        },
+        warp: ALC_CLEAR_WARP,   // clear each frame → crisp mandala lines (glow comes from the comp bloom)
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "vec3 flatbg = vec3(0.10, 0.22, 0.38);\n" +              // flat muted blue
+          "vec2 fq = d + 0.15 * vec2(sin(time * 0.2), cos(time * 0.17));\n" +
+          "float fv = fbm(fq * 3.0 + time * 0.05);\n" +
+          "float rdg = abs(fract(fv * 5.0) - 0.5);\n" +
+          "float ridge = smoothstep(0.06, 0.0, rdg);\n" +
+          "vec3 marble = mix(vec3(0.06, 0.18, 0.10), vec3(0.20, 0.05, 0.18), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.25, 0.7, 0.35);\n" +
+          "vec3 bg = mix(flatbg, marble, clamp(q14, 0.0, 1.0));\n" +
+          "bg *= 1.0 - 0.3 * pr;\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.18;\n" +
+          "ret = outc / (outc + vec3(0.85));\n" +
+          "}\n"
+      }
+    );
+    // a regular N-gon drawn as a closed waveform polygon, rotated by q9 * dir, jagged by value1.
+    function ngon(sides, R, dir) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 0.7, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var th = a.sample * 6.2832, seg = 6.2832 / sides;
+          var phi = (a.q9 || 0) * dir;
+          var w = ((th - phi) % seg + seg) % seg - seg / 2;        // angle within one polygon edge
+          var rad = R * Math.cos(seg / 2) / Math.cos(w) + 0.025 * (a.value1 || 0);
+          a.x = 0.5 + rad * Math.cos(th); a.y = 0.5 + rad * Math.sin(th);
+          rosePal(a, sides % 2);                                   // alternate the two-tone by polygon
+          return a;
+        }
+      };
+    }
+    function diagonal() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.03, a: 0.6, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample, disp = (a.value1 || 0) * 0.08;
+          a.x = 0.12 + s * 0.76 - disp * 0.7071; a.y = 0.12 + s * 0.76 + disp * 0.7071;  // SW→NE, perpendicular jag
+          var vis = a.q17 === undefined ? 1 : a.q17;
+          a.r = 0.95 * vis; a.g = 0.35 * vis; a.b = 0.85 * vis; a.a = 0.6 * vis;          // magenta line
+          return a;
+        }
+      };
+    }
+    function orb(qx, qy, isRing) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: isRing ? 96 : 80, additive: 1, usedots: 0, scaling: 1, smoothing: 0.9, a: isRing ? 0.25 : 0.9, thick: isRing ? 0 : 1 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = isRing ? (a.q6 || 0.05) : (a.q5 || 0.02), ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang); a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var vis = a.q17 === undefined ? 1 : a.q17;
+          if (isRing) { a.r = 0.85 * vis; a.g = 0.92 * vis; a.b = 1.0 * vis; a.a = 0.25 * vis; }
+          else { a.r = 1.0 * vis; a.g = 0.78 * vis; a.b = 0.42 * vis; a.a = 0.9 * vis; }
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = ngon(8, 0.30, 1);          // outer 8-gon
+    preset.waves[1] = ngon(6, 0.20, -1);         // mid 6-gon (counter-rotating)
+    preset.waves[2] = ngon(4, 0.12, 1);          // inner diamond
+    preset.waves[3] = diagonal();                // persistent diagonal waveform line
+    preset.waves[4] = orb("q1", "q2", false);    // flanking orb A
+    preset.waves[5] = orb("q3", "q4", false);    // flanking orb B
+    return preset;
+  })();
+
+  // ── Alchemy v2: Era — Supernova ──────────────────────────────────────────────
+  // Macro era 4 finale (reference 2:48–3:06): a violent furry radial URCHIN (spoke length
+  // ∝ RAW bass — explosive, not breathing — + live waveform fur), a dark central eye, the
+  // orbiter pair + tether, over a magenta↔lime radial bloom. Vivid (supernova exception).
+  // Decoupled layers: L1 vivid hue (q8) · L2 camera = Z-plunge ramp on its own clock (q12/q13
+  // → warp) · L3 dark ↔ radial-bloom bg, tightening on bass (q14) · L4 orbiter fade (q17);
+  // the urchin RE-BLOOMS on each beat (alcBeatFlash → q19).
+  P["Alchemy v2: Era — Supernova"] = (function () {
+    var huePhase = 0, lastT = 0, camPhase = 0, bgPhase = 0, orbPhase = 0;
+    var flash = alcBeatFlash();
+    var preset = build(
+      { wave_a: 0, decay: 0.94, gammaadj: 1.5, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.10, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var rawBass = t.bass || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3, f = flash(energy, dt);
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.03, 0.10); t.q8 = huePhase; // L1 vivid
+          camPhase += dt / 28; t.q12 = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);       // L2 plunge ramp
+          t.q13 = Math.max(0, mid - 1);                                               // L2 swirl
+          bgPhase += dt / 16; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);          // L3 dark↔bloom
+          orbPhase += dt / 19; t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832)); // L4
+          t.q18 = 0.16;                                  // urchin base radius
+          t.q19 = 0.18 * Math.max(0, rawBass - 1) + 0.30 * f;  // explosive spoke growth: RAW bass + beat re-bloom
+          t.q9 = tm * 0.06;                              // slow urchin spin
+          var th = tm * 0.34;
+          t.q1 = 0.5 + 0.33 * Math.cos(th);            t.q2 = 0.5 + 0.33 * Math.sin(th);
+          t.q3 = 0.5 + 0.33 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.33 * Math.sin(th + Math.PI);
+          t.q5 = 0.015 + 0.012 * bass; t.q6 = t.q5 * 2.1 + 0.006; t.q7 = 0.010 + 0.035 * treb;
+          return t;
+        },
+        // L2 CAMERA: Z-plunge — sample inward (content expands outward) gated by q12, with a
+        // small q13 swirl; long trails when plunging, short when at rest.
+        warp:
+          "shader_body {\n" +
+          "vec2 c = uv - 0.5;\n" +
+          "float pl = q12 * (0.02 + 0.03 * bass);\n" +
+          "float tw = 0.012 * q13;\n" +
+          "float sn = sin(tw), cs = cos(tw);\n" +
+          "vec2 rc = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs);\n" +
+          "vec2 sd = rc * (1.0 - pl) + 0.5;\n" +
+          "ret = texture2D(sampler_main, sd).rgb;\n" +
+          "ret -= mix(0.010, 0.004, q12);\n" +
+          "}\n",
+        // L3 BACKGROUND: magenta↔lime radial bloom (hue-clocked) that tightens on bass, faded
+        // in by q14; never pure black. Vivid (k=0.7).
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "float bloom = exp(-pr * pr * (3.0 - 1.5 * bass));\n" +
+          "vec3 col = mix(vec3(0.9, 0.2, 0.6), vec3(0.3, 0.9, 0.2), 0.5 + 0.5 * sin(time * 0.4 + q8 * 6.2832));\n" +
+          "vec3 bg = col * bloom * clamp(q14, 0.0, 1.0) + vec3(0.02, 0.01, 0.03);\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = bg + g + glow * 0.40;\n" +
+          "ret = outc / (outc + vec3(0.7));\n" +
+          "}\n"
+      }
+    );
+    function urchin() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.02, a: 0.8, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var n = 64, seg = 1 / n, k = Math.floor(a.sample / seg), ff = (a.sample - k * seg) / seg;
+          var ang = (k / n) * 6.2832 + (a.q9 || 0);
+          var rad = ff * ((a.q18 || 0.16) + (a.q19 || 0)) + (a.value1 || 0) * 0.04 * ff;  // RAW-bass spike + waveform fur
+          a.x = 0.5 + rad * Math.cos(ang); a.y = 0.5 + rad * Math.sin(ang);
+          var h = (a.q8 || 0) + k * 0.05;               // vivid rainbow per spike
+          a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          return a;
+        }
+      };
+    }
+    function tether() {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.03, a: 0.5, thick: 0 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ax = a.q1 !== undefined ? a.q1 : 0.4, ay = a.q2 !== undefined ? a.q2 : 0.5;
+          var bx = a.q3 !== undefined ? a.q3 : 0.6, by = a.q4 !== undefined ? a.q4 : 0.5;
+          var dx = bx - ax, dy = by - ay, len = Math.sqrt(dx * dx + dy * dy) || 1;
+          var nx = -dy / len, ny = dx / len, disp = (a.value1 || 0) * (a.q7 || 0.03);
+          a.x = ax + a.sample * dx + nx * disp; a.y = ay + a.sample * dy + ny * disp;
+          var vis = a.q17 === undefined ? 1 : a.q17;
+          a.r = 0.7 * vis; a.g = 0.85 * vis; a.b = 1.0 * vis; a.a = 0.5 * vis;
+          return a;
+        }
+      };
+    }
+    function orb(qx, qy, isRing) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: isRing ? 96 : 80, additive: 1, usedots: 0, scaling: 1, smoothing: 0.9, a: isRing ? 0.25 : 0.95, thick: isRing ? 0 : 1 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var r = isRing ? (a.q6 || 0.05) : (a.q5 || 0.02), ang = a.sample * 6.2832;
+          a.x = (a[qx] || 0.5) + r * Math.cos(ang); a.y = (a[qy] || 0.5) + r * Math.sin(ang);
+          var vis = a.q17 === undefined ? 1 : a.q17;
+          if (isRing) { a.r = 0.85 * vis; a.g = 0.92 * vis; a.b = 1.0 * vis; a.a = 0.25 * vis; }
+          else { a.r = 1.0 * vis; a.g = 0.72 * vis; a.b = 0.34 * vis; a.a = 0.95 * vis; }
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = urchin();                  // the furry supernova urchin (primary)
+    preset.waves[1] = tether();                  // tether between the orbiters
+    preset.waves[2] = orb("q1", "q2", false);    // orb A core
+    preset.waves[3] = orb("q3", "q4", false);    // orb B core
+    preset.waves[4] = orb("q1", "q2", true);     // orb A ring
+    preset.waves[5] = orb("q3", "q4", true);     // orb B ring
+    return preset;
+  })();
+
   // ── Alchemy v2: Wireframe Net ────────────────────────────────────────────────
   // Built from the ALCHEMY KIT. The woven net is FRAME FEEDBACK (docs foundation #1): a 2D
   // STAR (two waveform triangles) is redrawn each frame and its feedback TRAIL builds the

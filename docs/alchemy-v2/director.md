@@ -86,5 +86,16 @@ So every layer is data-driven from `frame_eqs` — no in-shader schedule mirrori
 - L4 MOTIF → a q-var multiplying motif-wave alpha to crossfade layers in/out.
 Keep ≤6 custom waves; muted + Reinhard tone-map (`ret = c/(c+k)`) per the Alchemy rule.
 
-**Built:** `Era — Anemone/Vortex` (reference 0:40–1:16). Remaining era-presets follow the
-four macro eras in `README.md` (Corridor; Mandala/Fluid; Ribbon/Supernova).
+**Built (all 4 macro eras, hooked into the Director playlist):**
+- `Era — Corridor` (0:00–0:40) — radial-waveform net + orbiters; camera folds into a
+  red/green kaleido "X" (q12) over horizon-bands↔black; vivid (kaleido exception).
+- `Era — Anemone/Vortex` (0:40–1:16) — anemone fur + tethered orbiters; vortex-dive camera
+  (q12/q13); solid-snap↔fluid bg snapping on beats.
+- `Era — Mandala/Fluid` (1:16–2:00) — nested counter-rotating N-gon mandalas + diagonal
+  waveform line; cleared feedback (crisp); flat-blue↔marble bg.
+- `Era — Supernova` (2:48–3:06 finale) — furry urchin (spoke length ∝ RAW bass + beat
+  re-bloom) + orbiters; Z-plunge camera; magenta↔lime radial bloom; vivid.
+
+All four are unverified on-screen (mechanically validated only) — tune per-era from the
+user's screenshots. The Director sequences between them (Tier 2); each morphs internally
+(Tier 1).

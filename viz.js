@@ -61,7 +61,10 @@
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
+    { label: "Alchemy v2: Era — Corridor", wmp: "Alchemy v2: Era — Corridor" },
     { label: "Alchemy v2: Era — Anemone/Vortex", wmp: "Alchemy v2: Era — Anemone/Vortex" },
+    { label: "Alchemy v2: Era — Mandala/Fluid", wmp: "Alchemy v2: Era — Mandala/Fluid" },
+    { label: "Alchemy v2: Era — Supernova", wmp: "Alchemy v2: Era — Supernova" },
     { label: "Alchemy v2: Orbiters", wmp: "Alchemy v2: Orbiters" },
     { label: "Alchemy v2: Kaleidoscope", wmp: "Alchemy v2: Kaleidoscope" },
     { label: "Alchemy v2: Anemone Pulsar", wmp: "Alchemy v2: Anemone Pulsar" },
@@ -375,10 +378,13 @@
     // era-presets exist: cycle the strongest existing Alchemy v2 scenes, one per
     // macro era (corridor / anemone-vortex / mandala-fluid / ribbon). Filtered to
     // those actually present; falls back to every Alchemy v2 preset.
+    // The four real Tier-1 era-presets (each runs the decoupled state machine internally,
+    // one per macro era of the reference timeline). The Director crossfades between THESE.
     var ERA_PLAYLIST = [
-      "Alchemy v2: Era — Anemone/Vortex", // real Tier-1 era-preset (covers anemone+vortex internally)
-      "Alchemy v2: Net Tunnel", "Alchemy v2: Mandala", "Alchemy v2: Marble",
-      "Alchemy v2: Ribbon", "Alchemy v2: Kaleidoscope", "Alchemy v2: Moiré",
+      "Alchemy v2: Era — Corridor",
+      "Alchemy v2: Era — Anemone/Vortex",
+      "Alchemy v2: Era — Mandala/Fluid",
+      "Alchemy v2: Era — Supernova",
     ];
     var eraList = ERA_PLAYLIST.filter(function (n) { return presets[n]; });
     if (eraList.length < 2) eraList = names.filter(function (n) { return /^Alchemy v2:/.test(n); });
