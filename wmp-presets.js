@@ -72,13 +72,10 @@
   // with bass. Fixes the "too black / single flat color" gap without going neon.
   // Needs NOISE_GLSL (fbm) prepended before the shader_body that calls alcFluid().
   var ALC_FLUID_GLSL =
-    "vec3 alcFluid(vec2 p, float t, float b){\n" +
+    "vec3 alcFluid(vec2 p, float t, float b, vec3 deep, vec3 mids, vec3 hi){\n" +  // 3 scene-config tones
     "  vec2 q = vec2(fbm(p*1.7 + vec2(t*0.04, -t*0.03)), fbm(p*1.7 + vec2(5.2,1.3) - t*0.035));\n" +
     "  float n = fbm(p*1.5 + q*1.4 + vec2(-t*0.02, t*0.025));\n" +
     "  float n2 = fbm(p*2.6 - q*1.1 + t*0.015);\n" +
-    "  vec3 deep = vec3(0.012, 0.045, 0.055);\n" +   // dark teal
-    "  vec3 mids = vec3(0.06, 0.035, 0.11);\n" +     // dusty purple
-    "  vec3 hi   = vec3(0.09, 0.15, 0.15);\n" +      // muted teal-grey
     "  vec3 c = mix(deep, mids, clamp(n*1.3, 0.0, 1.0));\n" +
     "  c = mix(c, hi, smoothstep(0.55, 0.95, n2));\n" +
     "  return c * (0.55 + 0.5 * b);\n" +
@@ -92,15 +89,15 @@
   // zoom. `d` = aspect-corrected centered coord (0 at center); `t` = time; `b` = bass
   // (brightens the ridges on beats). Needs NOISE_GLSL (fbm) prepended.
   var ALC_MARBLE_GLSL =
-    "vec3 alcMarble(vec2 d, float t, float b){\n" +
+    "vec3 alcMarble(vec2 d, float t, float b, vec3 colA, vec3 colB, vec3 vein){\n" +
     "  vec2 q = d + 0.15*vec2(sin(t*0.20), cos(t*0.17));\n" +
     "  float cs = cos(t*0.05), sn = sin(t*0.05);\n" +
     "  q = mat2(cs, -sn, sn, cs) * q;\n" +                            // slow in-place swirl (NOT feedback-zoom)
     "  float f = fbm(q*3.0 + t*0.05);\n" +
     "  float rdg = abs(fract(f*5.0 + t*0.10) - 0.5);\n" +
     "  float ridge = smoothstep(0.06, 0.0, rdg) * (0.6 + 0.6*b);\n" +  // bold bright iso-contour veins (user preferred this)
-    "  vec3 base = mix(vec3(0.16,0.40,0.27), vec3(0.42,0.24,0.46), 0.5+0.5*sin(t*0.06));\n" +  // muted green<->magenta
-    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vec3(0.45,0.85,0.55);\n" +
+    "  vec3 base = mix(colA, colB, 0.5+0.5*sin(t*0.06));\n" +          // two-tone ground (scene-config)
+    "  vec3 c = base*(0.45 + 0.55*f) + ridge*vein;\n" +               // veins in scene-config colour
     "  c *= mix(1.0, smoothstep(0.0, 0.45, length(d)), 0.6);\n" +      // soft INVERTING vignette (center darker, per frames)
     "  return c;\n" +
     "}\n";
@@ -150,11 +147,11 @@
   // alcRadialBloom: a central colour BLOOM radiating from center, hue-cycling magenta<->lime,
   // bass-pulsing (the supernova/burst colour field — section I, and D's radial burst). Needs no helper.
   var ALC_RADIALBLOOM_GLSL =
-    "vec3 alcRadialBloom(vec2 d, float t, float b){\n" +
+    "vec3 alcRadialBloom(vec2 d, float t, float b, vec3 colA, vec3 colB){\n" +  // two-tone, scene-config
     "  float r = length(d);\n" +
     "  float bloom = exp(-r*r*(3.0 - 1.5*b));\n" +              // tightens/expands with bass
-    "  vec3 c = mix(vec3(0.85,0.18,0.62), vec3(0.78,0.85,0.22), 0.5+0.5*sin(t*0.4));\n" +  // magenta<->lime
-    "  c = c*bloom + smoothstep(0.55,0.45,r)*vec3(0.5,0.15,0.7)*0.3;\n" +  // faint outer purple ring
+    "  vec3 c = mix(colA, colB, 0.5+0.5*sin(t*0.4));\n" +       // e.g. magenta<->lime
+    "  c = c*bloom + smoothstep(0.55,0.45,r)*colA*0.3;\n" +     // faint outer ring tinted by colA
     "  return c;\n" +
     "}\n";
 
@@ -185,18 +182,17 @@
 
   // bgMoire (BG6) — quad-mirrored MOIRÉ stripe colour field. PRODUCT of two mirrored stripe
   // sets (x AND y) -> the diamond/BUTTERFLY interference (fixes the standing moiré TODO; the
-  // old inline version only had x-stripes). `uv` = raw 0..1 uv; `t` time; `b` bass (pan+bright).
-  // Needs PAL_GLSL (pal). Returns the bar colour to composite.
+  // old inline version only had x-stripes). `uv` = raw 0..1 uv; `t` time; `b` bass (pan+bright);
+  // `barCol` = the lit-bar colour (scene-config). Returns the bar colour to composite.
   var ALC_MOIRE_GLSL =
-    "vec3 alcMoire(vec2 uv, float t, float b){\n" +
+    "vec3 alcMoire(vec2 uv, float t, float b, vec3 barCol){\n" +  // barCol = scene-config bar colour
     "  vec2 m = abs(uv - 0.5) + 0.5;\n" +                       // quad mirror (L/R + T/B) -> butterfly symmetry
     "  float pan = t * 0.15 + b * 0.4;\n" +
     "  float pitch = 20.0 + 5.0 * sin(t * 0.2);\n" +
     "  float bx = 0.5 + 0.5 * cos((m.x * pitch + pan) * 6.2832);\n" +
     "  float by = 0.5 + 0.5 * cos((m.y * pitch * 0.6 - pan) * 6.2832);\n" +  // second axis -> butterfly moiré
     "  float bars = pow(bx * by, 2.5);\n" +                     // product of two mirrored stripe sets
-    "  vec3 hue = pal(t * 0.05 + 0.67);\n" +                    // green-start
-    "  return mix(vec3(0.01,0.03,0.01), hue * (0.4 + 0.2*b), bars);\n" +
+    "  return mix(vec3(0.01,0.03,0.01), barCol * (0.4 + 0.2*b), bars);\n" +
     "}\n";
 
   // bgSolidSnap (T2.5) — instant SOLID-COLOUR flip background: returns one of N dusty preset
@@ -271,7 +267,9 @@
   // Equations are real FUNCTIONS: for a converted preset (function-based main
   // eqs) Butterchurn calls wave.point_eqs directly and never compiles *_str, so
   // point_eqs MUST be a function (an empty string would be skipped at draw time).
-  function circleWave(qx, qy) {
+  // colorize (optional) — an ALC_PAL palette to set per-point colour; omit to keep the
+  // default magenta baseVals colour (back-compat for existing callers).
+  function circleWave(qx, qy, colorize) {
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
@@ -284,6 +282,7 @@
         var rad = (a.q5 || 0.15) + 0.05 * a.value1;
         a.x = (a[qx] || 0.5) + rad * Math.cos(ang);
         a.y = (a[qy] || 0.5) + rad * Math.sin(ang);
+        if (colorize) colorize(a, 0);
         return a;
       }
     };
@@ -832,6 +831,7 @@
     // strobeVar q-var is truthy -> the feedback buffer gets DISCRETE spaced spokes (gaps
     // between them) instead of a continuous swept fan. The scene pulses the q-var on a timer.
     var strobeVar = opts.strobeVar || null;
+    var colorize = opts.colorize || null;   // optional ALC_PAL palette; falls back to the cosine wheel
     function line(angOff, perpOff) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
@@ -846,14 +846,18 @@
           var off = (a.value1 || 0) * jig + perpOff;    // jig=0 -> plain straight line; perpOff = thickness offset
           a.x = 0.5 + s * len * ct - off * st;
           a.y = 0.5 + s * len * st + off * ct;
-          var h = (a.q8 || 0) + hueOff;
-          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-          var l = (rr + gg + bb) / 3;
-          a.r = rr * sat + l * (1 - sat);
-          a.g = gg * sat + l * (1 - sat);
-          a.b = bb * sat + l * (1 - sat);
+          if (colorize) {
+            colorize(a, 0);
+          } else {
+            var h = (a.q8 || 0) + hueOff;
+            var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+            var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+            var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+            var l = (rr + gg + bb) / 3;
+            a.r = rr * sat + l * (1 - sat);
+            a.g = gg * sat + l * (1 - sat);
+            a.b = bb * sat + l * (1 - sat);
+          }
           if (strobeVar) a.a = (a[strobeVar] ? alpha : 0.0);   // only stamp on strobe frames -> discrete spokes
           return a;
         }
@@ -876,12 +880,14 @@
   //   opts.hueOff    hue offset added to q8
   //   opts.sat       saturation (1 = vivid magenta/lime/cyan; lower = dustier)
   //   opts.gain      brightness
+  //   opts.colorize  optional ALC_PAL palette (overrides the built-in spectral-spread coloring)
   function alcRadialBurst(opts) {
     opts = opts || {};
     var useSecond = opts.useSecond || false;
     var hueOff = opts.hueOff || 0;
     var sat = opts.sat === undefined ? 1.0 : opts.sat;
     var gain = opts.gain === undefined ? 1.0 : opts.gain;
+    var colorize = opts.colorize || null;
     return {
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
@@ -895,14 +901,18 @@
         if (rad < 0.02) rad = 0.02;
         a.x = 0.5 + rad * Math.cos(ang);
         a.y = 0.5 + rad * Math.sin(ang);
-        var h = (a.q8 || 0) + hueOff + a.sample * 0.5;   // hue varies around the ring
-        var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-        var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-        var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-        var l = (rr + gg + bb) / 3;
-        a.r = (rr * sat + l * (1 - sat)) * gain;
-        a.g = (gg * sat + l * (1 - sat)) * gain;
-        a.b = (bb * sat + l * (1 - sat)) * gain;
+        if (colorize) {
+          colorize(a, 0);
+        } else {
+          var h = (a.q8 || 0) + hueOff + a.sample * 0.5;   // hue varies around the ring
+          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          var l = (rr + gg + bb) / 3;
+          a.r = (rr * sat + l * (1 - sat)) * gain;
+          a.g = (gg * sat + l * (1 - sat)) * gain;
+          a.b = (bb * sat + l * (1 - sat)) * gain;
+        }
         return a;
       }
     };
@@ -913,7 +923,7 @@
   // copy MIRRORED about that horizon (same samples, opposite displacement) -> the on-water
   // reflection. Returns an ARRAY of 2 waves. Scene may tilt the horizon via q13. Config:
   //   opts.cy horizon y (0..1) | opts.amp waveform amplitude | opts.len half-span across width
-  //   opts.sat saturation | opts.alpha | opts.hueOff (hue from cycling q8)
+  //   opts.sat saturation | opts.alpha | opts.hueOff (hue from cycling q8) | opts.colorize (ALC_PAL)
   function bgWaveHorizon(opts) {
     opts = opts || {};
     var cy = opts.cy === undefined ? 0.5 : opts.cy;
@@ -922,6 +932,7 @@
     var sat = opts.sat === undefined ? 0.6 : opts.sat;
     var alpha = opts.alpha === undefined ? 0.8 : opts.alpha;
     var hueOff = opts.hueOff || 0;
+    var colorize = opts.colorize || null;
     function horizonWave(mirror) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
@@ -935,14 +946,18 @@
           var disp = (a.value1 || 0) * amp;
           a.x = 0.5 + s * len;
           a.y = cy + s * len * tilt + (mirror ? -disp : disp);   // reflect displacement about horizon
-          var h = (a.q8 || 0) + hueOff;
-          var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
-          var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-          var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-          var l = (rr + gg + bb) / 3;
-          a.r = rr * sat + l * (1 - sat);
-          a.g = gg * sat + l * (1 - sat);
-          a.b = bb * sat + l * (1 - sat);
+          if (colorize) {
+            colorize(a, mirror ? 1 : 0);
+          } else {
+            var h = (a.q8 || 0) + hueOff;
+            var rr = 0.5 + 0.5 * Math.cos(6.2832 * h);
+            var gg = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+            var bb = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+            var l = (rr + gg + bb) / 3;
+            a.r = rr * sat + l * (1 - sat);
+            a.g = gg * sat + l * (1 - sat);
+            a.b = bb * sat + l * (1 - sat);
+          }
           return a;
         }
       };
@@ -2653,7 +2668,7 @@
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
           "float vig = 1.0 - smoothstep(0.22, 0.95, length(d));\n" +
-          "vec3 bg = alcFluid(uv * 2.0, time, bass) * vig;\n" +
+          "vec3 bg = alcFluid(uv * 2.0, time, bass, vec3(0.012,0.045,0.055), vec3(0.06,0.035,0.11), vec3(0.09,0.15,0.15)) * vig;\n" +  // dark-teal / dusty-purple / teal-grey
           "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +                 // geometry + recede trails
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = bg + sharp + glow * 0.30;\n" +
@@ -3343,7 +3358,7 @@
           NOISE_GLSL + ALC_MARBLE_GLSL +
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
-          "vec3 bg = alcMarble(d, time, bass);\n" +
+          "vec3 bg = alcMarble(d, time, bass, vec3(0.16,0.40,0.27), vec3(0.42,0.24,0.46), vec3(0.45,0.85,0.55));\n" +  // green<->magenta + lime veins
           "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = bg + sharp + glow * 0.28;\n" +
