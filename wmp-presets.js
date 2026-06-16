@@ -1053,6 +1053,150 @@
     return arr;
   }
 
+  // ── Gradient Blob Orb (V17) ─────────────────────────────────────────────────
+  // Hot white/gold core + semi-transparent cyan/teal outer halo: the "small sun" look.
+  // Returns [outerShape, innerShape] — outer drawn first so inner sits on top.
+  // qxVar/qyVar: string q-var names holding the orb's live position ("q21", "q22" etc).
+  function alcOrbGradBlob(qxVar, qyVar, colorize) {
+    colorize = colorize || ALC_PAL.mono;
+    function layer(isInner) {
+      return {
+        baseVals: Object.assign({}, SHAPE_BASE, { enabled: 1, sides: 40, additive: 0, thickoutline: 0 }),
+        init_eqs: passthrough,
+        frame_eqs: function (s) {
+          var cx = s[qxVar] !== undefined ? s[qxVar] : 0.5;
+          var cy = s[qyVar] !== undefined ? s[qyVar] : 0.5;
+          var br = (s.q7 || 0.07) * (1 + 0.4 * Math.max(0, (s.bass_att || 1) - 1));
+          s.x = cx; s.y = cy;
+          if (isInner) {
+            s.rad = br * 0.55;
+            s.r = 1.0; s.g = 0.92; s.b = 0.55; s.a = 0.92;
+            s.r2 = 1.0; s.g2 = 0.98; s.b2 = 0.35; s.a2 = 1.0;
+            s.border_r = 1.0; s.border_g = 0.80; s.border_b = 0.20; s.border_a = 0.65;
+          } else {
+            s.rad = br * 1.45;
+            colorize(s, 0);
+            s.b = Math.min(1, s.b * 1.6 + 0.2);   // push toward cyan/teal
+            s.a = 0.30; s.r2 = s.r * 0.15; s.g2 = s.g * 0.2; s.b2 = s.b * 0.45; s.a2 = 0.08;
+            s.border_a = 0;
+          }
+          return s;
+        }
+      };
+    }
+    return [layer(false), layer(true)];
+  }
+
+  // ── Bullseye / Target Orb (V6/V14) ──────────────────────────────────────────
+  // n concentric rings in a single wave — sample range segmented into n bands.
+  // Outermost ring gets live waveform jitter for the subtle jagged edge.
+  function alcOrbTarget(qxVar, qyVar, n, colorize) {
+    n = n || 2; colorize = colorize || ALC_PAL.mono;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, smoothing: 0.05, a: 0.85 }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var cx = a[qxVar] !== undefined ? a[qxVar] : 0.5;
+        var cy = a[qyVar] !== undefined ? a[qyVar] : 0.5;
+        var si = a.sample * n, k = Math.min(Math.floor(si), n - 1), f = si - k;
+        var R = (a.q7 || 0.07) * (0.65 + k * 0.50) + (k === n - 1 ? 0.012 * (a.value1 || 0) : 0);
+        a.x = cx + R * Math.cos(f * 6.2832);
+        a.y = cy + R * Math.sin(f * 6.2832);
+        colorize(a, k);
+        if (k === n - 1) a.r = Math.min(1.5, a.r * 1.3 + 0.2);  // warm accent on outermost
+        return a;
+      }
+    };
+  }
+
+  // ── Feathery Ring (V12) ──────────────────────────────────────────────────────
+  // Large centered ring with radial filament spokes driven by live audio waveform.
+  // Segments: 0..0.5 = inner layer (short spokes), 0.5..1.0 = outer (longer spokes).
+  // Ring breathes with bass; spokes flutter with value1; slow rotation via q9.
+  function alcOrbFeathery(cx, cy, colorize) {
+    cx = cx !== undefined ? cx : 0.5; cy = cy !== undefined ? cy : 0.5;
+    colorize = colorize || ALC_PAL.mono;
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, smoothing: 0.25, a: 0.65 }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var R0 = (a.q5 || 0.20) + 0.05 * Math.max(0, (a.bass_att || 1) - 1);
+        var isOuter = a.sample >= 0.5;
+        var f = isOuter ? (a.sample - 0.5) * 2 : a.sample * 2;
+        var th = f * 6.2832 + (a.q9 || 0) * 0.06;
+        var spk = (isOuter ? 0.08 : 0.04) * (a.value1 || 0);
+        a.x = cx + (R0 + spk) * Math.cos(th);
+        a.y = cy + (R0 + spk) * Math.sin(th);
+        colorize(a, isOuter ? 1 : 0);
+        a.a = isOuter ? 0.50 : 0.72;
+        return a;
+      }
+    };
+  }
+
+  // ── Fine Dotted Trail (V5 sub-element) ───────────────────────────────────────
+  // Sparse dots marching the same corridor geometry as makeOrbTrailShapes.
+  // usedots:1 + low sample count (96) = clearly visible individual dots.
+  // Must share rows/nearYs with makeOrbTrailShapes for the paths to coincide.
+  function alcOrbDotTrail(rows, colorize) {
+    rows = rows || 2; colorize = colorize || ALC_PAL.warm;
+    var K = 1.4, nearX = 0.14, vpx = 0.86, vpy = 0.62;
+    var nearYs = rows === 1 ? [0.42] : [0.26, 0.54];
+    return {
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 96, additive: 1, usedots: 1, smoothing: 0, a: 0.55 }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var row = (rows === 2 && a.sample >= 0.5) ? 1 : 0;
+        var t = (rows === 2) ? (row === 0 ? a.sample * 2 : (a.sample - 0.5) * 2) : a.sample;
+        var nearY = nearYs[row];
+        var raw = t + (a.q14 || 0); raw = raw - Math.floor(raw);
+        var proj = 1.0 / (1.0 + K * raw);
+        var tm = a.q19 !== undefined ? a.q19 : (a.time || 0);
+        var wob = 0.04 * Math.sin(raw * 6.2832 * 1.3 + tm * 0.8) * proj;
+        a.x = (nearX - vpx) * proj + vpx;
+        a.y = (nearY - vpy) * proj + vpy + wob;
+        colorize(a, row);
+        var fade = (1.0 - raw) * sm01(raw / 0.02);
+        a.r *= 0.65 * fade; a.g *= 0.65 * fade; a.b *= 0.65 * fade;
+        return a;
+      }
+    };
+  }
+
+  // ── Dot Columns (V10) ────────────────────────────────────────────────────────
+  // Two vertical columns of hollow ring glyphs marching downward (marching speed
+  // driven by q19 time clock). Returns countPerCol*2 shapes to concat to preset.shapes.
+  function alcOrbDotColumns(countPerCol, colorize) {
+    countPerCol = countPerCol || 6; colorize = colorize || ALC_PAL.twoTone;
+    var cols = [0.38, 0.62];
+    var shapes = [];
+    for (var c = 0; c < 2; c++) {
+      for (var i = 0; i < countPerCol; i++) {
+        (function (colX, idx, colIdx) {
+          shapes.push({
+            baseVals: Object.assign({}, SHAPE_BASE, { enabled: 1, sides: 40, additive: 0, thickoutline: 1 }),
+            init_eqs: passthrough,
+            frame_eqs: function (s) {
+              var tm = s.q19 !== undefined ? s.q19 : (s.time || 0);
+              var yOff = ((idx / countPerCol) + tm * 0.05) % 1.0;
+              s.x = colX; s.y = yOff;
+              s.rad = 0.022 + 0.006 * Math.max(0, (s.bass_att || 1) - 1);
+              colorize(s, colIdx);
+              var fade = sm01(Math.min(yOff / 0.06, 1)) * sm01(Math.min((1 - yOff) / 0.06, 1));
+              s.a = 0; s.a2 = 0;
+              s.border_r = Math.min(1, s.r * 1.5 + 0.1);
+              s.border_g = Math.min(1, s.g * 1.5 + 0.1);
+              s.border_b = Math.min(1, s.b * 1.5 + 0.1);
+              s.border_a = fade * 0.85;
+              return s;
+            }
+          });
+        })(cols[c], i, c);
+      }
+    }
+    return shapes;
+  }
+
   // Shared per-frame driver for net scenes: cycles hue, accumulates the star's
   // self-spin, sets the motif q-vars, and breathes zoom on the beat. `headFn(time,
   // beat)` returns the [x,y] head position (camera-specific: centered for top,
@@ -2730,7 +2874,43 @@
       }
     };
 
+    preset.waves[3] = alcOrbDotTrail(2, ALC_PAL.warm);  // fine dots under each ring trail
     preset.shapes = makeOrbTrailShapes(8, 2, ALC_PAL.warm);
+    return preset;
+  })();
+
+  // ── Alchemy v2: Gradient Orbs ────────────────────────────────────────────────
+  // Two gradient-blob orbs (hot gold core + cyan halo) orbiting around a centered
+  // feathery ring — demonstrates alcOrbGradBlob, alcOrbFeathery, alcOrbDotColumns.
+  // Flat camera (near-zero feedback) so all shapes stay crisp.
+  P["Alchemy v2: Gradient Orbs"] = (function () {
+    var hue = 0, lastT = 0;
+    var preset = build(
+      alcCamera("flat"),
+      { frame: function (t) {
+          var bass = t.bass_att || 1, mid = t.mid_att || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          hue = (hue + dt * (0.018 + 0.04 * ((bass + mid) / 2))) % 1;
+          var R = 0.26 + 0.04 * Math.max(0, bass - 1);
+          var omega = 0.30;
+          t.q21 = 0.5 + R * Math.cos(omega * tm);       // orb A x (shape space)
+          t.q22 = 0.5 + R * Math.sin(omega * tm);       // orb A y
+          t.q23 = 0.5 - R * Math.cos(omega * tm);       // orb B x
+          t.q24 = 0.5 - R * Math.sin(omega * tm);       // orb B y
+          t.q5  = 0.18 + 0.04 * Math.max(0, bass - 1); // feathery ring radius
+          t.q7  = 0.065 + 0.02 * Math.max(0, bass - 1);// orb base radius
+          t.q8  = hue;
+          t.q9  = tm * 0.25;                             // feathery ring slow rotation
+          return t;
+        }, comp: ALC_COMP }
+    );
+    // waves: feathery ring at center + dot columns accent
+    preset.waves[0] = alcOrbFeathery(0.5, 0.5, ALC_PAL.spread);
+    preset.waves[1] = alcOrbTarget("q21", "q22", 2, ALC_PAL.mono);  // bullseye around orb A (wave space ≠ shape space; positions are approximate)
+    // shapes: two gradient blob orbs
+    var blobA = alcOrbGradBlob("q21", "q22", ALC_PAL.mono);
+    var blobB = alcOrbGradBlob("q23", "q24", ALC_PAL.mono);
+    preset.shapes = blobA.concat(blobB).concat(alcOrbDotColumns(2, ALC_PAL.twoTone));
     return preset;
   })();
 

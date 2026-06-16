@@ -67,6 +67,7 @@
     { label: "Alchemy v2: Vortex", wmp: "Alchemy v2: Vortex" },
     { label: "Alchemy v2: Wireframe Net", wmp: "Alchemy v2: Wireframe Net" },
     { label: "Alchemy v2: Net Corridor", wmp: "Alchemy v2: Net Corridor" },
+    { label: "Alchemy v2: Gradient Orbs", wmp: "Alchemy v2: Gradient Orbs" },
     { label: "Alchemy v2: Waveform Sheet", wmp: "Alchemy v2: Waveform Sheet" },
     { label: "Alchemy v2: Ray Burst", wmp: "Alchemy v2: Ray Burst" },
     { label: "Alchemy v2: N-gon Proof", wmp: "Alchemy v2: N-gon Proof" },
