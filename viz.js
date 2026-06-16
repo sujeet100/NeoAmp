@@ -71,6 +71,7 @@
     { label: "Alchemy v2: Bullseye Orbiters", wmp: "Alchemy v2: Bullseye Orbiters" },
     { label: "Alchemy v2: Marble", wmp: "Alchemy v2: Marble" },
     { label: "Alchemy v2: Net Tunnel", wmp: "Alchemy v2: Net Tunnel" },
+    { label: "Alchemy v2: Fountain", wmp: "Alchemy v2: Fountain" },
     { label: "Alchemy v2: Waveform Sheet", wmp: "Alchemy v2: Waveform Sheet" },
     { label: "Alchemy v2: Ray Burst", wmp: "Alchemy v2: Ray Burst" },
     { label: "Alchemy v2: N-gon Proof", wmp: "Alchemy v2: N-gon Proof" },
@@ -259,7 +260,7 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Net Tunnel";
+    var DEFAULT_PRESET = "Alchemy v2: Net Tunnel";  // rebuilt: rotating-line + feedback trace
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });

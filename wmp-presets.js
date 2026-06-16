@@ -114,27 +114,6 @@
     "float hx = step(0.5, fract((uv.x + uv.y) * resolution.y * 0.5));\n" +
     "ret *= mix(0.97, 1.0, hx);\n";
 
-  // Alchemy v2 BG8: perspective wireframe TUNNEL — fine radial rays converging to a
-  // vanishing point (section G of the reference). This is an EXPLICIT shader, NOT a
-  // feedback zoom (a zoom artifact gives mush, not crisp converging rays); the rays
-  // brighten toward the VP and carry a slow rainbow hue drift. `d` = aspect-corrected
-  // centered coord (0 at the VP); `t` = time; `b` = bass (brightens the VP on beats).
-  // Needs PAL_GLSL (pal) prepended. Caller adds the warm corner vignette + tone-map.
-  var ALC_NETTUNNEL_GLSL =
-    "vec3 alcNetTunnel(vec2 d, float t, float b){\n" +
-    "  float pang = atan(d.y, d.x);\n" +                                // NOT 'ang' (reserved in main())
-    "  float pr = length(d);\n" +                                      // NOT 'rad' (reserved)
-    "  float rays = abs(fract(pang*28.0/6.2832 + t*0.05) - 0.5);\n" +   // 28 radial spokes (longitudinal wires)
-    "  float spoke = smoothstep(0.05, 0.0, rays) * (0.22/(pr+0.16));\n" +  // thin rays, brighter near VP
-    "  float lr = log(pr + 0.05);\n" +                                 // log radius -> rings bunch toward VP (perspective)
-    "  float rg = abs(fract(lr*2.6 - t*0.25) - 0.5);\n" +              // concentric depth rings, flowing INWARD = forward motion
-    "  float ring = smoothstep(0.06, 0.0, rg) * smoothstep(0.02, 0.18, pr) * 0.9;\n" +  // fade rings out near the VP
-    "  float net = max(spoke, ring);\n" +                              // spokes + rings = wireframe NET tunnel
-    "  vec3 c = pal(pr*0.6 + t*0.04 + pang*0.05);\n" +                  // slow rainbow drift along depth
-    "  c *= net * (1.1 + b*1.4);\n" +                                   // bass lifts the VP glow
-    "  return c;\n" +
-    "}\n";
-
   // Maps the feedback-buffer luminance to a tint (cycling colA<->colB when they
   // differ; pass the same color twice to hold a fixed hue) with a soft,
   // bass-pulsing center bloom. colA/colB/speed/boost are GLSL literal strings.
@@ -3073,47 +3052,155 @@
   })();
 
   // ── Alchemy v2: Net Tunnel ─────────────────────────────────────────────────────
-  // BG8 showcase: a perspective wireframe TUNNEL — fine radial rays converging to a
-  // central vanishing point (section G of the reference), slow rainbow drift along
-  // depth, warm maroon corner vignette, bright VP that lifts on bass. A thin live-
-  // waveform tether slices through the throat. Explicit shader (NOT feedback zoom — the
-  // rays stay crisp). Vivid is correct here (a documented muting-rule exception).
+  // BG8, REBUILT per the user's check of the original (section G, 2:11-2:25): the net
+  // tunnel is NOT a drawn shader — it is 1-2 LINES through center ROTATING FAST, whose
+  // feedback TRACE accumulates into the radial net. Inward zoom (zoom<1) pulls the trace
+  // toward a vanishing point => perspective tunnel + concentric ring banding; a fast hue
+  // cycle means each ring radius (= a different trace age) shows a different hue => the
+  // rainbow rings. Same mechanism as Dance / Waveform Sheet (rotating line + persistence).
+  // Vivid is correct here. (memory wireframe-net-is-crossing-helices: structure CAN be the
+  // trace when it's a fast-swept primitive — the line is the explicitly-drawn part.)
   P["Alchemy v2: Net Tunnel"] = (function () {
     var hue = 0, lastT = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.94, gammaadj: 1.5,
-        zoom: 1.0, rot: 0.004, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+        wave_a: 0, decay: 0.985, gammaadj: 1.5,   // LONG trace -> the sweep builds the net
+        zoom: 0.972,                               // inward -> trace converges to a VP (tunnel depth + rings)
+        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || 1, mid = t.mid_att || 1, treb = t.treb_att || 1;
+          var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
-          hue = (hue + dt * (0.02 + 0.04 * ((bass + mid) / 2))) % 1;
+          hue = (hue + dt * (0.15 + 0.10 * bass)) % 1;   // FAST hue cycle -> rainbow rings (zoom-banded)
+          t.q1 = tm * (2.2 + 1.6 * mid);                  // line angle: FAST rotation (mid speeds it)
           t.q8 = hue;
-          // thin tether across the tunnel throat, slowly tilting; treble -> jaggedness
-          var tilt = 0.06 * Math.sin(tm * 0.25);
-          t.q21 = 0.16; t.q22 = 0.5 + tilt;
-          t.q23 = 0.84; t.q24 = 0.5 - tilt;
-          t.q26 = 0.03 + 0.05 * Math.max(0, treb - 1);
           return t;
         },
         comp:
-          PAL_GLSL + ALC_NETTUNNEL_GLSL +
           "shader_body {\n" +
-          "vec2 d = uv - vec2(0.5); d.x *= resolution.x / resolution.y;\n" +
-          "vec3 bg = alcNetTunnel(d, time, bass);\n" +
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "vec3 outc = bg + sharp + glow * 0.30;\n" +
-          "float vig = smoothstep(1.15, 0.25, length(d));\n" +   // bright VP (center), dark corners
-          "outc = outc * vig + vec3(0.10, 0.02, 0.05) * (1.0 - vig) * 0.5;\n" +  // warm maroon corner tint
-          "ret = outc / (outc + vec3(0.85));\n" +                // Reinhard tone-map
+          "vec3 outc = g + glow * 0.35;\n" +
+          "float vig = smoothstep(1.15, 0.2, length(d));\n" +
+          "outc = outc * vig + vec3(0.08, 0.02, 0.04) * (1.0 - vig) * 0.5;\n" +  // warm corner tint
+          "ret = outc / (outc + vec3(0.85));\n" +                                // Reinhard tone-map
           "}\n"
       }
     );
-    // thin live-waveform tether through the throat (rainbow-spread, cycles with q8)
-    preset.waves[0] = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.spread);
+    // 1-2 fast-rotating waveform lines through center; their feedback TRACE builds the net.
+    // angOff lets a second line run perpendicular ("sometimes 2 lines" in the reference).
+    function rotLine(angOff) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.04, a: 0.9, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var th = (a.q1 || 0) + angOff;
+          var ct = Math.cos(th), st = Math.sin(th);
+          var s = a.sample * 2.0 - 1.0;                 // -1..1 along the line through center
+          var disp = (a.value1 || 0) * 0.10;            // live waveform jag, perpendicular
+          a.x = 0.5 + s * 0.62 * ct - disp * st;
+          a.y = 0.5 + s * 0.62 * st + disp * ct;
+          var h = a.q8 || 0;                             // hue cycles fast -> rainbow rings via zoom-banding
+          a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+          a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+          a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = rotLine(0.0);
+    preset.waves[1] = rotLine(Math.PI / 2);   // second perpendicular line
+    return preset;
+  })();
+
+  // ── Alchemy v2: Fountain ───────────────────────────────────────────────────────
+  // BG7 (outward half): the radial filament FOUNTAIN / pinwheel (section D1, 0:58-1:06).
+  // A fine live-waveform burst near center is STREAMED OUTWARD + swirled by the feedback
+  // warp (sample-scale < 1 blooms content outward; a twist makes the pinwheel), so the
+  // spikes smear into hundreds of fine curved filaments radiating from a hot nucleus.
+  // Vivid magenta/lime/cyan (a documented muting-rule exception). The INWARD complement
+  // (gravitational vortex / supernova collapse) is the existing 'Alchemy v2: Vortex'.
+  P["Alchemy v2: Fountain"] = (function () {
+    var huePhase = 0, lastT = 0;
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.97, gammaadj: 1.35,   // long smear -> streaming filaments
+        zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0,
+        darken_center: 0,                          // center is the BRIGHT source (opposite of Vortex's pupil)
+        echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          huePhase = (huePhase + dt * (0.03 + 0.06 * ((bass + mid + treb) / 3))) % 1;
+          t.q8  = huePhase;
+          t.q9  = 0.035 + 0.03 * bass;              // burst base radius (strands start near center)
+          t.q10 = 0.05 + 0.07 * mid;                // filament length (waveform amplitude)
+          return t;
+        },
+        // FEEDBACK = the fountain: swirl + bloom OUTWARD. Sampling the previous frame from a
+        // coord scaled TOWARD center (sc<1) makes its content expand outward each frame; the
+        // rotation curves the streams into a pinwheel. mid speeds the spin; bass spreads faster.
+        warp:
+          "shader_body {\n" +
+          "vec2 c = uv - 0.5;\n" +
+          "float tw = 0.022 + 0.030 * mid;\n" +                 // swirl
+          "float sc = 0.972 - 0.012 * bass;\n" +                // <1 -> stream OUTWARD; bass widens
+          "float s = sin(tw), co = cos(tw);\n" +
+          "vec2 sd = vec2(c.x * co - c.y * s, c.x * s + c.y * co) * sc + 0.5;\n" +
+          "ret = texture2D(sampler_main, sd).rgb;\n" +
+          "ret -= 0.003;\n" +                                   // slow fade -> long fountain trails
+          "}\n",
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(d);\n" +
+          "float n = fbm(uv * 2.2 + vec2(time * 0.03, -time * 0.02));\n" +
+          "vec3 haze = mix(vec3(0.06, 0.02, 0.09), vec3(0.02, 0.09, 0.10), n);\n" +  // dusty purple <-> teal
+          "haze *= (1.0 - smoothstep(0.15, 1.0, pr)) * (0.5 + 0.4 * bass);\n" +       // soft, fades to edge
+          "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "vec3 outc = haze + g + glow * 0.35;\n" +
+          "outc += vec3(1.0, 0.85, 0.55) * exp(-pr * pr * 90.0) * (0.25 + 0.5 * bass);\n" +  // hot gold nucleus
+          "ret = outc / (outc + vec3(0.82));\n" +                // Reinhard tone-map
+          "}\n"
+      }
+    );
+
+    // SEED: a fine radial live-waveform burst near center (vivid). The feedback warp
+    // streams these spikes outward into the fountain filaments. Two offset copies for density.
+    function fountainBurst(useSecond, hueOff) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
+          smoothing: 0.04, a: 0.85, thick: 0
+        }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var ang = a.sample * 6.2832;
+          var samp = useSecond ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var rad = (a.q9 || 0.04) + (a.q10 || 0.06) * (samp || 0);
+          if (rad < 0.02) rad = 0.02;
+          a.x = 0.5 + rad * Math.cos(ang);
+          a.y = 0.5 + rad * Math.sin(ang);
+          // vivid spread palette (magenta/lime/cyan) keyed by angle + hue cycle
+          var h = (a.q8 || 0) + (hueOff || 0) + a.sample * 0.5;
+          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 1.0;
+          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 1.0;
+          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 1.0;
+          return a;
+        }
+      };
+    }
+    preset.waves[0] = fountainBurst(false, 0.0);
+    preset.waves[1] = fountainBurst(true, 0.33);
     return preset;
   })();
 
