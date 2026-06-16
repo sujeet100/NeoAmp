@@ -2891,13 +2891,13 @@
           var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.018 + 0.04 * ((bass + mid) / 2))) % 1;
-          var R = 0.26 + 0.04 * Math.max(0, bass - 1);
+          var R = 0.18 + 0.03 * Math.max(0, bass - 1);   // tighter orbit — blobs stay on screen
           var omega = 0.30;
           t.q21 = 0.5 + R * Math.cos(omega * tm);       // orb A x (shape space)
           t.q22 = 0.5 + R * Math.sin(omega * tm);       // orb A y
           t.q23 = 0.5 - R * Math.cos(omega * tm);       // orb B x
           t.q24 = 0.5 - R * Math.sin(omega * tm);       // orb B y
-          t.q5  = 0.09 + 0.02 * Math.max(0, bass - 1); // feathery ring radius (small — accent, not dominant)
+          t.q5  = 0.04 + 0.01 * Math.max(0, bass - 1); // feathery ring very small — subtle pulse only
           t.q7  = 0.065 + 0.02 * Math.max(0, bass - 1);// orb base radius
           t.q8  = hue;
           t.q9  = tm * 0.25;                             // feathery ring slow rotation
