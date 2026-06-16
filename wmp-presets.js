@@ -665,6 +665,10 @@
     // single THICK band (vs. the default angular spread of n distinct lines around center).
     var parallel = opts.parallel || false;
     var gap = opts.gap === undefined ? 0.005 : opts.gap;
+    // strobe: if set, the line is only STAMPED (visible) on frames where the scene's
+    // strobeVar q-var is truthy -> the feedback buffer gets DISCRETE spaced spokes (gaps
+    // between them) instead of a continuous swept fan. The scene pulses the q-var on a timer.
+    var strobeVar = opts.strobeVar || null;
     function line(angOff, perpOff) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
@@ -687,6 +691,7 @@
           a.r = rr * sat + l * (1 - sat);
           a.g = gg * sat + l * (1 - sat);
           a.b = bb * sat + l * (1 - sat);
+          if (strobeVar) a.a = (a[strobeVar] ? alpha : 0.0);   // only stamp on strobe frames -> discrete spokes
           return a;
         }
       };
@@ -3160,10 +3165,10 @@
   // (the gold orbs at upper-left / lower-right in the reference). NOT fast spin (=coarse
   // spokes), NOT a drawn shader. Same family as Dance / Waveform Sheet.
   P["Alchemy v2: Net Tunnel"] = (function () {
-    var hue = 0, lastT = 0;
+    var hue = 0, lastT = 0, lastStamp = 0;
     var preset = build(
       {
-        wave_a: 0, decay: 0.93, gammaadj: 1.5,   // SHORT trace: traces disappear quickly so the sweep stays sparse, not messy
+        wave_a: 0, decay: 0.5, gammaadj: 1.5,    // ~10x faster fade than 0.93 -> spokes vanish quickly, very sparse
         zoom: 1.0,                                 // NO zoom (zoom caused the smear/spiral/wedge artifacts)
         rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
       },
@@ -3172,8 +3177,11 @@
           var bass = t.bass_att || 1, mid = t.mid_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;
-          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.4 rev/s) so you see the sweep + fading tail
+          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.4 rev/s); kept per user
           t.q8 = hue;
+          // STROBE: stamp a spoke ~every 0.06s -> discrete spaced spokes (gaps between them),
+          // not a continuous fan. q15 is 1 on a stamp frame, 0 otherwise.
+          if (tm - lastStamp >= 0.06) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
           return t;
         },
         comp:
@@ -3194,7 +3202,7 @@
     // ONE thick PLAIN (no-waveform) straight line as 3 parallel copies; short decay -> a
     // visible rotating line leaving a sparse, quickly-fading trace (per the user's read of the
     // original). jiggle:0 keeps it ruler-straight even with music (waveform jag was the mess).
-    var lines = alcRotLines(3, { parallel: true, gap: 0.006, len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1 });
+    var lines = alcRotLines(3, { parallel: true, gap: 0.006, len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1, strobeVar: "q15" });
     preset.waves[0] = lines[0];
     preset.waves[1] = lines[1];
     preset.waves[2] = lines[2];
