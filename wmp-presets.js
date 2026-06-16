@@ -2914,6 +2914,61 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Bullseye Orbiters ───────────────────────────────────────────
+  // Reference: screenshot 2026-06-13 at 5.20.10 PM — two bullseye (concentric-ring) orbs
+  // on a diagonal axis joined by a dense golden waveform tether; warm purple smear background.
+  // alcOrbTarget: 2 concentric rings per orb; alcTether: live audio waveform connection.
+  // High decay (0.93) + slight zoom gives the long comet smear trail on the rings.
+  P["Alchemy v2: Bullseye Orbiters"] = (function () {
+    var hue = 0, lastT = 0;
+    var COMP = "shader_body {\n" +
+      "  vec2 d = uv - vec2(0.5);\n" +
+      "  d.x *= resolution.x / resolution.y;\n" +
+      "  float r = length(d);\n" +
+      // warm purple/mauve: hue drifts slowly, vignette toward center
+      "  vec3 bg = vec3(0.32 + 0.06*sin(time*0.07), 0.10, 0.42 + 0.06*cos(time*0.09));\n" +
+      "  bg *= (1.0 - 0.55*r*r);\n" +
+      "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+      // Reinhard tone-map so additive orb rings glow warm not blow white
+      "  ret = (c + bg * 0.18) / (c + bg * 0.18 + 0.55);\n" +
+      "}\n";
+
+    var preset = build(
+      {
+        wave_a: 0, decay: 0.93, gammaadj: 1.35,
+        zoom: 0.997,            // slight inward drift — trails compact but not pulled to center
+        rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0, echo_alpha: 0
+      },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || 1, treb = t.treb_att || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          hue = (hue + dt * (0.015 + 0.04 * bass)) % 1;
+
+          // Two orbs on opposite ends of a slowly-rotating diagonal axis
+          var R = 0.34 + 0.04 * Math.max(0, bass - 1);
+          var ang = tm * 0.18;                           // slow orbital precession
+          t.q21 = 0.5 + R * Math.cos(ang);              // orb A x
+          t.q22 = 0.5 + R * Math.sin(ang);              // orb A y
+          t.q23 = 0.5 - R * Math.cos(ang);              // orb B x (antipodal)
+          t.q24 = 0.5 - R * Math.sin(ang);              // orb B y
+          t.q7  = 0.07 + 0.02 * Math.max(0, bass - 1); // ring radius
+          t.q8  = hue;
+          t.q26 = 0.04 + 0.05 * Math.max(0, treb - 1); // tether jaggedness (treble-driven)
+          return t;
+        },
+        comp: COMP
+      }
+    );
+
+    // waves: bullseye at each orb + waveform tether
+    preset.waves[0] = alcOrbTarget("q21", "q22", 2, ALC_PAL.warm);   // orb A: 2 concentric rings
+    preset.waves[1] = alcOrbTarget("q23", "q24", 2, ALC_PAL.warm);   // orb B: 2 concentric rings
+    preset.waves[2] = alcTether("q21", "q22", "q23", "q24", "q26",   // golden waveform tether
+      function (a, i) { ALC_PAL.warm(a, 0); a.r = Math.min(1.5, a.r * 1.4); a.g = Math.min(1.5, a.g * 1.3); });
+    return preset;
+  })();
+
   // ── Alchemy v2: Waveform Sheet ───────────────────────────────────────────────
   // The SINGLE-LINE motif: ONE live-waveform line (alcRayWaves with n=1), slowly rotating,
   // over the spindle camera so its feedback trace spreads into a single rippling sheet seen
