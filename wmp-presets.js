@@ -3174,20 +3174,20 @@
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || 1, mid = t.mid_att || 1;
+          var bass = t.bass_att || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
-          hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;
-          t.q1 = tm * (2.4 + 1.0 * mid);                 // WATCHABLE spin (~0.5 rev/s); kept per user
+          hue = (hue + dt * (0.03 + 0.05 * bass)) % 1;   // hue still drifts with music; rotation does NOT
+          t.q1 = tm * 3.4;                               // CONSTANT spin (~0.5 rev/s) — NOT audio-driven, per user
           t.q8 = hue;
           // STROBE: stamp a spoke ~every 0.06s -> discrete spaced spokes (gaps between them).
           if (tm - lastStamp >= 0.06) { t.q15 = 1; lastStamp = tm; } else { t.q15 = 0; }
           return t;
         },
         // FADE is here (decay baseVal does nothing in this build): multiplicative fade in place
-        // (no movement — we sample uv directly). 0.85/frame -> a stamped spoke is ~gone in ~0.45s,
-        // which is LESS than one rotation period (~0.9s) -> the oldest spokes vanish before the
-        // line laps back, so a FULL CIRCLE never accumulates. ~9x faster than the old `ret-=0.004`.
-        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.85;\n}\n",
+        // (no movement — we sample uv directly). 0.91/frame -> a stamped spoke is ~gone in ~0.8s,
+        // just UNDER one rotation period (~0.9s) -> the oldest spokes vanish before the line laps
+        // back, so a FULL CIRCLE never accumulates (per user). Much faster than the old `ret-=0.004`.
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.91;\n}\n",
         comp:
           "shader_body {\n" +
           "vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
@@ -3203,13 +3203,10 @@
     );
     // Compose the reusable BG8 fan motif (rotating diameter-lines). The scene drives q1/q8
     // and supplies the feedback camera above; alcRotLines is the drop-in seed primitive.
-    // ONE thick PLAIN (no-waveform) straight line as 3 parallel copies; short decay -> a
-    // visible rotating line leaving a sparse, quickly-fading trace (per the user's read of the
-    // original). jiggle:0 keeps it ruler-straight even with music (waveform jag was the mess).
-    var lines = alcRotLines(3, { parallel: true, gap: 0.006, len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1, strobeVar: "q15" });
+    // ONE plain (no-waveform) straight line, Butterchurn thick flag. Strobed -> discrete spokes;
+    // the warp fade clears them within a rotation so no full circle accumulates.
+    var lines = alcRotLines(1, { len: 0.70, jiggle: 0, sat: 0.6, alpha: 0.9, thick: 1, strobeVar: "q15" });
     preset.waves[0] = lines[0];
-    preset.waves[1] = lines[1];
-    preset.waves[2] = lines[2];
     return preset;
   })();
 
