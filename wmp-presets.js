@@ -3414,8 +3414,10 @@
   // ~24s clock + bass zoom (q12/q13 → warp) · L3 horizon-bands ↔ black bg (q14, beat-lit
   // q16) · L4 orbiter fade (q17). Net spokes are the constant primary.
   P["Alchemy v2: Era — Corridor"] = (function () {
-    var huePhase = 0, lastT = 0, camPhase = 0;   // camera = deliberate gesture (LFO)
-    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.0); // stochastic decoupled layers
+    var lastT = 0, camPhase = 0;                 // camera = deliberate gesture (LFO)
+    var hueSH = makeSH(0, 1, 9, 18, 0.5);        // STOCHASTIC scheme hue → palette differs over time
+    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.0);
+    var oax = makeSH(0.18, 0.82, 5, 11, 0.7), oay = makeSH(0.18, 0.82, 5, 11, 0.7), obx = makeSH(0.18, 0.82, 5, 11, 0.7), oby = makeSH(0.18, 0.82, 5, 11, 0.7); // orbs at RANDOM places
     var flash = alcBeatFlash();
     var preset = build(
       { wave_a: 0, decay: 0.95, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0 },
@@ -3424,15 +3426,14 @@
           var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           var energy = (bass + mid + treb) / 3, f = flash(energy, dt);
-          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.03, 0.10); t.q8 = huePhase; // L1 fast/rainbow
+          t.q8 = (hueSH(tm, dt) + tm * 0.004) % 1;                                // L1 STOCHASTIC scheme hue
           camPhase += dt / 24; t.q12 = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);   // L2 kaleido-fold 0..1
           t.q13 = Math.max(0, bass - 1);                                          // L2 corridor zoom pulse
           t.q14 = bgSH(tm, dt);                                                   // L3 bands↔black (stochastic)
           t.q16 = 0.5 + 0.6 * f + 0.2 * Math.max(0, bass - 1);
           t.q17 = motifSH(tm, dt);                                                // L4 orbiter visibility (stochastic)
-          var th = tm * 0.30;
-          t.q1 = 0.5 + 0.34 * Math.cos(th);            t.q2 = 0.5 + 0.34 * Math.sin(th);
-          t.q3 = 0.5 + 0.34 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.34 * Math.sin(th + Math.PI);
+          t.q1 = oax(tm, dt); t.q2 = oay(tm, dt);       // orbs wander to RANDOM places (not a fixed orbit)
+          t.q3 = obx(tm, dt); t.q4 = oby(tm, dt);
           t.q5 = 0.015 + 0.012 * bass; t.q6 = t.q5 * 2.1 + 0.006; t.q7 = 0.010 + 0.035 * treb;
           t.q9 = tm * 0.10;                            // net spin
           t.q18 = 0.40;                                // net spoke length
