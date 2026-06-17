@@ -3641,8 +3641,7 @@
           "float sn = sin(tw), cs = cos(tw);\n" +
           "vec2 rc = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs);\n" +
           "vec2 sd = rc * (1.0 - pl) + 0.5;\n" +
-          "ret = texture2D(sampler_main, sd).rgb;\n" +
-          "ret -= mix(0.010, 0.004, q12);\n" +
+          "ret = texture2D(sampler_main, sd).rgb * mix(0.74, 0.93, q12);\n" + // FAST multiplicative fade → dark between spikes (kills the pale wash); longer streaks only deep in the plunge
           "}\n",
         // L3 BACKGROUND: magenta↔lime radial bloom (hue-clocked) that tightens on bass, faded
         // in by q14; never pure black. Vivid (k=0.7).
@@ -3657,7 +3656,7 @@
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
           "vec3 outc = bg + g + glow * 0.18;\n" +                            // less bloom (was a white halo)
-          "ret = outc / (outc + vec3(1.5));\n" +                            // stronger Reinhard → keeps colour instead of clipping to white
+          "ret = outc / (outc + vec3(1.1));\n" +                            // Reinhard (eased back now the fast fade prevents buildup) → colour returns
           "}\n"
       }
     );
