@@ -355,26 +355,43 @@
 
 
   // ── Alchemy v2: Random ───────────────────────────────────────────────────────
-  // V1's APPROACH (one preset, stochastic, non-choreographed, continuous feedback bleed) driven
-  // by the v2 KIT. HARD CONSTRAINT (verified in vendor/butterchurn.min.js): Butterchurn renders
-  // EXACTLY 4 custom waves (customWaveforms=range(4)) — waves[4+] are silently dropped. So the
-  // 4 slots are: [0] central polymorphic motif · [1] orb A (alcOrbiterNode Saturn) · [2] orb B ·
-  // [3] tether (alcTether). The orbiter PAIR + tether + central motif (the WMP signature) is thus
-  // ALWAYS on. Multi-part motifs (mandala) are packed into the single central wave.
-  // Look = v1's character: THICK lines (4-tap max dilation in comp), MUTED PASTEL multi-tone
-  // bleed backgrounds (NO rainbow/pal fields), gentle cameras. Decoupled stochastic layers
-  // (colour/palette/motif/orb/bg/camera) each drift on their own random cadence.
+  // ONE-SHOT REBUILD (see docs/alchemy-v2/v2-fix-plan.md). V2 regressed vs V1 because it dropped
+  // V1's ORCHESTRATION SPINE; this restores it while keeping the kit's motifs + V2's stochastic
+  // (non-looping) selection, and folds in Gemini's "unify the layers / share global state" note.
+  //   FIX 1 — ONE shared stochastic MACRO-LOOK clock crossfades background + camera + exposure
+  //           TOGETHER (kills the hard-cut slideshow); random order keeps it non-looping.
+  //   FIX 2 — STRUCTURED, frame-filling backgrounds (V1's proven tunnel/comb/strata/hex GLSL +
+  //           kit fluid/marble/wash/moiré/solidsnap/bloom) so the frame is NEVER empty.
+  //   FIX 3 — per-look EXPOSURE (q19) + Reinhard k=0.88 + stronger desaturation: no neon, no
+  //           white blow-out (V1's dual palette — soft-but-coloured geometry over MUTED grounds).
+  //   FIX 4 — the WMP signature: TWO ROAMING orbs (kit factories, cycled) spanning the frame,
+  //           joined by a jagged REAL-WAVEFORM tether (alcTether value1, NOT rand) + beads, on often.
+  //   FIX 5 — Gemini spatial coupling: all 4 waves share ONE gentle global rotation (q13) so the
+  //           foreground moves WITH the camera (same pivot ⇒ orbs stay joined; bounded sway).
+  // Rejected from Gemini (re-introduce known bugs): rand()-lightning (use live samples), global
+  // constant forward-zoom (depth is per-look), high-saturation (Alchemy stays muted).
+  // 4 waves: [0] central kit motif · [1] orb A · [2] orb B · [3] real-waveform tether + beads.
   P["Alchemy v2: Random"] = (function () {
-    // ── COLOUR — stochastic palette, DESATURATED to dusty pastel (the nostalgic Alchemy feel).
-    var PALS = [ALC_PAL.twoTone, ALC_PAL.roseGreen, ALC_PAL.redCyan, ALC_PAL.spread, ALC_PAL.spread, ALC_PAL.warm];
+    // ── COLOUR — stochastic palette, desaturated to dusty pastel (muted-Alchemy rule).
+    var PALS = [ALC_PAL.twoTone, ALC_PAL.roseGreen, ALC_PAL.redCyan, ALC_PAL.spread, ALC_PAL.warm];
     var curPal = PALS[0];
-    function pastel(a) { var l = (a.r + a.g + a.b) / 3, s = 0.72; a.r = a.r * s + l * (1 - s); a.g = a.g * s + l * (1 - s); a.b = a.b * s + l * (1 - s); }  // dusty but still COLOURFUL (was too grey at 0.5)
+    function desat(a, s) { var l = (a.r + a.g + a.b) / 3; a.r = a.r * s + l * (1 - s); a.g = a.g * s + l * (1 - s); a.b = a.b * s + l * (1 - s); }
+    function pastel(a) { desat(a, 0.66); }                          // dusty but still COLOURFUL
     function palMotif(a, idx) { curPal(a, idx); pastel(a); }
-    function palRing(a, idx) { curPal(a, idx); pastel(a); }
-    function palSpec(a, idx) {   // sample-keyed spectral (multi-colour ring) for spindle/rays
+    function palSpec(a, idx) {                                       // sample-keyed spectral (multi-colour) for spindle/rays
       var h = (a.q8 || 0) + a.sample * 0.7;
       a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
-      pastel(a);
+      desat(a, 0.6);
+    }
+    function comeGo(s) { var x = (0.5 + 0.5 * s - 0.30) / 0.30; x = x < 0 ? 0 : (x > 1 ? 1 : x); return x * x * (3 - 2 * x); }
+
+    // ── Gemini spatial coupling: rotate a wave point about centre by the shared global angle q13,
+    // so the WHOLE foreground (motif + both orbs + tether) sways together with the camera. Same
+    // pivot+angle for every wave ⇒ orbs stay joined to the tether. (Hoisted; called from below.)
+    function fgRotate(a) {
+      var ang = a.q13 || 0; if (!ang) return;
+      var s = Math.sin(ang), c = Math.cos(ang), x = a.x - 0.5, y = a.y - 0.5;
+      a.x = 0.5 + (c * x - s * y); a.y = 0.5 + (s * x + c * y);
     }
 
     // ── Generic stochastic discrete picker (random mode, beat-gated cut, hard-cap +5s).
@@ -388,32 +405,34 @@
       };
     }
 
-    // ── CENTRAL MOTIF point-functions (the kit, each fitting ONE wave; mandala packs all 12).
+    // ── CENTRAL MOTIF point-functions (kit factories; mandala packs all 12 into one wave).
     var fAnem = alcAnemone(26, palMotif).point_eqs;
     var fTriM = alcTriMandala(9, palMotif).point_eqs;
-    var fNgon = alcNgonPacked(ALC_MANDALA_SPECS, 1.4).point_eqs;        // all 12 star-polygons in ONE wave
+    var fNgon = alcNgonPacked(ALC_MANDALA_SPECS, 1.4).point_eqs;     // all 12 star-polygons in ONE wave
     var fSpin = alcSpindle(palSpec).point_eqs;
-    var fBur = alcRadialBurst({}).point_eqs;                            // built-in spectral
+    var fBur  = alcRadialBurst({}).point_eqs;                        // built-in spectral (muted below)
     var fStar = alcTriangle(0, 0).point_eqs;
-    var fDia = alcDiagonalLine(0.3, 0.62, 0.06).point_eqs;
-    var fHor = bgWaveHorizon({ cy: 0.5, amp: 0.16, colorize: palMotif })[0].point_eqs;
-    var fFea = alcOrbFeathery(0.5, 0.5, palMotif).point_eqs;
+    var fDia  = alcDiagonalLine(0.3, 0.62, 0.06).point_eqs;
+    var fHor  = bgWaveHorizon({ cy: 0.5, amp: 0.16, colorize: palMotif })[0].point_eqs;
+    var fFea  = alcOrbFeathery(0.5, 0.5, palMotif).point_eqs;
     var fMesh = alcMeshRings(8, 0.0).point_eqs;
-    function fRays(a) {                                                 // packed asterisk of waveform rays (one wave)
+    function fRays(a) {                                              // packed asterisk of waveform rays (one wave)
       var N = 7, seg = Math.floor(a.sample * N), u = a.sample * N - seg, s = u * 2 - 1;
       var th = (seg / N) * 3.14159 + (a.q9 || 0), len = (a.q5 || 0.3), disp = (a.value1 || 0) * (a.q6 || 0.04);
       a.x = 0.5 + s * len * Math.cos(th) - disp * Math.sin(th);
       a.y = 0.5 + s * len * Math.sin(th) + disp * Math.cos(th);
       palSpec(a, 0); if (u < 0.02) a.a = 0; return a;
     }
+    function fBur2(a) { fBur(a); desat(a, 0.5); return a; }          // tame the spectral burst (was the neon source)
     var MOTIF_N = 11;
     function centralDraw(a) {
       var m = a.q1 || 0;
       if (m < 0.5) fAnem(a); else if (m < 1.5) fTriM(a); else if (m < 2.5) fNgon(a);
-      else if (m < 3.5) fSpin(a); else if (m < 4.5) fBur(a); else if (m < 5.5) fRays(a);
+      else if (m < 3.5) fSpin(a); else if (m < 4.5) fBur2(a); else if (m < 5.5) fRays(a);
       else if (m < 6.5) fStar(a); else if (m < 7.5) fDia(a); else if (m < 8.5) fHor(a);
       else if (m < 9.5) fFea(a); else fMesh(a);
-      a.a = (a.a === undefined ? 0.85 : a.a) * (a.q15 || 0);            // motif visibility (+ dip-swap)
+      a.a = (a.a === undefined ? 0.85 : a.a) * (a.q15 || 0);         // motif visibility (+ dip-swap)
+      fgRotate(a);
       return a;
     }
     function scaleFor(m) {
@@ -421,14 +440,10 @@
       if (m < 5.5) return 0.34; if (m < 8.5) return 0.36; if (m < 9.5) return 0.22; return 0.40;
     }
 
-    // ── ORBS + TETHER (kit factories, parameterized to the orb positions). On slots 1/2/3 → render.
-    // Orb = a RANDOM pick (q16) among the KIT's parameterized orb factories — call them, don't
-    // re-derive. SMALL + pastel; the wave is non-additive (no white blowout/smear). orbiterNode
-    // (Saturn) · orbTarget n=2 / n=3 (bullseye). NOTE: gradBlob/feathery/dotTrail are SHAPE-based,
-    // so to hook them too they route through the 4 custom-SHAPE slots (separate budget) — TODO.
-    // alcOrbiterNode DROPPED — its 16-turn sqrt-spiral fill renders as an ugly white "yarn-ball"
-    // coil at this size; the look is inherent to that factory and fixing = re-deriving (forbidden).
-    // Keep the clean alcOrbTarget ring variants: single ring / double / triple bullseye (colored).
+    // ── ORBS — SMALL clean rings that drift SLOWLY (no big smeared loops) and come & go · cycle
+    // the kit's clean bullseye-ring factories (alcOrbTarget n=1/2/3) via q16. Real-waveform only.
+    // alcOrbiterNode DROPPED: its bright white core blows out under the comp glow+dilation (same
+    // reason the prior build dropped it). q7/q25 = radius.
     var orbA_fns = [
       alcOrbTarget("q21", "q22", 1, palMotif).point_eqs,
       alcOrbTarget("q21", "q22", 2, palMotif).point_eqs,
@@ -441,94 +456,102 @@
     ];
     function orbDispatch(fns, vis, a) {
       var st = a.q16 || 0;
-      (st < 0.9 ? fns[0] : st < 1.9 ? fns[1] : fns[2])(a);       // the chosen kit factory
+      (st < 0.9 ? fns[0] : st < 1.9 ? fns[1] : fns[2])(a);
       a.a = (a.a === undefined ? 0.9 : a.a) * vis;
+      fgRotate(a);
       return a;
     }
     var fTether = alcTether("q21", "q22", "q23", "q24", "q26", palMotif).point_eqs;
 
-    // ── CAMERA vocabulary [zoom, rot, twist, kaleido, drift]; vortex kept GENTLE (the strong one
-    // swallowed the whole frame). None static (no dead top-view).
-    var CAMS = [
-      [0.998, 0.004, 0.20, 0.0, 0.004],  // 0 DRIFT
-      [0.992, 0.006, 0.45, 0.0, 0.000],  // 1 VORTEX (gentle)
-      [1.016, 0.000, 0.0, 0.0, 0.000],   // 2 PLUNGE
-      [0.992, 0.007, 0.30, 1.0, 0.000],  // 3 KALEIDO
-      [0.998, 0.010, 0.0, 0.0, 0.010]    // 4 ROLL/FLOAT
+    // ── MACRO-LOOK table — each look BUNDLES a background field + camera + exposure so ONE picker
+    // crossfades them together. cam = [zoom, rot, twist, kaleido, drift]. Depth (zoom>1) is PER-LOOK
+    // (NOT global forward-flight). Several engage kaleido; none static.
+    var LOOKS = [
+      { bg: 0,  cam: [0.998, 0.004, 0.18, 0.0, 0.004], dark: 1.00 },  // fluid · drift
+      { bg: 4,  cam: [1.014, 0.002, 0.00, 0.0, 0.000], dark: 0.78 },  // tunnel · plunge
+      { bg: 1,  cam: [0.995, 0.006, 0.22, 1.0, 0.000], dark: 0.92 },  // marble · kaleido
+      { bg: 3,  cam: [0.998, 0.009, 0.00, 0.0, 0.009], dark: 1.00 },  // wash · float
+      { bg: 9,  cam: [0.994, 0.005, 0.18, 0.7, 0.000], dark: 0.86 },  // hex · kaleido
+      { bg: 5,  cam: [0.999, 0.003, 0.10, 0.0, 0.003], dark: 0.92 },  // comb · drift
+      { bg: 0,  cam: [0.994, 0.006, 0.30, 0.2, 0.000], dark: 0.95 },  // fluid · gentle vortex (was moiré dot-grid — too digital)
+      { bg: 8,  cam: [1.003, 0.004, 0.10, 0.0, 0.005], dark: 0.92 },  // strata · drift
+      { bg: 10, cam: [1.010, 0.004, 0.00, 0.0, 0.000], dark: 0.74 },  // radial bloom · plunge
+      { bg: 2,  cam: [0.998, 0.010, 0.00, 0.0, 0.008], dark: 1.00 },  // fluid-gold · roll
+      { bg: 7,  cam: [0.999, 0.002, 0.00, 0.0, 0.002], dark: 1.00 }   // solidsnap · drift
     ];
-    var CAM_N = 5;
+    var LOOK_N = LOOKS.length;
 
-    // ── Stochastic layer drivers.
+    // ── Stochastic drivers — ONE shared macro clock (bg+cam+exposure) + independent slower
+    // motif / orb-style / palette clocks (the non-looping "random" feel).
     var lastT = 0, huePhase = 0, spinAcc = 0, marchAcc = 0;
     var beat = alcBeatFlash({ rise: 1.25 });
-    var oax = makeSH(0.10, 0.30, 5, 11, 0.7), oay = makeSH(0.30, 0.70, 5, 11, 0.7);   // orb A → left, random
-    var obx = makeSH(0.70, 0.90, 5, 11, 0.7), oby = makeSH(0.30, 0.70, 5, 11, 0.7);   // orb B → right, random
-    // INDEPENDENT presence → orbs appear randomly: none / single / pair (not always-on).
-    var oaShow = makeSH(0, 1, 5, 12, 1.0), obShow = makeSH(0, 1, 5, 12, 1.0), tShow = makeSH(0, 1, 6, 13, 1.0);
-    var cvisSH = makeSH(0.5, 1.0, 7, 14, 0.9);
-    var motifPick = makePicker(MOTIF_N, 8, 17, 2.0);
-    var orbStylePick = makePicker(3, 9, 19, 0.5);                                      // which kit orb factory
-    var bgPick = makePicker(8, 5, 11, 1.5);
-    var camPick = makePicker(CAM_N, 12, 26, 3.0);
-    var palPick = makePicker(PALS.length, 14, 30, 0.5);
+    var lookPick = makePicker(LOOK_N, 9, 16, 4.0);                   // LONG fade ⇒ morph, not cut
+    var motifPick = makePicker(MOTIF_N, 7, 13, 2.0);                 // faster ⇒ more motif variety on screen
+    var orbStylePick = makePicker(3, 10, 20, 0.8);
+    var palPick = makePicker(PALS.length, 16, 32, 4.0);
 
     var preset = build(
-      { wave_a: 0, decay: 0.93, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
+      { wave_a: 0, decay: 0.90, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
       {
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
           var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
           var energy = (bass + mid + treb) / 3, bFlash = beat(t.bass || 1, dt);
 
-          // L1 COLOUR
-          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.012, 0.05);
+          // L1 COLOUR — slow energy-coupled hue drift + stochastic palette (long fade).
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.010, 0.04);
           t.q8 = huePhase;
           curPal = PALS[palPick(tm, dt).a];
 
-          // L3 MOTIF (central, slot 0)
+          // L2 MACRO-LOOK — one shared clock crossfades bg + camera + exposure together.
+          var lk = lookPick(tm, dt, bFlash > 0.6);
+          var A = LOOKS[lk.a], B = LOOKS[lk.b], k = lk.mix;
+          t.q18 = A.bg; t.q20 = B.bg; t.q27 = k;
+          t.q19 = A.dark + (B.dark - A.dark) * k;                    // per-look exposure (crossfaded)
+          var zoom = A.cam[0] + (B.cam[0] - A.cam[0]) * k, rot = A.cam[1] + (B.cam[1] - A.cam[1]) * k;
+          var twist = A.cam[2] + (B.cam[2] - A.cam[2]) * k, kal = A.cam[3] + (B.cam[3] - A.cam[3]) * k, drift = A.cam[4] + (B.cam[4] - A.cam[4]) * k;
+          if (zoom > 1.0) zoom += 0.02 * Math.max(0, bass - 1); else zoom -= 0.006 * Math.max(0, bass - 1);
+          rot *= (1 + 0.5 * Math.max(0, mid - 1));
+          t.q28 = zoom; t.q29 = rot; t.q30 = twist; t.q31 = kal; t.q32 = drift;
+
+          // L3 SPATIAL COUPLING — gentle bounded global foreground sway, shared by all waves.
+          t.q13 = 0.16 * Math.sin(tm * 0.05) + 0.08 * Math.sin(tm * 0.13);
+
+          // L4 CENTRAL MOTIF — kit factory, own slower cadence; visibility floor kept up so a
+          // motif swap never empties the frame.
           var mo = motifPick(tm, dt, bFlash > 0.6);
           var mCur = mo.mix < 0.5 ? mo.a : mo.b;
           t.q1 = mCur;
           var dd = (mo.mix - 0.5) * 4.0;
-          t.q15 = cvisSH(tm, dt) * (1 - 0.85 * Math.exp(-dd * dd));
-          t.q2 = 0.5; t.q3 = 0.5; t.q19 = tm;
+          t.q15 = (0.65 + 0.35 * comeGo(Math.sin(tm * 0.20))) * (1 - 0.55 * Math.exp(-dd * dd));
+          t.q2 = 0.5; t.q3 = 0.5;
           t.q6 = 0.02 + 0.06 * Math.min(treb, 1.5);
-          spinAcc += dt * (0.35 + 0.6 * Math.max(0, mid - 1));
+          spinAcc += dt * (0.30 + 0.6 * Math.max(0, mid - 1));
           t.q5 = scaleFor(mCur) * (0.85 + 0.25 * Math.max(0, bass - 1));
           t.q11 = Math.max(0, Math.min((energy - 0.6) / 0.9, 1));
-          t.q13 = 0.04 * Math.sin(tm * 0.1);
           marchAcc += dt * 0.06;
           t.q14 = (mCur >= 9.5) ? marchAcc : 0;
           if (mCur >= 3.5 && mCur < 4.5) { t.q9 = 0.05 + 0.03 * bass; t.q10 = 0.08 + 0.22 * Math.max(0, mid - 1) + 0.12 * bFlash; }
           else if (mCur >= 6.5 && mCur < 7.5) { t.q9 = spinAcc; t.q10 = 1.0; }
           else { t.q9 = spinAcc; t.q10 = 0.4 * Math.max(0, bass - 1); }
 
-          // L4 ORBS + tether (slots 1/2/3)
-          t.q21 = oax(tm, dt); t.q22 = oay(tm, dt);
-          t.q23 = obx(tm, dt); t.q24 = oby(tm, dt);
-          t.q25 = 0.03 + 0.012 * bass; t.q7 = t.q25;                   // SMALL orb radius (orbiterNode reads q25, orbTarget reads q7)
-          t.q26 = 0.020 + 0.025 * treb;
-          t.q16 = orbStylePick(tm, dt).a;                              // which kit orb factory (random)
-          var aShow = Math.max(0, Math.min((oaShow(tm, dt) - 0.4) / 0.25, 1));   // orb A present? (random)
-          var bShow = Math.max(0, Math.min((obShow(tm, dt) - 0.4) / 0.25, 1));   // orb B present?
-          t.q17 = aShow; t.q12 = bShow;                                // per-orb vis → none / single / pair
-          t.q4 = (aShow > 0.3 && bShow > 0.3) ? Math.max(0, Math.min((tShow(tm, dt) - 0.4) / 0.25, 1)) : 0;  // tether only when BOTH orbs + its own gate
-
-          // L2 BACKGROUND
-          var bg = bgPick(tm, dt, bFlash > 0.6);
-          t.q18 = bg.a; t.q20 = bg.b; t.q27 = bg.mix;
-
-          // L5 CAMERA
-          var cm = camPick(tm, dt);
-          var A = CAMS[cm.a], B = CAMS[cm.b], k = cm.mix;
-          var zoom = A[0] + (B[0] - A[0]) * k, rot = A[1] + (B[1] - A[1]) * k;
-          var twist = A[2] + (B[2] - A[2]) * k, kal = A[3] + (B[3] - A[3]) * k, drift = A[4] + (B[4] - A[4]) * k;
-          if (zoom > 1.0) zoom += 0.02 * Math.max(0, bass - 1); else zoom -= 0.006 * Math.max(0, bass - 1);
-          rot *= (1 + 0.5 * Math.max(0, mid - 1));
-          t.q28 = zoom; t.q29 = rot; t.q30 = twist; t.q31 = kal; t.q32 = drift;
+          // L5 ORBS + TETHER — ROAM across the frame (wide sine paths) so the tether spans it;
+          // both usually present ⇒ the WMP two-orbs+lightning signature fires often.
+          t.q21 = 0.5 + 0.20 * Math.sin(tm * 0.13);
+          t.q22 = 0.5 + 0.16 * Math.cos(tm * 0.11);
+          t.q23 = 0.5 + 0.20 * Math.cos(tm * 0.10 + 1.4);
+          t.q24 = 0.5 + 0.16 * Math.sin(tm * 0.12 + 2.1);
+          t.q7 = 0.045 + 0.016 * Math.max(0, bass - 1) + 0.010 * bass; // small clean orb
+          t.q25 = t.q7;
+          t.q26 = 0.035 + 0.05 * treb;                              // tether jag amplitude (live waveform)
+          t.q16 = orbStylePick(tm, dt).a;                           // which kit orb factory (random)
+          t.q17 = comeGo(Math.sin(tm * 0.085));                     // orb A: fully comes & goes (0..1)
+          t.q12 = comeGo(Math.sin(tm * 0.073 + 2.0));               // orb B: fully comes & goes
+          var both = Math.min(t.q17, t.q12);
+          t.q4 = Math.max(0, (both - 0.4) / 0.5);                   // tether when BOTH orbs present
           return t;
         },
-        // CAMERA warp — gentle twist (the vortex no longer swallows the frame).
+        // CAMERA warp — gentle polar twist + kaleido FOLD (q31). No constant forward-flight.
         warp:
           "shader_body {\n" +
           "  vec2 c = uv - 0.5;\n" +
@@ -546,68 +569,89 @@
           "  ret = texture2D(sampler_main, sd).rgb;\n" +
           "  ret -= mix(0.016, 0.010, clamp(q30, 0.0, 1.0));\n" +
           "}\n",
-        // BACKGROUND — MUTED PASTEL multi-tone bleed (v1 character), NO rainbow/pal fields. THICK
-        // lines via 4-tap max dilation of the feedback. Reinhard keeps it dusty.
+        // BACKGROUND — STRUCTURED frame-filling fields (V1's proven tunnel/comb/strata/hex GLSL +
+        // kit fluid/marble/wash/moiré/solidsnap/bloom), crossfaded by the macro clock (q18→q20 by
+        // q27), hue-rotated by q8, exposed by per-look darkness q19. THICK lines (4-tap max
+        // dilation) + kaleido mirror-fill (q31). Reinhard k=0.88 keeps it dusty (no white-out).
         comp:
-          NOISE_GLSL + ALC_FLUID_GLSL + ALC_MARBLE_GLSL + ALC_WASH_GLSL + ALC_MOIRE_GLSL + ALC_SOLIDSNAP_GLSL + ALC_FOG_GLSL +
+          NOISE_GLSL + ALC_FLUID_GLSL + ALC_MARBLE_GLSL + ALC_WASH_GLSL + ALC_MOIRE_GLSL + ALC_SOLIDSNAP_GLSL + ALC_RADIALBLOOM_GLSL +
           "vec3 hueRot(vec3 col, float a){ vec3 k = vec3(0.57735); float ca = cos(a), sa = sin(a); return col*ca + cross(k,col)*sa + k*dot(k,col)*(1.0-ca); }\n" +
-          // RICH dusty multi-tone fields (analysed from Alchemy Random video: bright teal/magenta/
-          // gold/green/purple fills, mid-high brightness — NOT dark). These set the colour; the
-          // shader_body brightens + tone-maps.
-          "vec3 bgField(float mode, float sel, vec2 d, vec2 uvv, float tt, float b){\n" +
-          "  if(mode<0.5) return alcFluid(uvv, tt, b, vec3(0.10,0.30,0.34), vec3(0.42,0.12,0.36), vec3(0.40,0.34,0.12));\n" +   // teal/magenta/gold
-          "  if(mode<1.5) return alcMarble(d, tt, b, vec3(0.14,0.34,0.18), vec3(0.40,0.12,0.36), vec3(0.7,0.95,0.6));\n" +      // green↔magenta veins
-          "  if(mode<2.5) return alcFluid(uvv, tt, b, vec3(0.42,0.30,0.10), vec3(0.12,0.22,0.44), vec3(0.42,0.14,0.34));\n" +   // gold/blue/plum
-          "  if(mode<3.5) return alcWash(d, tt, vec3(0.22,0.42,0.28), vec3(0.20,0.26,0.50), 0.05);\n" +                         // sage↔blue (brighter)
-          "  if(mode<4.5) return alcMarble(d, tt, b, vec3(0.16,0.18,0.42), vec3(0.42,0.30,0.10), vec3(0.6,0.7,0.95));\n" +      // cobalt/gold veins
-          "  if(mode<5.5) return alcFluid(uvv, tt, b, vec3(0.12,0.34,0.30), vec3(0.40,0.14,0.36), vec3(0.42,0.34,0.14));\n" +   // teal/magenta/gold
-          "  if(mode<6.5) return alcMoire(uvv, tt, b, vec3(0.55,0.95,0.7));\n" +                                              // moiré
-          "  return alcSolidSnap(sel) * 0.95;\n" +                                                                             // dusty solids (bright)
+          // V1's PROVEN structured scene-identity backgrounds (they fill the frame):
+          "vec3 bgTunnel(vec2 d,float pr,float pa,float t){ float rays=smoothstep(0.5,0.0, abs(fract(pa*8.0/3.14159+0.5)-0.5)); vec3 cyc=mix(vec3(0.10,0.5,0.25), vec3(0.45,0.10,0.40), 0.5+0.5*sin(t*0.05)); return vec3(0.03,0.07,0.05) + cyc*rays*smoothstep(1.7,0.1,pr); }\n" +
+          "vec3 bgComb(vec2 d,float t){ float s=smoothstep(0.36,0.5, abs(fract(d.x*9.0)-0.5)); return mix(vec3(0.07,0.10,0.08), vec3(0.11,0.16,0.10), s); }\n" +  // SOFT dusty vertical wallpaper (was harsh bright lines)
+          "vec3 bgStrata(vec2 d,float gy,float t){ float band=0.5+0.5*sin(gy*16.0 + sin(t*0.3)); vec3 cool=mix(vec3(0.10,0.30,0.34), vec3(0.42,0.12,0.36), 0.5+0.5*sin(t*0.05)); vec3 c=cool*(0.5+0.4*band); c+=vec3(0.5,0.34,0.10)*exp(-dot(d,d)*6.0); return c; }\n" +
+          "vec3 bgHex(vec2 d,float t){ vec2 p=d*6.0; float l1=abs(fract(p.x)-0.5), l2=abs(fract(p.x*0.5+p.y*0.866)-0.5), l3=abs(fract(p.x*0.5-p.y*0.866)-0.5); float gg=smoothstep(0.06,0.0,min(min(l1,l2),l3)); return vec3(0.05,0.09,0.15) + vec3(0.25,0.5,0.4)*gg*0.5; }\n" +
+          "vec3 bgField(float mode, vec2 d, float pr, float pa, float gy, vec2 uvv, float tt, float b, float sel){\n" +
+          "  if(mode<0.5) return alcFluid(uvv, tt, b, vec3(0.10,0.30,0.34), vec3(0.42,0.12,0.36), vec3(0.40,0.34,0.12));\n" +
+          "  if(mode<1.5) return alcMarble(d, tt, b, vec3(0.14,0.34,0.18), vec3(0.40,0.12,0.36), vec3(0.7,0.95,0.6));\n" +
+          "  if(mode<2.5) return alcFluid(uvv, tt, b, vec3(0.42,0.30,0.10), vec3(0.12,0.22,0.44), vec3(0.42,0.14,0.34));\n" +
+          "  if(mode<3.5) return alcWash(d, tt, vec3(0.22,0.42,0.28), vec3(0.20,0.26,0.50), 0.05);\n" +
+          "  if(mode<4.5) return bgTunnel(d, pr, pa, tt);\n" +
+          "  if(mode<5.5) return bgComb(d, tt);\n" +
+          "  if(mode<6.5) return alcMoire(uvv, tt, b, vec3(0.55,0.85,0.7));\n" +
+          "  if(mode<7.5) return alcSolidSnap(sel) * 0.92;\n" +
+          "  if(mode<8.5) return bgStrata(d, gy, tt);\n" +
+          "  if(mode<9.5) return bgHex(d, tt);\n" +
+          "  return alcRadialBloom(d, tt, b, vec3(0.42,0.12,0.36), vec3(0.20,0.40,0.18));\n" +
           "}\n" +
           "shader_body {\n" +
           "  vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
           "  float pr = length(d);\n" +
-          "  float sel = floor(time / 6.0);\n" +
-          "  vec3 bg = mix(bgField(q18, sel, d, uv, time, bass), bgField(q20, sel, d, uv, time, bass), clamp(q27, 0.0, 1.0));\n" +
-          "  bg = hueRot(bg, q8 * 6.2832 * 0.35);\n" +
-          "  bg *= (1.0 + 0.5 * bass);\n" +                            // COLOURFUL, frame-filling (was 0.55 → too dark)
-          "  bg *= 1.0 - 0.22 * smoothstep(0.55, 1.35, pr);\n" +       // gentle vignette only (no dark fog)
-          "  float o = 2.2 / resolution.y;\n" +                        // THICK lines: 4-tap max dilation (v1 look)
+          "  float pa = atan(d.y, d.x);\n" +
+          "  float gy = uv.y;\n" +
+          "  float pr2 = pr * 2.0;\n" +
+          "  float sel = floor(q8 * 4.0);\n" +
+          "  vec3 bg = mix(bgField(q18, d, pr2, pa, gy, uv, time, bass, sel), bgField(q20, d, pr2, pa, gy, uv, time, bass, sel), clamp(q27, 0.0, 1.0));\n" +
+          "  bg = hueRot(bg, q8 * 6.2832 * 0.30);\n" +
+          "  bg *= clamp(q19, 0.3, 1.2);\n" +
+          "  bg *= (0.95 + 0.35 * bass);\n" +
+          "  bg *= 1.0 - 0.22 * smoothstep(0.55, 1.35, pr);\n" +
+          "  bg += hueRot(vec3(0.05, 0.047, 0.062), q8 * 6.2832 * 0.30) * (0.6 + 0.3 * bass);\n" +  // dusty ambient floor — never pure black
+          "  float o = 1.8 / resolution.y;\n" +
           "  vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "  g = max(g, texture2D(sampler_main, uv + vec2(o,0.0)).rgb);\n" +
           "  g = max(g, texture2D(sampler_main, uv - vec2(o,0.0)).rgb);\n" +
           "  g = max(g, texture2D(sampler_main, uv + vec2(0.0,o)).rgb);\n" +
           "  g = max(g, texture2D(sampler_main, uv - vec2(0.0,o)).rgb);\n" +
+          "  float km = 0.20 * clamp(q31, 0.0, 1.0);\n" +
+          "  g += texture2D(sampler_main, vec2(1.0 - uv.x, uv.y)).rgb * km;\n" +
+          "  g += texture2D(sampler_main, vec2(uv.x, 1.0 - uv.y)).rgb * km;\n" +
           "  vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "  vec3 outc = bg + g * 1.15 + glow * 0.45;\n" +
-          "  ret = outc / (outc + vec3(0.7));\n" +                    // Reinhard k=0.7 → brighter, more saturated colour
+          "  vec3 outc = bg + g * 1.12 + glow * 0.45;\n" +
+          "  ret = outc / (outc + vec3(0.88));\n" +
           ALC_HATCH +
           "}\n"
       }
     );
 
-    // ── The 4 rendered waves: central motif + orb A + orb B + tether.
+    // ── The 4 rendered waves: central kit motif + orb A + orb B + real-waveform tether (+beads).
     preset.waves[0] = {
       baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.85 }),
       init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
     };
     function orbWave(fns, visVar) {
-      return {  // NON-additive (paints, no white blowout/smear) · small · comp dilation gives a little thickness
-        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 256, additive: 0, usedots: 0, scaling: 1, smoothing: 0.1, thick: 0, a: 0.9 }),
+      return {   // NON-additive (paints, no white blowout/smear); the comp glow term halos them.
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 256, additive: 0, usedots: 0, scaling: 1, smoothing: 0.1, thick: 1, a: 0.9 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) { return orbDispatch(fns, (a[visVar] || 0), a); }
       };
     }
-    preset.waves[1] = orbWave(orbA_fns, "q17");                        // orb A (vis q17)
-    preset.waves[2] = orbWave(orbB_fns, "q12");                        // orb B (vis q12)
-    preset.waves[3] = {   // tether: thick (v1 had thick) + non-additive crisp; shown only when q4>0
-      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.03, thick: 1, a: 0.9 }),
+    preset.waves[1] = orbWave(orbA_fns, "q17");                      // orb A (vis q17)
+    preset.waves[2] = orbWave(orbB_fns, "q12");                      // orb B (vis q12)
+    preset.waves[3] = {   // jagged REAL-waveform tether + bright beads strung on the line
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.9 }),
       init_eqs: passthrough, frame_eqs: passthrough,
-      point_eqs: function (a) { fTether(a); a.a = (a.a === undefined ? 0.9 : a.a) * (a.q4 || 0); return a; }
+      point_eqs: function (a) {
+        fTether(a);
+        var bead = Math.pow(Math.abs(Math.sin(a.sample * 3.14159 * 4.0)), 8.0);   // bright beads at intervals
+        a.r += bead * 0.6; a.g += bead * 0.6; a.b += bead * 0.7;
+        a.a = (a.a === undefined ? 0.9 : a.a) * (a.q4 || 0);
+        fgRotate(a);
+        return a;
+      }
     };
     return preset;
   })();
-
 
   // ── Alchemy v2: Orbiters ─────────────────────────────────────────────────────
   // First preset of the Alchemy v2 framework (see docs/alchemy-v2/). A focused,
