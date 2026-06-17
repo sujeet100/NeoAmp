@@ -71,16 +71,17 @@ in `viz.js`. Symptom if wrong: content fills only a corner and/or is blurry.
 | --- | --- |
 | `manifest.json` | MV3 manifest: content script on `music.youtube.com`, `sandbox` page, sandbox CSP (allows `unsafe-eval`/`wasm-unsafe-eval`), `web_accessible_resources`. |
 | `content.js` | Launcher button, `getDisplayMedia` capture, `AnalyserNode`, creates the iframe, pumps audio bytes via `postMessage`. |
-| `viz.html` | Sandboxed page: `<canvas>` + control bar + script includes (vendor, `wmp-presets.js`, `viz.js`). |
+| `viz.html` | Sandboxed page: `<canvas>` + control bar + script includes (vendor, `presets/*.js` in order, `viz.js`). |
 | `viz.js` | Butterchurn init, canvas sizing, favorites menu, keyboard, message handling, render loop. `FAVORITES` array defines the buttons. |
-| `wmp-presets.js` | Hand-authored custom presets + helpers; exposes `window.WMP_PRESETS`. **Most preset work happens here.** |
+| `presets/kit.js` | **Shared kit**, loaded first: helpers, GLSL constants, the `build()` factory, and every reusable `alc*` element/motif/background/orb factory. Its top-level declarations are shared globals the family files build on. |
+| `presets/{dance,alchemy,ambience,battery}.js` | Per-family hand-authored presets; each registers into `window.WMP_PRESETS`. **Most preset work happens in these** — e.g. Alchemy work lives in `presets/alchemy.js`. (Split out of the former monolithic `wmp-presets.js`; load order in `viz.html` is kit → families → `viz.js`.) |
 | `overlay.css` | Launcher button, fullscreen iframe, toast styling. |
 | `vendor/*.min.js` | Butterchurn 2.6.7 core + 3 preset packs (2.4.7). Vendored locally — MV3 bans remote code. |
 
 ## Butterchurn preset authoring (the reverse-engineered rules)
 
 A preset is an object in Butterchurn's **converted** format. Use the `build()`
-helper in `wmp-presets.js`:
+helper in `presets/kit.js`:
 
 ```js
 P["Name"] = build(baseValsOverrides, { frame: fn, pixel: fn, init: fn, warp: glsl, comp: glsl });
@@ -117,20 +118,22 @@ P["Name"] = build(baseValsOverrides, { frame: fn, pixel: fn, init: fn, warp: gls
   see opaque `getUniformLocation: program not linked` warnings, not a clear
   error). Name your locals anything else (`pang`, `pr`, …). Function PARAMETERS
   named `ang`/`rad` are fine (they shadow in their own scope).
-- **Helpers in `wmp-presets.js`:** `build`, `circleWave(qx,qy)`,
+- **Helpers in `presets/kit.js`:** `build`, `circleWave(qx,qy)`,
   `waveLine()`, `WAVE_BASE`, `SHAPE_BASE`, `AMBER_RAMP` (yellow ramp GLSL),
   and inline `pal`/`fbm`/`ctr`/`hash21`/`vnoise` GLSL helpers used by Alchemy.
 
 ### Validate before every reload
 
 ```bash
-node --check wmp-presets.js && node --check viz.js && node --check content.js
-# structural + runtime check of presets (catches missing fields / throwing eqs):
-node -e 'global.window=global; require("./wmp-presets.js");
-  for (const [n,p] of Object.entries(window.WMP_PRESETS)) {
-    p.frame_eqs({time:2,bass:1.3,bass_att:1.1,mid:1,treb:1,treb_att:1});
-    console.log("ok", n);
-  }'
+for f in presets/kit.js presets/dance.js presets/alchemy.js presets/ambience.js presets/battery.js viz.js content.js; do node --check "$f" || break; done
+# structural + runtime check: concat the split files into ONE global scope (mirrors the
+# browser's shared <script> scope — kit's top-level vars become globals the families use),
+# build every preset, run each frame_eqs (catches missing kit refs / throwing eqs):
+node -e 'const fs=require("fs"),vm=require("vm");global.window=global;
+  const cat=["kit","dance","alchemy","ambience","battery"].map(f=>fs.readFileSync("presets/"+f+".js","utf8")).join("\n;\n");
+  vm.runInThisContext(cat);
+  let n=0; for(const [k,p] of Object.entries(window.WMP_PRESETS)){ if(p.frame_eqs) p.frame_eqs({time:2,bass:1.3,bass_att:1.1,mid:1,treb:1,treb_att:1}); n++; }
+  console.log("ok", n, "presets");'
 ```
 
 GLSL **cannot** be compiled in Node — shader errors only show at runtime. Each
@@ -302,14 +305,14 @@ Sources: [Chrome MV3 overview](https://developer.chrome.com/docs/extensions/deve
   canvas-sizing and CSP comments), not restating the code.
 - **Keep shader strings readable**: one GLSL statement per concatenated line,
   trailing `\n`, helper functions named (`pal`, `fbm`, `ctr`).
-- **Match the existing style** (`var`/function-based, ES5-ish in `wmp-presets.js`
+- **Match the existing style** (`var`/function-based, ES5-ish in `presets/*.js`
   so the preset objects stay simple and copy-paste-able).
 Sources: [JS clean code 2025](https://saigontechnology.com/blog/clean-code/),
 [clean code checklist](https://alldaystech.com/guides/software-development/clean-code-best-practices).
 
 ## Quick orientation for a fresh session
-1. Read this file + skim `wmp-presets.js` (`build`, `circleWave`, `waveLine`,
-   and the `Dance of the Freaky Circles` preset — the canonical good example).
+1. Read this file + skim `presets/kit.js` (`build`, `circleWave`, `waveLine`) and
+   `presets/dance.js` (`Dance of the Freaky Circles` — the canonical good example).
 2. To add a WMP preset: study its reference frames, author a `P["..."]` entry,
    add a `{ label, wmp: "..." }` to `FAVORITES` in `viz.js`, validate with Node,
    ask the user to reload + screenshot, iterate with small tweaks, commit.
