@@ -570,6 +570,24 @@
     };
   }
 
+  // CB11 — STOCHASTIC "sample & hold + lerp" (Gemini's #1): the decoupled-layer idiom that
+  // beats a periodic LFO. Holds a RANDOM target in [lo,hi], re-rolls a new target every
+  // [minS,maxS] seconds (or when forceRoll is truthy — e.g. a beat), and exponentially eases
+  // the live value toward it. This is how Alchemy's layers feel "alive" rather than looping:
+  // random-pick-then-morph, each layer on its own irregular cadence. `ease` is per-second.
+  //   var bg = makeSH(0,1, 8,18); ... t.q14 = bg(t.time, dt);
+  function makeSH(lo, hi, minS, maxS, ease) {
+    var val = (lo + hi) / 2, target = val, next = 0;
+    return function (time, dt, forceRoll) {
+      if (forceRoll || time >= next) {
+        target = lo + Math.random() * (hi - lo);
+        next = time + minS + Math.random() * (maxS - minS);
+      }
+      val += (target - val) * Math.min(1, (ease === undefined ? 1.3 : ease) * (dt || 0.016));
+      return val;
+    };
+  }
+
   // MOTIF — one triangle whose 3 edges are the LIVE waveform displaced PERPENDICULAR
   // (the jagged wireframe line). Drawn at head (q2,q3), radius q5, self-rotated by q9.
   // Use one for a single-triangle scene, or two at 60deg apart for the hexagram star.
@@ -3239,7 +3257,8 @@
   // rule. <=6 custom waves (the build's reliable cap).
   P["Alchemy v2: Era — Anemone/Vortex"] = (function () {
     var huePhase = 0, lastT = 0;
-    var camPhase = 0, bgPhase = 0, orbPhase = 0;   // independent layer clocks
+    var camPhase = 0;                              // camera = deliberate gesture (LFO ramp)
+    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.0); // stochastic decoupled layers
     var bgSel = 0, lastSnap = -10;
     var flash = alcBeatFlash();
     var rosePal = alcPalette({ step: 0.5, base: 0.28, sat: 0.75, gain: 1.0 }); // green↔magenta band (brighter fur)
@@ -3267,15 +3286,13 @@
 
           // L3 — BACKGROUND: solid↔fluid crossfade on its OWN ~17s clock; solid colour
           // SNAPS to the next dusty tone on a strong beat (≥4s apart) — a discrete event.
-          bgPhase += dt / 17;
-          t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);                   // 0=solid, 1=fluid
+          t.q14 = bgSH(tm, dt);                                            // 0=solid↔1=fluid (stochastic sample&hold)
           if (f > 0.6 && (tm - lastSnap) > 4) { bgSel = (bgSel + 1) % 4; lastSnap = tm; }
           t.q15 = bgSel;
           t.q16 = 0.5 + 0.6 * f + 0.2 * Math.max(0, bass - 1);             // bg brightness lifts on beats
 
-          // L4 — MOTIF: orbiter pair fades in/out on its OWN ~22s clock.
-          orbPhase += dt / 22;
-          t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832));  // orb visibility 0.35..1
+          // L4 — MOTIF: orbiter pair fades in/out stochastically (random hold + morph).
+          t.q17 = motifSH(tm, dt);                                         // orbiter visibility (stochastic)
 
           // motif geometry (the anemone fur + the two flanking orbiters on opposing orbits)
           var th = tm * 0.30;
@@ -3397,7 +3414,8 @@
   // ~24s clock + bass zoom (q12/q13 → warp) · L3 horizon-bands ↔ black bg (q14, beat-lit
   // q16) · L4 orbiter fade (q17). Net spokes are the constant primary.
   P["Alchemy v2: Era — Corridor"] = (function () {
-    var huePhase = 0, lastT = 0, camPhase = 0, bgPhase = 0, orbPhase = 0;
+    var huePhase = 0, lastT = 0, camPhase = 0;   // camera = deliberate gesture (LFO)
+    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.0); // stochastic decoupled layers
     var flash = alcBeatFlash();
     var preset = build(
       { wave_a: 0, decay: 0.95, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.04, echo_alpha: 0 },
@@ -3409,9 +3427,9 @@
           huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.03, 0.10); t.q8 = huePhase; // L1 fast/rainbow
           camPhase += dt / 24; t.q12 = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);   // L2 kaleido-fold 0..1
           t.q13 = Math.max(0, bass - 1);                                          // L2 corridor zoom pulse
-          bgPhase += dt / 15; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);     // L3 bands↔black
+          t.q14 = bgSH(tm, dt);                                                   // L3 bands↔black (stochastic)
           t.q16 = 0.5 + 0.6 * f + 0.2 * Math.max(0, bass - 1);
-          orbPhase += dt / 20; t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832)); // L4
+          t.q17 = motifSH(tm, dt);                                                // L4 orbiter visibility (stochastic)
           var th = tm * 0.30;
           t.q1 = 0.5 + 0.34 * Math.cos(th);            t.q2 = 0.5 + 0.34 * Math.sin(th);
           t.q3 = 0.5 + 0.34 * Math.cos(th + Math.PI);  t.q4 = 0.5 + 0.34 * Math.sin(th + Math.PI);
@@ -3504,7 +3522,8 @@
   // layers: L1 green↔magenta hue (q8) · L2 camera = mandala spin rate (q9, its own clock) ·
   // L3 flat-blue ↔ marble bg crossfade (q14) · L4 diagonal-line + orbiter fade (q17).
   P["Alchemy v2: Era — Mandala/Fluid"] = (function () {
-    var huePhase = 0, lastT = 0, bgPhase = 0, linePhase = 0, spin = 0;
+    var huePhase = 0, lastT = 0, spin = 0;       // spin = mandala camera (gesture)
+    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.1); // stochastic decoupled layers
     var linePal = alcPalette({ base: 0.55, step: 0.10, sat: 0.3, gain: 1.8 }); // near-WHITE crisp lines (pop on any backdrop, like the reference)
     var preset = build(
       { wave_a: 0, decay: 0.5, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
@@ -3515,8 +3534,8 @@
           var energy = (bass + mid + treb) / 3;
           huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.012, 0.05); t.q8 = huePhase; // L1
           spin += dt * (0.15 + 0.25 * Math.max(0, treb - 1)); t.q9 = spin;          // L2 mandala spin (own clock)
-          bgPhase += dt / 18; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);        // L3 flat-blue↔marble
-          linePhase += dt / 21; t.q17 = 0.3 + 0.7 * (0.5 - 0.5 * Math.cos(linePhase * 6.2832)); // L4
+          t.q14 = bgSH(tm, dt);                                                       // L3 flat-blue↔marble (stochastic)
+          t.q17 = motifSH(tm, dt);                                                    // L4 diagonal + orb visibility (stochastic)
           t.q5 = 0.018 + 0.012 * bass; t.q6 = t.q5 * 2.1 + 0.006;                    // orb radii
           var th = tm * 0.22;
           t.q1 = 0.5 + 0.36 * Math.cos(th);            t.q2 = 0.5 + 0.36 * Math.sin(th);
@@ -3607,7 +3626,8 @@
   // → warp) · L3 dark ↔ radial-bloom bg, tightening on bass (q14) · L4 orbiter fade (q17);
   // the urchin RE-BLOOMS on each beat (alcBeatFlash → q19).
   P["Alchemy v2: Era — Supernova"] = (function () {
-    var huePhase = 0, lastT = 0, camPhase = 0, bgPhase = 0, orbPhase = 0;
+    var huePhase = 0, lastT = 0, camPhase = 0;   // camera = deliberate gesture (LFO)
+    var bgSH = makeSH(0, 1, 8, 18, 1.2), motifSH = makeSH(0.3, 1.0, 10, 22, 1.0); // stochastic decoupled layers
     var flash = alcBeatFlash();
     var preset = build(
       { wave_a: 0, decay: 0.94, gammaadj: 1.5, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.10, echo_alpha: 0 },
@@ -3620,8 +3640,8 @@
           huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.03, 0.10); t.q8 = huePhase; // L1 vivid
           camPhase += dt / 28; t.q12 = 0.5 - 0.5 * Math.cos(camPhase * 6.2832);       // L2 plunge ramp
           t.q13 = Math.max(0, mid - 1);                                               // L2 swirl
-          bgPhase += dt / 16; t.q14 = 0.5 - 0.5 * Math.cos(bgPhase * 6.2832);          // L3 dark↔bloom
-          orbPhase += dt / 19; t.q17 = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(orbPhase * 6.2832)); // L4
+          t.q14 = bgSH(tm, dt);                                                        // L3 dark↔bloom (stochastic)
+          t.q17 = motifSH(tm, dt);                                                     // L4 orbiter visibility (stochastic)
           t.q18 = 0.16;                                  // urchin base radius
           t.q19 = 0.18 * Math.max(0, rawBass - 1) + 0.30 * f;  // explosive spoke growth: RAW bass + beat re-bloom
           t.q9 = tm * 0.06;                              // slow urchin spin
