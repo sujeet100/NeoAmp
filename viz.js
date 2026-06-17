@@ -125,6 +125,7 @@
     { label: "Battery back to the groove", wmp: "Battery back to the groove" },
   ];
 
+  var DIRECTOR_KEY = "__director__"; // sentinel picker value that engages the auto-sequencer
   var viz = null, presets = {}, names = [], idx = 0, rafId = 0;
   var presetSel = null;
   var userFavs = new Set();
@@ -152,8 +153,8 @@
   var Director = (function () {
     var cfg = {
       enabled: false,
-      dwellCalmMs: 30000,    // dwell between cuts when the track is calm
-      dwellLoudMs: 14000,    // dwell when energetic (shorter → more frequent cuts)
+      dwellCalmMs: 24000,    // dwell between cuts when the track is calm
+      dwellLoudMs: 12000,    // dwell when energetic (shorter → more frequent cuts)
       maxBeatWaitMs: 2500,   // once dwell elapses, wait this long for a beat, else cut anyway
       blendCalmS: 3.0,       // crossfade length when calm (morphier)
       blendLoudS: 1.6,       // crossfade length when energetic (snappier)
@@ -234,6 +235,8 @@
       // pick gets its full dwell before the Director cuts away from it.
       noteLoaded: function (name, now) { curName = name; dwellElapsed = 0; pending = false; lastTickAt = now; },
       setEnabled: function (on, now) { cfg.enabled = !!on; dwellElapsed = 0; pending = false; lastTickAt = now; },
+      // jump to a fresh era immediately (so engaging the Director gives instant feedback).
+      kick: function () { if (cfg.enabled && eras.length >= 2 && onSwitch) { var n = pickNext(); if (n) onSwitch(n, blendS()); } },
       isEnabled: function () { return cfg.enabled; },
       eraCount: function () { return eras.length; },
       status: function () { return { enabled: cfg.enabled, energy: energy, vibe: vibe, beat: beat, dwellMs: dwellMs(), eras: eras.length, current: curName }; },
@@ -277,8 +280,16 @@
     post({ type: "preset:changed", name: key });
   }
   function loadByName(name, blend) { var i = names.indexOf(name); if (i >= 0) loadByIndex(i, blend); else console.warn("[WMP-viz] preset not found:", name); }
-  var step = function (d) { loadByIndex(idx + d); };
-  var randomPreset = function () { loadByIndex(Math.floor(Math.random() * names.length)); };
+  // A user picking from the dropdown: the Director sentinel engages auto-sequencing;
+  // any real preset takes manual control (and disengages the Director if it was running).
+  function userPick(name) {
+    if (name === DIRECTOR_KEY) { setDirector(true); return; }
+    if (Director.isEnabled()) setDirector(false);
+    loadByName(name); showBar();
+  }
+  // manual nav always disengages the Director (the user is taking over)
+  var step = function (d) { if (Director.isEnabled()) setDirector(false); loadByIndex(idx + d); };
+  var randomPreset = function () { if (Director.isEnabled()) setDirector(false); loadByIndex(Math.floor(Math.random() * names.length)); };
 
   function renderOptions() {
     if (!presetSel) return;
@@ -287,6 +298,12 @@
     var ph = document.createElement("option");
     ph.value = ""; ph.textContent = "♪ pick a preset…"; ph.disabled = true;
     sel.appendChild(ph);
+
+    // The Director "auto" entry — selecting it engages the audio-driven era sequencer.
+    var dirOpt = document.createElement("option");
+    dirOpt.value = DIRECTOR_KEY;
+    dirOpt.textContent = "✦ Director — auto-sequence the eras";
+    sel.appendChild(dirOpt);
 
     var addGroup = function (label, entries) {
       var og = document.createElement("optgroup");
@@ -326,7 +343,7 @@
   function buildBar() {
     presetSel = document.getElementById("presetSel");
     renderOptions();
-    presetSel.addEventListener("change", function () { if (presetSel.value) { loadByName(presetSel.value); showBar(); } });
+    presetSel.addEventListener("change", function () { if (presetSel.value) userPick(presetSel.value); });
     starEl.addEventListener("click", toggleFav);
     document.getElementById("prev").addEventListener("click", function () { step(-1); });
     document.getElementById("next").addEventListener("click", function () { step(1); });
@@ -420,6 +437,7 @@
 
   function setDirector(on) {
     Director.setEnabled(on, nowMs());
+    if (on) Director.kick();   // jump to a fresh era immediately so engaging gives instant feedback
     console.log("[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras");
     post({ type: "director", enabled: Director.isEnabled(), eras: Director.eraCount() });
     showBar();
