@@ -57,7 +57,15 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" },
+    { label: "Alchemy V4: Random (cycle all)", wmp: "__director__" },
+    { label: "Alchemy V4: Pulsar", wmp: "Alchemy V4: Pulsar" },
+    { label: "Alchemy V4: Corridor", wmp: "Alchemy V4: Corridor" },
+    { label: "Alchemy V4: Vortex", wmp: "Alchemy V4: Vortex" },
+    { label: "Alchemy V4: Mandala", wmp: "Alchemy V4: Mandala" },
+    { label: "Alchemy V4: Anemone", wmp: "Alchemy V4: Anemone" },
+    { label: "Alchemy V4: Orbiters", wmp: "Alchemy V4: Orbiters" },
+    { label: "Alchemy V4: Star", wmp: "Alchemy V4: Star" },
+    { label: "Alchemy V4: Burst", wmp: "Alchemy V4: Burst" },
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
@@ -155,8 +163,8 @@
   var Director = (function () {
     var cfg = {
       enabled: false,
-      dwellCalmMs: 24000,    // dwell between cuts when the track is calm
-      dwellLoudMs: 12000,    // dwell when energetic (shorter → more frequent cuts)
+      dwellCalmMs: 11000,    // dwell between cuts when the track is calm
+      dwellLoudMs: 6000,     // dwell when energetic (shorter → more frequent cuts)
       maxBeatWaitMs: 2500,   // once dwell elapses, wait this long for a beat, else cut anyway
       blendCalmS: 3.0,       // crossfade length when calm (morphier)
       blendLoudS: 1.6,       // crossfade length when energetic (snappier)
@@ -178,6 +186,7 @@
 
     // sequencer state
     var eras = [];           // preset names this Director cycles among
+    var bag = [];            // shuffle bag of era indices: every era plays once before any repeat
     var lastTickAt = 0, dwellElapsed = 0, pending = false, pendingSince = 0;
     var onSwitch = null, curName = null;
 
@@ -205,12 +214,19 @@
     function dwellMs() { return cfg.dwellCalmMs + (cfg.dwellLoudMs - cfg.dwellCalmMs) * vibe; }
     function blendS() { return cfg.blendCalmS + (cfg.blendLoudS - cfg.blendCalmS) * vibe; }
 
+    // SHUFFLE BAG: draw eras without replacement so every look plays once before any repeats
+    // (no "same thing again and again"). Refill+reshuffle when empty; avoid an immediate repeat
+    // across the bag boundary.
     function pickNext() {
       if (!eras.length) return null;
       if (eras.length === 1) return eras[0];
-      var next, guard = 0;
-      do { next = eras[Math.floor(Math.random() * eras.length)]; } while (next === curName && ++guard < 8);
-      return next;
+      if (!bag.length) {
+        for (var i = 0; i < eras.length; i++) bag.push(i);
+        for (var j = bag.length - 1; j > 0; j--) { var r = Math.floor(Math.random() * (j + 1)); var x = bag[j]; bag[j] = bag[r]; bag[r] = x; }
+      }
+      var idx = bag.shift();
+      if (eras[idx] === curName && bag.length) { var idx2 = bag.shift(); bag.push(idx); idx = idx2; }
+      return eras[idx];
     }
 
     function tick(now) {
@@ -231,7 +247,7 @@
 
     return {
       feed: feed, tick: tick, cfg: cfg,
-      setEras: function (list) { eras = (list || []).slice(); },
+      setEras: function (list) { eras = (list || []).slice(); bag = []; },
       setOnSwitch: function (fn) { onSwitch = fn; },
       // every preset load (manual OR director) resets the dwell clock so a manual
       // pick gets its full dwell before the Director cuts away from it.
@@ -405,8 +421,11 @@
       "Alchemy v2: Era — Mandala/Fluid",
       "Alchemy v2: Era — Supernova",
     ];
-    var eraList = ERA_PLAYLIST.filter(function (n) { return presets[n]; });
-    if (eraList.length < 2) eraList = names.filter(function (n) { return /^Alchemy v2:/.test(n); });
+    // V4 = the 8 kit-factory scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst),
+    // shuffle-cycled by the Director. Fall back to the v2 era playlist if V4 isn't present.
+    var v4Scenes = (window.WMP_V4_SCENES || []).filter(function (n) { return presets[n]; });
+    var eraList = v4Scenes.length >= 2 ? v4Scenes : ERA_PLAYLIST.filter(function (n) { return presets[n]; });
+    if (eraList.length < 2) eraList = names.filter(function (n) { return /^Alchemy v[24]:/.test(n); });
     Director.setEras(eraList);
     Director.setOnSwitch(function (name, blend) { loadByName(name, blend); });
 
@@ -415,9 +434,9 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy V4: Random";  // the v4 self-driving feedback engine — actively iterating
-    loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
-    renderLoop();
+    // Boot straight into the V4 director cycling the 8 kit-factory scenes (shuffle, no-repeat).
+    if (v4Scenes.length >= 2) { loadByName(v4Scenes[0]); renderLoop(); setDirector(true); }
+    else { loadByName(presets["Alchemy Random"] ? "Alchemy Random" : names[0]); renderLoop(); }
     post({ type: "ready", presets: names.length });
   }
 
