@@ -3505,7 +3505,7 @@
   // L3 flat-blue ↔ marble bg crossfade (q14) · L4 diagonal-line + orbiter fade (q17).
   P["Alchemy v2: Era — Mandala/Fluid"] = (function () {
     var huePhase = 0, lastT = 0, bgPhase = 0, linePhase = 0, spin = 0;
-    var linePal = alcPalette({ base: 0.55, step: 0.15, sat: 0.5, gain: 1.6 }); // bright pale cyan/white lines that POP on the saturated blue
+    var linePal = alcPalette({ base: 0.55, step: 0.10, sat: 0.3, gain: 1.8 }); // near-WHITE crisp lines (pop on any backdrop, like the reference)
     var preset = build(
       { wave_a: 0, decay: 0.5, gammaadj: 1.3, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
       {
@@ -3534,7 +3534,7 @@
           "float fv = fbm(fq * 3.0 + time * 0.05);\n" +
           "float rdg = abs(fract(fv * 5.0) - 0.5);\n" +
           "float ridge = smoothstep(0.05, 0.0, rdg);\n" +
-          "vec3 marble = mix(vec3(0.06, 0.20, 0.10), vec3(0.28, 0.05, 0.24), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.20, 0.70, 0.35);\n" +  // luminous green↔magenta fluid + bright veins
+          "vec3 marble = mix(vec3(0.06, 0.18, 0.10), vec3(0.26, 0.05, 0.22), 0.5 + 0.5 * sin(time * 0.06)) + ridge * vec3(0.12, 0.42, 0.22);\n" +  // luminous green↔magenta fluid + softer veins (so the white stars read on top)
           "vec3 bg = mix(flatbg, marble, clamp(q14, 0.0, 1.0));\n" +
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
@@ -3543,17 +3543,22 @@
           "}\n"
       }
     );
-    // a regular N-gon drawn as a closed waveform polygon, rotated by q9 * dir, jagged by value1.
-    function ngon(sides, R, dir) {
+    // a crisp {n/step} STAR POLYGON (e.g. pentagram {5/2}) — straight edges between every
+    // step-th vertex of n points → the recognizable nested-star mandala. Rotated by q9*dir.
+    function starPoly(n, step, R, dir) {
       return {
-        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.04, a: 1.0, thick: 1 }),
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.0, a: 1.0, thick: 1 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
-          var th = a.sample * 6.2832;
+          var idx = a.sample * n;                                  // position along the n star edges
+          var i0 = Math.floor(idx), fr = idx - i0;
           var phi = (a.q9 || 0) * dir;
-          var rad = R * (1.0 + 0.25 * Math.cos(sides * (th - phi))) + 0.02 * (a.value1 || 0); // N-petal rose → ornate mandala (not a flat polygon)
-          a.x = 0.5 + rad * Math.cos(th); a.y = 0.5 + rad * Math.sin(th);
-          linePal(a, sides % 2);                                   // bright pale lines, alternating two pale tones
+          var a0 = ((i0 * step) % n) / n * 6.2832 + phi;           // current star vertex
+          var a1 = (((i0 + 1) * step) % n) / n * 6.2832 + phi;     // next (step away)
+          var x = Math.cos(a0) + fr * (Math.cos(a1) - Math.cos(a0)); // straight crisp edge between them
+          var y = Math.sin(a0) + fr * (Math.sin(a1) - Math.sin(a0));
+          a.x = 0.5 + R * x; a.y = 0.5 + R * y;
+          linePal(a, n % 2);
           return a;
         }
       };
@@ -3585,9 +3590,9 @@
         }
       };
     }
-    preset.waves[0] = ngon(8, 0.30, 1);          // outer 8-gon
-    preset.waves[1] = ngon(6, 0.20, -1);         // mid 6-gon (counter-rotating)
-    preset.waves[2] = ngon(4, 0.12, 1);          // inner diamond
+    preset.waves[0] = starPoly(12, 5, 0.34, 1);  // outer 12/5 star
+    preset.waves[1] = starPoly(8, 3, 0.22, -1);  // mid 8/3 star (counter-rotating)
+    preset.waves[2] = starPoly(5, 2, 0.12, 1);   // inner pentagram
     preset.waves[3] = diagonal();                // persistent diagonal waveform line
     preset.waves[4] = orb("q1", "q2", false);    // flanking orb A
     preset.waves[5] = orb("q3", "q4", false);    // flanking orb B
@@ -3651,14 +3656,14 @@
           "vec3 bg = col * bloom * clamp(q14, 0.0, 1.0) + vec3(0.02, 0.01, 0.03);\n" +
           "vec3 g = texture2D(sampler_main, uv).rgb;\n" +
           "vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
-          "vec3 outc = bg + g + glow * 0.40;\n" +
-          "ret = outc / (outc + vec3(0.7));\n" +
+          "vec3 outc = bg + g + glow * 0.18;\n" +                            // less bloom (was a white halo)
+          "ret = outc / (outc + vec3(1.5));\n" +                            // stronger Reinhard → keeps colour instead of clipping to white
           "}\n"
       }
     );
     function urchin() {
       return {
-        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.02, a: 0.8, thick: 0 }),
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.02, a: 0.5, thick: 0 }),
         init_eqs: passthrough, frame_eqs: passthrough,
         point_eqs: function (a) {
           var n = 64, seg = 1 / n, k = Math.floor(a.sample / seg), ff = (a.sample - k * seg) / seg;
@@ -3668,9 +3673,9 @@
           // GREEN↔MAGENTA two-tone (canonical Alchemy; NOT a rainbow). Parity-split spikes,
           // duo drifts with the q8 clock.
           var h = (k % 2 ? 0.2 : 0.65) + 0.05 * Math.sin(6.2832 * (a.q8 || 0));
-          a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
-          a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
-          a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+          a.r = (0.5 + 0.5 * Math.cos(6.2832 * h)) * 0.5;            // dimmed so additive overlap stays COLOURED, not white
+          a.g = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33))) * 0.5;
+          a.b = (0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67))) * 0.5;
           return a;
         }
       };
