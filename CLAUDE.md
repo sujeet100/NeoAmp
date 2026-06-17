@@ -230,6 +230,19 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
 
 ## Working agreements (learned the hard way this project)
 
+- **★ USE ALL KIT VARIANTS, RANDOMLY — the core principle of Alchemy v2: Random.**
+  The kit defines multiple VARIANTS of every element (orbs: `alcOrb`/`alcOrbiterNode`/
+  `alcOrbTarget`/`alcOrbGradBlob`/`alcOrbFeathery`/`innerCircle`+`waveRing`; motifs:
+  anemone/triMandala/ngon/spindle/radialBurst/ray/diagonal/horizon/feathery/mesh; backgrounds:
+  fluid/marble/aurora/wash/bloom/horizonbands/moire/solidsnap; cameras; `ALC_PAL` palettes).
+  When the preset draws an element it MUST **stochastically pick among ALL the kit's variants of
+  that element** — never hardcode one variant, and **NEVER re-derive an inline version** of a
+  variant that already exists as a kit factory. CALL the factory. Every kit factory + its variants
+  must be hooked and reachable. (Repeatedly violated: shipped one orb style / inline ring-disc-
+  bullseye instead of cycling the real `alcOrb*` factories. Don't.) Where a constraint blocks a
+  variant (e.g. Butterchurn renders only **4 custom waves** + **4 custom shapes** per preset — see
+  vendor `customWaveforms=c.range(4)`), say so explicitly and route that variant through the other
+  budget (shape-based orbs via the 4 shape slots; instancing up to 1024×) rather than dropping it.
 - **Commit before any big preset change.** Reverting uncommitted shader rewrites
   meant reconstructing code from memory — painful. Small commits = easy
   `git revert`.

@@ -2684,6 +2684,260 @@
     return preset;
   })();
 
+  // ── Alchemy v2: Random ───────────────────────────────────────────────────────
+  // V1's APPROACH (one preset, stochastic, non-choreographed, continuous feedback bleed) driven
+  // by the v2 KIT. HARD CONSTRAINT (verified in vendor/butterchurn.min.js): Butterchurn renders
+  // EXACTLY 4 custom waves (customWaveforms=range(4)) — waves[4+] are silently dropped. So the
+  // 4 slots are: [0] central polymorphic motif · [1] orb A (alcOrbiterNode Saturn) · [2] orb B ·
+  // [3] tether (alcTether). The orbiter PAIR + tether + central motif (the WMP signature) is thus
+  // ALWAYS on. Multi-part motifs (mandala) are packed into the single central wave.
+  // Look = v1's character: THICK lines (4-tap max dilation in comp), MUTED PASTEL multi-tone
+  // bleed backgrounds (NO rainbow/pal fields), gentle cameras. Decoupled stochastic layers
+  // (colour/palette/motif/orb/bg/camera) each drift on their own random cadence.
+  P["Alchemy v2: Random"] = (function () {
+    // ── COLOUR — stochastic palette, DESATURATED to dusty pastel (the nostalgic Alchemy feel).
+    var PALS = [ALC_PAL.twoTone, ALC_PAL.roseGreen, ALC_PAL.redCyan, ALC_PAL.spread, ALC_PAL.spread, ALC_PAL.warm];
+    var curPal = PALS[0];
+    function pastel(a) { var l = (a.r + a.g + a.b) / 3, s = 0.72; a.r = a.r * s + l * (1 - s); a.g = a.g * s + l * (1 - s); a.b = a.b * s + l * (1 - s); }  // dusty but still COLOURFUL (was too grey at 0.5)
+    function palMotif(a, idx) { curPal(a, idx); pastel(a); }
+    function palRing(a, idx) { curPal(a, idx); pastel(a); }
+    function palSpec(a, idx) {   // sample-keyed spectral (multi-colour ring) for spindle/rays
+      var h = (a.q8 || 0) + a.sample * 0.7;
+      a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+      pastel(a);
+    }
+
+    // ── Generic stochastic discrete picker (random mode, beat-gated cut, hard-cap +5s).
+    function makePicker(n, minS, maxS, fade) {
+      var a = Math.floor(Math.random() * n), b = a, mix = 0, transing = false;
+      var start = 0, roll = minS + Math.random() * (maxS - minS), tstart = 0, out = { a: a, b: a, mix: 0 };
+      return function (time, dt, gate) {
+        if (!transing) { var el = time - start; if (el >= roll && (gate === undefined || gate || el >= roll + 5)) { b = Math.floor(Math.random() * (n - 1)); if (b >= a) b++; tstart = time; transing = true; } }
+        else { var fr = (time - tstart) / fade; mix = fr < 0 ? 0 : (fr > 1 ? 1 : fr); mix = mix * mix * (3 - 2 * mix); if (fr >= 1) { a = b; transing = false; mix = 0; start = time; roll = minS + Math.random() * (maxS - minS); } }
+        out.a = a; out.b = b; out.mix = mix; return out;
+      };
+    }
+
+    // ── CENTRAL MOTIF point-functions (the kit, each fitting ONE wave; mandala packs all 12).
+    var fAnem = alcAnemone(26, palMotif).point_eqs;
+    var fTriM = alcTriMandala(9, palMotif).point_eqs;
+    var fNgon = alcNgonPacked(ALC_MANDALA_SPECS, 1.4).point_eqs;        // all 12 star-polygons in ONE wave
+    var fSpin = alcSpindle(palSpec).point_eqs;
+    var fBur = alcRadialBurst({}).point_eqs;                            // built-in spectral
+    var fStar = alcTriangle(0, 0).point_eqs;
+    var fDia = alcDiagonalLine(0.3, 0.62, 0.06).point_eqs;
+    var fHor = bgWaveHorizon({ cy: 0.5, amp: 0.16, colorize: palMotif })[0].point_eqs;
+    var fFea = alcOrbFeathery(0.5, 0.5, palMotif).point_eqs;
+    var fMesh = alcMeshRings(8, 0.0).point_eqs;
+    function fRays(a) {                                                 // packed asterisk of waveform rays (one wave)
+      var N = 7, seg = Math.floor(a.sample * N), u = a.sample * N - seg, s = u * 2 - 1;
+      var th = (seg / N) * 3.14159 + (a.q9 || 0), len = (a.q5 || 0.3), disp = (a.value1 || 0) * (a.q6 || 0.04);
+      a.x = 0.5 + s * len * Math.cos(th) - disp * Math.sin(th);
+      a.y = 0.5 + s * len * Math.sin(th) + disp * Math.cos(th);
+      palSpec(a, 0); if (u < 0.02) a.a = 0; return a;
+    }
+    var MOTIF_N = 11;
+    function centralDraw(a) {
+      var m = a.q1 || 0;
+      if (m < 0.5) fAnem(a); else if (m < 1.5) fTriM(a); else if (m < 2.5) fNgon(a);
+      else if (m < 3.5) fSpin(a); else if (m < 4.5) fBur(a); else if (m < 5.5) fRays(a);
+      else if (m < 6.5) fStar(a); else if (m < 7.5) fDia(a); else if (m < 8.5) fHor(a);
+      else if (m < 9.5) fFea(a); else fMesh(a);
+      a.a = (a.a === undefined ? 0.85 : a.a) * (a.q15 || 0);            // motif visibility (+ dip-swap)
+      return a;
+    }
+    function scaleFor(m) {
+      if (m < 0.5) return 0.46; if (m < 1.5) return 0.42; if (m < 2.5) return 1.00; if (m < 3.5) return 0.40;
+      if (m < 5.5) return 0.34; if (m < 8.5) return 0.36; if (m < 9.5) return 0.22; return 0.40;
+    }
+
+    // ── ORBS + TETHER (kit factories, parameterized to the orb positions). On slots 1/2/3 → render.
+    // Orb = a RANDOM pick (q16) among the KIT's parameterized orb factories — call them, don't
+    // re-derive. SMALL + pastel; the wave is non-additive (no white blowout/smear). orbiterNode
+    // (Saturn) · orbTarget n=2 / n=3 (bullseye). NOTE: gradBlob/feathery/dotTrail are SHAPE-based,
+    // so to hook them too they route through the 4 custom-SHAPE slots (separate budget) — TODO.
+    // alcOrbiterNode DROPPED — its 16-turn sqrt-spiral fill renders as an ugly white "yarn-ball"
+    // coil at this size; the look is inherent to that factory and fixing = re-deriving (forbidden).
+    // Keep the clean alcOrbTarget ring variants: single ring / double / triple bullseye (colored).
+    var orbA_fns = [
+      alcOrbTarget("q21", "q22", 1, palMotif).point_eqs,
+      alcOrbTarget("q21", "q22", 2, palMotif).point_eqs,
+      alcOrbTarget("q21", "q22", 3, palMotif).point_eqs
+    ];
+    var orbB_fns = [
+      alcOrbTarget("q23", "q24", 1, palMotif).point_eqs,
+      alcOrbTarget("q23", "q24", 2, palMotif).point_eqs,
+      alcOrbTarget("q23", "q24", 3, palMotif).point_eqs
+    ];
+    function orbDispatch(fns, vis, a) {
+      var st = a.q16 || 0;
+      (st < 0.9 ? fns[0] : st < 1.9 ? fns[1] : fns[2])(a);       // the chosen kit factory
+      a.a = (a.a === undefined ? 0.9 : a.a) * vis;
+      return a;
+    }
+    var fTether = alcTether("q21", "q22", "q23", "q24", "q26", palMotif).point_eqs;
+
+    // ── CAMERA vocabulary [zoom, rot, twist, kaleido, drift]; vortex kept GENTLE (the strong one
+    // swallowed the whole frame). None static (no dead top-view).
+    var CAMS = [
+      [0.998, 0.004, 0.20, 0.0, 0.004],  // 0 DRIFT
+      [0.992, 0.006, 0.45, 0.0, 0.000],  // 1 VORTEX (gentle)
+      [1.016, 0.000, 0.0, 0.0, 0.000],   // 2 PLUNGE
+      [0.992, 0.007, 0.30, 1.0, 0.000],  // 3 KALEIDO
+      [0.998, 0.010, 0.0, 0.0, 0.010]    // 4 ROLL/FLOAT
+    ];
+    var CAM_N = 5;
+
+    // ── Stochastic layer drivers.
+    var lastT = 0, huePhase = 0, spinAcc = 0, marchAcc = 0;
+    var beat = alcBeatFlash({ rise: 1.25 });
+    var oax = makeSH(0.10, 0.30, 5, 11, 0.7), oay = makeSH(0.30, 0.70, 5, 11, 0.7);   // orb A → left, random
+    var obx = makeSH(0.70, 0.90, 5, 11, 0.7), oby = makeSH(0.30, 0.70, 5, 11, 0.7);   // orb B → right, random
+    // INDEPENDENT presence → orbs appear randomly: none / single / pair (not always-on).
+    var oaShow = makeSH(0, 1, 5, 12, 1.0), obShow = makeSH(0, 1, 5, 12, 1.0), tShow = makeSH(0, 1, 6, 13, 1.0);
+    var cvisSH = makeSH(0.5, 1.0, 7, 14, 0.9);
+    var motifPick = makePicker(MOTIF_N, 8, 17, 2.0);
+    var orbStylePick = makePicker(3, 9, 19, 0.5);                                      // which kit orb factory
+    var bgPick = makePicker(8, 5, 11, 1.5);
+    var camPick = makePicker(CAM_N, 12, 26, 3.0);
+    var palPick = makePicker(PALS.length, 14, 30, 0.5);
+
+    var preset = build(
+      { wave_a: 0, decay: 0.93, gammaadj: 1.4, zoom: 1.0, rot: 0.0, warp: 0.0, wrap: 0, darken_center: 0.0, echo_alpha: 0 },
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1, mid = t.mid_att || t.mid || 1, treb = t.treb_att || t.treb || 1;
+          var tm = t.time, dt = Math.min(0.1, Math.max(0, tm - lastT)); lastT = tm;
+          var energy = (bass + mid + treb) / 3, bFlash = beat(t.bass || 1, dt);
+
+          // L1 COLOUR
+          huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.012, 0.05);
+          t.q8 = huePhase;
+          curPal = PALS[palPick(tm, dt).a];
+
+          // L3 MOTIF (central, slot 0)
+          var mo = motifPick(tm, dt, bFlash > 0.6);
+          var mCur = mo.mix < 0.5 ? mo.a : mo.b;
+          t.q1 = mCur;
+          var dd = (mo.mix - 0.5) * 4.0;
+          t.q15 = cvisSH(tm, dt) * (1 - 0.85 * Math.exp(-dd * dd));
+          t.q2 = 0.5; t.q3 = 0.5; t.q19 = tm;
+          t.q6 = 0.02 + 0.06 * Math.min(treb, 1.5);
+          spinAcc += dt * (0.35 + 0.6 * Math.max(0, mid - 1));
+          t.q5 = scaleFor(mCur) * (0.85 + 0.25 * Math.max(0, bass - 1));
+          t.q11 = Math.max(0, Math.min((energy - 0.6) / 0.9, 1));
+          t.q13 = 0.04 * Math.sin(tm * 0.1);
+          marchAcc += dt * 0.06;
+          t.q14 = (mCur >= 9.5) ? marchAcc : 0;
+          if (mCur >= 3.5 && mCur < 4.5) { t.q9 = 0.05 + 0.03 * bass; t.q10 = 0.08 + 0.22 * Math.max(0, mid - 1) + 0.12 * bFlash; }
+          else if (mCur >= 6.5 && mCur < 7.5) { t.q9 = spinAcc; t.q10 = 1.0; }
+          else { t.q9 = spinAcc; t.q10 = 0.4 * Math.max(0, bass - 1); }
+
+          // L4 ORBS + tether (slots 1/2/3)
+          t.q21 = oax(tm, dt); t.q22 = oay(tm, dt);
+          t.q23 = obx(tm, dt); t.q24 = oby(tm, dt);
+          t.q25 = 0.03 + 0.012 * bass; t.q7 = t.q25;                   // SMALL orb radius (orbiterNode reads q25, orbTarget reads q7)
+          t.q26 = 0.020 + 0.025 * treb;
+          t.q16 = orbStylePick(tm, dt).a;                              // which kit orb factory (random)
+          var aShow = Math.max(0, Math.min((oaShow(tm, dt) - 0.4) / 0.25, 1));   // orb A present? (random)
+          var bShow = Math.max(0, Math.min((obShow(tm, dt) - 0.4) / 0.25, 1));   // orb B present?
+          t.q17 = aShow; t.q12 = bShow;                                // per-orb vis → none / single / pair
+          t.q4 = (aShow > 0.3 && bShow > 0.3) ? Math.max(0, Math.min((tShow(tm, dt) - 0.4) / 0.25, 1)) : 0;  // tether only when BOTH orbs + its own gate
+
+          // L2 BACKGROUND
+          var bg = bgPick(tm, dt, bFlash > 0.6);
+          t.q18 = bg.a; t.q20 = bg.b; t.q27 = bg.mix;
+
+          // L5 CAMERA
+          var cm = camPick(tm, dt);
+          var A = CAMS[cm.a], B = CAMS[cm.b], k = cm.mix;
+          var zoom = A[0] + (B[0] - A[0]) * k, rot = A[1] + (B[1] - A[1]) * k;
+          var twist = A[2] + (B[2] - A[2]) * k, kal = A[3] + (B[3] - A[3]) * k, drift = A[4] + (B[4] - A[4]) * k;
+          if (zoom > 1.0) zoom += 0.02 * Math.max(0, bass - 1); else zoom -= 0.006 * Math.max(0, bass - 1);
+          rot *= (1 + 0.5 * Math.max(0, mid - 1));
+          t.q28 = zoom; t.q29 = rot; t.q30 = twist; t.q31 = kal; t.q32 = drift;
+          return t;
+        },
+        // CAMERA warp — gentle twist (the vortex no longer swallows the frame).
+        warp:
+          "shader_body {\n" +
+          "  vec2 c = uv - 0.5;\n" +
+          "  float pr = length(c);\n" +
+          "  float pa = atan(c.y, c.x);\n" +
+          "  float seg = 6.2832 / 4.0;\n" +
+          "  float fa = abs(pa - seg * floor(pa / seg + 0.5));\n" +
+          "  float ua = mix(pa, fa, clamp(q31, 0.0, 1.0));\n" +
+          "  vec2 fc = vec2(cos(ua), sin(ua)) * pr;\n" +
+          "  float tw = q30 * (0.025 + 0.04 / (pr * 6.0 + 1.0));\n" +
+          "  float ro = q29 + tw;\n" +
+          "  float sn = sin(ro), cs = cos(ro);\n" +
+          "  vec2 rc = mat2(cs, -sn, sn, cs) * fc * q28;\n" +
+          "  vec2 sd = rc + 0.5 + vec2(q32 * sin(time * 0.23), q32 * cos(time * 0.19));\n" +
+          "  ret = texture2D(sampler_main, sd).rgb;\n" +
+          "  ret -= mix(0.016, 0.010, clamp(q30, 0.0, 1.0));\n" +
+          "}\n",
+        // BACKGROUND — MUTED PASTEL multi-tone bleed (v1 character), NO rainbow/pal fields. THICK
+        // lines via 4-tap max dilation of the feedback. Reinhard keeps it dusty.
+        comp:
+          NOISE_GLSL + ALC_FLUID_GLSL + ALC_MARBLE_GLSL + ALC_WASH_GLSL + ALC_MOIRE_GLSL + ALC_SOLIDSNAP_GLSL + ALC_FOG_GLSL +
+          "vec3 hueRot(vec3 col, float a){ vec3 k = vec3(0.57735); float ca = cos(a), sa = sin(a); return col*ca + cross(k,col)*sa + k*dot(k,col)*(1.0-ca); }\n" +
+          // RICH dusty multi-tone fields (analysed from Alchemy Random video: bright teal/magenta/
+          // gold/green/purple fills, mid-high brightness — NOT dark). These set the colour; the
+          // shader_body brightens + tone-maps.
+          "vec3 bgField(float mode, float sel, vec2 d, vec2 uvv, float tt, float b){\n" +
+          "  if(mode<0.5) return alcFluid(uvv, tt, b, vec3(0.10,0.30,0.34), vec3(0.42,0.12,0.36), vec3(0.40,0.34,0.12));\n" +   // teal/magenta/gold
+          "  if(mode<1.5) return alcMarble(d, tt, b, vec3(0.14,0.34,0.18), vec3(0.40,0.12,0.36), vec3(0.7,0.95,0.6));\n" +      // green↔magenta veins
+          "  if(mode<2.5) return alcFluid(uvv, tt, b, vec3(0.42,0.30,0.10), vec3(0.12,0.22,0.44), vec3(0.42,0.14,0.34));\n" +   // gold/blue/plum
+          "  if(mode<3.5) return alcWash(d, tt, vec3(0.22,0.42,0.28), vec3(0.20,0.26,0.50), 0.05);\n" +                         // sage↔blue (brighter)
+          "  if(mode<4.5) return alcMarble(d, tt, b, vec3(0.16,0.18,0.42), vec3(0.42,0.30,0.10), vec3(0.6,0.7,0.95));\n" +      // cobalt/gold veins
+          "  if(mode<5.5) return alcFluid(uvv, tt, b, vec3(0.12,0.34,0.30), vec3(0.40,0.14,0.36), vec3(0.42,0.34,0.14));\n" +   // teal/magenta/gold
+          "  if(mode<6.5) return alcMoire(uvv, tt, b, vec3(0.55,0.95,0.7));\n" +                                              // moiré
+          "  return alcSolidSnap(sel) * 0.95;\n" +                                                                             // dusty solids (bright)
+          "}\n" +
+          "shader_body {\n" +
+          "  vec2 d = uv - 0.5; d.x *= resolution.x / resolution.y;\n" +
+          "  float pr = length(d);\n" +
+          "  float sel = floor(time / 6.0);\n" +
+          "  vec3 bg = mix(bgField(q18, sel, d, uv, time, bass), bgField(q20, sel, d, uv, time, bass), clamp(q27, 0.0, 1.0));\n" +
+          "  bg = hueRot(bg, q8 * 6.2832 * 0.35);\n" +
+          "  bg *= (1.0 + 0.5 * bass);\n" +                            // COLOURFUL, frame-filling (was 0.55 → too dark)
+          "  bg *= 1.0 - 0.22 * smoothstep(0.55, 1.35, pr);\n" +       // gentle vignette only (no dark fog)
+          "  float o = 2.2 / resolution.y;\n" +                        // THICK lines: 4-tap max dilation (v1 look)
+          "  vec3 g = texture2D(sampler_main, uv).rgb;\n" +
+          "  g = max(g, texture2D(sampler_main, uv + vec2(o,0.0)).rgb);\n" +
+          "  g = max(g, texture2D(sampler_main, uv - vec2(o,0.0)).rgb);\n" +
+          "  g = max(g, texture2D(sampler_main, uv + vec2(0.0,o)).rgb);\n" +
+          "  g = max(g, texture2D(sampler_main, uv - vec2(0.0,o)).rgb);\n" +
+          "  vec3 glow = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+          "  vec3 outc = bg + g * 1.15 + glow * 0.45;\n" +
+          "  ret = outc / (outc + vec3(0.7));\n" +                    // Reinhard k=0.7 → brighter, more saturated colour
+          ALC_HATCH +
+          "}\n"
+      }
+    );
+
+    // ── The 4 rendered waves: central motif + orb A + orb B + tether.
+    preset.waves[0] = {
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.85 }),
+      init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
+    };
+    function orbWave(fns, visVar) {
+      return {  // NON-additive (paints, no white blowout/smear) · small · comp dilation gives a little thickness
+        baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 256, additive: 0, usedots: 0, scaling: 1, smoothing: 0.1, thick: 0, a: 0.9 }),
+        init_eqs: passthrough, frame_eqs: passthrough,
+        point_eqs: function (a) { return orbDispatch(fns, (a[visVar] || 0), a); }
+      };
+    }
+    preset.waves[1] = orbWave(orbA_fns, "q17");                        // orb A (vis q17)
+    preset.waves[2] = orbWave(orbB_fns, "q12");                        // orb B (vis q12)
+    preset.waves[3] = {   // tether: thick (v1 had thick) + non-additive crisp; shown only when q4>0
+      baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.03, thick: 1, a: 0.9 }),
+      init_eqs: passthrough, frame_eqs: passthrough,
+      point_eqs: function (a) { fTether(a); a.a = (a.a === undefined ? 0.9 : a.a) * (a.q4 || 0); return a; }
+    };
+    return preset;
+  })();
+
   // ── Alchemy v2: Orbiters ─────────────────────────────────────────────────────
   // First preset of the Alchemy v2 framework (see docs/alchemy-v2/). A focused,
   // CRISP recreation of the WMP "Orbiters" signature that fixes the gaps the user
@@ -5435,10 +5689,10 @@
           "vec2 d = uv - vec2(0.5);\n" +
           "d.x *= resolution.x / resolution.y;\n" +
           "float r = length(d);\n" +
-          "float rad = 0.26 + 0.07 * bass;\n" +
+          "float prad = 0.26 + 0.07 * bass;\n" +
           "float core = exp(-r*r * 22.0) * (1.0 + 0.6*bass_att);\n" +
-          "float rim = smoothstep(rad, rad*0.7, r) * smoothstep(rad*0.45, rad*0.75, r);\n" +
-          "float shade = clamp(1.0 - r/rad, 0.0, 1.0);\n" +
+          "float rim = smoothstep(prad, prad*0.7, r) * smoothstep(prad*0.45, prad*0.75, r);\n" +
+          "float shade = clamp(1.0 - r/prad, 0.0, 1.0);\n" +
           "shade = pow(shade, 1.5);\n" +
           "vec3 sphereCol = vec3(0.45, 0.78, 1.0);\n" +
           "vec3 orb = sphereCol * (shade*0.55 + rim*0.9) + vec3(0.85,0.95,1.0)*core;\n" +
@@ -5527,8 +5781,8 @@
           "vec2 d = uv - vec2(0.5);\n" +
           "d.x *= resolution.x / resolution.y;\n" +
           "float r = length(d);\n" +
-          "float ang = atan(d.y, d.x);\n" +
-          "float star = 0.5 + 0.5 * cos(ang * 5.0);\n" +
+          "float pang = atan(d.y, d.x);\n" +
+          "float star = 0.5 + 0.5 * cos(pang * 5.0);\n" +
           "float reach = (0.18 + 0.05*bass) * (0.6 + 0.4*star);\n" +
           "float glow = exp(-r*r / (reach*reach + 0.002));\n" +
           "glow = pow(glow, 1.3);\n" +
@@ -5983,17 +6237,17 @@
           "d.x *= resolution.x / resolution.y;\n" +
           "float PI = 3.14159265;\n" +
           "float seg = 2.0*PI/6.0;\n" +
-          "float ang = atan(d.y, d.x);\n" +
-          "ang = abs(mod(ang, seg) - seg*0.5);\n" +
-          "float rad = length(d);\n" +
-          "vec2 m = rad * vec2(cos(ang), sin(ang)) + 0.5;\n" +
+          "float pang = atan(d.y, d.x);\n" +
+          "pang = abs(mod(pang, seg) - seg*0.5);\n" +
+          "float prad = length(d);\n" +
+          "vec2 m = prad * vec2(cos(pang), sin(pang)) + 0.5;\n" +
           "vec3 c = texture2D(sampler_main, m).rgb;\n" +
           "float lum = dot(c, vec3(0.33));\n" +
           // WMP kaleidovision is GREEN-dominant with faint spectral speckle, not full rainbow.
-          "vec3 speck = pal(time*0.05 + rad*1.5);\n" +
+          "vec3 speck = pal(time*0.05 + prad*1.5);\n" +
           "vec3 col = mix(vec3(0.30,1.0,0.40), speck, 0.22);\n" +
           "ret = col * lum * 1.7;\n" +
-          "ret += vec3(0.30,1.0,0.40) * exp(-rad*rad*9.0) * (0.10 + 0.35*bass);\n" +
+          "ret += vec3(0.30,1.0,0.40) * exp(-prad*prad*9.0) * (0.10 + 0.35*bass);\n" +
           "}\n"
       }
     );
@@ -6029,10 +6283,10 @@
           "vec2 d = uv - 0.5;\n" +
           "d.x *= resolution.x / resolution.y;\n" +
           "float r = length(d);\n" +
-          "float ang = atan(d.y, d.x);\n" +
+          "float pang = atan(d.y, d.x);\n" +
           "float lum = dot(c, vec3(0.33));\n" +
           // WMP chemicalnova is a full-spectrum psychedelic burst — hue sweeps by angle+radius.
-          "vec3 tint = pal(ang/6.2832 + r*0.6 - time*0.12);\n" +
+          "vec3 tint = pal(pang/6.2832 + r*0.6 - time*0.12);\n" +
           "ret = tint * lum * 1.9;\n" +
           "ret += vec3(1.0) * exp(-r*r*22.0) * (0.3 + 1.2*bass);\n" +
           "}\n"

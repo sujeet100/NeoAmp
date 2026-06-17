@@ -60,6 +60,7 @@
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
+    { label: "Alchemy v2: Random", wmp: "Alchemy v2: Random" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
     { label: "Alchemy v2: Era — Corridor", wmp: "Alchemy v2: Era — Corridor" },
     { label: "Alchemy v2: Era — Anemone/Vortex", wmp: "Alchemy v2: Era — Anemone/Vortex" },
@@ -299,11 +300,11 @@
     ph.value = ""; ph.textContent = "♪ pick a preset…"; ph.disabled = true;
     sel.appendChild(ph);
 
-    // The Director "auto" entry — selecting it engages the audio-driven era sequencer.
-    var dirOpt = document.createElement("option");
-    dirOpt.value = DIRECTOR_KEY;
-    dirOpt.textContent = "✦ Director — auto-sequence the eras";
-    sel.appendChild(dirOpt);
+    // The Director (Tier-2 era sequencer) was RETIRED in favour of "Alchemy v2: Random",
+    // a single self-sequencing preset — its cross-preset crossfade read as a foggy
+    // slideshow (memory: alchemy-feels-random-principles). The IIFE stays dormant (still
+    // togglable via postMessage director:toggle for debugging) but is no longer offered
+    // in the picker.
 
     var addGroup = function (label, entries) {
       var og = document.createElement("optgroup");
@@ -413,7 +414,7 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Era — Anemone/Vortex";  // Step-3 era-preset — actively iterating
+    var DEFAULT_PRESET = "Alchemy v2: Random";  // the v2 single self-sequencing preset — actively iterating
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });
@@ -448,7 +449,8 @@
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "r" || e.key === "R") randomPreset();
     else if (e.key === "f" || e.key === "F") toggleFav();
-    else if (e.key === "d" || e.key === "D") setDirector(!Director.isEnabled());
+    // "d" Director toggle retired with the Director picker entry — "Alchemy v2: Random"
+    // self-sequences. (Director still reachable via postMessage for debugging.)
   });
 
   try { init(); } catch (e) { fail("init: " + (e && e.message ? e.message : e)); }
