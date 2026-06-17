@@ -57,6 +57,7 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
+    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" },
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
@@ -414,7 +415,7 @@
     setTimeout(sizeCanvas, 400);
     // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
     // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    var DEFAULT_PRESET = "Alchemy v2: Random";  // the v2 single self-sequencing preset — actively iterating
+    var DEFAULT_PRESET = "Alchemy V4: Random";  // the v4 self-driving feedback engine — actively iterating
     loadByName(presets[DEFAULT_PRESET] ? DEFAULT_PRESET : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]));
     renderLoop();
     post({ type: "ready", presets: names.length });
