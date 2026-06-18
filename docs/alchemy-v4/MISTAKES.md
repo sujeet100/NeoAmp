@@ -24,9 +24,17 @@ effort was burned repeating the same mistakes. This file is the antidote. **Read
   are read by neither shaders nor kit factories. Only `enabled` is build-fixed (see §4 correction).
 - **The `viz.js` cross-preset Director is retired for v4** (boots straight into the single preset).
 - v1 (`presets/alchemy.js` "Alchemy Random") and v2 ("Alchemy v2: …") remain **untouched**.
-- **Open follow-ups** (tracked as tasks): kaleidoscope shows only one quarter + add a DIAGONAL (X)
-  fold; reconsider the dense daisy-spirograph under fold; build/refine the 2:40-2:50 + 0:39-0:45
-  scenes; make the tether beat-synced (flash on the kick, not permanent). See `FINDINGS-AND-REBUILD-PLAN.md`.
+- **DONE 2026-06-18 (session 2):** beat-synced tether (#26); full DIAGONAL-X mirror kaleidoscope
+  (#22/#23); **bold X-fan kaleidoscope wedges** (#25 + the bolden note — folds now read as bold
+  complementary colour wedges + a radiating sweep fan, not a uniform blob, 7159bc4); **de-washed the
+  colours** (resaturate + darks-deepen + darker ground in COMP — ours measured too bright + under-sat
+  vs the original; 520581c — see [[alc-colors-were-washed-out]]); **the 2:40-2:50 scene** (#24: a new
+  WAVEFAN motif + concentric rings on both orbs + a waveAmt-eased look of big clustered ringed orbs
+  riding the waveform with a downward comb-fan, fold suppressed; 9cc1396). #21 (daisy-spirograph) was
+  already resolved (dropped in 74c1cbe → plain hexagon).
+- **Open follow-ups:** the 0:39-0:45 scene if still wanted; otherwise tuning from the user's live
+  screenshots. **Workflow note:** push commits DIRECTLY to `main` (no PR) — see [[git-push-direct-to-main]].
+  See `FINDINGS-AND-REBUILD-PLAN.md`.
 
 ---
 
