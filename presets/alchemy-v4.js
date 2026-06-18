@@ -378,7 +378,13 @@
   preset.waves[2] = {   // jagged REAL-waveform tether spanning the two orbs (gated: both present)
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.9 }),
     init_eqs: passthrough, frame_eqs: passthrough,
-    point_eqs: function (a) { fTether(a); var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); a.a = (a.a === undefined ? 0.9 : a.a) * g; return a; }
+    point_eqs: function (a) {
+      fTether(a);
+      var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55);             // both orbs present
+      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.40));                // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
+      a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
+      return a;
+    }
   };
   preset.shapes[0] = orbShape("q21", "q22", 0.00, "q25");   // orb A (near-persistent anchor)
   preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14");   // orb B (comes & goes; different hue)
