@@ -70,7 +70,16 @@
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
+    // DILATE the foreground (6-tap max) so thin waveform lines + orb rings read THICKER and defined
+    // against the vibrant background (the user's "lines too thin / not defined" note).
+    "  vec2 dpx = 1.7 / resolution;\n" +
     "  vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv + vec2(dpx.x, 0.0)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv - vec2(dpx.x, 0.0)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv + vec2(0.0, dpx.y)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv - vec2(0.0, dpx.y)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv + dpx).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, uv - dpx).rgb);\n" +
     "  vec2 px = 1.0 / resolution; vec3 bloom = vec3(0.0);\n" +
     "  for (int i = 0; i < 8; i++) {\n" +
     "    float ba = float(i) / 8.0 * 6.2832; vec2 bd = vec2(cos(ba), sin(ba));\n" +
@@ -111,13 +120,13 @@
         var hf = (s.q8 || 0) + (hueOff || 0), hb = hf + 0.5;         // fill hue, complementary border hue
         var fr = orbCol(hf, 0), fg = orbCol(hf, 0.33), fb = orbCol(hf, 0.67);
         var br = orbCol(hb, 0), bg = orbCol(hb, 0.33), bb = orbCol(hb, 0.67);
-        var bri = 0.78 + 0.55 * be;                                  // FILL brightness pulses with bass
+        var bri = 0.85 + 0.55 * be;                                  // FILL brightness pulses with bass
         s.x = cx; s.y = cy;
         s.rad = (s.q7 || 0.06) * (1 + 0.40 * be);                    // size pulses with bass
-        s.r = Math.min(1, fr * (bri + 0.35)); s.g = Math.min(1, fg * (bri + 0.35)); s.b = Math.min(1, fb * (bri + 0.35)); // bright core
-        s.a = 0.90 * vis;
-        s.r2 = fr * bri * 0.55; s.g2 = fg * bri * 0.55; s.b2 = fb * bri * 0.55; s.a2 = 0.0;  // coloured fill -> soft edge
-        s.border_r = br; s.border_g = bg; s.border_b = bb; s.border_a = 0.92 * vis;          // CONTRAST-hue ring
+        s.r = Math.min(1, fr * bri); s.g = Math.min(1, fg * bri); s.b = Math.min(1, fb * bri);   // COLOURED core (not washed white)
+        s.a = 0.96 * vis;
+        s.r2 = fr * 0.85; s.g2 = fg * 0.85; s.b2 = fb * 0.85; s.a2 = 0.30 * vis;               // prominent coloured body (was transparent)
+        s.border_r = br * 0.32; s.border_g = bg * 0.32; s.border_b = bb * 0.32; s.border_a = 0.95 * vis;  // DARK contrast-hue rim (thickened by the comp dilation)
         return s;
       }
     };
@@ -150,7 +159,10 @@
   // ── central-motif modes: each = a kit-factory point fn (one wave). Dispatched per-frame by q30. ──
   var fAnem = alcAnemone(24, ALC_PAL.roseGreen).point_eqs;
   var fSpin = alcSpindle(ALC_PAL.redCyan).point_eqs;
-  var fMand = alcNgonPacked(ALC_MANDALA_SPECS, 1.5).point_eqs;   // all mandala star-polys in ONE wave
+  // NOTE: no nested-polygon "mandala" mode. In the original (frames w_sweep f_14/20/26) the mandala
+  // is a SMALL central waveform MIRRORED by the kaleidoscope fold into big soft wedges — NOT a thin
+  // nested-star-polygon tangle (which is what alcNgonPacked produced). So the fold (look 3/6) builds
+  // the mandala from whatever flower motif is active; we shrink the motif under a fold (see frame).
   var fNgon = alcNgon({ sides: 6, aspectX: 1.0, hueOff: 0.0 }).point_eqs;
   var fTri  = alcTriangle(0, 0).point_eqs;
   // BOLT — V1's central "flow" motif (alchemy.js wave[3] shape 8): the live audio waveform drawn as
@@ -177,11 +189,11 @@
     a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
     return a;
   }
-  var MODES = [fAnem, fSpin, fMand, fNgon, fTri, fBolt, fUrchin];
+  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle) saturate to milky white in the feedback
   // buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than sparse outline modes.
-  var MODE_ALPHA = [0.80, 0.42, 0.70, 0.95, 0.85, 0.85, 0.72];   // anemone·spindle·mandala·ngon·triangle·bolt·urchin
-  function scaleFor(m) { return m === 2 ? 1.0 : (m === 0 ? 0.46 : m === 1 ? 0.40 : 0.5); }
+  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72];   // anemone·spindle·ngon·triangle·bolt·urchin
+  function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
     MODES[m](a);
@@ -256,6 +268,7 @@
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5; t.q3 = 0.5;
     t.q5 = scaleFor(mCur) * (0.82 + 0.40 * (bassA - 1) + 0.22 * f);      // breathing + per-beat pop
+    if (fold > 1.5) t.q5 *= 0.52;                                        // under a kaleidoscope fold: small center → clean mirrored wedges (orig f_26)
     t.q6 = 0.05;
     t.q9 = time * 0.06;                                                  // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);                               // twist scales with bass
