@@ -319,13 +319,18 @@
     // ORBS + TETHER — wide opposite-corner diagonal (separation ~0.6w, never crossing center).
     // STAGING: orb A is a near-persistent anchor; orb B comes & goes on its own phase → single↔pair;
     // the tether is gated to appear only when BOTH orbs are clearly present → sometimes-tethered.
-    t.q25 = 0.60 + 0.40 * comeGo(Math.sin(time * 0.070));                // orb A visibility (0.6..1.0)
-    t.q14 = comeGo(Math.sin(time * 0.055 + 1.7));                        // orb B visibility (0..1, staggered)
-    var dAng = Math.PI / 4 + 0.2 * Math.sin(time * 0.05);
-    t.q21 = 0.5 - 0.30 * Math.cos(dAng);
-    t.q22 = 0.5 - 0.28 * Math.sin(dAng);
-    t.q23 = 0.5 + 0.30 * Math.cos(dAng);
-    t.q24 = 0.5 + 0.28 * Math.sin(dAng);
+    // visibility — non-periodic come-and-go (summed incommensurate sines) so the single↔pair rhythm
+    // never loops; orb A near-persistent anchor, orb B varies.
+    t.q25 = 0.55 + 0.45 * comeGo(0.6 * Math.sin(time * 0.070) + 0.4 * Math.sin(time * 0.031 + 1.0));
+    t.q14 = comeGo(0.6 * Math.sin(time * 0.055 + 1.7) + 0.4 * Math.sin(time * 0.026 + 0.4));
+    // PATH — the pair axis rotates through ALL directions (non-uniformly) with breathing separation +
+    // independent per-orb wander, so the orbs stop retracing the same fixed diagonal (user note, #19).
+    var axis = time * 0.050 + 0.6 * Math.sin(time * 0.017);
+    var sep = 0.30 + 0.06 * Math.sin(time * 0.037), wob = 0.35 * Math.sin(time * 0.043);
+    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.090);
+    t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
+    t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
+    t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
     t.q7 = (0.060 + 0.020 * Math.max(0, bass - 1)) * (1 + 0.40 * f);     // orb radius (pops on beat)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA);                                 // tether jag amplitude (audio-coupled)
     return t;
