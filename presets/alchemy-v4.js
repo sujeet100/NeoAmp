@@ -67,6 +67,19 @@
   var COMP_V4 =
     NOISE_GLSL + PAL_GLSL + ALC_MOIRE_GLSL +
     "vec3 dusty(vec3 c, float s){ float l = dot(c, vec3(0.333)); return mix(vec3(l), c, s); }\n" +
+    // 3 expanding WAVY (scalloped) concentric rings around an orb, starting just outside its radius r0.
+    // Drawn FRESH in comp (never the feedback buffer) so they can't rotate into a spiral. Quadratic fade.
+    "vec3 orbRings(vec2 puv, float asp2, vec2 oc, float ph, float t2, float r0, vec3 rc){\n" +
+    "  vec2 od = puv - oc; od.x *= asp2; float odl = length(od); float oda = atan(od.y, od.x);\n" +
+    "  vec3 s = vec3(0.0);\n" +
+    "  for (int ri = 0; ri < 3; ri++) {\n" +
+    "    float rp = ph + float(ri) * 0.16;\n" +
+    "    float ringR = r0 + rp * 0.20 + 0.013 * sin(oda * 7.0 + t2 * 2.0);\n" +
+    "    float band = smoothstep(0.013, 0.0, abs(odl - ringR)) * step(rp, 1.0);\n" +
+    "    s += rc * band * (1.0 - rp) * (1.0 - rp) * 0.6;\n" +
+    "  }\n" +
+    "  return s;\n" +
+    "}\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
@@ -136,18 +149,13 @@
     "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" +   // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
 
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
-    // ORB RIPPLES — drawn FRESH here in comp (never in the feedback buffer) so they can NOT rotate
-    // into a spiral. 3 expanding WAVY rings around orb A (uv≈q21,q22), gated/expanded by q11 (set in
-    // frame_eqs: intermittent, off during swirl, fast-shed). Fades fast as each ring grows.
+    // ORB RIPPLES — concentric rings around BOTH orbs (each gated on its own presence q25/q14), sized to
+    // sit just outside the orb radius q7. q11 is the shed phase (frame_eqs: intermittent / off-during-swirl,
+    // forced ON in the #24 wavefan scene → the two big orbs read as concentric ringed targets).
     "  if (q11 < 1.0) {\n" +
-    "    vec2 od = uv - vec2(q21, q22); od.x *= asp; float odl = length(od); float oda = atan(od.y, od.x);\n" +
-    "    vec3 rc = dusty(pal(q8 + 0.12), 0.9);\n" +
-    "    for (int ri = 0; ri < 3; ri++) {\n" +
-    "      float rp = q11 + float(ri) * 0.16;\n" +
-    "      float ringR = 0.02 + rp * 0.20 + 0.013 * sin(oda * 7.0 + time * 2.0);\n" +                 // WAVY (scalloped) ring
-    "      float band = smoothstep(0.013, 0.0, abs(odl - ringR)) * step(rp, 1.0);\n" +
-    "      col += rc * band * (1.0 - rp) * (1.0 - rp) * 0.6;\n" +                                     // fast quadratic fade outward
-    "    }\n" +
+    "    float r0 = 0.02 + q7 * 0.7;\n" +
+    "    if (q25 > 0.5) col += orbRings(uv, asp, vec2(q21, q22), q11, time, r0, dusty(pal(q8 + 0.12), 0.9));\n" +
+    "    if (q14 > 0.5) col += orbRings(uv, asp, vec2(q23, q24), q11, time, r0, dusty(pal(q8 + 0.45), 0.9));\n" +
     "  }\n" +
     "  col *= q31;\n" +
     // DE-WASH (measured vs the original: ours was too BRIGHT + UNDER-saturated → washed/pastel). Reinhard
@@ -273,10 +281,24 @@
     if (u < 0.03) a.a = 0;   // hide spoke-to-spoke jump
     return a;
   }
-  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain];
+  // WAVEFAN — the big bold horizontal oscilloscope waveform of the 2:40-2:50 scene (orig rot_06..10):
+  // the live audio drawn WIDE across centre with tall peaks (a mountain range), a green→yellow→magenta
+  // gradient along it. Under the #24 look's downward drift + high decay the trail smears into the fine
+  // descending comb-fan; the two big ringed orbs ride near it. Real-waveform (primary-motif rule).
+  function fWaveFan(a) {
+    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var width = (a.q5 || 0.4) * 2.1;                                    // wide horizontal span
+    var amp = (a.q6 || 0.05) * 4.8;                                     // tall waveform peaks
+    a.x = cx + (a.sample - 0.5) * width;
+    a.y = cy + (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25;
+    var h = (a.q8 || 0) + a.sample * 0.34;                             // green→yellow→magenta gradient along the wave
+    a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+    return a;
+  }
+  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain
+  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50, 0.80];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan
   function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
@@ -303,7 +325,7 @@
   ];
 
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
-  var lastT = 0, huePhase = 0, ripplePh = 0;
+  var lastT = 0, huePhase = 0, ripplePh = 0, waveAmt = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
   var bgPick    = makePicker(6, 14, 26, 5.0);             // background variant (6: moiré/marble/horizon/ribbon/aurora) — own slow clock
@@ -348,6 +370,9 @@
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd));                       // dips to ~0.21 at the swap instant
+    // #24 SCENE amount — eased toward 1 while the WAVEFAN motif (mode 8) is active, so the 2:40-2:50 look
+    // (big clustered ringed orbs + downward comb-fan) BLEEDS in/out rather than cutting.
+    waveAmt += ((mCur === 8 ? 1 : 0) - waveAmt) * Math.min(1, dt * 0.8);
 
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5; t.q3 = 0.5;
@@ -375,10 +400,25 @@
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
     t.q7 = (0.060 + 0.020 * Math.max(0, bass - 1)) * (1 + 0.40 * f);     // orb radius (pops on beat)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA);                                 // tether jag amplitude (audio-coupled)
+    // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
+    // drift so the waveform trail smears into the descending comb-fan, both orbs present → ringed targets.
+    if (waveAmt > 0.01) {
+      var wa = waveAmt, ca = time * 0.03;
+      t.q19 -= 0.004 * wa;                                              // downward drift → descending comb
+      t.q1 += (0.945 - t.q1) * 0.6 * wa;                               // a touch more decay for the comb trail
+      t.q7 *= (1 + 1.3 * wa);                                          // BIG orbs
+      t.q21 += (0.40 + 0.05 * Math.cos(ca) - t.q21) * wa;
+      t.q22 += (0.44 + 0.05 * Math.sin(ca) - t.q22) * wa;
+      t.q23 += (0.58 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa;
+      t.q24 += (0.56 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
+      t.q25 = Math.max(t.q25, wa); t.q14 = Math.max(t.q14, wa);         // both orbs present
+      t.q13 *= (1 - wa);                                               // #24 is NOT folded — fade out any kaleidoscope fold strength
+      if (wa > 0.5) t.q12 = 1;                                        // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
+    }
     // RIPPLE phase (q11) — INTERMITTENT beat-shed: only when orb A is present, NOT during swirl
     // scenes (q17), and on a slow on/off clock. Resets on a beat then expands fast and fully fades,
     // so it can't accumulate/rotate into a spiral (the always-on version did). q11>=1 ⇒ ripple off.
-    var rippleOK = (t.q25 > 0.5) && (t.q17 < 0.03) && (Math.sin(time * 0.11 + 1.0) > 0.1);
+    var rippleOK = ((t.q25 > 0.5) && (t.q17 < 0.03) && (Math.sin(time * 0.11 + 1.0) > 0.1)) || waveAmt > 0.4;
     if (rippleOK) { ripplePh += dt * 2.2; if (ripplePh >= 1.3 || f > 0.5) ripplePh = 0.0; }   // shed every ~0.6s OR on a beat
     else ripplePh = 2.0;
     t.q11 = ripplePh;
