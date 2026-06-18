@@ -73,13 +73,17 @@
     // DILATE the foreground (6-tap max) so thin waveform lines + orb rings read THICKER and defined
     // against the vibrant background (the user's "lines too thin / not defined" note).
     "  vec2 dpx = 1.7 / resolution;\n" +
-    "  vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv + vec2(dpx.x, 0.0)).rgb);\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv - vec2(dpx.x, 0.0)).rgb);\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv + vec2(0.0, dpx.y)).rgb);\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv - vec2(0.0, dpx.y)).rgb);\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv + dpx).rgb);\n" +
-    "  sharp = max(sharp, texture2D(sampler_main, uv - dpx).rgb);\n" +
+    // foreground sample coord — folded across BOTH diagonals about screen centre for the new full
+    // DIAGONAL-X kaleidoscope (fold>=8), so the MOTIF mirrors into all 4 wedges (not just the bg).
+    "  vec2 kuv = uv;\n" +
+    "  if (q12 > 7.5) { vec2 kc = uv - 0.5; kc.x *= asp; vec2 kr = vec2(kc.x + kc.y, kc.y - kc.x) * 0.70711; kr = abs(kr); kc = vec2(kr.x - kr.y, kr.x + kr.y) * 0.70711; kc.x /= asp; kuv = kc + 0.5; }\n" +
+    "  vec3 sharp = texture2D(sampler_main, kuv).rgb;\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv + vec2(dpx.x, 0.0)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv - vec2(dpx.x, 0.0)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv + vec2(0.0, dpx.y)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv - vec2(0.0, dpx.y)).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv + dpx).rgb);\n" +
+    "  sharp = max(sharp, texture2D(sampler_main, kuv - dpx).rgb);\n" +
     "  vec2 px = 1.0 / resolution; vec3 bloom = vec3(0.0);\n" +
     "  for (int i = 0; i < 8; i++) {\n" +
     "    float ba = float(i) / 8.0 * 6.2832; vec2 bd = vec2(cos(ba), sin(ba));\n" +
@@ -96,6 +100,9 @@
     "  if (q12 > 3.5 && q12 < 4.5) { fpd = abs(pdc); }\n" +
     "  else if (q12 > 5.5) { float fa = atan(pdc.y, pdc.x); float fseg = 6.2832 / max(q12, 2.0); fa = abs(fa - fseg * floor(fa / fseg + 0.5)); fpd = length(pdc) * vec2(cos(fa), sin(fa)); }\n" +
     "  pdc = mix(pdc, fpd, clamp(q13, 0.0, 1.0));\n" +
+    // NEW full DIAGONAL-X kaleidoscope (fold>=8): mirror the BACKGROUND across BOTH diagonals about
+    // screen centre (rotate -45°, abs, rotate +45°) → 4 triangular wedges like the original (f_18).
+    "  if (q12 > 7.5) { vec2 dr = vec2(pdc.x + pdc.y, pdc.y - pdc.x) * 0.70711; dr = abs(dr); pdc = vec2(dr.x - dr.y, dr.x + dr.y) * 0.70711; }\n" +
     "  vec2 w = pdc * 1.3 + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
@@ -268,7 +275,7 @@
     { decay: 0.88, fold: 4, zoom: 0.004, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.003, swirl: 0.00, dx: 0, dy: -0.0008, tilt: 0.08, tiltOsc: 0.05, pan: 0.05, px: 0.50, py: 0.50, exp: 0.90 },  // anemone free-space
     { decay: 0.87, fold: 1, zoom: 0.008, rot: 0.000, swirl: 0.02, dx: 0, dy:  0.0000, tilt: 0.12, tiltOsc: 0.04, pan: 0.06, px: 0.52, py: 0.48, exp: 0.90 },  // side-angle drift
-    { decay: 0.89, fold: 4, zoom: 0.000, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.06, tiltOsc: 0.04, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope (was radial 6 → made an off-brand spirograph; quad = soft butterfly like orig f_22/f_26)
+    { decay: 0.89, fold: 8, zoom: 0.000, rot: 0.004, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.04, tiltOsc: 0.03, pan: 0.0, px: 0.50, py: 0.50, exp: 0.92 },  // NEW full DIAGONAL-X kaleidoscope (centred; orig 0:29 f_18). Look 3 keeps the quad fold.
     { decay: 0.90, fold: 1, zoom: -0.012, rot: 0.000, swirl: 0.03, dx: 0, dy: -0.0010, tilt: 0.05, tiltOsc: 0.05, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 }  // burst bloom outward
   ];
 
@@ -295,7 +302,7 @@
     function L(key) { return A[key] + (B[key] - A[key]) * k; }
     t.q1 = L("decay");
     var fold = (k < 0.5 ? A.fold : B.fold);                              // fold is discrete (snap at midpoint, hidden by morph)
-    t.q12 = fold; t.q13 = fold > 1.5 ? (0.6 + 0.4 * Math.min(1, (bassA - 1) + 0.5 * Math.sin(time * 0.07))) : 0;
+    t.q12 = fold; t.q13 = (fold > 1.5 && fold < 7.5) ? (0.6 + 0.4 * Math.min(1, (bassA - 1) + 0.5 * Math.sin(time * 0.07))) : 0;  // fold>=8 = the COMP diagonal full-mirror (WARP itself doesn't fold it)
     t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13);          // per-look zoom (no global recede — it smeared bristles into a net)
     t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045);                                // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
