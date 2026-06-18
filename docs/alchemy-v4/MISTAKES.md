@@ -1,0 +1,173 @@
+# Alchemy V4 — MISTAKES & LEARNINGS (read this BEFORE touching V4)
+
+Handoff doc. The Alchemy visualizer has been rebuilt several times (v1 → v2 → v4) and a lot of
+effort was burned repeating the same mistakes. This file is the antidote. **Read it first.**
+
+---
+
+## 0. CURRENT STATE (where the last session left off)
+
+- **V4 = `presets/alchemy-v4.js`** — rebuilt on the **REAL v2 kit factories** as **8 shuffle-cycled
+  scenes**: Pulsar, Corridor, Vortex, Mandala, Anemone, Orbiters, Star, Burst. The user reaction to
+  this rebuild was **"looks way better, good"** — so this architecture is CONFIRMED RIGHT. Do not
+  abandon it.
+- Each scene = real kit-factory **waves** (alcAnemone / alcSpindle / alcNgon / alcNgonStack /
+  alcStarWaves / alcTether / alcMeshRings...) + clean filled-colour **orb SHAPES** + a shared engine
+  (WARP: kaleidoscope fold + dynamic camera; COMP: vibrant multi-colour-fusion background + bloom +
+  Reinhard tone-map). The **viz.js `Director`** shuffle-cycles the scenes (every scene once before any
+  repeat), engaged on startup. Each scene is also individually selectable in the dropdown.
+- **Engine q-vars are remapped OFF the kit motif contract** (motifs read q2–q11/q14/q21–q26; engine
+  reads q1/q12–q32) so the kit factories aren't disturbed. See the header of `alchemy-v4.js`.
+- **Last commit `27c29aa`** added clean filled-orb shapes, layered every scene, the n-gon corridor,
+  and continuous camera — **Node-validated but NOT yet verified on-screen** (handoff happened right
+  before the render test). **First task next session: render-test it** (see §5 harness).
+- v1 (`presets/alchemy.js` "Alchemy Random") and v2 ("Alchemy v2: …") are **untouched** — keep it so.
+
+---
+
+## 1. THE BIG META-MISTAKE (the one that cost the most)
+
+**Thrashing: reacting to each piece of rapid feedback with a fresh full rewrite, and over-correcting
+into the opposite extreme.** Colours went muted → muddy → flat-single-tone → neon pastel-rainbow →
+(finally) dusty-harmonious. Each rewrite fixed the last complaint and introduced a new one. ~20
+rounds, little convergence, user frustration.
+
+**How to avoid it next time:**
+- **Verify with the self-render harness (§5) BEFORE showing the user.** Most thrash came from shipping
+  blind and getting a "no" on something I could have seen myself.
+- **Make small targeted changes, not full rewrites,** once the architecture is right (it is now).
+- **Don't over-correct.** "Too muted" does NOT mean "go neon rainbow." Aim for the middle the
+  reference actually shows.
+- When feedback feels contradictory across rounds, **stop and re-derive the target from the reference
+  + ask one focused question** rather than ping-ponging. (Doing this once — confirming "rebuild on real
+  kit factories" — is what finally unstuck it.)
+
+---
+
+## 2. HISTORICAL MISTAKES (v1 / v2 — from CLAUDE.md + docs)
+
+1. **v2 decomposed the image wrong:** discrete motifs on flat backgrounds, switched by a director →
+   **hollow, repetitive, scenes-too-long, muddy.** The real Alchemy is a dense, layered, continuously
+   morphing field.
+2. **Over-applying the "muted colours" rule → dull/muddy brown.** The original is muted **but
+   LUMINOUS and genuinely colourful** (especially the 720p reference). "Muted" = *not blown to
+   white, not neon* — NOT *low-saturation/dull*.
+3. **Shipped ONE variant when the kit has many** (e.g. one orb style out of 18).
+4. **Re-derived inline versions of kit factories** instead of calling the real ones.
+
+---
+
+## 3. THIS SESSION'S MISTAKES (the valuable, specific part)
+
+Each is **Mistake → Correction**. These are the concrete don'ts.
+
+- **M1 — Hand-coded/"ported" motif geometry instead of the REAL kit factories.** My `polyEdge`,
+  `radialAt`, comb-net etc. produced scribbles, woven-cloth nets, ugly shapes ("motifs are fucked
+  up"). → **Use the actual kit factories** (alcAnemone, alcSpindle, alcNgon(Stack), alcStarWaves,
+  alcMeshRings, alcOrbiterNode, alcTether, alcOrb*). They're tuned and beautiful. Don't reimplement.
+
+- **M2 — Reduced the vocabulary** to ~6–12 "mechanisms," collapsing variety. User: *"don't reduce the
+  number of motifs… there could be variations of each, be elaborate."* → **Keep the FULL vocabulary;
+  variations of a motif are separate looks.** See `CATALOG.md` (40+ motifs, 33 backgrounds).
+
+- **M3 — Backgrounds oscillated between WRONG extremes:** near-black flat → flat single-tone wash →
+  neon pastel RAINBOW. User wanted **vibrant MULTI-COLOUR FUSION** (2–3 *harmonious dusty* colours
+  bleeding together, like the original's colour bleed) — NOT single-colour AND NOT full rainbow. →
+  **Dusty harmonious anchor pairs** (teal/amber, sage/rose, gold/violet…) fused via fbm; saturated
+  but not neon. Use `alcAurora`/`alcFluid`/`alcMarble` kit fields + a moiré variant.
+
+- **M4 — Ugly orbs (repeated complaint).** Drew them as (a) comp gaussian blobs = blurry/faded, and
+  (b) `alcOrbiterNode` whose 16-turn white sqrt-spiral fill got smeared by feedback into big white
+  cones — "spiral, too big, no colour fill, out of focus." → **Clean FILLED COLOUR orbs as SHAPES**
+  (bright core → colour halo → colour ring), small, low roam + low decay so they don't smear into
+  cones. (Implemented as `orbShape()` in alchemy-v4.js.)
+
+- **M5 — Single motif per scene** (a lone central element). User: *"where are the secondary elements —
+  orbs, tethers, lines?"* → **LAYER every scene:** central motif + tether + two orbs + accent line.
+  The original is dense and layered.
+
+- **M6 — Static "top-view" camera** (only centred zoom/rot/swirl) → felt 2D, no depth. User: *"camera
+  is static, no movement, no feeling of space."* → **Dynamic 3D camera:** perspective tilt
+  (floor/tunnel recede) + continuous forward fly-zoom + orbit pan + tilt oscillation. The original has
+  strong depth/space.
+
+- **M7 — Abrupt whole-scene swaps.** User: *"scenes should bleed seamlessly — one motif appears, the
+  rest change, continuous motion."* → Long crossfades + **orbs/tether persist across scenes** (the
+  central motif morphs while the field continues) + continuous bg/camera (don't reset per scene).
+
+- **M8 — Corridor was smooth spiraling CIRCLES** (`alcMeshRings`) → looked ugly. User: *"the corridor
+  needs to be waveform — triangle, 2 triangles, or n-geo."* → **Corridor = n-gon/triangle WAVEFORM**
+  receding under a tunnel camera (alcNgon + forward fly-zoom).
+
+- **M9 — Didn't use the self-render harness early enough** → asked the user to screenshot every tiny
+  change, wasting many rounds. → **Build/keep the harness (§5) and self-verify first.**
+
+- **M10 — Over-trusted the stale "muted" memory against the user's direct, repeated feedback and the
+  higher-quality 720p reference.** The `validate-dont-reflexively-agree` rule cuts both ways: validate
+  against the **best** reference (the 720p clip is vibrant) and the user's current eyes, not stale notes.
+
+---
+
+## 4. WHAT ACTUALLY WORKS (the converged approach — keep doing this)
+
+- **Use the REAL kit factories** for motifs (don't reimplement geometry).
+- **Multi-preset, not one mega-preset.** Each "look" is a separate preset with FIXED kit-factory waves
+  (correct per-wave `additive`/`samples` baseVals). The Director crossfades between them. (A single
+  preset can't reliably hot-swap per-wave baseVals each frame — that's why multi-preset.)
+- **Engine q-var split** (critical, avoids collisions): motifs read q2–q11/q14/q21–q26; engine
+  (warp/comp) reads q1/q12–q32.
+- **Every scene LAYERED:** central motif (waves) + tether (wave) + clean orbs (SHAPES) + accent.
+- **Vibrant harmonious multi-colour-fusion backgrounds** (dusty anchor pairs, not rainbow, not flat).
+- **Dynamic camera** (perspective tilt + forward fly + orbit pan) for a sense of 3D space.
+- **Director shuffle-bag** (every scene once before any repeat) + long crossfade for seamless bleed.
+- **Reinhard tone-map** in comp keeps additive cores soft (no white blow-out). Kit factories
+  **self-colour** via ALC_PAL (driven by q8 hue); the comp should NOT recolour the foreground —
+  just composite it over the vibrant bg + bloom + tone-map.
+
+---
+
+## 5. THE SELF-RENDER HARNESS (verify without the user — USE THIS)
+
+We cannot see the live extension render, but we CAN drive `viz.html` headlessly and screenshot it:
+1. chrome-devtools MCP → `navigate_page` to `file:///…/ytmusic-wmp-visualizer/viz.html`; `resize_page`
+   1280×720.
+2. `evaluate_script`: install a `setInterval` that posts synthetic audio every ~16ms:
+   `window.postMessage({ __wmp:true, type:"audio", data:<Uint8Array(1024)> }, "*")` where the array is
+   a 128-centred time-domain waveform of a few sines (bass≈3, mid≈27, treb≈130 cycles) × a beat
+   envelope. Then `postMessage({__wmp:true,type:"director:set",enabled:false})` and
+   `{type:"preset:load",name:"Alchemy V4: …"}` to target a specific scene.
+3. `take_screenshot`. Wait + screenshot again to catch the director cycling / motion.
+
+GLSL can't compile in Node → also **ANGLE-precheck** shaders: extract `preset.warp`/`preset.comp`,
+wrap each in a Butterchurn-style `main()` (predeclare `vec3 ret; vec2 uv; float rad; float ang;` +
+`uniform float q1..q32` + the samplers), `compileShader`+`linkProgram` in a real webgl context, read
+the logs. (Reserved-name rule: never declare locals `ang`/`rad`/`ret`/`uv`/`q*` in a shader_body.)
+
+Node validation each round: `node --check` every preset file + the concat-in-one-scope build that runs
+every `frame_eqs` and the enabled waves' `point_eqs` / shapes' `frame_eqs`.
+
+---
+
+## 6. REFERENCE ASSETS
+
+- **Original:** `~/Downloads/Alchemy Random Media Player 480p.mp4` (228s).
+- **BEST reference (vibrant, dense, 720p):** `~/Downloads/YouTube 1080p 60fps Download.mp4` (186s).
+  Match its vibrancy. The **1:05 scene** = a vortex-swirl carrying an orb+tether comet with a gold arm
+  over a teal/lavender ground — still to nail (add a dedicated vortex+orbs+tether scene).
+- **v2 capture (what failed):** `~/Desktop/v2 implementation.mov`.
+- **Analysis docs:** `docs/alchemy-v4/SPEC.md` (6 base mechanisms, knob space, pacing) and
+  `CATALOG.md` (exhaustive 40+ motifs + 33 backgrounds, each mapped to a kit factory).
+- Scratch frame montages lived under `/tmp/v4/` (re-extract with ffmpeg as needed).
+
+---
+
+## 7. OPEN / NEXT STEPS (per the user's last feedback)
+
+1. **Render-test `27c29aa`** in the harness (orbs clean & colour-filled? scenes layered? corridor a
+   waveform n-gon tunnel? camera feels 3D?). Fix what's off with small edits, not rewrites.
+2. **Seamless bleed:** consider longer crossfade / element-level persistence so looks morph rather
+   than cut.
+3. **Add more of the CATALOG** into the rotation (the user wants the full vocabulary, elaborately):
+   more orb variants, ribbon, dot-grid/wallpaper, perspective-floor, dahlia, etc.
+4. **Add the 1:05 vortex+orbs+tether comet scene.**
+5. Keep colours **vibrant-but-harmonious** (dusty anchor pairs), never neon-rainbow or flat single-tone.

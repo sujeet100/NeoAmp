@@ -161,6 +161,17 @@ startup loads "Dance of the Freaky Circles" (known-good).
 
 ## Current state
 
+**★ ACTIVE WORK — Alchemy V4 (`presets/alchemy-v4.js`):** a ground-up rebuild that
+reproduces WMP Alchemy by composing the **REAL v2 kit factories** into 8 shuffle-cycled
+scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst) with vibrant
+multi-colour-fusion backgrounds + a dynamic camera + the viz.js `Director`. The user
+confirmed this direction ("looks way better"). **Before touching V4, read
+`docs/alchemy-v4/MISTAKES.md`** — it captures the ~20 rounds of mistakes (hand-coding
+motifs instead of using kit factories, colour thrashing, hollow single-motif scenes,
+static camera, ugly orbs) and the converged approach, plus the **self-render harness**
+(headless `viz.html` + synthetic-audio postMessage + chrome-devtools screenshot) used to
+verify without the user. Specs: `docs/alchemy-v4/SPEC.md`, `docs/alchemy-v4/CATALOG.md`.
+
 **Done & committed (`git log`):** Dance of the Freaky Circles (two orbiting
 waveform circles — the best one, use it as the reference pattern), and batch 1:
 Alchemy Random, Ambience Thingus/Water/Down the Drain, Battery relatively
