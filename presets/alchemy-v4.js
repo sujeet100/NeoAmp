@@ -88,6 +88,27 @@
   var BASE = { wave_a: 0, additivewave: 1, decay: 0.95, zoom: 1, rot: 0, warp: 0, dx: 0, dy: 0,
                cx: 0.5, cy: 0.5, gammaadj: 1.5, darken_center: 0, wrap: 0, echo_alpha: 0 };
 
+  // Clean FILLED COLOUR orb as a custom SHAPE (not a spiral wave): bright warm-white core ->
+  // colour halo -> colour ring. Drawn solid each frame (no 16-turn spiral, no white cone).
+  // Positioned at (qx,qy) q-var fields; radius q7; colour from the shared hue clock q8 + hueOff.
+  function orbShape(qx, qy, hueOff) {
+    return {
+      baseVals: Object.assign({}, SHAPE_BASE, { enabled: 1, sides: 48, additive: 0, thickoutline: 1 }),
+      init_eqs: passthrough,
+      frame_eqs: function (s) {
+        var cx = s[qx] !== undefined ? s[qx] : 0.5, cy = s[qy] !== undefined ? s[qy] : 0.5;
+        var h = (s.q8 || 0) + (hueOff || 0);
+        var r = 0.5 + 0.5 * Math.cos(6.2832 * h), g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)), b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+        s.x = cx; s.y = cy;
+        s.rad = (s.q7 || 0.035) * (1 + 0.35 * Math.max(0, (s.bass_att || 1) - 1));
+        s.r = 1.0; s.g = 0.96; s.b = 0.88; s.a = 0.95;       // bright warm-white CORE
+        s.r2 = r; s.g2 = g; s.b2 = b; s.a2 = 0.0;            // colour halo fading out (the colour fill)
+        s.border_r = r; s.border_g = g; s.border_b = b; s.border_a = 0.85;  // colour ring
+        return s;
+      }
+    };
+  }
+
   // Per-scene frame driver: sets the engine q-vars (camera/fold/bg/exposure) + the motif contract
   // (center/size/hue/spin/...) + orbiter motion. cfg holds the constants for this look.
   function sceneFrame(cfg) {
@@ -98,14 +119,14 @@
       // ENGINE — camera + fold + bg + exposure (always-on gentle drift so nothing is static)
       t.q1 = cfg.decay;
       t.q12 = cfg.fold || 1; t.q13 = cfg.fold > 1.5 ? 1 : 0;
-      t.q15 = (cfg.zoom || 0) + 0.004 * (bassA - 1) + 0.0022 * Math.sin(time * 0.17);
-      t.q16 = (cfg.rot || 0) + 0.0026 * Math.sin(time * 0.11);
+      t.q15 = (cfg.zoom || 0) + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13);     // forward breath / fly
+      t.q16 = (cfg.rot || 0) + 0.003 * Math.sin(time * 0.09);
       t.q17 = (cfg.swirl || 0) + (cfg.swirl ? 0.03 * (bassA - 1) : 0);
       t.q18 = cfg.dx || 0; t.q19 = cfg.dy || 0;
-      var pan = cfg.pan || 0;
-      t.q20 = (cfg.px === undefined ? 0.5 : cfg.px) + pan * Math.cos(time * 0.13);
-      t.q27 = (cfg.py === undefined ? 0.5 : cfg.py) + pan * Math.sin(time * 0.13);
-      t.q28 = cfg.tilt || 0;
+      var pan = cfg.pan === undefined ? 0.025 : cfg.pan;                                  // gentle orbit -> parallax
+      t.q20 = (cfg.px === undefined ? 0.5 : cfg.px) + pan * Math.cos(time * 0.11);
+      t.q27 = (cfg.py === undefined ? 0.5 : cfg.py) + pan * Math.sin(time * 0.11);
+      t.q28 = (cfg.tilt || 0) + (cfg.tiltOsc === undefined ? 0.06 : cfg.tiltOsc) * Math.sin(time * 0.10);  // 3D plane wobble -> sense of space
       t.q29 = cfg.bg || 0;
       t.q31 = (cfg.exp || 1.0) * (1 + 0.25 * (bassA - 1));
       t.q32 = bass;
@@ -113,7 +134,7 @@
       t.q2 = 0.5; t.q3 = 0.5;
       t.q5 = (cfg.size || 0.4) * (0.82 + 0.4 * (bassA - 1));            // breathing radius
       t.q6 = cfg.jag || 0.05;
-      t.q7 = cfg.orbR || 0.06;
+      t.q7 = cfg.orbR || 0.035;
       t.q8 = (cfg.hue || 0) + time * 0.02;                              // slow WMP hue drift (shared by fg + bg)
       t.q9 = time * (cfg.spin || 0);
       t.q10 = (cfg.twist || 0) * (0.5 + 0.8 * (bassA - 1));             // vortex shear scales with bass
@@ -121,69 +142,75 @@
       t.q14 = (cfg.meshFlow ? (time * cfg.meshFlow) % 1 : 0);
       // orbiter node pair (pulsar / orbiters): roam on wide opposite paths so the tether spans
       var th = time * (cfg.orbitRate || 0.20);
-      t.q21 = 0.5 + 0.26 * Math.cos(th); t.q22 = 0.5 + 0.22 * Math.sin(th * 0.83);
-      t.q23 = 0.5 + 0.26 * Math.cos(th + Math.PI); t.q24 = 0.5 + 0.22 * Math.sin(th * 0.83 + Math.PI);
-      t.q25 = cfg.orbR || 0.05; t.q26 = cfg.tetherAmp || 0.05;
+      t.q21 = 0.5 + 0.16 * Math.cos(th); t.q22 = 0.5 + 0.14 * Math.sin(th * 0.83);
+      t.q23 = 0.5 + 0.16 * Math.cos(th + Math.PI); t.q24 = 0.5 + 0.14 * Math.sin(th * 0.83 + Math.PI);
+      t.q25 = cfg.orbR || 0.035; t.q26 = cfg.tetherAmp || 0.05;
       return t;
     };
   }
 
-  // Build a scene preset from real kit-factory waves + the shared engine.
-  function v4(name, cfg, waves) {
+  // Build a scene preset from real kit-factory WAVES + orb SHAPES + the shared engine.
+  function v4(name, cfg, waves, shapes) {
     var preset = build(BASE, { frame: sceneFrame(cfg), warp: WARP_V4, comp: COMP_V4 });
-    for (var i = 0; i < preset.waves.length; i++) preset.waves[i].baseVals.enabled = 0;  // start all off
+    for (var i = 0; i < preset.waves.length; i++) preset.waves[i].baseVals.enabled = 0;
     while (preset.waves.length < waves.length) preset.waves.push({ baseVals: Object.assign({}, WAVE_BASE), init_eqs: passthrough, frame_eqs: passthrough, point_eqs: "" });
     for (var j = 0; j < waves.length; j++) preset.waves[j] = waves[j];
+    shapes = shapes || [];
+    for (var s = 0; s < preset.shapes.length; s++) preset.shapes[s].baseVals.enabled = 0;
+    while (preset.shapes.length < shapes.length) preset.shapes.push({ baseVals: Object.assign({}, SHAPE_BASE), init_eqs: passthrough, frame_eqs: passthrough });
+    for (var k = 0; k < shapes.length; k++) preset.shapes[k] = shapes[k];
     P[name] = preset;
     (window.WMP_V4_SCENES = window.WMP_V4_SCENES || []).push(name);
     return preset;
   }
+  function orbPair() { return [orbShape("q21", "q22", 0.0), orbShape("q23", "q24", 0.5)]; }  // two complementary orbs
 
-  // ── the SCENES (real kit factories) ─────────────────────────────────────────────
-  // PULSAR — the WMP signature: a furry waveform anemone flanked by two crisp ringed orbs joined
-  // by a jagged lightning tether.
+  // ── the SCENES (real kit factories; each LAYERED: central motif + tether + two orbs) ──────────
+  // PULSAR — anemone flower flanked by two crisp filled orbs joined by a jagged lightning tether.
   v4("Alchemy V4: Pulsar",
-     { bg: 0, hue: 0.30, size: 0.42, jag: 0.05, spin: 0.10, decay: 0.86, exp: 1.0, tilt: 0.05, orbR: 0.05, tetherAmp: 0.06, orbitRate: 0.22 },
-     [alcAnemone(30, ALC_PAL.roseGreen),
-      alcOrbiterNode("q21", "q22", "q25", ALC_PAL.mono),
-      alcOrbiterNode("q23", "q24", "q25", ALC_PAL.mono),
-      alcTether("q21", "q22", "q23", "q24", "q26", null)]);
+     { bg: 0, hue: 0.30, size: 0.42, jag: 0.05, spin: 0.10, decay: 0.86, exp: 1.0, tilt: 0.05, orbR: 0.04, tetherAmp: 0.06, orbitRate: 0.22 },
+     [alcAnemone(30, ALC_PAL.roseGreen), alcSpindle(ALC_PAL.mono), alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm)],
+     orbPair());
 
-  // CORRIDOR / NET TUNNEL — perspective mesh-rings receding to a vanishing point.
+  // CORRIDOR — a hexagon + triangle WAVEFORM n-gon flying into a tunnel (perspective + forward fly).
   v4("Alchemy V4: Corridor",
-     { bg: 3, hue: 0.50, size: 0.42, spin: 0.05, decay: 0.55, exp: 1.05, tilt: 0.30, zoom: 0.012, px: 0.84, py: 0.55, meshFlow: 0.06 },
-     [alcMeshRings(8, 0.0), alcMeshRings(8, 0.28)]);
+     { bg: 3, hue: 0.50, size: 0.34, jag: 0.05, spin: 0.04, decay: 0.78, exp: 1.05, tilt: 0.34, zoom: 0.022, tiltOsc: 0.03, px: 0.5, py: 0.5, orbR: 0.03, tetherAmp: 0.05 },
+     [alcNgon({ sides: 6, aspectX: 1.0, hueOff: 0.0 }), alcNgon({ sides: 3, aspectX: 1.0, hueOff: 0.35 }), alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.spread)],
+     orbPair());
 
-  // VORTEX — kitchen-sink drain: a waveform urchin spun into a spiral by rotational feedback.
+  // VORTEX — kitchen-sink drain: a waveform urchin + orbs spun into a spiral by rotational feedback.
   v4("Alchemy V4: Vortex",
-     { bg: 2, hue: 0.00, size: 0.40, spin: 0.20, twist: 0.7, decay: 0.965, exp: 1.0, swirl: 0.09, rot: 0.018, zoom: 0.015, px: 0.45, py: 0.42 },
-     [alcSpindle(ALC_PAL.redCyan), alcSpindle(ALC_PAL.twoTone)]);
+     { bg: 2, hue: 0.00, size: 0.40, spin: 0.20, twist: 0.7, decay: 0.965, exp: 1.0, swirl: 0.09, rot: 0.018, zoom: 0.015, tiltOsc: 0.04, px: 0.45, py: 0.42, orbR: 0.035, tetherAmp: 0.05 },
+     [alcSpindle(ALC_PAL.redCyan), alcSpindle(ALC_PAL.twoTone), alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm)],
+     orbPair());
 
-  // MANDALA — nested star-polygon / triangle-waveform mandala over the moiré background.
+  // MANDALA — nested star-polygon / triangle-waveform mandala over the moiré background + orbs.
   v4("Alchemy V4: Mandala",
-     { bg: 1, hue: 0.62, size: 1.0, jag: 0.04, spin: 0.04, decay: 0.45, exp: 1.05, tilt: 0.0 },
-     alcNgonStack(1.5, ALC_MANDALA_SPECS, 3));   // 12 specs / 3 = 4 packed waves
+     { bg: 1, hue: 0.62, size: 1.0, jag: 0.04, spin: 0.04, decay: 0.45, exp: 1.05, tilt: 0.0, tiltOsc: 0.03, orbR: 0.03 },
+     alcNgonStack(1.5, ALC_MANDALA_SPECS, 3),   // 12 specs / 3 = 4 packed waves
+     orbPair());
 
-  // ANEMONE — the central sound-waveform flower on its own (the v1 look), big and crisp.
+  // ANEMONE — the central sound-waveform flower + orbs + tether (the v1 look, layered).
   v4("Alchemy V4: Anemone",
-     { bg: 0, hue: 0.83, size: 0.5, jag: 0.06, spin: 0.07, twist: 0.0, decay: 0.80, exp: 1.0, tilt: 0.04, orbitRate: 0.15 },
-     [alcAnemone(34, ALC_PAL.redCyan), alcSpindle(ALC_PAL.mono)]);
+     { bg: 0, hue: 0.83, size: 0.5, jag: 0.06, spin: 0.07, decay: 0.80, exp: 1.0, tilt: 0.04, orbR: 0.035, tetherAmp: 0.06, orbitRate: 0.15 },
+     [alcAnemone(34, ALC_PAL.redCyan), alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.mono), alcDiagonalLine(0.4, 0.55, 0.05)],
+     orbPair());
 
-  // ORBITERS — two crisp filled orbs joined by the lightning tether, roaming (no central motif).
+  // ORBITERS — two crisp filled orbs + lightning tether + a small central target ring.
   v4("Alchemy V4: Orbiters",
-     { bg: 0, hue: 0.15, size: 0.3, decay: 0.90, exp: 1.0, tilt: 0.12, pan: 0.04, orbR: 0.06, tetherAmp: 0.07, orbitRate: 0.20 },
-     [alcOrbiterNode("q21", "q22", "q25", ALC_PAL.warm),
-      alcOrbiterNode("q23", "q24", "q25", ALC_PAL.warm),
-      alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.spread),
-      alcOrbTarget("q2", "q3", 3, ALC_PAL.twoTone)]);
+     { bg: 0, hue: 0.15, size: 0.18, decay: 0.86, exp: 1.0, tilt: 0.12, pan: 0.05, orbR: 0.05, tetherAmp: 0.07, orbitRate: 0.20 },
+     [alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.spread), alcOrbTarget("q2", "q3", 2, ALC_PAL.twoTone)],
+     orbPair());
 
-  // STAR — hexagram of two counter-rotating waveform triangles + a crossing diagonal slice.
+  // STAR — hexagram of two counter-rotating waveform triangles + diagonal slice + orbs.
   v4("Alchemy V4: Star",
-     { bg: 3, hue: 0.55, size: 0.32, jag: 0.05, spin: 0.09, decay: 0.78, exp: 1.05, tilt: 0.06 },
-     alcStarWaves(2, 0.0).concat([alcDiagonalLine(0.4, 0.6, 0.06)]));
+     { bg: 3, hue: 0.55, size: 0.32, jag: 0.05, spin: 0.09, decay: 0.78, exp: 1.05, tilt: 0.06, orbR: 0.03 },
+     alcStarWaves(2, 0.0).concat([alcDiagonalLine(0.4, 0.6, 0.06)]),
+     orbPair());
 
-  // BURST — a waveform urchin blooming OUTWARD into a pinwheel (fountain).
+  // BURST — a waveform urchin blooming OUTWARD into a pinwheel (fountain) + orbs.
   v4("Alchemy V4: Burst",
-     { bg: 2, hue: 0.40, size: 0.45, spin: 0.10, twist: 0.0, decay: 0.95, exp: 1.05, swirl: 0.04, zoom: -0.014, tilt: 0.0 },
-     [alcSpindle(ALC_PAL.spread), alcSpindle(ALC_PAL.roseGreen)]);
+     { bg: 2, hue: 0.40, size: 0.45, spin: 0.10, decay: 0.95, exp: 1.05, swirl: 0.04, zoom: -0.014, tiltOsc: 0.05, orbR: 0.035, tetherAmp: 0.05 },
+     [alcSpindle(ALC_PAL.spread), alcSpindle(ALC_PAL.roseGreen), alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm)],
+     orbPair());
 })();
