@@ -202,10 +202,22 @@
     if (u < 0.02) a.a = 0;
     return a;
   }
-  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine];
-  // per-mode alpha: dense ADDITIVE bristle modes (spindle) saturate to milky white in the feedback
-  // buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than sparse outline modes.
-  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline
+  // FOUNTAIN — the v2 radial-burst "fountain": ~48 waveform spokes spraying OUTWARD from the centre
+  // (vs the urchin's amplitude-radius ring). Spins (q9) + blooms; pairs with the vortex/burst looks.
+  function fFountain(a) {
+    var N = 48, fk = (a.sample || 0) * N, seg = Math.floor(fk), u = fk - seg;
+    var ang = (seg / N) * 6.2832 + (a.q9 || 0);
+    var rad = (a.q5 || 0.4) * (0.10 + 0.90 * u) + (a.value1 || 0) * 0.06 * u;   // spoke centre→out, waveform-tipped
+    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + rad * Math.cos(ang); a.y = cy + rad * Math.sin(ang);
+    var h = a.q8 || 0; a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+    if (u < 0.03) a.a = 0;   // hide spoke-to-spoke jump
+    return a;
+  }
+  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain];
+  // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
+  // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
+  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain
   function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
@@ -223,7 +235,7 @@
   var LOOKS = [
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.000, swirl: 0.00, dx: 0, dy: -0.0010, tilt: 0.10, tiltOsc: 0.05, pan: 0.04, px: 0.50, py: 0.50, exp: 0.90 },  // free-space, gentle rise
     { decay: 0.86, fold: 1, zoom: 0.018, rot: 0.004, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.30, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // corridor: forward fly + steep tilt
-    { decay: 0.91, fold: 1, zoom: 0.012, rot: 0.016, swirl: 0.07, dx: 0, dy: 0.0000, tilt: 0.05, tiltOsc: 0.04, pan: 0.06, px: 0.46, py: 0.43, exp: 0.88 },  // vortex swirl
+    { decay: 0.93, fold: 1, zoom: -0.006, rot: 0.022, swirl: 0.14, dx: 0, dy: 0.0000, tilt: 0.05, tiltOsc: 0.04, pan: 0.06, px: 0.46, py: 0.43, exp: 0.88 },  // vortex DRAIN (inward swirl spiral)
     { decay: 0.88, fold: 4, zoom: 0.004, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.003, swirl: 0.00, dx: 0, dy: -0.0008, tilt: 0.08, tiltOsc: 0.05, pan: 0.05, px: 0.50, py: 0.50, exp: 0.90 },  // anemone free-space
     { decay: 0.87, fold: 1, zoom: 0.008, rot: 0.000, swirl: 0.02, dx: 0, dy:  0.0000, tilt: 0.12, tiltOsc: 0.04, pan: 0.06, px: 0.52, py: 0.48, exp: 0.90 },  // side-angle drift
