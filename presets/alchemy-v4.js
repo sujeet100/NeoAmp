@@ -331,26 +331,14 @@
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.62 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
   };
-  // waves[1] = orb RIPPLES — crisp concentric WAVY rings shed from orb A, expanding + fading
-  // outward (phase q11). NOT a blur (the user's note): real additive line rings + the comp dilation
-  // give defined wavy rings, densest at the orb and fainter outward, recoloured by the hue clock.
-  // 4 rings packed into one wave via sample-banding; gated by orb-A visibility (q25).
+  // waves[1] = orb RIPPLES — DISABLED. The always-on concentric-ring impl got rotated by the camera
+  // (roll/swirl) + accumulated in the feedback buffer into an ugly PERSISTENT SPIRAL (user flagged
+  // it). The ripple point_eqs is preserved in git commit 853df0e. REINTRODUCE later as an
+  // INTERMITTENT, fast-fading, beat-shed effect (the original shows ripples only "in some
+  // variations", not constantly) with low feedback persistence so it can't smear into a spiral — TODO #17.
   preset.waves[1] = {
-    baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.6 }),
-    init_eqs: passthrough, frame_eqs: passthrough,
-    point_eqs: function (a) {
-      var K = 4, fk = (a.sample || 0) * K, seg = Math.floor(fk), u = fk - seg;
-      var th = u * 6.2832;
-      var ph = (a.q11 || 0) + seg / K; ph = ph - Math.floor(ph);          // staggered per-ring expansion phase
-      var rad = 0.015 + ph * 0.22 + 0.026 * (a.value1 || 0);              // expanding ring + WAVY scallop (never a clean circle)
-      var cx = a.q21 !== undefined ? a.q21 : 0.5, cy = a.q22 !== undefined ? a.q22 : 0.5;
-      a.x = cx + rad * Math.cos(th); a.y = cy + rad * Math.sin(th);
-      var h = (a.q8 || 0) + 0.12;                                         // ripple hue (drifts with the music clock)
-      a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
-      a.a = (1.0 - ph) * 0.6 * (a.q25 || 0);                             // fade outward; only while orb A is present
-      if (u < 0.03) a.a = 0;                                             // hide the ring-to-ring seam jump
-      return a;
-    }
+    baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
+    init_eqs: passthrough, frame_eqs: passthrough, point_eqs: ""
   };
   preset.waves[2] = {   // jagged REAL-waveform tether spanning the two orbs (gated: both present)
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.9 }),
