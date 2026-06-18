@@ -96,7 +96,16 @@
     "  if (q29 < 1.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.6); }\n" +                 // moiré
     "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" +  // marble
     "  else if (q29 < 3.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" +              // horizon bands
-    "  ground *= (0.45 + 0.4 * n1 + 0.15 * bb) * mix(0.6, 1.0, smoothstep(1.45, 0.1, prad));\n" +
+    "  else if (q29 < 4.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" +  // ribbon stripes
+    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" +        // aurora swirl
+    // ASYMMETRIC corner bleed — the original is NEVER flat: a drifting OFF-CENTER colour pool + a
+    // warm plume rising from one edge, so colour always bleeds into a corner (not a centred vignette).
+    "  vec2 poolC = 0.42 * vec2(cos(time * 0.05 + hb * 6.2832), sin(time * 0.037 + 1.3));\n" +
+    "  float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
+    "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
+    "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
+    "  ground *= (0.50 + 0.40 * n1 + 0.12 * bb) * mix(0.72, 1.05, smoothstep(1.5, 0.15, prad));\n" +   // softer floor → corners never black
+
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
     "  col *= q31;\n" +
     "  ret = col / (col + vec3(0.6));\n" +
@@ -247,7 +256,7 @@
   var lastT = 0, huePhase = 0, ripplePh = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
-  var bgPick    = makePicker(4, 14, 26, 5.0);             // background variant — own slow clock (decoupled)
+  var bgPick    = makePicker(6, 14, 26, 5.0);             // background variant (6: moiré/marble/horizon/ribbon/aurora) — own slow clock
   var motifPick = makePicker(MODES.length, 6, 12, 2.0);   // central motif — own clock, dip-swap
 
   function frame(t) {
