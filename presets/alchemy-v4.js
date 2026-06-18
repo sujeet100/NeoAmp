@@ -219,7 +219,7 @@
   ];
 
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
-  var lastT = 0, huePhase = 0;
+  var lastT = 0, huePhase = 0, ripplePh = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
   var bgPick    = makePicker(4, 14, 26, 5.0);             // background variant — own slow clock (decoupled)
@@ -272,7 +272,8 @@
     t.q6 = 0.05;
     t.q9 = time * 0.06;                                                  // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);                               // twist scales with bass
-    t.q11 = 0.6 + 0.9 * energy;                                          // ngon tier-density energy gate
+    ripplePh = (ripplePh + dt * (0.30 + 0.25 * energy)) % 1;             // ripple ring expansion (faster when loud)
+    t.q11 = ripplePh;                                                    // q11 freed when the nested-polygon mandala was removed → orb ripple phase
 
     // ORBS + TETHER — wide opposite-corner diagonal (separation ~0.6w, never crossing center).
     // STAGING: orb A is a near-persistent anchor; orb B comes & goes on its own phase → single↔pair;
@@ -296,11 +297,26 @@
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.62 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
   };
-  // waves[1] reserved for a future companion/secondary layer — disabled for now (additive bristle
-  // companions accumulated into a milky white-out; density will be re-added more carefully later).
+  // waves[1] = orb RIPPLES — crisp concentric WAVY rings shed from orb A, expanding + fading
+  // outward (phase q11). NOT a blur (the user's note): real additive line rings + the comp dilation
+  // give defined wavy rings, densest at the orb and fainter outward, recoloured by the hue clock.
+  // 4 rings packed into one wave via sample-banding; gated by orb-A visibility (q25).
   preset.waves[1] = {
-    baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
-    init_eqs: passthrough, frame_eqs: passthrough, point_eqs: ""
+    baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.6 }),
+    init_eqs: passthrough, frame_eqs: passthrough,
+    point_eqs: function (a) {
+      var K = 4, fk = (a.sample || 0) * K, seg = Math.floor(fk), u = fk - seg;
+      var th = u * 6.2832;
+      var ph = (a.q11 || 0) + seg / K; ph = ph - Math.floor(ph);          // staggered per-ring expansion phase
+      var rad = 0.015 + ph * 0.22 + 0.026 * (a.value1 || 0);              // expanding ring + WAVY scallop (never a clean circle)
+      var cx = a.q21 !== undefined ? a.q21 : 0.5, cy = a.q22 !== undefined ? a.q22 : 0.5;
+      a.x = cx + rad * Math.cos(th); a.y = cy + rad * Math.sin(th);
+      var h = (a.q8 || 0) + 0.12;                                         // ripple hue (drifts with the music clock)
+      a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+      a.a = (1.0 - ph) * 0.6 * (a.q25 || 0);                             // fade outward; only while orb A is present
+      if (u < 0.03) a.a = 0;                                             // hide the ring-to-ring seam jump
+      return a;
+    }
   };
   preset.waves[2] = {   // jagged REAL-waveform tether spanning the two orbs (gated: both present)
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.9 }),
