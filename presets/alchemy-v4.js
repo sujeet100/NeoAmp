@@ -112,6 +112,21 @@
     "  else if (q29 < 3.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" +              // horizon bands
     "  else if (q29 < 4.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" +  // ribbon stripes
     "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" +        // aurora swirl
+    // BOLD kaleidoscope wedges — when a fold is active, split the (already-mirrored) field into two
+    // distinct LUMINOUS colour panes along the fold axes so it reads as bold colour wedges (orig
+    // sweep_08 = a green/mauve bowtie-X), NOT the uniform symmetric blob a low-contrast fbm fold gives.
+    // Palette-driven by hb → harmonious + cycles with the music; the textured ground still modulates
+    // each pane (luminous, not flat). A soft seam glow marks the visible diagonal X where panes meet.
+    "  float foldOn = clamp(q13, 0.0, 1.0); if (q12 > 7.5) foldOn = 1.0;\n" +
+    "  if (foldOn > 0.01) {\n" +
+    "    float bowtie = smoothstep(-0.04, 0.04, abs(pdc.x) - abs(pdc.y));\n" +                          // 1 = along-axis wedge, 0 = cross wedge (crisp pane edge)
+    "    vec3 paneA = dusty(pal(hb + 0.12), 1.05) * 1.15;\n" +
+    "    vec3 paneB = dusty(pal(hb + 0.62), 0.98) * 0.90;\n" +                                          // ~half-turn apart → always COMPLEMENTARY (bold at every hue moment)
+    "    vec3 wedge = mix(paneB, paneA, bowtie);\n" +
+    "    float seam = smoothstep(0.06, 0.0, abs(abs(pdc.x) - abs(pdc.y)));\n" +
+    "    wedge += dusty(pal(hb + 0.37), 0.9) * seam * 0.45;\n" +                                        // luminous seam-X glow
+    "    ground = mix(ground, wedge, 0.68 * foldOn);\n" +
+    "  }\n" +
     // ASYMMETRIC corner bleed — the original is NEVER flat: a drifting OFF-CENTER colour pool + a
     // warm plume rising from one edge, so colour always bleeds into a corner (not a centred vignette).
     "  vec2 poolC = 0.42 * vec2(cos(time * 0.05 + hb * 6.2832), sin(time * 0.037 + 1.3));\n" +
@@ -272,10 +287,10 @@
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.000, swirl: 0.00, dx: 0, dy: -0.0010, tilt: 0.10, tiltOsc: 0.05, pan: 0.04, px: 0.50, py: 0.50, exp: 0.90 },  // free-space, gentle rise
     { decay: 0.86, fold: 1, zoom: 0.018, rot: 0.004, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.30, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // corridor: forward fly + steep tilt
     { decay: 0.93, fold: 1, zoom: -0.006, rot: 0.022, swirl: 0.14, dx: 0, dy: 0.0000, tilt: 0.05, tiltOsc: 0.04, pan: 0.06, px: 0.46, py: 0.43, exp: 0.88 },  // vortex DRAIN (inward swirl spiral)
-    { decay: 0.88, fold: 4, zoom: 0.004, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope
+    { decay: 0.93, fold: 4, zoom: 0.004, rot: 0.010, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope (high decay → swept X-fan)
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.003, swirl: 0.00, dx: 0, dy: -0.0008, tilt: 0.08, tiltOsc: 0.05, pan: 0.05, px: 0.50, py: 0.50, exp: 0.90 },  // anemone free-space
     { decay: 0.87, fold: 1, zoom: 0.008, rot: 0.000, swirl: 0.02, dx: 0, dy:  0.0000, tilt: 0.12, tiltOsc: 0.04, pan: 0.06, px: 0.52, py: 0.48, exp: 0.90 },  // side-angle drift
-    { decay: 0.89, fold: 8, zoom: 0.000, rot: 0.004, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.04, tiltOsc: 0.03, pan: 0.0, px: 0.50, py: 0.50, exp: 0.92 },  // NEW full DIAGONAL-X kaleidoscope (centred; orig 0:29 f_18). Look 3 keeps the quad fold.
+    { decay: 0.93, fold: 8, zoom: 0.000, rot: 0.008, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.04, tiltOsc: 0.03, pan: 0.0, px: 0.50, py: 0.50, exp: 0.92 },  // NEW full DIAGONAL-X kaleidoscope (centred; orig 0:29 f_18). Look 3 keeps the quad fold.
     { decay: 0.90, fold: 1, zoom: -0.012, rot: 0.000, swirl: 0.03, dx: 0, dy: -0.0010, tilt: 0.05, tiltOsc: 0.05, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 }  // burst bloom outward
   ];
 
@@ -329,7 +344,7 @@
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5; t.q3 = 0.5;
     t.q5 = scaleFor(mCur) * (0.82 + 0.40 * (bassA - 1) + 0.22 * f);      // breathing + per-beat pop
-    if (fold > 1.5) t.q5 *= 0.52;                                        // under a kaleidoscope fold: small center → clean mirrored wedges (orig f_26)
+    if (fold > 1.5 && mCur !== 6) t.q5 *= 0.52;                          // small mirrored flower under a fold (orig f_26); but keep the rotline SWEEP (mode 6) LONG → radiating X-fan (orig sweep_08)
     t.q6 = 0.05;
     t.q9 = time * 0.06;                                                  // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);                               // twist scales with bass
