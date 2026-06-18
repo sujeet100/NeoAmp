@@ -189,10 +189,23 @@
     a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
     return a;
   }
-  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin];
+  // ROTLINE — the original "rotating lines" + line-sweep (frames w_rot ~2:40, w_sweep ~0:40): N live-
+  // waveform diameter lines sharing one rotation (q9, sped up), smeared by feedback into a swept fan.
+  function fRotLine(a) {
+    var N = 3, fk = (a.sample || 0) * N, seg = Math.floor(fk), u = fk - seg, s = u * 2 - 1;
+    var th = (a.q9 || 0) * 4.0 + seg * (3.14159 / N);
+    var len = (a.q5 || 0.4) * 1.45, disp = (a.value1 || 0) * (a.q6 || 0.05) * 1.8;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + s * len * Math.cos(th) - disp * Math.sin(th);
+    a.y = cy + s * len * Math.sin(th) + disp * Math.cos(th);
+    var h = a.q8 || 0; a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0;
+    return a;
+  }
+  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle) saturate to milky white in the feedback
   // buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than sparse outline modes.
-  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72];   // anemone·spindle·ngon·triangle·bolt·urchin
+  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline
   function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
