@@ -114,6 +114,19 @@
     "  ground *= (0.50 + 0.40 * n1 + 0.12 * bb) * mix(0.72, 1.05, smoothstep(1.5, 0.15, prad));\n" +   // softer floor → corners never black
 
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
+    // ORB RIPPLES — drawn FRESH here in comp (never in the feedback buffer) so they can NOT rotate
+    // into a spiral. 3 expanding WAVY rings around orb A (uv≈q21,q22), gated/expanded by q11 (set in
+    // frame_eqs: intermittent, off during swirl, fast-shed). Fades fast as each ring grows.
+    "  if (q11 < 1.0) {\n" +
+    "    vec2 od = uv - vec2(q21, q22); od.x *= asp; float odl = length(od); float oda = atan(od.y, od.x);\n" +
+    "    vec3 rc = dusty(pal(q8 + 0.12), 0.9);\n" +
+    "    for (int ri = 0; ri < 3; ri++) {\n" +
+    "      float rp = q11 + float(ri) * 0.16;\n" +
+    "      float ringR = 0.02 + rp * 0.20 + 0.013 * sin(oda * 7.0 + time * 2.0);\n" +                 // WAVY (scalloped) ring
+    "      float band = smoothstep(0.013, 0.0, abs(odl - ringR)) * step(rp, 1.0);\n" +
+    "      col += rc * band * (1.0 - rp) * (1.0 - rp) * 0.6;\n" +                                     // fast quadratic fade outward
+    "    }\n" +
+    "  }\n" +
     "  col *= q31;\n" +
     "  ret = col / (col + vec3(0.6));\n" +
     "}\n";
@@ -313,8 +326,6 @@
     t.q6 = 0.05;
     t.q9 = time * 0.06;                                                  // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);                               // twist scales with bass
-    ripplePh = (ripplePh + dt * (0.30 + 0.25 * energy)) % 1;             // ripple ring expansion (faster when loud)
-    t.q11 = ripplePh;                                                    // q11 freed when the nested-polygon mandala was removed → orb ripple phase
 
     // ORBS + TETHER — wide opposite-corner diagonal (separation ~0.6w, never crossing center).
     // STAGING: orb A is a near-persistent anchor; orb B comes & goes on its own phase → single↔pair;
@@ -334,6 +345,13 @@
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
     t.q7 = (0.060 + 0.020 * Math.max(0, bass - 1)) * (1 + 0.40 * f);     // orb radius (pops on beat)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA);                                 // tether jag amplitude (audio-coupled)
+    // RIPPLE phase (q11) — INTERMITTENT beat-shed: only when orb A is present, NOT during swirl
+    // scenes (q17), and on a slow on/off clock. Resets on a beat then expands fast and fully fades,
+    // so it can't accumulate/rotate into a spiral (the always-on version did). q11>=1 ⇒ ripple off.
+    var rippleOK = (t.q25 > 0.5) && (t.q17 < 0.03) && (Math.sin(time * 0.11 + 1.0) > 0.1);
+    if (rippleOK) { ripplePh += dt * 2.2; if (ripplePh >= 1.3 || f > 0.5) ripplePh = 0.0; }   // shed every ~0.6s OR on a beat
+    else ripplePh = 2.0;
+    t.q11 = ripplePh;
     return t;
   }
 
@@ -344,11 +362,8 @@
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.62 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
   };
-  // waves[1] = orb RIPPLES — DISABLED. The always-on concentric-ring impl got rotated by the camera
-  // (roll/swirl) + accumulated in the feedback buffer into an ugly PERSISTENT SPIRAL (user flagged
-  // it). The ripple point_eqs is preserved in git commit 853df0e. REINTRODUCE later as an
-  // INTERMITTENT, fast-fading, beat-shed effect (the original shows ripples only "in some
-  // variations", not constantly) with low feedback persistence so it can't smear into a spiral — TODO #17.
+  // waves[1] free — orb ripples are drawn in the COMP shader (fresh each frame → cannot spiral),
+  // NOT a feedback-buffer wave. See the q11 ripple block in COMP_V4 + the gating in frame_eqs.
   preset.waves[1] = {
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: ""
