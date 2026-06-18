@@ -111,9 +111,17 @@ Each is **Mistake → Correction**. These are the concrete don'ts.
 ## 4. WHAT ACTUALLY WORKS (the converged approach — keep doing this)
 
 - **Use the REAL kit factories** for motifs (don't reimplement geometry).
-- **Multi-preset, not one mega-preset.** Each "look" is a separate preset with FIXED kit-factory waves
-  (correct per-wave `additive`/`samples` baseVals). The Director crossfades between them. (A single
-  preset can't reliably hot-swap per-wave baseVals each frame — that's why multi-preset.)
+- **⚠️ CORRECTION (2026-06-18, vendor-verified): the "multi-preset" rationale below is WRONG.** A
+  decode of `vendor/butterchurn.min.js` proves Butterchurn re-reads `samples/scaling/spectrum/
+  smoothing/usedots/additive/thick` (waves) and `sides/additive/textured/thickoutline/num_inst`
+  (shapes) from each slot's **`frame_eqs` return EVERY FRAME** — only `enabled` is fixed at build.
+  So a SINGLE preset CAN morph per-slot geometry, blend mode, polygon sides and instancing
+  continuously (`P["Alchemy v2: Random"]` already does). The user now requires ONE seamless preset
+  (single menu entry); the cross-preset Director crossfade is what reads "foggy/muddy" (viz.js:320).
+  **See `docs/alchemy-v4/FINDINGS-AND-REBUILD-PLAN.md` for the verified single-preset architecture.**
+  ~~Multi-preset, not one mega-preset.~~ (superseded) — Each "look" was a separate preset with FIXED
+  kit-factory waves; the Director crossfaded between them. (The claim "a single preset can't hot-swap
+  per-wave baseVals each frame" is false — only `enabled` is build-fixed.)
 - **Engine q-var split** (critical, avoids collisions): motifs read q2–q11/q14/q21–q26; engine
   (warp/comp) reads q1/q12–q32.
 - **Every scene LAYERED:** central motif (waves) + tether (wave) + clean orbs (SHAPES) + accent.
@@ -128,6 +136,15 @@ Each is **Mistake → Correction**. These are the concrete don'ts.
 
 ## 5. THE SELF-RENDER HARNESS (verify without the user — USE THIS)
 
+**✅ IMPLEMENTED (2026-06-18): `tools/selfrender.mjs`** — a pure-Node CDP harness (built-in
+`WebSocket`/`fetch`, no MCP, no puppeteer). Run `node tools/selfrender.mjs ["Preset Name"] [t1,t2,...]`
+→ launches **full Chrome via `--headless=new --use-angle=swiftshader --enable-unsafe-swiftshader`**
+(the standalone `chrome-headless-shell` gives a NULL WebGL context — use full Chrome), loads
+`viz.html` over `file://`, pumps synthetic audio via `postMessage`, writes `/tmp/alc-render/*.png`,
+and prints the page console (catches `[WMP-viz]` + the shader-compile hook). Read the PNGs to self-verify.
+The chrome-devtools MCP is NOT required.
+
+The original manual recipe (still valid if you have the MCP):
 We cannot see the live extension render, but we CAN drive `viz.html` headlessly and screenshot it:
 1. chrome-devtools MCP → `navigate_page` to `file:///…/ytmusic-wmp-visualizer/viz.html`; `resize_page`
    1280×720.

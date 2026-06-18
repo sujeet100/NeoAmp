@@ -165,12 +165,17 @@ startup loads "Dance of the Freaky Circles" (known-good).
 reproduces WMP Alchemy by composing the **REAL v2 kit factories** into 8 shuffle-cycled
 scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst) with vibrant
 multi-colour-fusion backgrounds + a dynamic camera + the viz.js `Director`. The user
-confirmed this direction ("looks way better"). **Before touching V4, read
-`docs/alchemy-v4/MISTAKES.md`** — it captures the ~20 rounds of mistakes (hand-coding
-motifs instead of using kit factories, colour thrashing, hollow single-motif scenes,
-static camera, ugly orbs) and the converged approach, plus the **self-render harness**
-(headless `viz.html` + synthetic-audio postMessage + chrome-devtools screenshot) used to
-verify without the user. Specs: `docs/alchemy-v4/SPEC.md`, `docs/alchemy-v4/CATALOG.md`.
+confirmed this direction ("looks way better"). **★ NEXT DIRECTION (2026-06-18): collapse the 8
+scenes into ONE seamless preset (single menu entry) — read `docs/alchemy-v4/FINDINGS-AND-REBUILD-PLAN.md`
+FIRST.** It is the authoritative plan from an 18-agent reverse-engineering pass: the seamless
+single-preset architecture (vendor-verified — only `enabled` is build-fixed, so one preset CAN morph
+geometry per frame; this OVERTURNS MISTAKES.md §4), plus per-problem fixes for the user's v4 critique
+(transitions, orb spacing/colour/staging, 3D camera, empty frames, kaleidoscope, ripples, V1 central
+flow, V2 vortex/fountain/moiré/ribbon). **Also read `docs/alchemy-v4/MISTAKES.md`** — the ~20 rounds
+of mistakes (hand-coding motifs, colour thrashing, hollow scenes, static camera, ugly orbs) + the
+converged approach + the **self-render harness** (headless `viz.html` + synthetic-audio postMessage +
+chrome-devtools screenshot) used to verify without the user. Specs: `docs/alchemy-v4/SPEC.md`,
+`docs/alchemy-v4/CATALOG.md`.
 
 **Done & committed (`git log`):** Dance of the Freaky Circles (two orbiting
 waveform circles — the best one, use it as the reference pattern), and batch 1:

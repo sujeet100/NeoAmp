@@ -57,15 +57,7 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V4: Random (cycle all)", wmp: "__director__" },
-    { label: "Alchemy V4: Pulsar", wmp: "Alchemy V4: Pulsar" },
-    { label: "Alchemy V4: Corridor", wmp: "Alchemy V4: Corridor" },
-    { label: "Alchemy V4: Vortex", wmp: "Alchemy V4: Vortex" },
-    { label: "Alchemy V4: Mandala", wmp: "Alchemy V4: Mandala" },
-    { label: "Alchemy V4: Anemone", wmp: "Alchemy V4: Anemone" },
-    { label: "Alchemy V4: Orbiters", wmp: "Alchemy V4: Orbiters" },
-    { label: "Alchemy V4: Star", wmp: "Alchemy V4: Star" },
-    { label: "Alchemy V4: Burst", wmp: "Alchemy V4: Burst" },
+    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" },   // ONE seamless self-sequencing preset
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
@@ -432,11 +424,12 @@
     window.addEventListener("resize", sizeCanvas);
     requestAnimationFrame(sizeCanvas);
     setTimeout(sizeCanvas, 400);
-    // Default startup preset — set to whatever Alchemy v2 scene we're actively iterating on
-    // (falls back to Alchemy Random, then the first preset, if it isn't present).
-    // Boot straight into the V4 director cycling the 8 kit-factory scenes (shuffle, no-repeat).
-    if (v4Scenes.length >= 2) { loadByName(v4Scenes[0]); renderLoop(); setDirector(true); }
-    else { loadByName(presets["Alchemy Random"] ? "Alchemy Random" : names[0]); renderLoop(); }
+    // Boot straight into the single seamless "Alchemy V4: Random" preset (it self-sequences in
+    // frame_eqs — no cross-preset Director crossfade, which read foggy/like-a-new-preset). The
+    // Director (viz.js) stays dormant; reachable only via the postMessage debug toggle.
+    var bootName = presets["Alchemy V4: Random"] ? "Alchemy V4: Random"
+                 : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]);
+    loadByName(bootName); renderLoop();
     post({ type: "ready", presets: names.length });
   }
 
