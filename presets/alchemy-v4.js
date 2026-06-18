@@ -319,9 +319,10 @@
     // ORBS + TETHER — wide opposite-corner diagonal (separation ~0.6w, never crossing center).
     // STAGING: orb A is a near-persistent anchor; orb B comes & goes on its own phase → single↔pair;
     // the tether is gated to appear only when BOTH orbs are clearly present → sometimes-tethered.
-    // visibility — non-periodic come-and-go (summed incommensurate sines) so the single↔pair rhythm
-    // never loops; orb A near-persistent anchor, orb B varies.
-    t.q25 = 0.55 + 0.45 * comeGo(0.6 * Math.sin(time * 0.070) + 0.4 * Math.sin(time * 0.031 + 1.0));
+    // visibility — non-periodic come-and-go (summed incommensurate sines). BOTH orbs fully disappear
+    // now and then (the original has orb-absent moments — w_ripple f_30). Orb A is biased to be
+    // present most of the time but DROPS TO 0 periodically; orb B varies more, out of phase with A.
+    t.q25 = comeGo(0.30 + 0.60 * Math.sin(time * 0.060 + 0.3) + 0.38 * Math.sin(time * 0.027 + 2.2));
     t.q14 = comeGo(0.6 * Math.sin(time * 0.055 + 1.7) + 0.4 * Math.sin(time * 0.026 + 0.4));
     // PATH — the pair axis rotates through ALL directions (non-uniformly) with breathing separation +
     // independent per-orb wander, so the orbs stop retracing the same fixed diagonal (user note, #19).
