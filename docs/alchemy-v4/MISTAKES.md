@@ -7,21 +7,26 @@ effort was burned repeating the same mistakes. This file is the antidote. **Read
 
 ## 0. CURRENT STATE (where the last session left off)
 
-- **V4 = `presets/alchemy-v4.js`** — rebuilt on the **REAL v2 kit factories** as **8 shuffle-cycled
-  scenes**: Pulsar, Corridor, Vortex, Mandala, Anemone, Orbiters, Star, Burst. The user reaction to
-  this rebuild was **"looks way better, good"** — so this architecture is CONFIRMED RIGHT. Do not
-  abandon it.
-- Each scene = real kit-factory **waves** (alcAnemone / alcSpindle / alcNgon / alcNgonStack /
-  alcStarWaves / alcTether / alcMeshRings...) + clean filled-colour **orb SHAPES** + a shared engine
-  (WARP: kaleidoscope fold + dynamic camera; COMP: vibrant multi-colour-fusion background + bloom +
-  Reinhard tone-map). The **viz.js `Director`** shuffle-cycles the scenes (every scene once before any
-  repeat), engaged on startup. Each scene is also individually selectable in the dropdown.
-- **Engine q-vars are remapped OFF the kit motif contract** (motifs read q2–q11/q14/q21–q26; engine
-  reads q1/q12–q32) so the kit factories aren't disturbed. See the header of `alchemy-v4.js`.
-- **Last commit `27c29aa`** added clean filled-orb shapes, layered every scene, the n-gon corridor,
-  and continuous camera — **Node-validated but NOT yet verified on-screen** (handoff happened right
-  before the render test). **First task next session: render-test it** (see §5 harness).
-- v1 (`presets/alchemy.js` "Alchemy Random") and v2 ("Alchemy v2: …") are **untouched** — keep it so.
+- **V4 = `presets/alchemy-v4.js` is now ONE seamless self-sequencing preset** `P["Alchemy V4: Random"]`
+  (single menu entry). The earlier 8-shuffle-cycled-presets design was **collapsed** because the
+  cross-preset crossfade read "foggy / like a new preset faded in" (the user's #1 complaint). The user
+  reaction to the rebuild + the round of fixes was **very positive** ("looks much better", "orbs look
+  gorgeous"). **This single-preset architecture is CONFIRMED RIGHT — do not go back to multi-preset.**
+- **Architecture** (see `alchemy-v4.js` header + §8 below): an in-preset director (`makePicker` spine
+  ported from v2:Random) drives THREE independent slow clocks over ONE persistent feedback buffer —
+  **lookPick** (camera/exposure/fold), **bgPick** (background, decoupled), **motifPick** (central
+  geometry, swapped under an opacity dip `q4`). Central motif = a per-frame dispatch (`q30`) over
+  inline/kit point-fns (anemone/spindle/ngon/triangle/bolt/urchin/rotline/fountain). Orbs = filled
+  SHAPES (come-and-go, varied path), tether = a wave, ripples = a COMP-shader effect. Engine = v4's
+  `WARP_V4` (fold + camera) + `COMP_V4` (fusion bg + asymmetric bleed + dilation + Reinhard).
+- **q-var map** (in the file header): engine reads `q1/q12–q20/q27–q32` + `q8` hue; motifs read
+  `q2–q11/q14/q21–q26`; control `q30` (motif mode) + `q4` (motif visibility) + `q11` (ripple phase)
+  are read by neither shaders nor kit factories. Only `enabled` is build-fixed (see §4 correction).
+- **The `viz.js` cross-preset Director is retired for v4** (boots straight into the single preset).
+- v1 (`presets/alchemy.js` "Alchemy Random") and v2 ("Alchemy v2: …") remain **untouched**.
+- **Open follow-ups** (tracked as tasks): kaleidoscope shows only one quarter + add a DIAGONAL (X)
+  fold; reconsider the dense daisy-spirograph under fold; build/refine the 2:40-2:50 + 0:39-0:45
+  scenes; make the tether beat-synced (flash on the kick, not permanent). See `FINDINGS-AND-REBUILD-PLAN.md`.
 
 ---
 
@@ -188,3 +193,59 @@ every `frame_eqs` and the enabled waves' `point_eqs` / shapes' `frame_eqs`.
    more orb variants, ribbon, dot-grid/wallpaper, perspective-floor, dahlia, etc.
 4. **Add the 1:05 vortex+orbs+tether comet scene.**
 5. Keep colours **vibrant-but-harmonious** (dusty anchor pairs), never neon-rainbow or flat single-tone.
+
+---
+
+## 8. SESSION 2026-06-18 — THE SUCCESSFUL REBUILD (what worked; read to avoid the old rabbit holes)
+
+This session converged FAST (no thrash) where earlier ones burned ~20 rounds. The difference was a
+tight **edit → validate → self-render → commit** loop and small targeted changes. Keep doing this.
+
+### The working cadence (THIS is why it went well — don't deviate)
+1. **Self-render every change with `tools/selfrender.mjs`** (pure-Node CDP harness, no MCP — see §5).
+   `node tools/selfrender.mjs ["Preset"] ["t1,t2,..."]` → reads `/tmp/alc-render/*.png` + the page
+   console. This ENDED the screenshot-loop with the user — verify yourself first. To verify a feature
+   that only fires under specific conditions (a fold, a beat, an orb-gone moment), **temporarily force
+   the q-var** (e.g. `t.q12=4;t.q13=0.85`), render, then remove the `// __DEBUG__` line.
+2. **Small targeted edits, ONE concern at a time. Commit after each verified change** (the user asked
+   for this explicitly; small commits = trivial revert). Don't batch many changes blind.
+3. **Node-validate before every render**: `node --check` + the concat+frame_eqs harness (catches
+   missing refs / throwing eqs / q-var collisions). GLSL only fails at runtime → the harness console
+   + the in-browser shader hook surface it.
+
+### Architecture that worked (the answer to "make it ONE seamless preset")
+- ONE persistent preset; morph by mutating q-vars in `frame_eqs`, NEVER `loadPreset` (preset swaps =
+  Butterchurn's two-program crossfade = the "foggy / new preset" feel). Vendor-verified: **only
+  `enabled` is build-fixed** — samples/additive/sides/usedots/num_inst are per-frame (§4 correction).
+- Independent slow clocks (look / bg / motif) over one buffer = "endlessly varied, never loops, reads
+  as one preset." Motif geometry swaps under an **opacity dip** (q4), not a vertex blend.
+- Persistent secondary layer (orbs + tether) bridges motif changes; bg decoupled on its own clock.
+
+### NEW GOTCHAS discovered this session (each cost a round — avoid next time)
+- **Additive bristle density → milky white-out.** Dense additive radial motifs (spindle, fountain)
+  accumulate in the feedback buffer to equilibrium ≈ input/(1−decay) → saturates to white. Fix:
+  **per-mode alpha** (dense modes get ~0.4–0.5) + keep decay ≤ ~0.93. (Hit this twice.)
+- **Anything PERSISTENT in the feedback buffer gets rotated by the camera roll/swirl → SPIRAL.** The
+  always-on ripple smeared into an ugly permanent spiral. Fix: do transient/secondary effects
+  (ripples) **in the COMP shader, drawn FRESH each frame** (never a feedback wave) so they can't
+  rotate/accumulate. Gate them intermittent + OFF during swirl scenes + fast-fade.
+- **Radial (6-fold) fold on a dense flower → off-brand thin-line spirograph.** The original
+  kaleidoscope (w_sweep f_22/24/26) is **QUAD (4-fold) soft COLOUR wedges** (fold the *background
+  colour*, not just thin motif lines) + a *small* mirrored centre. Use quad; shrink the motif under a
+  fold. (Open: it's still only one quarter on screen + needs a DIAGONAL/X fold — tracked.)
+- **Don't leave an orb always-on.** A permanently-visible orb reads weird. Orbs must fully come-and-go
+  (the original has orb-absent moments) on out-of-phase clocks so they're never all gone at once; and
+  their path must vary (rotate the pair axis through all directions, not a fixed diagonal).
+- **The waveform/lines read too thin against vibrant bg** → add a max-DILATION pass in COMP (thickens
+  every foreground line + orb ring). Cheap, big payoff.
+- **Backgrounds must never be flat** → asymmetric OFF-CENTER colour pool + one-edge plume (not a
+  centred vignette); decouple the bg clock from the motif so the same motif appears over many grounds.
+
+### Original-video facts re-confirmed this session (see FINDINGS-AND-REBUILD-PLAN.md for the full set)
+- Kaleidoscope = soft QUAD colour wedges + small mirrored centre; the dominant element is folded
+  *colour*, not lines. The original also uses a DIAGONAL/X fold (≈0:20–0:30).
+- Orbs: vary count (0 / single / pair / cluster), positions, and paths; appear at varied spots, not a
+  fixed diagonal. The connecting lightning/tether appears WITH the beat and disappears (≈0:27–0:39) —
+  it is NOT permanently on.
+- Ripples (≈2:46): wavy (never perfect circles) concentric rings, defined (not blur), recolour with
+  the pulse, shed on the beat.

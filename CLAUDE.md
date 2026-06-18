@@ -165,17 +165,18 @@ startup loads "Dance of the Freaky Circles" (known-good).
 reproduces WMP Alchemy by composing the **REAL v2 kit factories** into 8 shuffle-cycled
 scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst) with vibrant
 multi-colour-fusion backgrounds + a dynamic camera + the viz.js `Director`. The user
-confirmed this direction ("looks way better"). **★ NEXT DIRECTION (2026-06-18): collapse the 8
-scenes into ONE seamless preset (single menu entry) — read `docs/alchemy-v4/FINDINGS-AND-REBUILD-PLAN.md`
-FIRST.** It is the authoritative plan from an 18-agent reverse-engineering pass: the seamless
-single-preset architecture (vendor-verified — only `enabled` is build-fixed, so one preset CAN morph
-geometry per frame; this OVERTURNS MISTAKES.md §4), plus per-problem fixes for the user's v4 critique
-(transitions, orb spacing/colour/staging, 3D camera, empty frames, kaleidoscope, ripples, V1 central
-flow, V2 vortex/fountain/moiré/ribbon). **Also read `docs/alchemy-v4/MISTAKES.md`** — the ~20 rounds
-of mistakes (hand-coding motifs, colour thrashing, hollow scenes, static camera, ugly orbs) + the
-converged approach + the **self-render harness** (headless `viz.html` + synthetic-audio postMessage +
-chrome-devtools screenshot) used to verify without the user. Specs: `docs/alchemy-v4/SPEC.md`,
-`docs/alchemy-v4/CATALOG.md`.
+confirmed this direction ("looks way better"). **★ SHIPPED (2026-06-18): `alchemy-v4.js` is now ONE
+seamless self-sequencing preset** `P["Alchemy V4: Random"]` (single menu entry) — the 8-scene Director
+was collapsed because the cross-preset crossfade read "foggy". The user is happy with it after a round
+of fixes (orbs, mandala, lines, camera, ripples, vortex/fountain, backgrounds). **Before touching it,
+read `docs/alchemy-v4/MISTAKES.md` — especially §0 (current architecture) + §8 (this session's working
+cadence + the new gotchas: additive-density milky-out, feedback-rotation spiral → do ripples in COMP,
+radial-fold-on-flower spirograph → use quad, no always-on orb).** And `FINDINGS-AND-REBUILD-PLAN.md`
+(the authoritative reverse-engineering plan + the vendor finding that OVERTURNS MISTAKES.md §4: only
+`enabled` is build-fixed, so one preset CAN morph geometry per frame). **Verify with
+`tools/selfrender.mjs`** (pure-Node CDP self-render harness, no MCP). Open follow-ups (tasks #21–#26):
+kaleidoscope one-quarter + diagonal/X fold; dense daisy-spirograph; the 2:40-2:50 / 0:39-0:45 scenes;
+beat-synced tether. Specs: `docs/alchemy-v4/SPEC.md`, `docs/alchemy-v4/CATALOG.md`.
 
 **Done & committed (`git log`):** Dance of the Freaky Circles (two orbiting
 waveform circles — the best one, use it as the reference pattern), and batch 1:
