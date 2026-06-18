@@ -133,7 +133,7 @@
     "  float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
     "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
-    "  ground *= (0.50 + 0.40 * n1 + 0.12 * bb) * mix(0.72, 1.05, smoothstep(1.5, 0.15, prad));\n" +   // softer floor → corners never black
+    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" +   // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
 
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
     // ORB RIPPLES — drawn FRESH here in comp (never in the feedback buffer) so they can NOT rotate
@@ -150,7 +150,15 @@
     "    }\n" +
     "  }\n" +
     "  col *= q31;\n" +
-    "  ret = col / (col + vec3(0.6));\n" +
+    // DE-WASH (measured vs the original: ours was too BRIGHT + UNDER-saturated → washed/pastel). Reinhard
+    // compresses highlights toward white and dusty()/bloom average colour out, so after tone-mapping we
+    // RE-SATURATE (luminance-preserving) + apply a gentle contrast that deepens darks → saturated elements
+    // POP against more near-black, matching the vibrant 1080p reference. Still luminous, not neon/blown-white.
+    "  vec3 toned = col / (col + vec3(0.6));\n" +
+    "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
+    "  toned = mix(vec3(tl), toned, 1.22);\n" +                                     // resaturate toward the original's SATMAX (gentler → not neon)
+    "  toned = mix(toned * toned, toned, 0.72);\n" +                               // deepen darks/mids ONLY (x*x ≤ x) → contrast without lifting highlights to blowout
+    "  ret = clamp(toned, 0.0, 1.0);\n" +
     "}\n";
 
   var BASE = { wave_a: 0, additivewave: 1, decay: 0.95, zoom: 1, rot: 0, warp: 0, dx: 0, dy: 0,
