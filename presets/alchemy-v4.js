@@ -89,6 +89,13 @@
     "  float bl = (bloom.r + bloom.g + bloom.b) * 0.05;\n" +
     "  float hb = q8; float bb = 0.5 + 0.5 * (q32 - 1.0);\n" +
     "  vec3 cA = dusty(pal(hb), 0.9), cB = dusty(pal(hb + 0.5), 0.85), cC = dusty(pal(hb + 0.28), 0.9);\n" +
+    // KALEIDOSCOPE = fold the BACKGROUND colour into soft wedges (orig f_26 is soft colour panes, not a
+    // thin-line spirograph). When a fold is active (q13>0) mirror pdc before building the ground, so
+    // the bg reads as big mirrored colour wedges; the (small) folded motif sits as the mirrored centre.
+    "  vec2 fpd = pdc;\n" +
+    "  if (q12 > 3.5 && q12 < 4.5) { fpd = abs(pdc); }\n" +
+    "  else if (q12 > 5.5) { float fa = atan(pdc.y, pdc.x); float fseg = 6.2832 / max(q12, 2.0); fa = abs(fa - fseg * floor(fa / fseg + 0.5)); fpd = length(pdc) * vec2(cos(fa), sin(fa)); }\n" +
+    "  pdc = mix(pdc, fpd, clamp(q13, 0.0, 1.0));\n" +
     "  vec2 w = pdc * 1.3 + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
@@ -248,7 +255,7 @@
     { decay: 0.88, fold: 4, zoom: 0.004, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope
     { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.003, swirl: 0.00, dx: 0, dy: -0.0008, tilt: 0.08, tiltOsc: 0.05, pan: 0.05, px: 0.50, py: 0.50, exp: 0.90 },  // anemone free-space
     { decay: 0.87, fold: 1, zoom: 0.008, rot: 0.000, swirl: 0.02, dx: 0, dy:  0.0000, tilt: 0.12, tiltOsc: 0.04, pan: 0.06, px: 0.52, py: 0.48, exp: 0.90 },  // side-angle drift
-    { decay: 0.89, fold: 6, zoom: 0.000, rot: 0.010, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.06, tiltOsc: 0.04, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 },  // RADIAL kaleidoscope
+    { decay: 0.89, fold: 4, zoom: 0.000, rot: 0.006, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.06, tiltOsc: 0.04, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope (was radial 6 → made an off-brand spirograph; quad = soft butterfly like orig f_22/f_26)
     { decay: 0.90, fold: 1, zoom: -0.012, rot: 0.000, swirl: 0.03, dx: 0, dy: -0.0010, tilt: 0.05, tiltOsc: 0.05, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 }  // burst bloom outward
   ];
 
