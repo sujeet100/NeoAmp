@@ -667,6 +667,7 @@
       if (dragBand !== -1) { dragBand = -1; sched(); return; }
       var p = pos(e);
       if (p.x >= EQ_LAYOUT.on.x && p.x <= EQ_LAYOUT.on.x + EQ_LAYOUT.on.w && p.y >= EQ_LAYOUT.on.y && p.y <= EQ_LAYOUT.on.y + EQ_LAYOUT.on.h) { on = !on; if (hooks.onEnabled) hooks.onEnabled(on); sched(); }
+      else if (p.x >= EQ_LAYOUT.presets.x && p.x <= EQ_LAYOUT.presets.x + EQ_LAYOUT.presets.w && p.y >= EQ_LAYOUT.presets.y && p.y <= EQ_LAYOUT.presets.y + EQ_LAYOUT.presets.h) { hooks.onPresets && hooks.onPresets(); }
       else if (p.x >= EQ_LAYOUT.close.x && p.x <= EQ_LAYOUT.close.x + 9 && p.y >= EQ_LAYOUT.close.y && p.y <= EQ_LAYOUT.close.y + 9) { hooks.onClose && hooks.onClose(); }
     };
     window.addEventListener("mousemove", onMove);
@@ -676,6 +677,13 @@
     return {
       el: canvas,
       dragRegion: { x: 0, y: 0, w: 244 * scale, h: EQ_LAYOUT.titlebar.h * scale },
+      // externally apply a preset (updates the faders + curve to match)
+      setEq: function (b, pre, en) {
+        if (b && b.length === 10) bands = b.slice();
+        if (typeof pre === "number") preamp = pre;
+        if (typeof en === "boolean") on = en;
+        sched();
+      },
       destroy: function () {
         if (raf) cancelAnimationFrame(raf);
         window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);

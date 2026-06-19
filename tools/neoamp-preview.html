@@ -76,6 +76,7 @@ chrome.storage = { local: {
       getEqState:function(){return {enabled:eqState.enabled,preamp:eqState.preamp,bands:eqState.bands.slice(),balance:eqState.balance};},
       setEqEnabled:function(v){eqState.enabled=v;}, setPreamp:function(v){eqState.preamp=v;},
       setEqBand:function(i,v){eqState.bands[i]=v;}, setBalance:function(v){eqState.balance=v;},
+      setEq:function(b,pre,en){if(b)eqState.bands=b.slice(); if(typeof pre==="number")eqState.preamp=pre; if(typeof en==="boolean")eqState.enabled=en;},
     },
     storage: { get: function (k, cb) { chrome.storage.local.get(k, function (o) { cb(o[k]); }); }, set: chrome.storage.local.set },
     toast: function (m) { console.log("[toast]", m); },

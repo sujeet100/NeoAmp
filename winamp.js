@@ -679,6 +679,55 @@
   }
   // skinned EQ window (chrome-less host, like the main window). Hidden until the
   // EQ button is clicked. The procedural #wa-eq stays hidden in classic mode.
+  // Curated EQ presets. (Researched: Winamp's stock curves are crude + clipping-prone,
+  // so these keep the nostalgic names but use tasteful gains.) Order = low→high (60..16k).
+  var EQ_PRESETS = [
+    { name: "Flat", bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Bass Boost", bands: [5, 4, 2, 0, 0, 0, 0, 1, 1, 1] },
+    { name: "Vocal / Clarity", bands: [0, -2, -3, -1, 0, 3, 3, 1, 0, 0] },
+    { name: "Loudness (V-shape)", bands: [7, 4, 1, -2, -3, -2, 1, 4, 5, 6] },
+    { name: "Rock", bands: [3, 2, 0, -1, 0, 2, 3, 3, 2, 2] },
+    { name: "Pop", bands: [2, 1, 0, 0, 2, 3, 2, 2, 2, 2] },
+    { name: "Electronic / Dance", bands: [5, 4, 1, -2, 1, 1, 3, 4, 4, 3] },
+    { name: "Hip-Hop", bands: [5, 4, 2, -2, 1, 2, 1, 2, 2, 1] },
+    { name: "Classical", bands: [1, 0, -1, 0, 1, 2, 2, 2, 2, 3] },
+    { name: "Jazz", bands: [2, 2, 0, 0, 2, 1, 1, 2, 2, 2] },
+    { name: "Headphones", bands: [5, 3, 1, 0, 0, 2, 2, 1, 0, -1] },
+    { name: "Laptop Speakers", bands: [6, 4, 1, -1, 0, 1, 3, 5, 4, 2] },
+    { name: "Podcast / Voice", bands: [-3, 1, 1, 2, 2, 3, 2, 0, 0, -1] },
+  ];
+  // apply a preset everywhere at once: live audio (relayed), the classic EQ faders,
+  // the procedural sliders + curve, and persistence — and turn the EQ on.
+  function applyEqPreset(p) {
+    NA.control.setEq(p.bands, 0, true);
+    if (classicEqApi && classicEqApi.setEq) classicEqApi.setEq(p.bands, 0, true);
+    if (els.eqSliders) {
+      els.eqSliders.forEach(function (sl, i) { sl.value = String(i === 0 ? 0 : (p.bands[i - 1] || 0)); });
+      drawEqCurve();
+    }
+  }
+  // dropdown off the classic EQ window's PRESETS button (toggle on repeat click)
+  function showEqPresetsMenu(w) {
+    var open = w.el.querySelector(".wa-eqpre-menu");
+    if (open) { open.remove(); return; }
+    var menu = h("div", { class: "wa-eqpre-menu" });
+    menu.style.cssText = "position:absolute; top:62px; right:12px; z-index:10; background:#10142e; border:1px solid #d8b863; border-radius:3px; padding:3px; max-height:200px; overflow:auto; box-shadow:0 4px 14px rgba(0,0,0,.6); font:11px/1.5 'Arial Narrow','Helvetica Neue',Arial,sans-serif;";
+    EQ_PRESETS.forEach(function (p) {
+      var it = h("div", { text: p.name });
+      it.style.cssText = "padding:2px 12px; color:#f0d182; cursor:pointer; white-space:nowrap; border-radius:2px;";
+      it.addEventListener("mouseenter", function () { it.style.background = "#2a2f55"; it.style.color = "#fff7dc"; });
+      it.addEventListener("mouseleave", function () { it.style.background = ""; it.style.color = "#f0d182"; });
+      it.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      it.addEventListener("click", function (e) { e.stopPropagation(); applyEqPreset(p); menu.remove(); });
+      menu.appendChild(it);
+    });
+    w.el.appendChild(menu);
+    setTimeout(function () {
+      var close = function (ev) { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("mousedown", close, true); } };
+      document.addEventListener("mousedown", close, true);
+    }, 0);
+  }
+
   function mountClassicEq(skin) {
     var w = wins["wa-eq-skin"];
     if (!w) {
@@ -698,6 +747,7 @@
       onBand: function (i, db) { NA.control.setEqBand(i, db); },
       onPreamp: function (db) { NA.control.setPreamp(db); },
       onEnabled: function (on) { NA.control.setEqEnabled(on); },
+      onPresets: function () { showEqPresetsMenu(w); },
       onClose: function () {
         w.el.style.display = "none"; classicApi && classicApi.setToggles(false, isShown("wa-pl"));
       },

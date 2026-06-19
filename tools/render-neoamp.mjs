@@ -101,6 +101,10 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
   await evalJs(send, `(function(){var w=document.getElementById('wa-eq-skin'); if(w){w.style.display='';w.style.left='40px';w.style.top='560px';w.style.zIndex=9998;} return !!w;})()`);
   await sleep(200);
   await clipShot("eq_window", { x: 38, y: 558, width: 562, height: 240 });
+  // click the EQ window's PRESETS button (canvas hit) → capture the presets menu
+  await evalJs(send, `(function(){var c=document.querySelector('#wa-eq-skin canvas'); if(!c)return 0; var r=c.getBoundingClientRect(); ['mousedown','mouseup'].forEach(function(t){window.dispatchEvent(new MouseEvent(t,{clientX:r.left+478,clientY:r.top+48,bubbles:true}));}); return 1;})()`);
+  await sleep(150);
+  await clipShot("eq_presets", { x: 38, y: 558, width: 562, height: 300 });
   await evalJs(send, `(function(){var w=document.getElementById('wa-eq-skin'); if(w)w.style.display='none'; return true;})()`);
 
   // open Library (LIB toggle in the NP panel), then run a search, then HOME

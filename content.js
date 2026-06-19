@@ -410,6 +410,13 @@
     setPreamp: function (db) { eqState.preamp = +db || 0; relayEq(); persistEq(); },
     setEqBand: function (i, db) { if (i >= 0 && i < eqState.bands.length) { eqState.bands[i] = +db || 0; relayEq(); persistEq(); } },
     setBalance: function (x) { eqState.balance = clamp(+x || 0, -1, 1); relayEq(); persistEq(); },
+    // bulk-apply a preset (all 10 bands + optional preamp/enabled) in one relay
+    setEq: function (bands, preamp, enabled) {
+      if (bands && bands.length === eqState.bands.length) eqState.bands = bands.map(Number);
+      if (typeof preamp === "number") eqState.preamp = preamp;
+      if (typeof enabled === "boolean") eqState.enabled = enabled;
+      relayEq(); persistEq();
+    },
     playQueueItem: function (i) {
       var items = document.querySelectorAll("ytmusic-player-queue-item");
       var it = items[i];
