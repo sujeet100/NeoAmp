@@ -15,6 +15,14 @@ Goal: the user is nostalgic for WMP's Battery/Ambience/Alchemy visualizers and
 Winamp skins. We reproduce those looks as Butterchurn presets driven by the live
 YouTube Music audio.
 
+**TWO WORKSTREAMS.** Most of *this* file is the **visualizer presets**. The other
+half of the project is the **Winamp-style player UI** (`content.js` / `winamp.js` /
+`wsz.js` / `winamp.css` — floating windowed player, real `.wsz` skins, now-playing /
+playlist / library). If you're working on the player UI (windows, skins, controls,
+EQ, keyboard), read **`docs/neoamp-ui/HANDOFF.md`** first — and note you can
+**self-render that UI headlessly** via `node tools/render-neoamp.mjs` (sibling of the
+viz's `tools/selfrender.mjs`). Next planned UI work: a real EQ + state-sync + keyboard.
+
 ## How to run / test (manual — there is no automated UI test)
 
 1. `chrome://extensions` (Arc: `arc://extensions`) → enable **Developer mode** →
