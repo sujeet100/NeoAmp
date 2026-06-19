@@ -310,46 +310,43 @@
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* button cluster: a like/dislike row, a VIS/LIB row, then the skin picker —
    evenly spaced instead of cramped together */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .wa-np-toggles { display: flex; gap: 5px; }
-.wa-np-toggles .wa-np-tog { flex: 1 1 0; }
-/* VIS/LIB + like/dislike: modelled on the skin's GREEN EQ/PL key — a raised
-   button with a green LCD face and an embossed dark label/icon; it brightens +
-   glows when active (window open / track liked). No separate LED dot — the green
-   key itself is the indicator, exactly like the EQ button. */
+/* VIS/LIB + like/dislike: small CHROME keys like the EQ/PL buttons — a brushed
+   silver face, a pixelated label, and a square LED. Sized tight like the EQ key
+   (no stretching). (Per-skin bitmap buttons are a follow-up — see notes.) */
 .wa-np-tog {
-  display: flex; align-items: center; justify-content: center;
-  height: 22px; min-width: 50px; padding: 0 11px; cursor: pointer;
-  font: 700 10px/1 var(--wa-font); letter-spacing: 1.5px; text-transform: uppercase;
-  color: #08300f; text-shadow: 0 1px 0 rgba(175,255,185,0.45);   /* engraved dark label */
-  background: linear-gradient(180deg, #57c873 0%, #2f9f4c 48%, #1f7d39 100%);
-  border: 1px solid; border-color: #9bf3ad #0c451c #0a3917 #74dd8c;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 18px; padding: 0 5px; cursor: pointer;
+  font: 16px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
+  color: #1c1f24;                                  /* dark pixel label on chrome */
+  background: linear-gradient(180deg, #f6f6fa 0%, #d2d2da 46%, #aeaeb8 54%, #cccdd4 100%);
+  border: 1px solid; border-color: #ffffff #72727c #5c5c66 #ececf2;
   border-radius: 2px;
-  box-shadow: inset 0 1px 0 rgba(220,255,225,0.5), 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 2px rgba(0,0,0,0.5);
 }
-.wa-np-tog:hover { filter: brightness(1.08); }
-.wa-np-tog.on {                                  /* lit/pressed: window open / liked */
-  border-color: #0a3917 #74dd8c #9bf3ad #0c451c;
-  background: linear-gradient(180deg, #1f7d39, #46be62);
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 7px rgba(60,230,110,0.55);
+.wa-np-tog:hover { filter: brightness(1.04); }
+.wa-np-tog.on, .wa-np-tog:active {               /* pressed-in chrome */
+  border-color: #5c5c66 #ececf2 #ffffff #72727c;
+  background: linear-gradient(180deg, #b6b6c0, #d6d6de);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-/* like = GOLD key with a heart; dislike = PINK key with a thumbs-down
-   (override the green .wa-np-tog base for the rate pair); glow when active */
+/* square LED: dark when off, green when on (window open / active) */
+.wa-np-tog::before {
+  content: ""; width: 6px; height: 6px; flex: 0 0 auto; border-radius: 0;
+  background: #243027; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55);
+}
+.wa-np-tog.on::before { background: var(--wa-accent, #16e651); box-shadow: 0 0 4px var(--wa-accent-glow), inset 0 0 0 1px rgba(0,0,0,0.3); }
+/* like/dislike: chrome key, NO label LED — the icon SHAPE carries the colour
+   (gold heart when liked, pink thumb when disliked); muted when inactive. */
 .wa-np-rate { display: flex; gap: 5px; }
-.wa-rate-btn { min-width: 0; padding: 0 10px; }
-.wa-rate-btn svg { width: 14px; height: 14px; display: block; }
-.wa-rate-btn.wa-like {
-  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
-  border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
-}
-.wa-rate-btn.wa-like svg { fill: #3a2a06; }
-.wa-rate-btn.wa-dislike {
-  background: linear-gradient(180deg, #f3aec6 0%, #db6f97 48%, #c25278 100%);
-  border-color: #ffd4e4 #6e2440 #5c1c34 #f4bcd2;
-}
-.wa-rate-btn.wa-dislike svg { fill: #4a1430; }
-.wa-rate-btn.wa-like.on { box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 8px rgba(235,195,95,0.78); }
-.wa-rate-btn.wa-dislike.on { box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 8px rgba(240,130,170,0.78); }
+.wa-rate-btn { padding: 0 7px; }
+.wa-rate-btn::before { display: none; }
+.wa-rate-btn svg { width: 13px; height: 13px; display: block; }
+.wa-rate-btn.wa-like svg { fill: #b89a4e; }                                   /* heart shape: muted gold */
+.wa-rate-btn.wa-like.on svg { fill: #f0c34e; filter: drop-shadow(0 0 2px rgba(240,195,80,0.85)); }      /* liked: bright gold */
+.wa-rate-btn.wa-dislike svg { fill: #b07088; }                                /* thumb shape: muted pink */
+.wa-rate-btn.wa-dislike.on svg { fill: #f06a9a; filter: drop-shadow(0 0 2px rgba(240,110,160,0.85)); }  /* disliked: bright pink */
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
 .wa-np-btns .wa-skinsel-btn { height: 20px; padding: 0 10px; font-size: 11px; }
