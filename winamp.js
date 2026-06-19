@@ -117,9 +117,12 @@
     var body = h("div", { class: "wa-body" });
     var el = h("div", { class: "wa-win inactive", id: id }, [bar, body]);
 
-    // optional extra titlebar buttons (e.g. fullscreen), then shade, then close
+    // optional extra titlebar buttons (e.g. fullscreen), then shade, then close.
+    // b.html lets a button use a crisp inline-SVG icon instead of a text glyph.
     (opts.titleButtons || []).forEach(function (b) {
-      var btn = h("span", { class: "wa-tbtn", title: b.title, text: b.label });
+      var attrs = { class: "wa-tbtn" + (b.cls ? " " + b.cls : ""), title: b.title };
+      if (b.html) attrs.html = b.html; else attrs.text = b.label;
+      var btn = h("span", attrs);
       btn.addEventListener("click", function (e) { e.stopPropagation(); b.onClick(); });
       tbtns.appendChild(btn);
     });
@@ -741,7 +744,9 @@
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
     ]);
-    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, npSkinSel]);
+    // two columns: like/dislike on the left, VIS+LIB row over the skin picker on the right
+    var col2 = h("div", { class: "wa-np-col2" }, [toggles, npSkinSel]);
+    var btns = h("div", { class: "wa-np-btns" }, [rate, col2]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
     el.addEventListener("mousedown", function () { raise(el); }, true);
@@ -859,9 +864,11 @@
   // VISUALIZATION WINDOW (Butterchurn iframe in the body)
   // =========================================================================
   function buildViz() {
+    // crisp fullscreen icon (4 corner brackets) instead of the flaky ⛶ glyph
+    var FS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v2.4H5.4V10H3V3zm11 0h7v7h-2.4V5.4H14V3zM5.4 14H3v7h7v-2.4H5.4V14zm13.2 0H21v7h-7v-2.4h4.6V14z"/></svg>';
     var win = makeWindow("wa-viz", "Visualization", {
       shade: false,
-      titleButtons: [{ label: "⛶", title: "Fullscreen (Esc to exit)", onClick: toggleVizFullscreen }],
+      titleButtons: [{ html: FS_SVG, cls: "wa-fsbtn", title: "Fullscreen (Esc to exit)", onClick: toggleVizFullscreen }],
       onClose: function () { hideWin("wa-viz"); },
     });
     vizFrame = h("iframe", { class: "wa-viz-frame", src: chrome.runtime.getURL("viz.html"), frameborder: "0", allowtransparency: "false" });

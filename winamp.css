@@ -330,9 +330,11 @@
 }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* button cluster: a like/dislike row, a VIS/LIB row, then the skin picker —
-   evenly spaced instead of cramped together */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+/* button cluster: TWO columns side by side — like/dislike (stacked) on the left,
+   and VIS+LIB (a row) over the skin picker on the right */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.wa-np-rate { display: flex; flex-direction: column; gap: 5px; }   /* like over dislike */
+.wa-np-col2 { display: flex; flex-direction: column; gap: 5px; }
 .wa-np-toggles { display: flex; gap: 5px; }
 /* VIS/LIB + like/dislike: small CHROME keys like the EQ/PL buttons — a brushed
    silver face, a pixelated label, and a square LED. Sized tight like the EQ key
@@ -425,6 +427,8 @@
 }
 .wa-genskin .wa-tbtn:hover, .wa-plskin .wa-tbtn:hover { filter: brightness(1.15); }
 .wa-genskin .wa-tbtn:active, .wa-plskin .wa-tbtn:active { filter: brightness(0.82); border-color: rgba(0,0,0,0.6) rgba(255,236,160,0.55) rgba(255,236,160,0.55) rgba(0,0,0,0.6); }
+/* crisp SVG fullscreen icon centered in the gold button (replaces the ⛶ glyph) */
+.wa-tbtn svg { width: 12px; height: 12px; fill: currentColor; display: block; pointer-events: none; }
 /* the close glyph is BAKED into the gold top-right corner sprite (--gen-tr); our
    drawn ✕ doubled it up and was mis-shoved 54px left. Replace it with a
    transparent hit-area pinned exactly over the baked icon (Webamp gen-window.css
@@ -684,16 +688,18 @@
 .wa-skinsel-arrow { font-size: 8px; opacity: 0.85; }
 .wa-skinsel-menu {
   display: none; position: absolute; right: 0; top: 100%; margin-top: 2px;
-  z-index: 50; min-width: 132px;
-  font: 700 10px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  background: linear-gradient(180deg, #2a241a, #1c1812);
-  border: 1px solid; border-color: #d9b25a #4a3810 #4a3810 #d9b25a;
-  box-shadow: 2px 3px 6px rgba(0,0,0,0.6);
+  z-index: 50; min-width: 140px;
+  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif;   /* clear, not condensed */
+  background: linear-gradient(180deg, #322a1c, #221b10);
+  border: 1px solid; border-color: #e0bc66 #4a3810 #4a3810 #e0bc66;
+  box-shadow: 2px 3px 7px rgba(0,0,0,0.65);
 }
 .wa-skinsel-menu.open { display: block; }
-.wa-skinsel-item { padding: 5px 10px; color: #e7d2a0; cursor: pointer; white-space: nowrap; }
+/* bright cream text on dark so each skin name is clearly readable */
+.wa-skinsel-item { padding: 6px 11px; color: #f6edcf; cursor: pointer; white-space: nowrap; text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
+.wa-skinsel-item + .wa-skinsel-item { border-top: 1px solid rgba(255,235,170,0.08); }
 /* gold selection highlight (was a harsh bright-green accent) */
-.wa-skinsel-item:hover { background: linear-gradient(180deg, #e7c878, #b8923c); color: #2a1d08; }
+.wa-skinsel-item:hover { background: linear-gradient(180deg, #efd185, #c79a3e); color: #241803; text-shadow: 0 1px 0 rgba(255,250,225,0.5); }
 .wa-skinsel-item.load { border-top: 1px solid #4a3810; color: #c9a44a; }
 
 /* =======================================================================
