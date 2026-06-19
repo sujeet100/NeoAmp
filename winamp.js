@@ -332,29 +332,60 @@
   var skinSelectors = [];
   var DEFAULT_WSZ = "wsz:" + CLASSIC_SKINS[0].id;
   var activeSkinValue = DEFAULT_WSZ;        // currently applied skin (for reverting the picker)
-  function populateSkinOptions(sel) {
-    sel.innerHTML = "";
-    CLASSIC_SKINS.forEach(function (s) {
-      sel.appendChild(h("option", { value: "wsz:" + s.id, text: s.name + (s.custom ? " ★" : "") }));
-    });
-    sel.appendChild(h("option", { value: "__load__", text: "＋ Load skin…" }));
-  }
+  // A native <select> renders the OS dropdown, which breaks the skin illusion.
+  // buildSkinSelect() instead returns a beveled button + a custom popup list
+  // styled like a classic Winamp menu. The returned DOM node exposes a `.value`
+  // getter/setter and a `.populate()` method so selectSkin/refreshSkinOptions/
+  // setSkinSelectors keep working against the same array (skinSelectors).
   function buildSkinSelect() {
-    var sel = h("select", { class: "wa-skinsel", title: "Skin" });
-    populateSkinOptions(sel);
-    sel.addEventListener("mousedown", function (e) { e.stopPropagation(); });
-    sel.addEventListener("change", function () { selectSkin(sel.value); });
-    skinSelectors.push(sel);
-    return sel;
+    var label = h("span", { class: "wa-skinsel-label", text: "Skin" });
+    var btn = h("div", { class: "wa-skinsel-btn", title: "Skin" }, [label, h("span", { class: "wa-skinsel-arrow", text: "▾" })]);
+    var menu = h("div", { class: "wa-skinsel-menu" });
+    var wrap = h("div", { class: "wa-skinsel" }, [btn, menu]);
+    var current = "";
+    Object.defineProperty(wrap, "value", {
+      get: function () { return current; },
+      set: function (v) {
+        current = v;
+        var d = CLASSIC_SKINS.filter(function (s) { return "wsz:" + s.id === v; })[0];
+        label.textContent = d ? d.name : "Skin";
+      },
+    });
+    wrap.populate = function () {
+      menu.innerHTML = "";
+      CLASSIC_SKINS.forEach(function (s) {
+        var it = h("div", { class: "wa-skinsel-item", text: s.name + (s.custom ? " ★" : "") });
+        it.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("wsz:" + s.id); });
+        menu.appendChild(it);
+      });
+      var load = h("div", { class: "wa-skinsel-item load", text: "＋ Load skin…" });
+      load.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__load__"); });
+      menu.appendChild(load);
+    };
+    btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a window drag
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var willOpen = !menu.classList.contains("open");
+      // close any other open picker, then toggle this one
+      skinSelectors.forEach(function (w) { var m = w.querySelector(".wa-skinsel-menu"); if (m) m.classList.remove("open"); });
+      if (willOpen) menu.classList.add("open");
+    });
+    wrap.populate();
+    skinSelectors.push(wrap);
+    return wrap;
   }
-  function refreshSkinOptions() { skinSelectors.forEach(function (s) { populateSkinOptions(s); s.value = activeSkinValue; }); }
+  // click anywhere else closes open skin menus
+  document.addEventListener("click", function () {
+    skinSelectors.forEach(function (w) { var m = w.querySelector(".wa-skinsel-menu"); if (m) m.classList.remove("open"); });
+  });
+  function refreshSkinOptions() { skinSelectors.forEach(function (w) { w.populate(); w.value = activeSkinValue; }); }
   function selectSkin(value) {
     if (value === "__load__") { openSkinPicker(); setSkinSelectors(activeSkinValue); return; }
     if (value.indexOf("wsz:") === 0) { enableClassic(value.slice(4)); activeSkinValue = value; }
     else { disableClassic(); applySkin(value); }
     setSkinSelectors(value);
   }
-  function setSkinSelectors(value) { skinSelectors.forEach(function (s) { s.value = value; }); }
+  function setSkinSelectors(value) { skinSelectors.forEach(function (w) { w.value = value; }); }
 
   // ---- user-loaded .wsz skins (drag-drop / file picker), persisted -----------
   function bufToB64(buf) {
@@ -663,7 +694,8 @@
     ]);
     // VIS/LIB toggles live here because Winamp's main window has no such buttons
     function npBtn(label, title, id, after) {
-      var b = h("div", { class: "wa-np-btn", title: title, text: label });
+      // same size/font as the main window's EQ/PL toggles (.wa-tog) + an LED
+      var b = h("div", { class: "wa-tog wa-np-tog", title: title, text: label });
       b.addEventListener("mousedown", function (e) { e.stopPropagation(); }); // don't start a drag
       b.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -752,7 +784,7 @@
   // EQUALIZER WINDOW (cosmetic — sliders move but don't filter audio yet)
   // =========================================================================
   function buildEq() {
-    var win = makeWindow("wa-eq", "NeoAmp Equalizer", { onClose: function () { hideWin("wa-eq"); } });
+    var win = makeWindow("wa-eq", "Equalizer", { onClose: function () { hideWin("wa-eq"); } });
     var curve = h("canvas", { class: "wa-eq-curve wa-inset", width: "300", height: "56" });
     var onTog = h("div", { class: "wa-tog on", text: "ON" });
     var autoTog = h("div", { class: "wa-tog", text: "AUTO" });
@@ -796,7 +828,7 @@
   // VISUALIZATION WINDOW (Butterchurn iframe in the body)
   // =========================================================================
   function buildViz() {
-    var win = makeWindow("wa-viz", "NeoAmp Visualization", {
+    var win = makeWindow("wa-viz", "Visualization", {
       shade: false,
       titleButtons: [{ label: "⛶", title: "Fullscreen (Esc to exit)", onClick: toggleVizFullscreen }],
       onClose: function () { hideWin("wa-viz"); },
@@ -834,7 +866,7 @@
   // PLAYLIST WINDOW (mirrors YTM's "Up Next" queue)
   // =========================================================================
   function buildPlaylist() {
-    var win = makeWindow("wa-pl", "NeoAmp Playlist", { shade: false, onClose: function () { hideWin("wa-pl"); } });
+    var win = makeWindow("wa-pl", "Playlist", { shade: false, onClose: function () { hideWin("wa-pl"); } });
     var list = h("div", { class: "wa-pl-list" });
     var mk = function (lbl, title, fn) {
       var b = h("div", { class: "wa-pl-btn", title: title, text: lbl });
@@ -898,7 +930,7 @@
   // MEDIA LIBRARY WINDOW (search YTM → sectioned results → play)
   // =========================================================================
   function buildLibrary() {
-    var win = makeWindow("wa-lib", "NeoAmp Library", { shade: false, onClose: function () { hideWin("wa-lib"); } });
+    var win = makeWindow("wa-lib", "Media Library", { shade: false, onClose: function () { hideWin("wa-lib"); } });
     var input = h("input", { class: "wa-lib-input", type: "text", placeholder: "Search songs, artists, albums…" });
     var go = h("button", { class: "wa-lib-go", text: "GO" });
     var list = h("div", { class: "wa-lib-list" });
