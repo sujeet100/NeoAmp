@@ -670,13 +670,17 @@
 /* =======================================================================
    LAUNCHER
    ======================================================================= */
+/* retro GOLD launcher, matching the NeoAmp nameplate + skin picker (was blue) */
 #neoamp-launch {
   position: fixed; right: 18px; bottom: 18px; z-index: 2147483601; pointer-events: auto;
-  font: 700 12px/1 "Lucida Console", monospace; letter-spacing: 1px;
-  color: #d6deff; padding: 9px 13px;
-  background: linear-gradient(180deg, #4a5fb0, #1d2864);
-  border: 1px solid #0c0c12; border-radius: 3px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 14px rgba(0,0,0,0.5);
+  font: 700 12px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif; letter-spacing: 1px;
+  color: #3a2a06; text-shadow: 0 1px 0 rgba(255,246,214,0.6);
+  padding: 9px 15px;
+  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
+  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255,250,228,0.6), 0 4px 14px rgba(0,0,0,0.5);
   cursor: pointer;
 }
-#neoamp-launch:hover { filter: brightness(1.12); }
+#neoamp-launch:hover { filter: brightness(1.06); }
+#neoamp-launch:active { border-color: #4a3810 #efdfa6 #fbefcb #5a4514; box-shadow: inset 1px 1px 3px rgba(60,40,8,0.6); }
