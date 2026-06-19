@@ -284,13 +284,13 @@
 /* "Now Playing" panel docked between Main and EQ in classic (.wsz) mode.
    Skin-width (550px = 275 * 2x) so it lines up flush with the skinned windows. */
 .wa-np {
-  width: 550px; height: 84px; cursor: move; box-sizing: border-box;  /* border inside 550 so it matches the borderless main canvas */
-  display: flex; align-items: stretch; gap: 8px; padding: 6px;
-  /* themed from the skin's PLEDIT palette so it changes per skin */
-  background: var(--pl-normalbg, var(--wa-win-bg));
-  border: 2px solid var(--wa-win-border);
+  width: 550px; height: 92px; cursor: move; box-sizing: border-box;  /* border inside 550 so it matches the borderless main canvas */
+  display: flex; align-items: center; gap: 12px; padding: 9px 13px;
+  /* gold beveled frame so it reads as a framed window like the gold GEN ones */
+  background: linear-gradient(180deg, #2a2620 0%, #1a1712 100%);
+  border: 2px solid; border-color: #dcb65e #4a3810 #3a2c0c #cba749;
   box-shadow:
-    inset 2px 2px 0 var(--wa-bevel-light), inset -2px -2px 0 var(--wa-bevel-dark),
+    inset 1px 1px 0 rgba(255,246,214,0.45), inset -1px -1px 0 rgba(26,16,4,0.7),
     var(--wa-win-shadow);
 }
 .wa-np-art {
@@ -308,39 +308,48 @@
 }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
-/* VIS/LIB + like/dislike: small raised, beveled buttons modelled on the classic
-   EQ/PL toggles — an LCD-green label/icon on a metal face with a left-side LED
-   that lights when active (window open / track liked). */
+/* button cluster: a like/dislike row, a VIS/LIB row, then the skin picker —
+   evenly spaced instead of cramped together */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
+.wa-np-toggles { display: flex; gap: 5px; }
+.wa-np-toggles .wa-np-tog { flex: 1 1 0; }
+/* VIS/LIB + like/dislike: modelled on the skin's GREEN EQ/PL key — a raised
+   button with a green LCD face and an embossed dark label/icon; it brightens +
+   glows when active (window open / track liked). No separate LED dot — the green
+   key itself is the indicator, exactly like the EQ button. */
 .wa-np-tog {
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  height: 20px; min-width: 52px; padding: 0 9px; cursor: pointer;
-  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
-  color: var(--pl-normal, var(--wa-lcd));
-  background: linear-gradient(180deg, #545460 0%, #3b3b46 52%, #2b2b34 100%);
-  border: 1px solid; border-color: rgba(255,255,255,0.28) #121218 #121218 rgba(255,255,255,0.28);
+  display: flex; align-items: center; justify-content: center;
+  height: 22px; min-width: 50px; padding: 0 11px; cursor: pointer;
+  font: 700 10px/1 var(--wa-font); letter-spacing: 1.5px; text-transform: uppercase;
+  color: #08300f; text-shadow: 0 1px 0 rgba(175,255,185,0.45);   /* engraved dark label */
+  background: linear-gradient(180deg, #57c873 0%, #2f9f4c 48%, #1f7d39 100%);
+  border: 1px solid; border-color: #9bf3ad #0c451c #0a3917 #74dd8c;
   border-radius: 2px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(220,255,225,0.5), 0 1px 2px rgba(0,0,0,0.5);
 }
-.wa-np-tog:hover { filter: brightness(1.12); }
-.wa-np-tog.on {
-  border-color: #121218 rgba(255,255,255,0.28) rgba(255,255,255,0.28) #121218;
-  background: linear-gradient(180deg, #2a2a33, #44444f);
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7);
-  color: var(--wa-lcd); text-shadow: 0 0 5px var(--wa-accent-glow);
+.wa-np-tog:hover { filter: brightness(1.08); }
+.wa-np-tog.on {                                  /* lit/pressed: window open / liked */
+  border-color: #0a3917 #74dd8c #9bf3ad #0c451c;
+  background: linear-gradient(180deg, #1f7d39, #46be62);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 7px rgba(60,230,110,0.55);
 }
-.wa-np-tog::before {
-  content: ""; width: 5px; height: 5px; border-radius: 1px; flex: 0 0 auto;
-  background: #15331c; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);   /* LED off */
-}
-.wa-np-tog.on::before { background: var(--wa-accent); box-shadow: 0 0 5px var(--wa-accent-glow); }  /* LED on */
-/* like/dislike: SVG icon + LED; the icon + LED light green (like) / red (dislike) */
+/* like = GOLD key with a heart; dislike = PINK key with a thumbs-down
+   (override the green .wa-np-tog base for the rate pair); glow when active */
 .wa-np-rate { display: flex; gap: 5px; }
-.wa-rate-btn { min-width: 0; padding: 0 8px; color: var(--wa-fg-dim); }
-.wa-rate-btn svg { width: 13px; height: 13px; fill: currentColor; display: block; }
-.wa-rate-btn.wa-like.on { color: var(--wa-accent); }
-.wa-rate-btn.wa-dislike.on { color: var(--wa-bar-peak, #ff5050); text-shadow: none; }
-.wa-rate-btn.wa-dislike.on::before { background: var(--wa-bar-peak, #ff5050); box-shadow: 0 0 5px rgba(255,80,80,0.6); }
+.wa-rate-btn { min-width: 0; padding: 0 10px; }
+.wa-rate-btn svg { width: 14px; height: 14px; display: block; }
+.wa-rate-btn.wa-like {
+  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
+  border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+}
+.wa-rate-btn.wa-like svg { fill: #3a2a06; }
+.wa-rate-btn.wa-dislike {
+  background: linear-gradient(180deg, #f3aec6 0%, #db6f97 48%, #c25278 100%);
+  border-color: #ffd4e4 #6e2440 #5c1c34 #f4bcd2;
+}
+.wa-rate-btn.wa-dislike svg { fill: #4a1430; }
+.wa-rate-btn.wa-like.on { box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 8px rgba(235,195,95,0.78); }
+.wa-rate-btn.wa-dislike.on { box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), 0 0 8px rgba(240,130,170,0.78); }
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
 .wa-np-btns .wa-skinsel-btn { height: 20px; padding: 0 10px; font-size: 11px; }
@@ -641,10 +650,10 @@
    the skin illusion). Readable bold sans, dark engraved text on the gold plate. */
 .wa-skinsel { position: relative; display: inline-block; margin-right: 4px; }
 .wa-skinsel-btn {
-  display: flex; align-items: center; gap: 5px; height: 15px; padding: 0 8px;
-  font: 700 9px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 0.3px; white-space: nowrap;
-  color: #3a2a06; text-shadow: 0 1px 0 rgba(255,246,214,0.55);
+  display: flex; align-items: center; gap: 5px; height: 16px; padding: 0 8px;
+  font: 700 10px/1 "Helvetica Neue", Arial, sans-serif;   /* clearer than Arial Narrow */
+  letter-spacing: 0; white-space: nowrap;
+  color: #231702; text-shadow: 0 1px 0 rgba(255,248,222,0.5);
   background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
   border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
   border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255,250,228,0.6), 0 1px 2px rgba(0,0,0,0.45);

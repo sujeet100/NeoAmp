@@ -727,12 +727,11 @@
     ]);
     var npSkinSel = buildSkinSelect();
     npSkinSel.value = "wsz:" + (CLASSIC_SKINS[0] && CLASSIC_SKINS[0].id);
-    var btns = h("div", { class: "wa-np-btns" }, [
-      rate,
+    var toggles = h("div", { class: "wa-np-toggles" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
-      npSkinSel,
     ]);
+    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, npSkinSel]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
     el.addEventListener("mousedown", function () { raise(el); }, true);
