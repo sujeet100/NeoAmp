@@ -309,12 +309,14 @@
   var RESIZABLE_W = { "wa-viz": 1, "wa-lib": 1 };
   var RESIZABLE_H = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1 };
   function applyLayout() {
+    // viz/lib default to the RIGHT of the classic stack (which is 550px wide at
+    // x40 → right edge ~590), so they don't float over the docked windows.
     var defaults = {
       "wa-main": { x: 40, y: 70 },
       "wa-eq": { x: 40, y: 250 },
-      "wa-viz": { x: 514, y: 70, w: 360, h: 280 },
+      "wa-viz": { x: 610, y: 70, w: 380, h: 300 },
       "wa-pl": { x: 40, y: 430, h: 220 },
-      "wa-lib": { x: 514, y: 370, w: 380, h: 300, hidden: true },
+      "wa-lib": { x: 610, y: 386, w: 380, h: 320, hidden: true },
     };
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
@@ -586,7 +588,12 @@
     classicWin.el.style.display = "";
     if (wins["wa-np"]) wins["wa-np"].el.style.display = "";
     raise(classicWin.el);
+    // hide BOTH procedural windows the classic skin replaces: the main window
+    // (#wa-main → #wa-skin) and the procedural equalizer (#wa-eq → #wa-eq-skin).
+    // #wa-eq is shown by default, so on a fresh load it otherwise floats over the
+    // Now-Playing panel in classic mode.
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "none";
+    if (wins["wa-eq"]) wins["wa-eq"].el.style.display = "none";
     NA.storage.set({ neoampSkin: "wsz:" + id });
 
     classicLoading = true;
@@ -618,6 +625,7 @@
     if (wins["wa-np"]) wins["wa-np"].el.style.display = "none";
     if (wins["wa-eq-skin"]) wins["wa-eq-skin"].el.style.display = "none";
     if (wins["wa-main"]) wins["wa-main"].el.style.display = "";
+    if (wins["wa-eq"] && els.eqTog) wins["wa-eq"].el.style.display = els.eqTog.classList.contains("on") ? "" : "none";
     removeFrame();
   }
   // Wrap the DOM windows (Playlist/Library/Viz) in a skin-matching frame: the
