@@ -953,7 +953,7 @@
     var home = h("button", { class: "wa-lib-go wa-lib-home", title: "Quick Picks & Listen Again", text: "HOME" });
     var list = h("div", { class: "wa-lib-list" });
     var status = h("div", { class: "wa-lib-status", text: "Search, or HOME for Quick Picks & Listen Again." });
-    home.addEventListener("click", loadHome);
+    home.addEventListener("click", function () { loadHome(true); });
     win.body.appendChild(h("div", { class: "wa-lib-bar" }, [input, go, home]));
     win.body.appendChild(list);
     win.body.appendChild(status);
@@ -1060,18 +1060,22 @@
     });
     els.libStatus.textContent = "Home — Quick Picks & Listen Again (double-click to play).";
   }
-  function loadHome() {
+  // navigate=true lets content.js SPA-jump YTM to its home feed if no shelves are
+  // currently loaded (explicit HOME button only); the idle auto-load passes false
+  // so merely opening the Library never yanks the user off their page.
+  function loadHome(navigate) {
     if (!els.libList) return;
     els.libStatus.textContent = "Loading Quick Picks & Listen Again…";
-    NA.getHomeShelves(renderHome);
+    NA.getHomeShelves(renderHome, navigate);
   }
   // when the Library is revealed: focus the box, and auto-show the home shelves
-  // if it's idle (empty query + nothing playing + nothing listed yet)
+  // if it's idle (empty query + nothing playing + nothing listed yet) — without
+  // navigating (only scrapes shelves already on the page).
   function libBecameVisible() {
     if (els.libInput) els.libInput.focus();
     var t = NA.getTrack && NA.getTrack();
     if (els.libInput && !els.libInput.value.trim() && (!t || !t.title) && els.libList && !els.libList.childElementCount) {
-      loadHome();
+      loadHome(false);
     }
   }
 

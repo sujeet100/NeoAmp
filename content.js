@@ -123,10 +123,13 @@
   function parseByline(text) {
     var parts = (text || "").split("•").map(function (s) { return clean(s); }).filter(Boolean);
     var out = { artist: parts[0] || "", album: "", year: "", plays: "" };
+    // Order matters: the FIRST non-plays segment is the album, so a 4-digit
+    // album title ("1989", "1984") isn't stolen by the year test; a later
+    // 19xx/20xx is the year.
     parts.slice(1).forEach(function (p) {
-      if (/^\d{4}$/.test(p)) out.year = p;
-      else if (/\b(plays?|views?)\b/i.test(p)) out.plays = p;
-      else if (!out.album) out.album = p;             // first non-year/non-plays = album
+      if (/\b(plays?|views?)\b/i.test(p)) out.plays = p;
+      else if (!out.album) out.album = p;
+      else if (/^(19|20)\d{2}$/.test(p)) out.year = p;
     });
     return out;
   }
@@ -187,7 +190,7 @@
         title: title,
         artist: byline.split("•")[0].trim(),
         duration: clean((it.querySelector(".duration") || {}).textContent),
-        plays: matchPlays(it.textContent),       // usually absent in queue rows
+        plays: matchPlays(byline),               // from the byline only (usually absent)
         art: img && /^https?:/.test(img.src) ? img.src : "",
         playing: it.hasAttribute("selected") || pbs === "playing" || pbs === "paused",
       });
@@ -214,9 +217,11 @@
 
   // play count for a result row: scan the flex columns first, then the whole row
   function rowPlays(r) {
+    // scan only the metadata flex columns — not the whole row (a title containing
+    // "views"/"plays" would otherwise yield a bogus count)
     var cols = r.querySelectorAll(".flex-column, yt-formatted-string.flex-column, .secondary-flex-columns yt-formatted-string");
     for (var i = 0; i < cols.length; i++) { var m = matchPlays(cols[i].textContent); if (m) return m; }
-    return matchPlays(r.textContent);
+    return "";
   }
   // song vs playlist/album, by the title link's navigation endpoint (not the tag)
   function classifyRow(r) {
@@ -309,7 +314,11 @@
     if (logo) { logo.click(); return true; }
     return false;
   }
-  function getHomeShelves(cb) {
+  // allowNavigate=true permits clicking the Home pivot (SPA-navigating YTM there)
+  // when no shelves are on the page — reserved for the explicit HOME button. The
+  // auto path (allowNavigate falsy) only scrapes shelves already present, so
+  // merely opening the Library never yanks the user off their current page.
+  function getHomeShelves(cb, allowNavigate) {
     var collect = function () {
       var list = scrapeShelf(findShelf("Quick picks"), "Quick Picks")
         .concat(scrapeShelf(findShelf("Listen again"), "Listen Again"));
@@ -320,7 +329,7 @@
       }), home: true });
     };
     if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) { collect(); return; }
-    if (!goHome()) { cb({ results: [], home: true }); return; }
+    if (!allowNavigate || !goHome()) { cb({ results: [], home: true }); return; }
     var tries = 0;
     (function wait() {
       if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) { setTimeout(collect, 400); return; }
@@ -398,16 +407,21 @@
     like: function () {
       var r = likeRenderer(); if (!r) return;
       var b = r.querySelector("#button-shape-like > button") || r.querySelector("#button-shape-like button") || r.querySelector("button[aria-label='Like']");
-      if (b) { b.click(); sendTrack(); }
+      // YTM flips like-status asynchronously — re-read after a tick so the LED
+      // reflects the toggle promptly instead of waiting for the 400ms poll.
+      if (b) { b.click(); setTimeout(sendTrack, 250); }
     },
     dislike: function () {
       var r = likeRenderer(); if (!r) return;
       var b = r.querySelector("#button-shape-dislike > button") || r.querySelector("#button-shape-dislike button") || r.querySelector("button[aria-label='Dislike']");
-      if (b) { b.click(); sendTrack(); }
+      if (b) { b.click(); setTimeout(sendTrack, 250); }
     },
     // play a scraped home-shelf item by its index (refs held in homeItems)
     playHomeItem: function (idx) {
       var it = homeItems[idx]; if (!it || !it._el) return;
+      // the cached node goes stale after any SPA navigation (e.g. a search) tore
+      // down the home DOM — detect it (a detached node is still truthy) and bail.
+      if (!document.contains(it._el)) { toast("Home list changed — press HOME to refresh"); return; }
       var b = it._el.querySelector("ytmusic-play-button-renderer") || it._el.querySelector(".thumbnail yt-icon, yt-icon.icon");
       if (b) { b.click(); return; }
       var a = it._el.querySelector("a.yt-simple-endpoint[href]"); if (a) a.click();
