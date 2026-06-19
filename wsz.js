@@ -250,7 +250,7 @@
     var st = {
       elapsed: 0, duration: 0, title: "NeoAmp", kbps: "", khz: "", stereo: true,
       playing: false, paused: false, shuffle: false, repeat: false, volume: 1, balance: 0,
-      pressed: null, eqOn: false, plOn: false, freq: null, marqueeX: 0,
+      pressed: null, eqOn: false, plOn: false, freq: null, marqueeX: 0, scrub: null,
     };
 
     function sheet(name) { return skin.sheets[name]; }
@@ -300,16 +300,38 @@
       drawGlyphs(full, R.x - off + fullW, R.y);   // wrap copy for seamless loop
       ctx.restore();
     }
-    // brand nameplate over the skin's baked "WINAMP" titlebar text (the text is
-    // part of each skin's TITLEBAR.BMP, so we cover it with a small dark plate)
+    // Brand nameplate over the skin's baked "WINAMP" titlebar text (the wordmark
+    // is part of each skin's TITLEBAR.BMP). We can't recolor the skin's bitmap
+    // font cleanly (its glyphs have no alpha), so the plate is drawn as a classic
+    // engraved gold/bronze chrome plaque with vector lettering — skin-independent,
+    // and kept inside x16..243 so it never covers the real titlebar buttons
+    // (options at x6-15; minimize/shade/close at x244-273, per Webamp main-window.css).
     function drawBrand() {
-      var label = "neoamp";                 // lowercased for the FONT map
-      var bw = label.length * CHAR_W, pw = bw + 10, ph = 9;
-      var px = Math.round((MAIN_W - pw) / 2), py = 3;
-      ctx.fillStyle = "rgba(8,8,14,0.92)"; ctx.fillRect(px, py, pw, ph);
-      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fillRect(px, py, pw, 1);
-      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(px, py + ph - 1, pw, 1);
-      drawText(label, px + 5, py + 2, bw + 2);
+      var label = "NeoAmp";
+      ctx.save();
+      ctx.font = "700 9px 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif";
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "1px";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      var tw = ctx.measureText(label).width;
+      var pw = Math.ceil(tw) + 16, ph = 12, py = 1;
+      var cx = Math.round(MAIN_W / 2), px = Math.round(cx - pw / 2);
+      if (px < 16) { px = 16; cx = px + pw / 2; }                 // clear options button
+      if (px + pw > 243) { px = 243 - pw; cx = px + pw / 2; }     // clear min/shade/close
+      // brushed gold→bronze plate with a hard mid seam
+      var pg = ctx.createLinearGradient(0, py, 0, py + ph);
+      pg.addColorStop(0, "#d8b863"); pg.addColorStop(0.5, "#9b7a2e");
+      pg.addColorStop(0.5, "#876722"); pg.addColorStop(1, "#523e13");
+      ctx.fillStyle = pg; ctx.fillRect(px, py, pw, ph);
+      // raised bevel: light top/left, dark bottom/right
+      ctx.fillStyle = "rgba(255,248,220,0.9)"; ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py, 1, ph);
+      ctx.fillStyle = "rgba(34,23,4,0.92)"; ctx.fillRect(px, py + ph - 1, pw, 1); ctx.fillRect(px + pw - 1, py, 1, ph);
+      // engraved lettering: dark incised shadow under a bright gold/chrome face
+      var ty = py + ph / 2 + 1;
+      ctx.fillStyle = "rgba(20,12,0,0.85)"; ctx.fillText(label, cx + 0.6, ty + 0.8);
+      var lg = ctx.createLinearGradient(0, py + 1, 0, py + ph - 1);
+      lg.addColorStop(0, "#fff7dc"); lg.addColorStop(0.5, "#f0d182"); lg.addColorStop(1, "#a87f28");
+      ctx.fillStyle = lg; ctx.fillText(label, cx, ty);
+      ctx.restore();
     }
     // live spectrum analyzer in the main window's visualizer region
     function drawAnalyzer() {
@@ -349,7 +371,7 @@
     }
     function drawBalance() {
       var img = sheet("BALANCE"); if (!img) return;
-      var idx = Math.round(Math.abs(st.balance) * 27);
+      var idx = Math.floor(Math.abs(st.balance) * 27);   // Webamp uses floor(abs*27)
       blitRect("BALANCE", SP.BALANCE.BG_X, idx * 15, LAYOUT.balance.w, 13, LAYOUT.balance.x, LAYOUT.balance.y);
       var tx = LAYOUT.balance.x + Math.round(((st.balance + 1) / 2) * (LAYOUT.balance.w - 14));
       blit("BALANCE", st.pressed === "balance" ? "THUMB_A" : "THUMB", tx, LAYOUT.balance.y + 1);
@@ -359,7 +381,9 @@
       if (!sheet("POSBAR")) return;
       blit("POSBAR", "BG", LAYOUT.position.x, LAYOUT.position.y);
       if (st.duration > 0 && !st.stopped) {
-        var frac = Math.max(0, Math.min(1, st.elapsed / st.duration));
+        // while scrubbing, the thumb follows the cursor (seek commits on release)
+        var frac = (st.pressed === "position" && st.scrub != null)
+          ? st.scrub : Math.max(0, Math.min(1, st.elapsed / st.duration));
         var tx = LAYOUT.position.x + Math.round(frac * (LAYOUT.position.w - 29));
         blit("POSBAR", st.pressed === "position" ? "THUMB_A" : "THUMB", tx, LAYOUT.position.y);
       }
@@ -415,22 +439,52 @@
       return (e.clientX - b.left) / scale;
     }
 
+    // value 0..1 for a horizontal slider from the cursor x (thumbW reserved at
+    // the right so the thumb's left edge tracks the cursor, like real Winamp)
+    function valAt(e, R, thumbW) {
+      return Math.max(0, Math.min(1, (localX(e) - R.x) / (R.w - thumbW)));
+    }
+
+    // which slider is being dragged: "volume" | "balance" | "position" | null.
+    // Drag uses WINDOW listeners (not canvas) so it survives the cursor leaving
+    // the canvas — exactly why mountEq listens on window for its band faders.
+    var slider = null;
     var BUTTONS = ["prev", "play", "pause", "stop", "next", "eject"];
     canvas.addEventListener("mousedown", function (e) {
       // transport press feedback
       for (var i = 0; i < BUTTONS.length; i++) {
         if (hit(e, LAYOUT[BUTTONS[i]])) { st.pressed = BUTTONS[i]; scheduleRender(); return; }
       }
-      // sliders: seek / volume by click position
+      // sliders: begin a drag; clicking the track also jumps to that spot
       if (hit(e, LAYOUT.position) && st.duration > 0) {
-        var f = Math.max(0, Math.min(1, (localX(e) - LAYOUT.position.x) / (LAYOUT.position.w - 29)));
-        if (hooks.onSeek) hooks.onSeek(f * st.duration);
-      } else if (hit(e, LAYOUT.volume)) {
-        var v = Math.max(0, Math.min(1, (localX(e) - LAYOUT.volume.x) / (LAYOUT.volume.w - 14)));
-        st.volume = v; if (hooks.onVolume) hooks.onVolume(v); scheduleRender();
+        slider = "position"; st.pressed = "position"; st.scrub = valAt(e, LAYOUT.position, 29);
+        scheduleRender(); return;
+      }
+      if (hit(e, LAYOUT.volume)) {
+        slider = "volume"; st.pressed = "volume"; st.volume = valAt(e, LAYOUT.volume, 14);
+        if (hooks.onVolume) hooks.onVolume(st.volume); scheduleRender(); return;
+      }
+      if (hit(e, LAYOUT.balance)) {
+        slider = "balance"; st.pressed = "balance"; st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1;
+        scheduleRender(); return;
       }
     });
+    var onSlide = function (e) {
+      if (!slider) return;
+      if (slider === "volume") { st.volume = valAt(e, LAYOUT.volume, 14); if (hooks.onVolume) hooks.onVolume(st.volume); }
+      else if (slider === "balance") { st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1; }
+      else if (slider === "position") { st.scrub = valAt(e, LAYOUT.position, 29); }
+      scheduleRender();
+    };
+    var onSlideEnd = function () {
+      if (!slider) return;
+      if (slider === "position" && hooks.onSeek && st.scrub != null) hooks.onSeek(st.scrub * st.duration);
+      slider = null; st.pressed = null; st.scrub = null; scheduleRender();
+    };
+    window.addEventListener("mousemove", onSlide);
+    window.addEventListener("mouseup", onSlideEnd);
     canvas.addEventListener("mouseup", function (e) {
+      if (slider) return;            // a slider release is handled by onSlideEnd
       var was = st.pressed; st.pressed = null; scheduleRender();
       if (!was) {
         // non-transport clicks resolved on mouseup
@@ -451,8 +505,9 @@
         else if (was === "eject") hooks.onEject && hooks.onEject();
       }
     });
-    // release press state if the mouse leaves mid-click
-    canvas.addEventListener("mouseleave", function () { if (st.pressed && st.pressed.length) { st.pressed = null; scheduleRender(); } });
+    // release a transport-button press if the mouse leaves mid-click — but never
+    // cancel an active slider drag (that's tracked on window listeners).
+    canvas.addEventListener("mouseleave", function () { if (st.pressed && !slider) { st.pressed = null; scheduleRender(); } });
 
     render();
 
@@ -473,7 +528,14 @@
       setVolume: function (v) { st.volume = v; scheduleRender(); },
       setToggles: function (eqOn, plOn) { st.eqOn = eqOn; st.plOn = plOn; scheduleRender(); },
       pushAudio: function (freq) { st.freq = freq; scheduleRender(); },
-      destroy: function () { clearInterval(tick); if (raf) cancelAnimationFrame(raf); canvas.remove(); },
+      // remove the window-level drag listeners too (mountMain is remounted on
+      // every skin switch — otherwise stale handlers stack up and fire against a
+      // detached canvas).
+      destroy: function () {
+        clearInterval(tick); if (raf) cancelAnimationFrame(raf);
+        window.removeEventListener("mousemove", onSlide); window.removeEventListener("mouseup", onSlideEnd);
+        canvas.remove();
+      },
     };
   }
 
@@ -559,21 +621,27 @@
       var bi = bandAt(p);
       if (bi >= 0) { dragBand = bi; bands[bi] = valFromY(p.y); sched(); e.preventDefault(); }
     });
-    window.addEventListener("mousemove", function (e) {
+    var onMove = function (e) {
       if (dragBand < 0) return; bands[dragBand] = valFromY(pos(e).y); sched();
-    });
-    window.addEventListener("mouseup", function (e) {
+    };
+    var onUp = function (e) {
       if (dragBand >= 0) { dragBand = -1; sched(); return; }
       var p = pos(e);
       if (p.x >= EQ_LAYOUT.on.x && p.x <= EQ_LAYOUT.on.x + EQ_LAYOUT.on.w && p.y >= EQ_LAYOUT.on.y && p.y <= EQ_LAYOUT.on.y + EQ_LAYOUT.on.h) { on = !on; sched(); }
       else if (p.x >= EQ_LAYOUT.close.x && p.x <= EQ_LAYOUT.close.x + 9 && p.y >= EQ_LAYOUT.close.y && p.y <= EQ_LAYOUT.close.y + 9) { hooks.onClose && hooks.onClose(); }
-    });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
 
     render();
     return {
       el: canvas,
       dragRegion: { x: 0, y: 0, w: 244 * scale, h: EQ_LAYOUT.titlebar.h * scale },
-      destroy: function () { if (raf) cancelAnimationFrame(raf); canvas.remove(); },
+      destroy: function () {
+        if (raf) cancelAnimationFrame(raf);
+        window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
+        canvas.remove();
+      },
     };
   }
 
@@ -605,6 +673,7 @@
     TL: [0, 0, 25, 20], TFILL: [127, 0, 25, 20], TITLE: [26, 0, 100, 20], TR: [153, 0, 25, 20],
     LEFT: [0, 42, 12, 29], RIGHT: [31, 42, 20, 29],
     BL: [0, 72, 125, 38], BR: [126, 72, 150, 38], BFILL: [179, 0, 25, 38],
+    CLOSE: [52, 42, 9, 9],    // pressed-close sprite (released close is baked into TR)
   };
   function pleditFrameAssets(skin) {
     var p = skin.sheets.PLEDIT; if (!p) return null;
