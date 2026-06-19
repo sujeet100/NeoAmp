@@ -96,6 +96,13 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
   await clipShot("dropdown", { x: 360, y: 330, width: 280, height: 300 });
   await evalJs(send, `document.body.click(); true`);
 
+  // reveal the classic EQ window (mounted-but-hidden) at a fixed spot + capture its
+  // faders — they should sit at the seeded band gains, not flat
+  await evalJs(send, `(function(){var w=document.getElementById('wa-eq-skin'); if(w){w.style.display='';w.style.left='40px';w.style.top='560px';w.style.zIndex=9998;} return !!w;})()`);
+  await sleep(200);
+  await clipShot("eq_window", { x: 38, y: 558, width: 562, height: 240 });
+  await evalJs(send, `(function(){var w=document.getElementById('wa-eq-skin'); if(w)w.style.display='none'; return true;})()`);
+
   // open Library (LIB toggle in the NP panel), then run a search, then HOME
   await evalJs(send, `[].slice.call(document.querySelectorAll('.wa-np-tog')).filter(function(b){return /LIB/i.test(b.textContent);}).forEach(function(b){b.click();}); true`);
   await sleep(500); await shot(send, "2_library_open");

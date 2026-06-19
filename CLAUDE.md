@@ -17,11 +17,15 @@ YouTube Music audio.
 
 **TWO WORKSTREAMS.** Most of *this* file is the **visualizer presets**. The other
 half of the project is the **Winamp-style player UI** (`content.js` / `winamp.js` /
-`wsz.js` / `winamp.css` — floating windowed player, real `.wsz` skins, now-playing /
-playlist / library). If you're working on the player UI (windows, skins, controls,
-EQ, keyboard), read **`docs/neoamp-ui/HANDOFF.md`** first — and note you can
-**self-render that UI headlessly** via `node tools/render-neoamp.mjs` (sibling of the
-viz's `tools/selfrender.mjs`). Next planned UI work: a real EQ + state-sync + keyboard.
+`wsz.js` / `winamp.css` + now `sw.js` / `offscreen.js` — floating windowed player,
+real `.wsz` skins, now-playing / playlist / library, **real EQ**). If you're working
+on the player UI (windows, skins, controls, EQ, keyboard), read
+**`docs/neoamp-ui/HANDOFF.md`** first — and note you can **self-render that UI
+headlessly** via `node tools/render-neoamp.mjs` (sibling of the viz's
+`tools/selfrender.mjs`). **SHIPPED 2026-06-19:** the **real EQ** (audio now captured
+via `chrome.tabCapture` in an **offscreen document** + a **service worker**, NOT
+getDisplayMedia — so the EQ shapes what you hear), plus state-sync + keyboard. The viz
+still gets FFT via `postMessage`; only the audio *source* changed. See HANDOFF.md §3/§5.
 
 ## How to run / test (manual — there is no automated UI test)
 

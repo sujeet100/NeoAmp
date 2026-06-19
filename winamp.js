@@ -516,9 +516,9 @@
     ]);
 
     els.vol = h("input", { class: "wa-range wa-vol", type: "range", min: "0", max: "100", value: "100", title: "Volume" });
-    els.bal = h("input", { class: "wa-range wa-bal", type: "range", min: "-100", max: "100", value: "0", title: "Balance (cosmetic)" });
+    els.bal = h("input", { class: "wa-range wa-bal", type: "range", min: "-100", max: "100", value: "0", title: "Balance" });
     els.vol.addEventListener("input", function () { NA.control.setVolume(+els.vol.value / 100); paintRange(els.vol); });
-    els.bal.addEventListener("input", function () { paintRange(els.bal); });
+    els.bal.addEventListener("input", function () { NA.control.setBalance(+els.bal.value / 100); paintRange(els.bal); });
     var vols = h("div", { class: "wa-vols" }, [els.vol, els.bal]);
 
     function tog(label, title, fn) {
@@ -526,8 +526,8 @@
       t.addEventListener("click", function () { fn(t); });
       return t;
     }
-    els.shuffleTog = tog("SHUF", "Shuffle", function (t) { t.classList.toggle("on"); NA.control.toggleShuffle(); });
-    els.repeatTog = tog("REP", "Repeat", function (t) { t.classList.toggle("on"); NA.control.toggleRepeat(); });
+    els.shuffleTog = tog("SHUF", "Shuffle", function (t) { transportToggleAt = Date.now(); t.classList.toggle("on"); NA.control.toggleShuffle(); });
+    els.repeatTog = tog("REP", "Repeat", function (t) { transportToggleAt = Date.now(); t.classList.toggle("on"); NA.control.toggleRepeat(); });
     els.eqTog = tog("EQ", "Toggle equalizer", function (t) { toggleWin("wa-eq", t); });
     els.plTog = tog("PL", "Toggle playlist", function (t) { toggleWin("wa-pl", t); refreshQueue(true); });
     els.visTog = tog("VIS", "Toggle visualization", function (t) { toggleWin("wa-viz", t); });
@@ -551,8 +551,9 @@
       seeking = false;
     });
 
-    // init volume + slider fills
+    // init volume + balance + slider fills
     els.vol.value = String(Math.round(NA.control.getVolume() * 100));
+    if (NA.control.getEqState) els.bal.value = String(Math.round(NA.control.getEqState().balance * 100));
     [els.seek, els.vol, els.bal].forEach(paintRange);
   }
 
@@ -692,9 +693,15 @@
       // position is set by dockClassicStack() (flush below the Now-Playing panel)
     }
     if (classicEqApi) classicEqApi.destroy();
-    classicEqApi = window.NeoAmpClassic.mountEq(w.el, skin, { onClose: function () {
-      w.el.style.display = "none"; classicApi && classicApi.setToggles(false, isShown("wa-pl"));
-    } });
+    classicEqApi = window.NeoAmpClassic.mountEq(w.el, skin, {
+      initial: NA.control.getEqState ? NA.control.getEqState() : null,
+      onBand: function (i, db) { NA.control.setEqBand(i, db); },
+      onPreamp: function (db) { NA.control.setPreamp(db); },
+      onEnabled: function (on) { NA.control.setEqEnabled(on); },
+      onClose: function () {
+        w.el.style.display = "none"; classicApi && classicApi.setToggles(false, isShown("wa-pl"));
+      },
+    });
     w.drag.style.width = classicEqApi.dragRegion.w + "px";
     w.drag.style.height = classicEqApi.dragRegion.h + "px";
   }
@@ -793,9 +800,11 @@
       onNext: function () { NA.control.next(); },
       onEject: function () { focusYtSearch(); },
       onSeek: function (t) { NA.control.seek(t); },
-      onVolume: function (v) { NA.control.setVolume(v); if (els.vol) els.vol.value = String(Math.round(v * 100)); },
-      onShuffle: function () { NA.control.toggleShuffle(); },
-      onRepeat: function () { NA.control.toggleRepeat(); },
+      onVolume: function (v) { NA.control.setVolume(v); if (els.vol) { els.vol.value = String(Math.round(v * 100)); paintRange(els.vol); } },
+      balance: NA.control.getEqState ? NA.control.getEqState().balance : 0,
+      onBalance: function (x) { NA.control.setBalance(x); if (els.bal) { els.bal.value = String(Math.round(x * 100)); paintRange(els.bal); } },
+      onShuffle: function () { transportToggleAt = Date.now(); NA.control.toggleShuffle(); },
+      onRepeat: function () { transportToggleAt = Date.now(); NA.control.toggleRepeat(); },
       onToggleEq: function () { toggleWin("wa-eq-skin"); dockClassicStack(); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onTogglePl: function () { toggleWin("wa-pl", els.plTog); refreshQueue(true); dockClassicStack(); classicApi && classicApi.setToggles(isShown("wa-eq-skin"), isShown("wa-pl")); },
       onToggleViz: function () { toggleWin("wa-viz", els.visTog); },
@@ -806,14 +815,23 @@
   function pushClassicTrack(t) {
     pushNowPlaying(t);
     if (!classicApi) return;
-    classicApi.update({
+    var patch = {
       elapsed: t.currentTime || 0,
       duration: t.duration || 0,
       title: t.title ? (t.title + (t.artist ? " - " + t.artist : "")) : "NeoAmp",
       stopped: !t.title,
       paused: !!t.paused,
       playing: !t.paused && !!t.title,
-    });
+    };
+    // only set the toggles when YTM's state is actually known (null → keep the
+    // optimistic value rather than overwriting it with undefined/false), and not
+    // while a just-fired toggle is still settling (don't revert the optimistic flip)
+    if (!transportSettling()) {
+      if (t.shuffle != null) patch.shuffle = !!t.shuffle;
+      if (t.repeat != null) patch.repeat = !!t.repeat;
+    }
+    if (t.volume != null) patch.volume = t.volume;
+    classicApi.update(patch);
   }
 
   // =========================================================================
@@ -821,19 +839,25 @@
   // =========================================================================
   function buildEq() {
     var win = makeWindow("wa-eq", "Equalizer", { onClose: function () { hideWin("wa-eq"); } });
+    var es = NA.control.getEqState ? NA.control.getEqState() : { enabled: true, preamp: 0, bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
     var curve = h("canvas", { class: "wa-eq-curve wa-inset", width: "300", height: "56" });
-    var onTog = h("div", { class: "wa-tog on", text: "ON" });
+    var onTog = h("div", { class: "wa-tog" + (es.enabled ? " on" : ""), text: "ON" });
     var autoTog = h("div", { class: "wa-tog", text: "AUTO" });
-    onTog.addEventListener("click", function () { onTog.classList.toggle("on"); });
-    autoTog.addEventListener("click", function () { autoTog.classList.toggle("on"); });
+    onTog.addEventListener("click", function () { onTog.classList.toggle("on"); NA.control.setEqEnabled(onTog.classList.contains("on")); });
+    autoTog.addEventListener("click", function () { autoTog.classList.toggle("on"); }); // AUTO (auto-preamp) stays cosmetic
     var top = h("div", { class: "wa-eq-top" }, [onTog, autoTog, curve]);
 
     var labels = ["PRE", "60", "170", "310", "600", "1K", "3K", "6K", "12K", "14K", "16K"];
     var bands = h("div", { class: "wa-eq-bands" });
     els.eqSliders = [];
-    labels.forEach(function (lab) {
-      var sl = h("input", { class: "wa-vrange", type: "range", min: "-12", max: "12", value: "0" });
-      sl.addEventListener("input", function () { drawEqCurve(); });
+    labels.forEach(function (lab, idx) {
+      var initVal = idx === 0 ? es.preamp : (es.bands[idx - 1] || 0); // idx 0 = preamp, 1..10 = bands
+      var sl = h("input", { class: "wa-vrange", type: "range", min: "-12", max: "12", value: String(initVal) });
+      sl.addEventListener("input", function () {
+        var v = +sl.value;
+        if (idx === 0) NA.control.setPreamp(v); else NA.control.setEqBand(idx - 1, v);
+        drawEqCurve();
+      });
       els.eqSliders.push(sl);
       bands.appendChild(h("div", { class: "wa-eq-band" }, [sl, h("div", { class: "wa-eq-label", text: lab })]));
     });
@@ -1128,8 +1152,27 @@
   // =========================================================================
   // live data → UI
   // =========================================================================
+  // reflect YTM's ACTUAL transport state on the procedural toggles + volume
+  // slider. null = unknown → leave the current value (never clobber with a guess);
+  // skip the volume slider while the user is dragging it (don't fight the drag).
+  // a user just toggled SHUF/REP optimistically; suppress reconciliation briefly so
+  // the periodic tick can't revert it before YTM's DOM reflects the new state
+  var transportToggleAt = 0;
+  function transportSettling() { return (Date.now() - transportToggleAt) < 600; }
+  function syncTransport(t) {
+    if (!transportSettling()) {
+      if (t.shuffle != null && els.shuffleTog) els.shuffleTog.classList.toggle("on", !!t.shuffle);
+      if (t.repeat != null && els.repeatTog) els.repeatTog.classList.toggle("on", !!t.repeat);
+    }
+    if (els.vol && t.volume != null && document.activeElement !== els.vol) {
+      var vv = String(Math.round(t.volume * 100));
+      if (els.vol.value !== vv) { els.vol.value = vv; paintRange(els.vol); }
+    }
+  }
+
   function onTrack(t) {
     if (classicApi) pushClassicTrack(t);   // classic skin mirrors the same state
+    syncTransport(t);
     if (els.clock && !seeking) els.clock.textContent = fmt(t.currentTime);
     if (els.playBtn) els.playBtn.innerHTML = icon(t.paused ? "play" : "pause");
     trackDur = t.duration || 0;
@@ -1267,6 +1310,13 @@
     else NA.toast("Use YouTube Music's own search box");
   }
 
+  // keyboard "L": open the Library/search window (if hidden) and focus its box
+  function focusLibrary() {
+    if (!isShown("wa-lib")) { toggleWin("wa-lib", els.libTog); libBecameVisible(); }
+    else if (wins["wa-lib"]) raise(wins["wa-lib"].el);
+    if (els.libInput) setTimeout(function () { try { els.libInput.focus(); els.libInput.select(); } catch (_) {} }, 30);
+  }
+
   function buildUI() {
     if (root) return;
     root = h("div", { id: "neoamp-root" });
@@ -1331,28 +1381,59 @@
   // ---- launcher + keyboard -------------------------------------------------
   function ensureLauncher() {
     if (document.getElementById("neoamp-launch")) return;
-    launcher = h("button", { id: "neoamp-launch", title: "Launch NeoAmp (Shift+V)", text: "◢◤ NeoAmp" });
-    launcher.addEventListener("click", function () { NA.start(); });
+    // During the real-EQ rebuild this button toggles the EQ capture (relayed to the
+    // service worker, which owns the gesture-gated tabCapture). It will fold back into
+    // the full player launch once the EQ is integrated.
+    launcher = h("button", { id: "neoamp-launch", title: "Click the gold ‘N’ NeoAmp icon in the toolbar to start", text: "◢◤ NeoAmp" });
+    // a webpage button can't start tab-capture (Chrome security) — the gold "N"
+    // toolbar icon (or right-click) can. Guide the user there.
+    launcher.addEventListener("click", function () { NA.toast("Click the gold “N” NeoAmp icon in Arc’s toolbar to start  (or right-click → “Toggle NeoAmp player + EQ”)"); });
     document.documentElement.appendChild(launcher);
   }
 
   NA.on("start", showUI);
   NA.on("stop", hideUI);
 
+  // Shift+V launches/stops NeoAmp anywhere. The classic Winamp transport keys
+  // (Z X C V B, Space, arrows, L) are active only while NeoAmp is running, so
+  // they don't hijack YTM when the player is closed. Guarded against text fields
+  // + modifier combos; handled keys preventDefault + stopPropagation so YTM's own
+  // shortcut (Space/arrows) doesn't also fire and double-toggle.
   window.addEventListener("keydown", function (e) {
-    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-    if (e.shiftKey && (e.key === "V" || e.key === "v")) { e.preventDefault(); NA.isRunning() ? NA.stop() : NA.start(); }
+    var tgt = e.target;
+    if (tgt && (/^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName) || tgt.isContentEditable)) return;
+    if (e.shiftKey && (e.key === "V" || e.key === "v")) { e.preventDefault(); NA.isRunning() ? NA.stop() : NA.start(); return; }
+    // Shift excluded too (Shift+V handled above); CapsLock letters still work (shiftKey false)
+    if (!NA.isRunning() || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    var c = NA.control, handled = true;
+    switch (e.key) {
+      case "z": case "Z": c.prev(); break;
+      case "x": case "X": c.play(); break;
+      case "c": case "C": c.pause(); break;
+      case "v": case "V": c.stop(); break;          // plain V (Shift+V returned above)
+      case "b": case "B": c.next(); break;
+      case " ": c.playPause(); break;
+      case "ArrowRight": c.seekBy(5); break;
+      case "ArrowLeft": c.seekBy(-5); break;
+      case "ArrowUp": c.nudgeVolume(0.05); break;
+      case "ArrowDown": c.nudgeVolume(-0.05); break;
+      case "l": case "L": focusLibrary(); break;
+      default: handled = false;
+    }
+    if (handled) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 
-  ensureLauncher();
+  // In-page ◢◤ launcher is DISABLED — the gold "N" toolbar icon (+ right-click) launches
+  // now, so the on-page button has no function. Kept in code (ensureLauncher above) in
+  // case we want it back. Re-enable by uncommenting this + the observer below.
+  // ensureLauncher();
 
-  // DEV auto-launch: getDisplayMedia needs a user gesture (and a native share-picker
-  // dialog that can't be auto-dismissed), so a true click-free launch on page load is
-  // impossible. This skips hunting for the button — the FIRST click/keypress anywhere
-  // (e.g. clicking to play a track) auto-starts NeoAmp. Default ON; disable in the page
-  // console with:  localStorage.setItem('neoamp_autostart','0')
+  // DEV auto-launch is OFF during the real-EQ rebuild: the in-page getDisplayMedia
+  // capture fights the new tabCapture EQ path (Chrome won't capture one tab twice),
+  // so auto-grabbing the audio would block the EQ. It gets folded into the tabCapture
+  // launch flow once the EQ is integrated. Re-enable: localStorage.setItem('neoamp_autostart','1')
   try {
-    if (localStorage.getItem("neoamp_autostart") !== "0") {
+    if (localStorage.getItem("neoamp_autostart") === "1") {
       var autoStart = function () {
         document.removeEventListener("pointerdown", autoStart, true);
         document.removeEventListener("keydown", autoStart, true);
@@ -1363,9 +1444,10 @@
     }
   } catch (_) {}
 
-  // YTM is a SPA; re-add the launcher if a navigation wipes it.
-  var mo = new MutationObserver(function () {
-    if (!document.getElementById("neoamp-launch") && !NA.isRunning()) ensureLauncher();
-  });
-  mo.observe(document.documentElement, { childList: true });
+  // YTM is a SPA; this re-added the in-page launcher after a navigation wiped it.
+  // Disabled with the launcher (above) — restore both together if we bring it back.
+  // var mo = new MutationObserver(function () {
+  //   if (!document.getElementById("neoamp-launch") && !NA.isRunning()) ensureLauncher();
+  // });
+  // mo.observe(document.documentElement, { childList: true });
 })();

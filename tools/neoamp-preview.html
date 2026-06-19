@@ -38,7 +38,10 @@ chrome.storage = { local: {
     title: "Pneuma", artist: "Tool", album: "Fear Inoculum", year: "2019",
     plays: "12M plays", likeStatus: "LIKE",
     art: "", currentTime: 184, duration: 723, paused: false, volume: 0.82,
+    shuffle: true, repeat: false,
   };
+  // mock EQ state so the real getEqState()/setEq*/setBalance wiring is exercised
+  var eqState = { enabled: true, preamp: 0, bands: [4, 2, 0, -2, -3, 0, 2, 4, 5, 3], balance: 0 };
   var queue = [
     { index:0, title:"Pneuma", artist:"Tool", duration:"11:53", plays:"12M plays", art:"", playing:true },
     { index:1, title:"Invincible", artist:"Tool", duration:"12:44", plays:"8.1M plays", art:"", playing:false },
@@ -66,10 +69,13 @@ chrome.storage = { local: {
       { section:"Listen Again", title:"Vicarious", subtitle:"Tool", art:"", homeIndex:2 },
     ] }); },
     control: {
-      playPause:noop, prev:noop, next:noop, stop:noop, seek:noop,
-      setVolume:noop, getVolume:function(){return track.volume;},
+      playPause:noop, play:noop, pause:noop, prev:noop, next:noop, stop:noop, seek:noop, seekBy:noop,
+      setVolume:noop, nudgeVolume:noop, getVolume:function(){return track.volume;},
       toggleShuffle:noop, toggleRepeat:noop, playQueueItem:noop,
       playLibraryItem:noop, openLibraryItem:noop, like:noop, dislike:noop, playHomeItem:noop,
+      getEqState:function(){return {enabled:eqState.enabled,preamp:eqState.preamp,bands:eqState.bands.slice(),balance:eqState.balance};},
+      setEqEnabled:function(v){eqState.enabled=v;}, setPreamp:function(v){eqState.preamp=v;},
+      setEqBand:function(i,v){eqState.bands[i]=v;}, setBalance:function(v){eqState.balance=v;},
     },
     storage: { get: function (k, cb) { chrome.storage.local.get(k, function (o) { cb(o[k]); }); }, set: chrome.storage.local.set },
     toast: function (m) { console.log("[toast]", m); },

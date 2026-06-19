@@ -249,7 +249,8 @@
     // current display state, mutated by update()
     var st = {
       elapsed: 0, duration: 0, title: "NeoAmp", kbps: "", khz: "", stereo: true,
-      playing: false, paused: false, shuffle: false, repeat: false, volume: 1, balance: 0,
+      playing: false, paused: false, shuffle: false, repeat: false, volume: 1,
+      balance: (hooks && typeof hooks.balance === "number") ? hooks.balance : 0,
       pressed: null, eqOn: false, plOn: false, freq: null, marqueeX: 0, scrub: null,
     };
 
@@ -466,13 +467,14 @@
       }
       if (hit(e, LAYOUT.balance)) {
         slider = "balance"; st.pressed = "balance"; st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1;
+        if (hooks.onBalance) hooks.onBalance(st.balance);
         scheduleRender(); return;
       }
     });
     var onSlide = function (e) {
       if (!slider) return;
       if (slider === "volume") { st.volume = valAt(e, LAYOUT.volume, 14); if (hooks.onVolume) hooks.onVolume(st.volume); }
-      else if (slider === "balance") { st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1; }
+      else if (slider === "balance") { st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1; if (hooks.onBalance) hooks.onBalance(st.balance); }
       else if (slider === "position") { st.scrub = valAt(e, LAYOUT.position, 29); }
       scheduleRender();
     };
@@ -540,8 +542,9 @@
   }
 
   // =========================================================================
-  // EQUALIZER window renderer. Cosmetic (like the procedural EQ): the 10 bands
-  // + preamp drag vertically and redraw the curve, but don't filter audio yet.
+  // EQUALIZER window renderer. The 10 bands + preamp drag vertically, redraw the
+  // curve, AND drive the real audio graph via hooks.onBand/onPreamp/onEnabled.
+  // hooks.initial = { enabled, preamp, bands[10] } seeds the faders.
   // =========================================================================
   function mountEq(hostEl, skin, hooks) {
     hooks = hooks || {};
@@ -555,9 +558,11 @@
     var ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
 
-    var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 10 band gains, -12..12
-    var preamp = 0;
-    var on = true, dragBand = -1;
+    var init = hooks.initial || {};
+    var bands = (init.bands && init.bands.length === 10) ? init.bands.slice() : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // -12..12
+    var preamp = +init.preamp || 0;        // -12..12
+    var on = init.enabled !== false;
+    var dragBand = -1;                     // -1 none, -2 preamp, 0..9 a band
 
     function img() { return skin.sheets.EQMAIN; }
     function blit(key, dx, dy) {
@@ -613,21 +618,28 @@
     }
     function bandAt(p) {
       if (p.y < EQ_LAYOUT.bandY - 2 || p.y > EQ_LAYOUT.bandY + EQ_LAYOUT.thumbRange + 13) return -1;
+      if (p.x >= EQ_LAYOUT.preamp.x - 2 && p.x <= EQ_LAYOUT.preamp.x + 13) return -2;
       for (var i = 0; i < 10; i++) if (p.x >= EQ_LAYOUT.bandX[i] - 2 && p.x <= EQ_LAYOUT.bandX[i] + 13) return i;
       return -1;
+    }
+    // set the value of whatever fader is being dragged + fire its hook
+    function setDragVal(y) {
+      var v = valFromY(y);
+      if (dragBand === -2) { preamp = v; if (hooks.onPreamp) hooks.onPreamp(preamp); }
+      else if (dragBand >= 0) { bands[dragBand] = v; if (hooks.onBand) hooks.onBand(dragBand, v); }
     }
     canvas.addEventListener("mousedown", function (e) {
       var p = pos(e);
       var bi = bandAt(p);
-      if (bi >= 0) { dragBand = bi; bands[bi] = valFromY(p.y); sched(); e.preventDefault(); }
+      if (bi !== -1) { dragBand = bi; setDragVal(p.y); sched(); e.preventDefault(); }
     });
     var onMove = function (e) {
-      if (dragBand < 0) return; bands[dragBand] = valFromY(pos(e).y); sched();
+      if (dragBand === -1) return; setDragVal(pos(e).y); sched();
     };
     var onUp = function (e) {
-      if (dragBand >= 0) { dragBand = -1; sched(); return; }
+      if (dragBand !== -1) { dragBand = -1; sched(); return; }
       var p = pos(e);
-      if (p.x >= EQ_LAYOUT.on.x && p.x <= EQ_LAYOUT.on.x + EQ_LAYOUT.on.w && p.y >= EQ_LAYOUT.on.y && p.y <= EQ_LAYOUT.on.y + EQ_LAYOUT.on.h) { on = !on; sched(); }
+      if (p.x >= EQ_LAYOUT.on.x && p.x <= EQ_LAYOUT.on.x + EQ_LAYOUT.on.w && p.y >= EQ_LAYOUT.on.y && p.y <= EQ_LAYOUT.on.y + EQ_LAYOUT.on.h) { on = !on; if (hooks.onEnabled) hooks.onEnabled(on); sched(); }
       else if (p.x >= EQ_LAYOUT.close.x && p.x <= EQ_LAYOUT.close.x + 9 && p.y >= EQ_LAYOUT.close.y && p.y <= EQ_LAYOUT.close.y + 9) { hooks.onClose && hooks.onClose(); }
     };
     window.addEventListener("mousemove", onMove);

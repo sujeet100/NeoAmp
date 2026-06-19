@@ -18,9 +18,14 @@
 
   var FFT_SIZE = 1024; // must equal Butterchurn's fftSize (2 * numSamps=512)
 
-  var audioCtx = null, analyser = null, stream = null;
-  var rafId = 0, timeBytes = null, freqBytes = null, running = false;
+  var timeBytes = null, freqBytes = null, running = false;
   var trackTimer = 0, lastTrack = null;
+
+  // EQ state — the UI's source of truth. The actual audio graph lives in the OFFSCREEN
+  // document (it owns the gesture-gated tabCapture); the content script relays changes
+  // there via the service worker and persists them. Flat (all 0, balance 0) = transparent.
+  var eqState = { enabled: true, preamp: 0, bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], balance: 0 };
+  var eqSaveTimer = 0;
 
   // --- tiny event bus -------------------------------------------------------
   var listeners = { start: [], stop: [], audio: [], track: [] };
@@ -34,76 +39,62 @@
     for (var i = 0; i < a.length; i++) { try { a[i](arg); } catch (e) { console.error("[NeoAmp]", ev, e); } }
   }
 
-  // --- capture --------------------------------------------------------------
-  async function start() {
-    if (running) return;
-    var s;
+  // --- EQ helpers -----------------------------------------------------------
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  // relay the live EQ to the offscreen engine (via the service worker) so a fader
+  // drag shapes the audio immediately. Harmless if capture isn't running.
+  function relayEq() {
     try {
-      s = await navigator.mediaDevices.getDisplayMedia({
-        video: true, // required by the API even though we only keep audio
-        audio: { suppressLocalAudioPlayback: false },
-        preferCurrentTab: true,
-        selfBrowserSurface: "include",
+      chrome.runtime.sendMessage({
+        target: "sw", type: "relay-eq",
+        eq: { bands: eqState.bands.slice(), preamp: eqState.preamp, balance: eqState.balance, enabled: eqState.enabled },
       });
-    } catch (e) { toast("Capture cancelled"); return; }
-    s.getVideoTracks().forEach(function (t) { t.stop(); });
-    var at = s.getAudioTracks();
-    if (!at.length) {
-      toast("No tab audio — re-share and tick “Share tab audio”");
-      s.getTracks().forEach(function (t) { t.stop(); });
-      return;
-    }
-    stream = s;
-    at[0].addEventListener("ended", stop); // user clicked "Stop sharing"
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") { try { await audioCtx.resume(); } catch (_) {} }
-    var src = audioCtx.createMediaStreamSource(new MediaStream(at));
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = FFT_SIZE;
-    analyser.smoothingTimeConstant = 0; // raw time-domain for Butterchurn
-    // Boost the analysis signal so visuals react harder (tab audio is often
-    // quiet). Analysis branch only — doesn't change what you hear, since
-    // getDisplayMedia keeps the tab audible on its own.
-    var boost = audioCtx.createGain();
-    boost.gain.value = 1.8;
-    var sink = audioCtx.createGain();
-    sink.gain.value = 0; // pull the graph so the analyser gets samples, silently
-    src.connect(boost);
-    boost.connect(analyser);
-    analyser.connect(sink);
-    sink.connect(audioCtx.destination);
-    timeBytes = new Uint8Array(analyser.fftSize);
-    freqBytes = new Uint8Array(analyser.frequencyBinCount); // fftSize/2 = 512
-
-    running = true;
-    pump();
-    trackTimer = setInterval(sendTrack, 400);
-    emit("start");
+    } catch (_) {}
+  }
+  function persistEq() {
+    clearTimeout(eqSaveTimer);
+    eqSaveTimer = setTimeout(function () { try { chrome.storage.local.set({ neoampEq: eqState }); } catch (_) {} }, 400);
   }
 
-  function stop() {
-    if (!running && !audioCtx) return;
+  // --- audio lifecycle (driven by the service worker + offscreen engine) ----
+  // tabCapture must be started by something that "invokes" the extension (the
+  // right-click "Toggle NeoAmp EQ") — a page button can't (Chrome gesture rule). The
+  // SW tells us when capture begins/ends; we raise the player UI + poll the track, and
+  // the offscreen streams FFT frames here for the visuals.
+  var frame = { time: null, freq: null };
+  function onEqStarted() {
+    if (running) return;
+    running = true;
+    timeBytes = new Uint8Array(FFT_SIZE);
+    freqBytes = new Uint8Array(FFT_SIZE / 2);
+    trackTimer = setInterval(sendTrack, 400);
+    relayEq();               // hand the engine the persisted curve
+    emit("start");
+    sendTrack();
+  }
+  function onEqStopped() {
+    if (!running) return;
     running = false;
-    cancelAnimationFrame(rafId);
     clearInterval(trackTimer); trackTimer = 0;
-    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
-    if (audioCtx) { try { audioCtx.close(); } catch (_) {} }
-    audioCtx = analyser = stream = timeBytes = freqBytes = null;
+    timeBytes = freqBytes = null;
     emit("stop");
   }
-
-  // The analyser produces both arrays each frame; subscribers (the viz iframe
-  // bridge + the spectrum analyzer) read what they need.
-  var frame = { time: null, freq: null };
-  function pump() {
-    rafId = requestAnimationFrame(pump);
-    if (!analyser) return;
-    analyser.getByteTimeDomainData(timeBytes);
-    analyser.getByteFrequencyData(freqBytes);
+  // FFT frames arrive base64-packed [time(FFT_SIZE) | freq(FFT_SIZE/2)] because
+  // runtime messaging is JSON (typed arrays can't cross). Unpack + fan out to the
+  // same "audio" subscribers as before (the viz iframe bridge + the spectrum analyzer).
+  function onFft(b64) {
+    if (!running || !timeBytes) return;
+    var bin; try { bin = atob(b64); } catch (_) { return; }
+    if (bin.length !== timeBytes.length + freqBytes.length) return;
+    for (var i = 0; i < timeBytes.length; i++) timeBytes[i] = bin.charCodeAt(i) & 255;
+    for (var j = 0; j < freqBytes.length; j++) freqBytes[j] = bin.charCodeAt(timeBytes.length + j) & 255;
     frame.time = timeBytes; frame.freq = freqBytes;
     emit("audio", frame);
   }
+  // ask the SW to stop capture (stopping needs no gesture, unlike starting)
+  function requestStop() { try { chrome.runtime.sendMessage({ target: "sw", type: "stop-capture" }); } catch (_) {} }
+  // a page button can't START capture — guide the user to the right-click menu
+  function startHint() { toast("Right-click the page → “Toggle NeoAmp EQ” to start"); }
 
   // --- now-playing + transport ---------------------------------------------
   function q(sel) { return document.querySelector(sel); }
@@ -150,6 +141,37 @@
     return "INDIFFERENT";
   }
 
+  // Read a button's on/off from aria-pressed (the reliable signal), falling back
+  // to an "active" class. Returns null when unreadable so callers can leave the
+  // UI on its current/optimistic value rather than clobbering it with a guess.
+  function readPressed(el) {
+    if (!el) return null;
+    var ap = el.getAttribute("aria-pressed");
+    if (ap === "true") return true;
+    if (ap === "false") return false;
+    var cl = el.className || "";
+    if (/\bactive\b|style-default-active/.test(cl)) return true;
+    return null;
+  }
+  // Shuffle (binary) + Repeat (mapped to binary: any repeat mode = "on").
+  // YTM's exact repeat DOM varies by build, so this is best-effort with a null
+  // fallback; confirm selectors live if repeat sync looks wrong.
+  function readShuffle() {
+    return readPressed(qa(["ytmusic-player-bar [aria-label*='Shuffle' i]", "ytmusic-player-bar .shuffle"]));
+  }
+  function readRepeat() {
+    var bar = q("ytmusic-player-bar");
+    var mode = bar && (bar.getAttribute("repeat-mode") || bar.getAttribute("repeat_mode") || "");
+    if (mode) return !/none|off/i.test(mode);   // NONE / ALL_OFF = off; ALL / ONE = on
+    var b = qa(["ytmusic-player-bar [aria-label*='Repeat' i]", "ytmusic-player-bar .repeat"]);
+    var p = readPressed(b);
+    if (p != null) return p;
+    var al = (b && (b.getAttribute("aria-label") || b.getAttribute("title")) || "").toLowerCase();
+    if (/off/.test(al)) return false;
+    if (/repeat (all|one)|one|all/.test(al)) return true;
+    return null;
+  }
+
   function readTrack() {
     var v = q("video");
     var titleEl = q("ytmusic-player-bar .title");
@@ -168,6 +190,8 @@
       duration: v && isFinite(v.duration) ? v.duration : 0,
       paused: v ? v.paused : true,
       volume: v ? v.volume : 1,
+      shuffle: readShuffle(),                          // true | false | null (unknown)
+      repeat: readRepeat(),                            // true | false | null (unknown)
     };
   }
   function getTrack() { return lastTrack || readTrack(); }
@@ -359,14 +383,33 @@
 
   var control = {
     playPause: function () { var v = q("video"); if (v) { v.paused ? v.play() : v.pause(); sendTrack(); } },
+    play: function () { var v = q("video"); if (v && v.paused) { v.play(); sendTrack(); } },
+    pause: function () { var v = q("video"); if (v && !v.paused) { v.pause(); sendTrack(); } },
     next: function () { var b = qa(["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"]); if (b) b.click(); },
     prev: function () { var b = qa(["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"]); if (b) b.click(); },
     stop: function () { var v = q("video"); if (v) { v.pause(); try { v.currentTime = 0; } catch (_) {} sendTrack(); } },
     seek: function (t) { var v = q("video"); if (v && isFinite(t)) { v.currentTime = t; sendTrack(); } },
+    // relative seek (keyboard ←/→) — reads the live time so it isn't stale-by-a-tick
+    seekBy: function (d) {
+      var v = q("video");
+      if (v && isFinite(v.currentTime)) {
+        var dur = isFinite(v.duration) ? v.duration : Infinity;
+        v.currentTime = Math.max(0, Math.min(dur, v.currentTime + d)); sendTrack();
+      }
+    },
     setVolume: function (x) { var v = q("video"); if (v) { v.volume = Math.max(0, Math.min(1, x)); } },
+    nudgeVolume: function (d) { var v = q("video"); if (v) { v.volume = Math.max(0, Math.min(1, v.volume + d)); sendTrack(); } },
     getVolume: function () { var v = q("video"); return v ? v.volume : 1; },
-    toggleShuffle: function () { var b = qa(["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"]); if (b) b.click(); },
-    toggleRepeat: function () { var b = qa(["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]); if (b) b.click(); },
+    // toggle YTM's own control, then re-read shortly after so the UI reflects the
+    // ACTUAL resulting state (YTM flips it async; same pattern as like/dislike).
+    toggleShuffle: function () { var b = qa(["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"]); if (b) { b.click(); setTimeout(sendTrack, 250); } },
+    toggleRepeat: function () { var b = qa(["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]); if (b) { b.click(); setTimeout(sendTrack, 250); } },
+    // --- equalizer + balance (relayed live to the offscreen audio engine) ---
+    getEqState: function () { return { enabled: eqState.enabled, preamp: eqState.preamp, bands: eqState.bands.slice(), balance: eqState.balance }; },
+    setEqEnabled: function (on) { eqState.enabled = !!on; relayEq(); persistEq(); },
+    setPreamp: function (db) { eqState.preamp = +db || 0; relayEq(); persistEq(); },
+    setEqBand: function (i, db) { if (i >= 0 && i < eqState.bands.length) { eqState.bands[i] = +db || 0; relayEq(); persistEq(); } },
+    setBalance: function (x) { eqState.balance = clamp(+x || 0, -1, 1); relayEq(); persistEq(); },
     playQueueItem: function (i) {
       var items = document.querySelectorAll("ytmusic-player-queue-item");
       var it = items[i];
@@ -437,6 +480,17 @@
     set: function (obj) { try { chrome.storage.local.set(obj); } catch (_) {} },
   };
 
+  // restore the saved EQ (Winamp remembers it). Loaded eagerly so start() sees it
+  // when building the graph and the UI sees it via getEqState() at build time.
+  storage.get("neoampEq", function (e) {
+    if (!e || !e.bands || e.bands.length !== eqState.bands.length) return;
+    eqState.enabled = e.enabled !== false;
+    eqState.preamp = +e.preamp || 0;
+    eqState.bands = e.bands.map(Number);
+    eqState.balance = clamp(+e.balance || 0, -1, 1);
+    relayEq();   // if capture is already live, push the restored curve to the engine
+  });
+
   function toast(msg) {
     var t = document.createElement("div");
     t.className = "ytm-wmp-toast";
@@ -445,9 +499,22 @@
     setTimeout(function () { t.parentNode && t.parentNode.removeChild(t); }, 4500);
   }
 
+  // messages from the service worker: lifecycle (raise/hide the player when capture
+  // begins/ends), FFT frames (drive the visuals), and status toasts.
+  try {
+    chrome.runtime.onMessage.addListener(function (msg) {
+      if (!msg || msg.target !== "content") return;
+      if (msg.type === "lifecycle") { msg.state === "started" ? onEqStarted() : onEqStopped(); }
+      else if (msg.type === "fft") onFft(msg.b64);
+      else if (msg.type === "toast") toast(msg.text);
+    });
+  } catch (_) {}
+
   window.NeoAmp = {
-    start: start,
-    stop: stop,
+    // START needs a gesture the extension owns (the right-click menu); the launcher /
+    // Shift+V can only guide to it. STOP works anytime (no gesture needed).
+    start: startHint,
+    stop: requestStop,
     isRunning: function () { return running; },
     on: on, off: off,
     getTrack: getTrack,
