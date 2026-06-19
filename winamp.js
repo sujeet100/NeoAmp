@@ -624,7 +624,7 @@
   // skin's GEN.BMP if present, else its PLEDIT.BMP (every skin ships PLEDIT, so
   // the frame always matches — no more gold fallback for GEN-less skins).
   // PLEDIT.TXT colors drive the playlist/library list text.
-  var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz"];
+  var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz", "wa-np"];
   var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   function applyFrame(skin) {

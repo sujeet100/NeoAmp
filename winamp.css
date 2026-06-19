@@ -284,14 +284,36 @@
 /* "Now Playing" panel docked between Main and EQ in classic (.wsz) mode.
    Skin-width (550px = 275 * 2x) so it lines up flush with the skinned windows. */
 .wa-np {
-  width: 550px; height: 92px; cursor: move; box-sizing: border-box;  /* border inside 550 so it matches the borderless main canvas */
+  width: 550px; min-height: 96px; cursor: move; box-sizing: border-box;
   display: flex; align-items: center; gap: 12px; padding: 9px 13px;
-  /* gold beveled frame so it reads as a framed window like the gold GEN ones */
-  background: linear-gradient(180deg, #2a2620 0%, #1a1712 100%);
-  border: 2px solid; border-color: #dcb65e #4a3810 #3a2c0c #cba749;
+  background: var(--pl-normalbg, var(--wa-win-bg));
+  border: 2px solid var(--wa-win-border);
   box-shadow:
-    inset 1px 1px 0 rgba(255,246,214,0.45), inset -1px -1px 0 rgba(26,16,4,0.7),
+    inset 1px 1px 0 var(--wa-bevel-light), inset -1px -1px 0 var(--wa-bevel-dark),
     var(--wa-win-shadow);
+}
+/* In classic mode the NP panel is framed with the SKIN's own GEN/PLEDIT sprites
+   (like the Playlist/Library windows) so it matches AND changes with the skin —
+   no titlebar, so the top/bottom are plain ridge strips and the sides are rails. */
+.wa-np.wa-genskin {
+  border: 0; padding: 11px 22px 13px 26px; min-height: 96px;
+  background:
+    var(--gen-gold) left top / 50px 11px repeat-x,
+    var(--gen-bfill) left bottom / 50px 13px repeat-x,
+    var(--gen-ml) left top / 22px 58px repeat-y,
+    var(--gen-mr) right top / 16px 58px repeat-y,
+    var(--pl-normalbg, #14141c);
+  box-shadow: var(--wa-win-shadow);
+}
+.wa-np.wa-plskin {
+  border: 0; padding: 11px 34px 14px 24px; min-height: 96px;
+  background:
+    var(--plf-tfill) left top / 50px 12px repeat-x,
+    var(--plf-bfill) left bottom / 50px 16px repeat-x,
+    var(--plf-left) left top / 24px 58px repeat-y,
+    var(--plf-right) right top / 40px 58px repeat-y,
+    var(--pl-normalbg, #14141c);
+  box-shadow: var(--wa-win-shadow);
 }
 .wa-np-art {
   flex: 0 0 auto; width: 72px; height: 72px; object-fit: cover; display: block;
@@ -316,40 +338,40 @@
    silver face, a pixelated label, and a square LED. Sized tight like the EQ key
    (no stretching). (Per-skin bitmap buttons are a follow-up — see notes.) */
 .wa-np-tog {
-  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  height: 18px; padding: 0 5px; cursor: pointer;
-  font: 16px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
-  color: #1c1f24;                                  /* dark pixel label on chrome */
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 18px; padding: 0 6px; cursor: pointer;
+  font: 13px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
+  /* dark pixel label, faux-bolded (VT323 has no bold weight); smaller so the
+     label clears the button top/bottom */
+  color: #15171c; text-shadow: 0.6px 0 0 currentColor;
   background: linear-gradient(180deg, #f6f6fa 0%, #d2d2da 46%, #aeaeb8 54%, #cccdd4 100%);
   border: 1px solid; border-color: #ffffff #72727c #5c5c66 #ececf2;
   border-radius: 2px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 2px rgba(0,0,0,0.5);
 }
 .wa-np-tog:hover { filter: brightness(1.04); }
-.wa-np-tog.on, .wa-np-tog:active {               /* pressed-in chrome */
+.wa-np-tog.on:not(.wa-rate-btn), .wa-np-tog:active:not(.wa-rate-btn) {   /* pressed-in chrome */
   border-color: #5c5c66 #ececf2 #ffffff #72727c;
   background: linear-gradient(180deg, #b6b6c0, #d6d6de);
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-/* square LED: dark when off, green when on (window open / active) */
+/* square LED, a bit bigger: dark when off, neon-green when on (window open) */
 .wa-np-tog::before {
-  content: ""; width: 6px; height: 6px; flex: 0 0 auto; border-radius: 0;
-  background: #243027; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55);
+  content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 0;
+  background: #1d2a20; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);
 }
-.wa-np-tog.on::before { background: var(--wa-accent, #16e651); box-shadow: 0 0 4px var(--wa-accent-glow), inset 0 0 0 1px rgba(0,0,0,0.3); }
-/* like/dislike: chrome key, NO label LED — the icon SHAPE carries the colour
-   (gold heart when liked, pink thumb when disliked); muted when inactive. */
+.wa-np-tog.on::before { background: var(--wa-accent, #16e651); box-shadow: 0 0 5px var(--wa-accent-glow), inset 0 0 0 1px rgba(0,0,0,0.25); }
+/* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
+   behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
 .wa-np-rate { display: flex; gap: 5px; }
 .wa-rate-btn { padding: 0 7px; }
 .wa-rate-btn::before { display: none; }
-.wa-rate-btn svg { width: 13px; height: 13px; display: block; }
-.wa-rate-btn.wa-like svg { fill: #b89a4e; }                                   /* heart shape: muted gold */
-.wa-rate-btn.wa-like.on svg { fill: #f0c34e; filter: drop-shadow(0 0 2px rgba(240,195,80,0.85)); }      /* liked: bright gold */
-.wa-rate-btn.wa-dislike svg { fill: #b07088; }                                /* thumb shape: muted pink */
-.wa-rate-btn.wa-dislike.on svg { fill: #f06a9a; filter: drop-shadow(0 0 2px rgba(240,110,160,0.85)); }  /* disliked: bright pink */
+.wa-rate-btn svg { width: 14px; height: 14px; display: block; fill: #34343a; }   /* LED off: dark */
+.wa-rate-btn.wa-like.on svg { fill: #ffd23a; filter: drop-shadow(0 0 3px #ffcf3a) drop-shadow(0 0 7px rgba(255,200,60,0.6)); }       /* neon amber ON */
+.wa-rate-btn.wa-dislike.on svg { fill: #ff3b8d; filter: drop-shadow(0 0 3px #ff3b8d) drop-shadow(0 0 7px rgba(255,60,140,0.6)); }   /* neon pink ON */
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
-.wa-np-btns .wa-skinsel-btn { height: 20px; padding: 0 10px; font-size: 11px; }
+.wa-np-btns .wa-skinsel-btn { height: 19px; padding: 0 11px; font-size: 12px; }
 
 /* =======================================================================
    GEN.BMP generic-window frame (Playlist / Library / Viz in classic mode).
@@ -647,17 +669,18 @@
    the skin illusion). Readable bold sans, dark engraved text on the gold plate. */
 .wa-skinsel { position: relative; display: inline-block; margin-right: 4px; }
 .wa-skinsel-btn {
-  display: flex; align-items: center; gap: 5px; height: 16px; padding: 0 8px;
-  font: 700 10px/1 "Helvetica Neue", Arial, sans-serif;   /* clearer than Arial Narrow */
-  letter-spacing: 0; white-space: nowrap;
-  color: #231702; text-shadow: 0 1px 0 rgba(255,248,222,0.5);
-  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
-  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
-  border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255,250,228,0.6), 0 1px 2px rgba(0,0,0,0.45);
+  display: flex; align-items: center; gap: 5px; height: 17px; padding: 0 9px;
+  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.2px; white-space: nowrap;
+  /* engraved gold lettering like the NeoAmp nameplate: bright cream text on a
+     deeper bronze plate with a dark incised shadow (readable + matching) */
+  color: #fdf2cc; text-shadow: 0 1px 1px rgba(28,16,2,0.95), 0 -1px 0 rgba(28,16,2,0.35);
+  background: linear-gradient(180deg, #c9a44a 0%, #9a7a2e 48%, #7c5e1f 52%, #5a4216 100%);
+  border: 1px solid; border-color: #f0d98a #4a3810 #3a2c0c #d9b25a;
+  border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255,240,190,0.5), 0 1px 2px rgba(0,0,0,0.45);
   cursor: pointer;
 }
-.wa-skinsel-btn:hover { filter: brightness(1.06); }
-.wa-skinsel-btn:active { border-color: #4a3810 #efdfa6 #fbefcb #5a4514; box-shadow: inset 1px 1px 3px rgba(60,40,8,0.6); }
+.wa-skinsel-btn:hover { filter: brightness(1.07); }
+.wa-skinsel-btn:active { border-color: #3a2c0c #d9b25a #f0d98a #4a3810; box-shadow: inset 1px 1px 3px rgba(40,26,4,0.6); }
 .wa-skinsel-arrow { font-size: 8px; opacity: 0.85; }
 .wa-skinsel-menu {
   display: none; position: absolute; right: 0; top: 100%; margin-top: 2px;
