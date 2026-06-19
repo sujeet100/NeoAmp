@@ -361,7 +361,7 @@
    Layout: gold corners + LR_FILL ridges fill the bar; the title sits centered
    on the plain CENTER_FILL plaque flanked by LEFT_END/RIGHT_END caps. */
 .wa-win.wa-genskin .wa-titlebar {
-  height: 40px; padding: 0; border: 0; box-shadow: none;
+  height: 40px; flex: 0 0 40px; padding: 0; border: 0; box-shadow: none;   /* never let the flex column shrink the gold bar (it collapsed in the shorter playlist) */
   position: relative; display: flex; align-items: center; justify-content: flex-end;
   background:
     var(--gen-tl) left top / 50px 40px no-repeat,
@@ -435,7 +435,7 @@
    + fill. All 1x sprites scaled 2x via background-size.
    ======================================================================= */
 .wa-win.wa-plskin .wa-titlebar {
-  height: 40px; padding: 0; border: 0; box-shadow: none;
+  height: 40px; flex: 0 0 40px; padding: 0; border: 0; box-shadow: none;   /* don't let the flex column shrink the title bar */
   position: relative; display: flex; align-items: center; justify-content: flex-end;
   background:
     var(--plf-tl) left top / 50px 40px no-repeat,
