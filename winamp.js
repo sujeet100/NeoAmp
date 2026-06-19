@@ -50,9 +50,11 @@
   // real Winamp skins (.wsz) rendered by wsz.js. id -> vendored resource path.
   var CLASSIC_SKINS = [
     { id: "base-2.91", name: "Winamp Classic", file: "vendor/skins/base-2.91.wsz" },
+    { id: "topazamp", name: "TopazAmp", file: "vendor/skins/topazamp.wsz" },
     { id: "sony-esprit", name: "Sony Esprit", file: "vendor/skins/sony-esprit.wsz" },
     { id: "nucleo-nlog", name: "Nucleo NLog", file: "vendor/skins/nucleo-nlog.wsz" },
     { id: "winamp3-classified", name: "Winamp3 Classified", file: "vendor/skins/winamp3-classified.wsz" },
+    { id: "winamp5-classified", name: "Winamp5 Classified", file: "vendor/skins/winamp5-classified.wsz" },
     { id: "bento-classified", name: "Bento Classified", file: "vendor/skins/bento-classified.wsz" },
   ];
   var classicApi = null;        // mounted Main-window renderer (null = procedural mode)

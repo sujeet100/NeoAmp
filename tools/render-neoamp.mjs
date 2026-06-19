@@ -98,6 +98,16 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
   await evalJs(send, `(function(){var h=document.querySelector('.wa-lib-home'); if(h) h.click(); return !!h;})()`);
   await sleep(500); await shot(send, "4_home");
 
+  // optional: switch to a named skin (env SKIN="TopazAmp") and screenshot it
+  const SKIN = process.env.SKIN;
+  if (SKIN) {
+    await evalJs(send, `(function(){var b=document.querySelector('.wa-np-btns .wa-skinsel-btn'); if(b)b.click(); return !!b;})()`);
+    await sleep(200);
+    const picked = await evalJs(send, `(function(){var it=[].slice.call(document.querySelectorAll('.wa-skinsel-item')).filter(function(i){return new RegExp(${JSON.stringify(SKIN)},'i').test(i.textContent);})[0]; if(it){it.click();return it.textContent;} return 'NOT FOUND';})()`);
+    console.log("SKIN SWITCH:", picked);
+    await sleep(2800); await shot(send, "skin_" + SKIN.replace(/[^a-z0-9]+/gi, "_"));
+  }
+
   // measure the NP buttons + skin picker so I can check sizes objectively
   const sizes = await evalJs(send, `JSON.stringify((function(){
     function box(sel){var e=document.querySelector(sel); return e?(Math.round(e.getBoundingClientRect().width)+"x"+Math.round(e.getBoundingClientRect().height)):null;}
