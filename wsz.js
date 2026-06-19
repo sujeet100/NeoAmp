@@ -594,37 +594,10 @@
       ctx.stroke();
       ctx.restore();
     }
-    // overlay a gold "NeoAmp Equalizer" plate over the skin's baked "WINAMP EQUALIZER"
-    // (same engraved nameplate style as the main window's drawBrand)
-    function drawEqBrand() {
-      var label = "NeoAmp Equalizer";
-      ctx.save();
-      ctx.font = "700 9px 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif";
-      if ("letterSpacing" in ctx) ctx.letterSpacing = "0.5px";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      // min width so the plate fully covers the skin's baked "WINAMP EQUALIZER"
-      var pw = Math.max(Math.ceil(ctx.measureText(label).width) + 20, 162), ph = 12, py = 1;
-      var cx = Math.round(MAIN_W / 2), px = Math.round(cx - pw / 2);
-      if (px < 16) { px = 16; cx = px + pw / 2; }
-      if (px + pw > 252) { px = 252 - pw; cx = px + pw / 2; }   // keep clear of shade/close (x254+)
-      var pg = ctx.createLinearGradient(0, py, 0, py + ph);
-      pg.addColorStop(0, "#d8b863"); pg.addColorStop(0.5, "#9b7a2e");
-      pg.addColorStop(0.5, "#876722"); pg.addColorStop(1, "#523e13");
-      ctx.fillStyle = pg; ctx.fillRect(px, py, pw, ph);
-      ctx.fillStyle = "rgba(255,248,220,0.9)"; ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py, 1, ph);
-      ctx.fillStyle = "rgba(34,23,4,0.92)"; ctx.fillRect(px, py + ph - 1, pw, 1); ctx.fillRect(px + pw - 1, py, 1, ph);
-      var ty = py + ph / 2 + 1;
-      ctx.fillStyle = "rgba(20,12,0,0.85)"; ctx.fillText(label, cx + 0.5, ty + 0.7);
-      var lg = ctx.createLinearGradient(0, py + 1, 0, py + ph - 1);
-      lg.addColorStop(0, "#fff7dc"); lg.addColorStop(0.5, "#f0d182"); lg.addColorStop(1, "#a87f28");
-      ctx.fillStyle = lg; ctx.fillText(label, cx, ty);
-      ctx.restore();
-    }
     function render() {
       ctx.clearRect(0, 0, MAIN_W, MAIN_H);
       if (img()) ctx.drawImage(img(), 0, 0, 275, 116, 0, 0, 275, 116);
-      blit("TITLE_SEL", 0, 0);
-      drawEqBrand();
+      blit("TITLE_SEL", 0, 0);   // the skin's own EQ titlebar (incl. its baked title) — always matches the skin
       blit(on ? "ON_SEL" : "ON", EQ_LAYOUT.on.x, EQ_LAYOUT.on.y);
       blit("AUTO", EQ_LAYOUT.auto.x, EQ_LAYOUT.auto.y);
       blit("PRESETS", EQ_LAYOUT.presets.x, EQ_LAYOUT.presets.y);

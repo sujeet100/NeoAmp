@@ -89,7 +89,7 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
   }
   await clipShot("np_focus", { x: 38, y: 300, width: 562, height: 103 });   // the whole Now-Playing panel
   await clipShot("eqpl_focus", { x: 470, y: 175, width: 130, height: 24 });  // main-window EQ/PL bitmap buttons
-  await clipShot("viz_titlebar", { x: 600, y: 66, width: 400, height: 48 }); // viz titlebar (fullscreen + close)
+  await clipShot("viz_titlebar", { x: 892, y: 62, width: 120, height: 56 }); // viz titlebar RIGHT corner (fullscreen + close)
   // open the NP skin-picker dropdown (raise NP above the playlist first) + capture it
   await evalJs(send, `(function(){var n=document.getElementById('wa-np'); if(n)n.style.zIndex=9999; var b=document.querySelector('.wa-np-btns .wa-skinsel-btn'); if(b)b.click(); return !!b;})()`);
   await sleep(250);

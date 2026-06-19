@@ -616,7 +616,8 @@
     }
     ensureNowPlaying();
     classicWin.el.style.display = "";
-    if (wins["wa-np"]) wins["wa-np"].el.style.display = "";
+    // NOTE: the Now-Playing panel is shown later (after its skin frame is applied) so
+    // it doesn't flash black/unframed while the .wsz loads.
     raise(classicWin.el);
     // hide BOTH procedural windows the classic skin replaces: the main window
     // (#wa-main → #wa-skin) and the procedural equalizer (#wa-eq → #wa-eq-skin).
@@ -636,6 +637,7 @@
       classicWin.drag.style.height = classicApi.dragRegion.h + "px";
       mountClassicEq(skin);
       applyFrame(skin);
+      if (wins["wa-np"]) wins["wa-np"].el.style.display = "";   // show NP now it's framed (no black flash)
       dockClassicStack();
       var cur = NA.getTrack(); if (cur) pushClassicTrack(cur);
       classicApi.setVolume(NA.control.getVolume());

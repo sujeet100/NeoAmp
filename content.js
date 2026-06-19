@@ -533,4 +533,9 @@
     toast: toast,
     FFT_SIZE: FFT_SIZE,
   };
+
+  // Tell the SW a fresh page loaded so it clears any stale capture state for this tab.
+  // After a refresh the old capture is dead, but the SW may still think it's live — which
+  // made starting take TWO clicks (first click stopped the ghost session).
+  try { chrome.runtime.sendMessage({ target: "sw", type: "content-loaded" }); } catch (_) {}
 })();

@@ -103,6 +103,15 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.target !== "sw") return;
   if (msg.type === "toggle-eq") toggleCapture(sender.tab || null);
   else if (msg.type === "stop-capture") { if (capturing) toggleCapture(null); }
+  else if (msg.type === "content-loaded") {
+    // the captured tab reloaded → its capture is dead; reset to idle so ONE click
+    // restarts cleanly (otherwise the first click just stops the ghost session)
+    if (capturing && sender.tab && sender.tab.id === capturedTabId) {
+      chrome.runtime.sendMessage({ target: "offscreen", type: "stop" }).catch(() => {});
+      capturing = false; capturedTabId = null;
+      console.log("[NeoAmp sw] captured tab reloaded — reset to idle");
+    }
+  }
   else if (msg.type === "relay-eq") {
     // EQ window faders → offscreen graph (live)
     chrome.runtime.sendMessage({ target: "offscreen", type: "setEq", bands: msg.eq.bands, preamp: msg.eq.preamp, balance: msg.eq.balance, enabled: msg.eq.enabled }).catch(() => {});
