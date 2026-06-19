@@ -67,19 +67,6 @@
   var COMP_V4 =
     NOISE_GLSL + PAL_GLSL + ALC_MOIRE_GLSL +
     "vec3 dusty(vec3 c, float s){ float l = dot(c, vec3(0.333)); return mix(vec3(l), c, s); }\n" +
-    // 3 expanding WAVY (scalloped) concentric rings around an orb, starting just outside its radius r0.
-    // Drawn FRESH in comp (never the feedback buffer) so they can't rotate into a spiral. Quadratic fade.
-    "vec3 orbRings(vec2 puv, float asp2, vec2 oc, float ph, float t2, float r0, vec3 rc){\n" +
-    "  vec2 od = puv - oc; od.x *= asp2; float odl = length(od); float oda = atan(od.y, od.x);\n" +
-    "  vec3 s = vec3(0.0);\n" +
-    "  for (int ri = 0; ri < 3; ri++) {\n" +
-    "    float rp = ph + float(ri) * 0.16;\n" +
-    "    float ringR = r0 + rp * 0.20 + 0.006 * sin(oda * 3.0 + t2 * 2.0);\n" +
-    "    float band = smoothstep(0.013, 0.0, abs(odl - ringR)) * step(rp, 1.0);\n" +
-    "    s += rc * band * (1.0 - rp) * (1.0 - rp) * 0.6;\n" +
-    "  }\n" +
-    "  return s;\n" +
-    "}\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
@@ -149,14 +136,8 @@
     "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" +   // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
 
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
-    // ORB RIPPLES — concentric rings around BOTH orbs (each gated on its own presence q25/q14), sized to
-    // sit just outside the orb radius q7. q11 is the shed phase (frame_eqs: intermittent / off-during-swirl,
-    // forced ON in the #24 wavefan scene → the two big orbs read as concentric ringed targets).
-    "  if (q11 < 1.0) {\n" +
-    "    float r0 = 0.02 + q7 * 0.7;\n" +
-    "    if (q25 > 0.5) col += orbRings(uv, asp, vec2(q21, q22), q11, time, r0, dusty(pal(q8 + 0.12), 0.9));\n" +
-    "    if (q14 > 0.5) col += orbRings(uv, asp, vec2(q23, q24), q11, time, r0, dusty(pal(q8 + 0.45), 0.9));\n" +
-    "  }\n" +
+    // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
+    //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
     // DE-WASH (measured vs the original: ours was too BRIGHT + UNDER-saturated → washed/pastel). Reinhard
     // compresses highlights toward white and dusty()/bloom average colour out, so after tone-mapping we
@@ -284,7 +265,7 @@
   // WAVEFAN — the big bold horizontal oscilloscope waveform of the 2:40-2:50 scene (orig rot_06..10):
   // the live audio drawn WIDE across centre with tall peaks (a mountain range), a green→yellow→magenta
   // gradient along it. Under the #24 look's downward drift + high decay the trail smears into the fine
-  // descending comb-fan; the two big ringed orbs ride near it. Real-waveform (primary-motif rule).
+  // descending comb-fan; the two big orbs ride near it. Real-waveform (primary-motif rule).
   function fWaveFan(a) {
     var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
     var width = (a.q5 || 0.4) * 2.1;                                    // wide horizontal span
@@ -325,7 +306,7 @@
   ];
 
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
-  var lastT = 0, huePhase = 0, ripplePh = 0, waveAmt = 0;
+  var lastT = 0, huePhase = 0, waveAmt = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
   var bgPick    = makePicker(5, 14, 26, 5.0);             // 5 DISTINCT bg variants (moiré/marble/horizon/ribbon/aurora), one per index — own slow clock
@@ -371,7 +352,7 @@
     var dd = (mo.mix - 0.5) * 4.0;
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd));                       // dips to ~0.21 at the swap instant
     // #24 SCENE amount — eased toward 1 while the WAVEFAN motif (mode 8) is active, so the 2:40-2:50 look
-    // (big clustered ringed orbs + downward comb-fan) BLEEDS in/out rather than cutting.
+    // (big clustered orbs + downward comb-fan) BLEEDS in/out rather than cutting.
     waveAmt += ((mCur === 8 ? 1 : 0) - waveAmt) * Math.min(1, dt * 0.8);
 
     // MOTIF contract (read by the kit factories)
@@ -401,7 +382,7 @@
     t.q7 = (0.060 + 0.020 * Math.max(0, bass - 1)) * (1 + 0.40 * f);     // orb radius (pops on beat)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA);                                 // tether jag amplitude (audio-coupled)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
-    // drift so the waveform trail smears into the descending comb-fan, both orbs present → ringed targets.
+    // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
       var wa = waveAmt, ca = time * 0.03;
       t.q19 -= 0.004 * wa;                                              // downward drift → descending comb
@@ -416,13 +397,7 @@
       if (wa > 0.5) t.q12 = 1;                                        // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
       t.q29 += (4.9 - t.q29) * wa;                                    // calm aurora ground (the orig #24 is plain/dark, not the busy moiré dot-grid)
     }
-    // RIPPLE phase (q11) — INTERMITTENT beat-shed: only when orb A is present, NOT during swirl
-    // scenes (q17), and on a slow on/off clock. Resets on a beat then expands fast and fully fades,
-    // so it can't accumulate/rotate into a spiral (the always-on version did). q11>=1 ⇒ ripple off.
-    var rippleOK = ((t.q25 > 0.5) && (t.q17 < 0.03) && (Math.sin(time * 0.11 + 1.0) > 0.1)) || waveAmt > 0.4;
-    if (rippleOK) { ripplePh += dt * 2.2; if (ripplePh >= 1.3 || f > 0.5) ripplePh = 0.0; }   // shed every ~0.6s OR on a beat
-    else ripplePh = 2.0;
-    t.q11 = ripplePh;
+    t.q11 = 0;   // orb ripples removed — the original's orb rings are a 3D feedback trace, not a drawn ring
     return t;
   }
 
@@ -433,8 +408,8 @@
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.62 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
   };
-  // waves[1] free — orb ripples are drawn in the COMP shader (fresh each frame → cannot spiral),
-  // NOT a feedback-buffer wave. See the q11 ripple block in COMP_V4 + the gating in frame_eqs.
+  // waves[1] free. (Orb ripples were removed: the original's orb rings are a 3D feedback trace/tube-stack,
+  // not a drawn ring — the flat procedural version read as fake. q11 is now unused.)
   preset.waves[1] = {
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
     init_eqs: passthrough, frame_eqs: passthrough, point_eqs: ""
