@@ -143,10 +143,20 @@
     return wins[id];
   }
 
+  // Bring a window to the front. Grabbing the main window (the docked anchor —
+  // #wa-main procedurally, #wa-skin in classic mode) raises the WHOLE attached
+  // stack together, so the player group never gets split across the viz window's
+  // depth (classic Winamp: the main window + its docked sub-windows surface as a
+  // unit). Sub-windows grabbed on their own still raise individually.
   function raise(el) {
     Object.keys(wins).forEach(function (k) { wins[k].el.classList.add("inactive"); });
-    el.classList.remove("inactive");
+    var group = (el.id === "wa-main" || el.id === "wa-skin")
+      ? attachedCluster(el).map(function (m) { return m.el; }).filter(function (g) { return g !== el; })
+      : [];
+    // group members first (below), then the grabbed window on top + marked active
+    group.forEach(function (g) { g.style.zIndex = String(++zTop); g.classList.remove("inactive"); });
     el.style.zIndex = String(++zTop);
+    el.classList.remove("inactive");
   }
 
   // Transient full-viewport overlay shown during a drag/resize. Mouse events
