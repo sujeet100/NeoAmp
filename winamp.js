@@ -131,7 +131,7 @@
       });
       tbtns.appendChild(shadeBtn);
     }
-    var closeBtn = h("span", { class: "wa-tbtn", title: "Close", text: "✕" });
+    var closeBtn = h("span", { class: "wa-tbtn wa-close", title: "Close", text: "✕" });
     closeBtn.addEventListener("click", function (e) { e.stopPropagation(); (opts.onClose || function () { el.style.display = "none"; })(); });
     tbtns.appendChild(closeBtn);
 
@@ -594,8 +594,8 @@
   // the frame always matches — no more gold fallback for GEN-less skins).
   // PLEDIT.TXT colors drive the playlist/library list text.
   var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz"];
-  var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill" };
-  var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill" };
+  var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
+  var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   function applyFrame(skin) {
     removeFrame();
     var gen = window.NeoAmpClassic.genAssets(skin);
@@ -623,8 +623,8 @@
   function removeFrame() {
     GEN_WINDOWS.forEach(function (id) { if (wins[id]) { wins[id].el.classList.remove("wa-genskin"); wins[id].el.classList.remove("wa-plskin"); } });
     var s = root.style;
-    ["tl", "gold", "tr", "lend", "cfill", "rend", "ml", "mr", "bl", "br", "bfill"].forEach(function (k) { s.removeProperty("--gen-" + k); });
-    ["tl", "tfill", "title", "tr", "left", "right", "bl", "br", "bfill"].forEach(function (k) { s.removeProperty("--plf-" + k); });
+    ["tl", "gold", "tr", "lend", "cfill", "rend", "ml", "mr", "bl", "br", "bfill", "close"].forEach(function (k) { s.removeProperty("--gen-" + k); });
+    ["tl", "tfill", "title", "tr", "left", "right", "bl", "br", "bfill", "close"].forEach(function (k) { s.removeProperty("--plf-" + k); });
     ["normal", "current", "normalbg", "selectedbg"].forEach(function (k) { s.removeProperty("--pl-" + k); });
     s.removeProperty("--wa-stack-w");
     if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "";

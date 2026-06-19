@@ -371,9 +371,21 @@
   image-rendering: pixelated;
 }
 .wa-genskin .wa-title .wa-logo { display: none; }
-/* keep the close/fullscreen buttons clear of the gold right-corner cap */
-.wa-win.wa-genskin .wa-tbtns { position: relative; z-index: 2; margin-right: 54px; }
+/* non-close framed buttons (the viz fullscreen toggle) clear the gold corner cap.
+   .wa-tbtns is static so .wa-close anchors to the (relative) titlebar, not here. */
+.wa-win.wa-genskin .wa-tbtns { position: static; margin-right: 54px; }
 .wa-genskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #d6deff; }
+/* the close glyph is BAKED into the gold top-right corner sprite (--gen-tr); our
+   drawn ✕ doubled it up and was mis-shoved 54px left. Replace it with a
+   transparent hit-area pinned exactly over the baked icon (Webamp gen-window.css
+   right:2 top:3 9x9 → 2x: right:4 top:6 18x18); only the pressed sprite draws. */
+.wa-genskin .wa-close, .wa-plskin .wa-close {
+  position: absolute; top: 6px; right: 4px; width: 18px; height: 18px;
+  margin: 0; padding: 0; background: none; border: 0; box-shadow: none;
+  color: transparent; font-size: 0; z-index: 4; cursor: pointer;
+}
+.wa-genskin .wa-close:active { background: var(--gen-close) center / 18px 18px no-repeat; }
+.wa-plskin .wa-close:active { background: var(--plf-close) center / 18px 18px no-repeat; }
 /* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
 #wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body {
   margin: 0; padding: 10px 26px 34px 30px;   /* clears the frame borders + breathing room */
@@ -420,7 +432,7 @@
   image-rendering: pixelated;
 }
 .wa-plskin .wa-title .wa-logo { display: none; }
-.wa-win.wa-plskin .wa-tbtns { position: relative; z-index: 2; margin-right: 54px; }
+.wa-win.wa-plskin .wa-tbtns { position: static; margin-right: 54px; }
 .wa-plskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #e7ecff; }
 #wa-pl.wa-plskin .wa-body, #wa-lib.wa-plskin .wa-body, #wa-viz.wa-plskin .wa-body {
   margin: 0; padding: 10px 44px 42px 28px;   /* right tile is wider; bottom clears the frame */
