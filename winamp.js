@@ -524,7 +524,7 @@
     els.eqTog = tog("EQ", "Toggle equalizer", function (t) { toggleWin("wa-eq", t); });
     els.plTog = tog("PL", "Toggle playlist", function (t) { toggleWin("wa-pl", t); refreshQueue(true); });
     els.visTog = tog("VIS", "Toggle visualization", function (t) { toggleWin("wa-viz", t); });
-    els.libTog = tog("LIB", "Toggle media library / search", function (t) { toggleWin("wa-lib", t); if (els.libInput) els.libInput.focus(); });
+    els.libTog = tog("LIB", "Toggle media library / search", function (t) { toggleWin("wa-lib", t); if (isShown("wa-lib")) libBecameVisible(); });
     var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.plTog, els.visTog, els.libTog]);
 
     var controls = h("div", { class: "wa-controls" }, [transport, vols, toggles]);
@@ -707,11 +707,24 @@
       els["np" + label] = b;
       return b;
     }
+    // like / dislike the current track (the main window has no such control)
+    function rateBtn(label, title, kind) {
+      var b = h("div", { class: "wa-tog wa-np-tog wa-rate-btn " + (kind === "dislike" ? "wa-dislike" : "wa-like"), title: title, text: label });
+      b.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      b.addEventListener("click", function (e) { e.stopPropagation(); if (NA.control[kind]) NA.control[kind](); });
+      els[kind === "dislike" ? "npDislike" : "npLike"] = b;
+      return b;
+    }
+    var rate = h("div", { class: "wa-np-rate" }, [
+      rateBtn("♥", "Like this track", "like"),
+      rateBtn("✖", "Dislike this track", "dislike"),
+    ]);
     var npSkinSel = buildSkinSelect();
     npSkinSel.value = "wsz:" + (CLASSIC_SKINS[0] && CLASSIC_SKINS[0].id);
     var btns = h("div", { class: "wa-np-btns" }, [
+      rate,
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
-      npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (els.libInput) els.libInput.focus(); }),
+      npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
       npSkinSel,
     ]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
@@ -745,7 +758,10 @@
     w.el.classList.toggle("empty", !hasArt);
     if (els.npTitle) els.npTitle.textContent = t.title || "—";
     if (els.npArtist) els.npArtist.textContent = t.artist || "";
-    if (els.npAlbum) els.npAlbum.textContent = t.album || "";
+    // album + year on one line (filtered so it's never a stray " • " when absent)
+    if (els.npAlbum) els.npAlbum.textContent = [t.album, t.year].filter(Boolean).join("  •  ");
+    if (els.npLike) els.npLike.classList.toggle("on", t.likeStatus === "LIKE");
+    if (els.npDislike) els.npDislike.classList.toggle("on", t.likeStatus === "DISLIKE");
   }
   function isShown(id) { return wins[id] && wins[id].el.style.display !== "none"; }
   function classicHooks() {
@@ -912,6 +928,7 @@
           h("span", { class: "wa-pl-n", text: (item.index + 1) + "." }),
           thumb,
           h("span", { class: "wa-pl-t", text: item.title + (item.artist ? " - " + item.artist : "") }),
+          item.plays ? h("span", { class: "wa-pl-plays", text: item.plays }) : null,
           h("span", { class: "wa-pl-d", text: item.duration || "" }),
         ]);
         row.title = "Double-click to play";
@@ -933,9 +950,11 @@
     var win = makeWindow("wa-lib", "Media Library", { shade: false, onClose: function () { hideWin("wa-lib"); } });
     var input = h("input", { class: "wa-lib-input", type: "text", placeholder: "Search songs, artists, albums…" });
     var go = h("button", { class: "wa-lib-go", text: "GO" });
+    var home = h("button", { class: "wa-lib-go wa-lib-home", title: "Quick Picks & Listen Again", text: "HOME" });
     var list = h("div", { class: "wa-lib-list" });
-    var status = h("div", { class: "wa-lib-status", text: "Type a query and press GO / Enter." });
-    win.body.appendChild(h("div", { class: "wa-lib-bar" }, [input, go]));
+    var status = h("div", { class: "wa-lib-status", text: "Search, or HOME for Quick Picks & Listen Again." });
+    home.addEventListener("click", loadHome);
+    win.body.appendChild(h("div", { class: "wa-lib-bar" }, [input, go, home]));
     win.body.appendChild(list);
     win.body.appendChild(status);
     els.libInput = input; els.libList = list; els.libStatus = status;
@@ -971,21 +990,89 @@
         list.appendChild(h("div", { class: "wa-lib-sec", text: it.section }));
       }
       var thumb = makeThumb("wa-lib-thumb", it.art);
-      var row = h("div", { class: "wa-lib-row" + (it.rowIndex < 0 ? " top" : "") }, [
+      var isColl = it.kind === "playlist" || it.kind === "album";
+      var sub = it.subtitle || "";
+      if (it.plays && sub.indexOf(it.plays) < 0) sub += (sub ? "  •  " : "") + it.plays;   // append play count
+      var title = h("div", { class: "wa-lib-t" }, [
+        isColl ? h("span", { class: "wa-lib-badge", text: it.kind === "album" ? "ALB" : "PL" }) : null,
+        h("span", { text: it.title }),
+      ]);
+      var row = h("div", { class: "wa-lib-row" + (it.rowIndex < 0 ? " top" : "") + (isColl ? " is-collection" : "") }, [
         thumb,
+        h("div", { class: "wa-lib-meta" }, [title, h("div", { class: "wa-lib-s", text: sub })]),
+      ]);
+      if (isColl) {
+        // single-click OPENS the playlist/album page; double-click PLAYS it.
+        // Debounce the click so a double-click doesn't also fire the open.
+        row.title = "Click to open · Double-click to play";
+        var clickT = null;
+        row.addEventListener("click", function () {
+          if (clickT) return;
+          clickT = setTimeout(function () { clickT = null; NA.control.openLibraryItem(it.rowIndex); }, 250);
+        });
+        row.addEventListener("dblclick", function () {
+          if (clickT) { clearTimeout(clickT); clickT = null; }
+          NA.control.playLibraryItem(it.rowIndex);
+          setTimeout(function () { refreshQueue(true); }, 700);
+        });
+      } else {
+        row.title = "Double-click to play";
+        row.addEventListener("dblclick", function () {
+          NA.control.playLibraryItem(it.rowIndex);
+          setTimeout(function () { refreshQueue(true); }, 700);
+        });
+      }
+      list.appendChild(row);
+    });
+    els.libStatus.textContent = items.length + " results for “" + res.query + "”.";
+  }
+
+  // Library "home" view (shown when the search box is empty / nothing playing):
+  // the "Quick Picks" and "Listen Again" shelves scraped from YTM's home feed.
+  function renderHome(res) {
+    var list = els.libList; if (!list) return;
+    list.innerHTML = "";
+    var items = (res && res.results) || [];
+    if (!items.length) {
+      els.libStatus.textContent = "Open YouTube Music's home to load Quick Picks & Listen Again.";
+      return;
+    }
+    var lastSection = null;
+    items.forEach(function (it) {
+      if (it.section !== lastSection) {
+        lastSection = it.section;
+        list.appendChild(h("div", { class: "wa-lib-sec", text: it.section }));
+      }
+      var row = h("div", { class: "wa-lib-row" }, [
+        makeThumb("wa-lib-thumb", it.art),
         h("div", { class: "wa-lib-meta" }, [
-          h("div", { class: "wa-lib-t", text: it.title }),
+          h("div", { class: "wa-lib-t" }, [h("span", { text: it.title })]),
           h("div", { class: "wa-lib-s", text: it.subtitle || "" }),
         ]),
       ]);
       row.title = "Double-click to play";
+      var idx = it.homeIndex;
       row.addEventListener("dblclick", function () {
-        NA.control.playLibraryItem(it.rowIndex);
+        NA.control.playHomeItem(idx);
         setTimeout(function () { refreshQueue(true); }, 700);
       });
       list.appendChild(row);
     });
-    els.libStatus.textContent = items.length + " results for “" + res.query + "”.";
+    els.libStatus.textContent = "Home — Quick Picks & Listen Again (double-click to play).";
+  }
+  function loadHome() {
+    if (!els.libList) return;
+    els.libStatus.textContent = "Loading Quick Picks & Listen Again…";
+    NA.getHomeShelves(renderHome);
+  }
+  // when the Library is revealed: focus the box, and auto-show the home shelves
+  // if it's idle (empty query + nothing playing + nothing listed yet)
+  function libBecameVisible() {
+    if (els.libInput) els.libInput.focus();
+    var t = NA.getTrack && NA.getTrack();
+    if (els.libInput && !els.libInput.value.trim() && (!t || !t.title) && els.libList && !els.libList.childElementCount) {
+      loadHome();
+    }
   }
 
   // =========================================================================
