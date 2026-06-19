@@ -309,24 +309,41 @@
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
-/* VIS/LIB/like toggles in the Now-Playing panel match the main window's EQ/PL
-   toggles (.wa-tog: 18px tall, 7px label) plus an LED that lights when active —
-   instead of the old oversized silver buttons. */
-.wa-np-tog { display: flex; align-items: center; gap: 5px; min-width: 40px; }
+/* VIS/LIB + like/dislike: small raised, beveled buttons modelled on the classic
+   EQ/PL toggles — an LCD-green label/icon on a metal face with a left-side LED
+   that lights when active (window open / track liked). */
+.wa-np-tog {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  height: 20px; min-width: 52px; padding: 0 9px; cursor: pointer;
+  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
+  color: var(--pl-normal, var(--wa-lcd));
+  background: linear-gradient(180deg, #545460 0%, #3b3b46 52%, #2b2b34 100%);
+  border: 1px solid; border-color: rgba(255,255,255,0.28) #121218 #121218 rgba(255,255,255,0.28);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(0,0,0,0.5);
+}
+.wa-np-tog:hover { filter: brightness(1.12); }
+.wa-np-tog.on {
+  border-color: #121218 rgba(255,255,255,0.28) rgba(255,255,255,0.28) #121218;
+  background: linear-gradient(180deg, #2a2a33, #44444f);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7);
+  color: var(--wa-lcd); text-shadow: 0 0 5px var(--wa-accent-glow);
+}
 .wa-np-tog::before {
   content: ""; width: 5px; height: 5px; border-radius: 1px; flex: 0 0 auto;
-  background: #16401f; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);   /* LED off */
+  background: #15331c; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);   /* LED off */
 }
 .wa-np-tog.on::before { background: var(--wa-accent); box-shadow: 0 0 5px var(--wa-accent-glow); }  /* LED on */
-/* like/dislike rate buttons: glyph-only (no LED dot); the glyph itself lights */
-.wa-np-rate { display: flex; gap: 4px; }
-.wa-rate-btn { min-width: 0; padding: 0 7px; font-size: 11px; }
-.wa-rate-btn::before { display: none; }
-.wa-rate-btn.wa-like.on { color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow); }
-.wa-rate-btn.wa-dislike.on { color: var(--wa-bar-peak, #ff5050); text-shadow: 0 0 5px rgba(255,80,80,0.6); }
+/* like/dislike: SVG icon + LED; the icon + LED light green (like) / red (dislike) */
+.wa-np-rate { display: flex; gap: 5px; }
+.wa-rate-btn { min-width: 0; padding: 0 8px; color: var(--wa-fg-dim); }
+.wa-rate-btn svg { width: 13px; height: 13px; fill: currentColor; display: block; }
+.wa-rate-btn.wa-like.on { color: var(--wa-accent); }
+.wa-rate-btn.wa-dislike.on { color: var(--wa-bar-peak, #ff5050); text-shadow: none; }
+.wa-rate-btn.wa-dislike.on::before { background: var(--wa-bar-peak, #ff5050); box-shadow: 0 0 5px rgba(255,80,80,0.6); }
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
-.wa-np-btns .wa-skinsel-btn { height: 18px; padding: 0 8px; font-size: 9px; }
+.wa-np-btns .wa-skinsel-btn { height: 20px; padding: 0 10px; font-size: 11px; }
 
 /* =======================================================================
    GEN.BMP generic-window frame (Playlist / Library / Viz in classic mode).
@@ -354,8 +371,9 @@
 }
 .wa-win.wa-genskin .wa-title {
   position: absolute; left: 50%; top: 0; transform: translateX(-50%);  /* top:0 — plaque was floating */
-  flex: none; height: 40px; display: flex; align-items: center; padding: 0 48px;
-  color: #d6deff; font-size: 11px; letter-spacing: 2px; pointer-events: none;
+  flex: none; height: 40px; display: flex; align-items: center; justify-content: center;
+  padding: 0 48px; min-width: 150px;   /* keep short titles' plaque substantial */
+  color: #d6deff; font-size: 11px; letter-spacing: 2px; pointer-events: none; white-space: nowrap;
   background:
     var(--gen-lend) left top / 50px 40px no-repeat,
     var(--gen-rend) right top / 50px 40px no-repeat,
@@ -366,9 +384,19 @@
 /* non-close framed buttons (the viz fullscreen toggle) clear the gold corner cap.
    .wa-tbtns is static so .wa-close anchors to the (relative) titlebar, not here. */
 .wa-win.wa-genskin .wa-tbtns { position: static; margin-right: 54px; }
-/* keep framed buttons above the centered title plaque (.wa-tbtns lost its
-   z-index when it went static for .wa-close); .wa-close's z-index:4 still wins */
-.wa-genskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #d6deff; position: relative; z-index: 3; }
+/* framed titlebar buttons (the viz fullscreen toggle): an 18x18 gold-bordered
+   control matching the close, sitting on the gold ridge clear of the corner cap.
+   z-index:3 keeps it above the centered title plaque; .wa-close's z-index:4 wins. */
+.wa-genskin .wa-tbtn, .wa-plskin .wa-tbtn {
+  position: relative; z-index: 3;
+  width: 18px; height: 18px; padding: 0; font-size: 13px; line-height: 1;
+  display: grid; place-items: center; color: #fce9a0;
+  background: linear-gradient(180deg, rgba(74,55,16,0.92), rgba(34,24,6,0.94));
+  border: 1px solid; border-color: rgba(255,236,160,0.55) rgba(0,0,0,0.6) rgba(0,0,0,0.6) rgba(255,236,160,0.55);
+  border-radius: 2px;
+}
+.wa-genskin .wa-tbtn:hover, .wa-plskin .wa-tbtn:hover { filter: brightness(1.15); }
+.wa-genskin .wa-tbtn:active, .wa-plskin .wa-tbtn:active { filter: brightness(0.82); border-color: rgba(0,0,0,0.6) rgba(255,236,160,0.55) rgba(255,236,160,0.55) rgba(0,0,0,0.6); }
 /* the close glyph is BAKED into the gold top-right corner sprite (--gen-tr); our
    drawn ✕ doubled it up and was mis-shoved 54px left. Replace it with a
    transparent hit-area pinned exactly over the baked icon (Webamp gen-window.css
@@ -419,7 +447,8 @@
    baked "PLAYLIST" text, so we use the plain tile texture + our own label) */
 .wa-win.wa-plskin .wa-title {
   position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-  flex: none; height: 40px; display: flex; align-items: center; padding: 0 18px;
+  flex: none; height: 40px; display: flex; align-items: center; justify-content: center;
+  padding: 0 18px; min-width: 150px; white-space: nowrap;
   color: #e7ecff; font-size: 11px; letter-spacing: 1px; pointer-events: none;
   text-shadow: 0 1px 1px rgba(0,0,0,0.8);
   background: var(--plf-tfill) left top / 50px 40px repeat-x;
@@ -427,7 +456,7 @@
 }
 .wa-plskin .wa-title .wa-logo { display: none; }
 .wa-win.wa-plskin .wa-tbtns { position: static; margin-right: 54px; }
-.wa-plskin .wa-tbtn { background: rgba(0,0,0,0.3); border-color: rgba(0,0,0,0.5); color: #e7ecff; position: relative; z-index: 3; }
+/* (framed .wa-tbtn styling is shared with .wa-genskin above) */
 #wa-pl.wa-plskin .wa-body, #wa-lib.wa-plskin .wa-body, #wa-viz.wa-plskin .wa-body {
   margin: 0; padding: 10px 44px 42px 28px;   /* right tile is wider; bottom clears the frame */
   background:
@@ -607,29 +636,36 @@
 .wa-lib-s { font: 9px/1.3 var(--wa-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-lib-status { font: 9px/1.2 var(--wa-font); color: var(--wa-fg-dim); padding: 1px 2px; }
 
-/* classic skin picker: a beveled button + a styled popup list (no native
-   <select>, which renders the OS dropdown and breaks the skin illusion) */
+/* classic skin picker: a RETRO GOLD beveled button (matching the NeoAmp
+   nameplate) + a styled popup list — no native <select> (its OS dropdown breaks
+   the skin illusion). Readable bold sans, dark engraved text on the gold plate. */
 .wa-skinsel { position: relative; display: inline-block; margin-right: 4px; }
 .wa-skinsel-btn {
-  display: flex; align-items: center; gap: 4px; height: 13px; padding: 0 4px;
-  font: 700 8px/1 var(--wa-font); color: var(--wa-btn-fg); white-space: nowrap;
-  background: var(--wa-btn-bg);
-  border: 1px solid; border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
-  border-radius: 1px; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; height: 15px; padding: 0 8px;
+  font: 700 9px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0.3px; white-space: nowrap;
+  color: #3a2a06; text-shadow: 0 1px 0 rgba(255,246,214,0.55);
+  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
+  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+  border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255,250,228,0.6), 0 1px 2px rgba(0,0,0,0.45);
+  cursor: pointer;
 }
-.wa-skinsel-btn:active { border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark); }
-.wa-skinsel-arrow { font-size: 7px; opacity: 0.75; }
+.wa-skinsel-btn:hover { filter: brightness(1.06); }
+.wa-skinsel-btn:active { border-color: #4a3810 #efdfa6 #fbefcb #5a4514; box-shadow: inset 1px 1px 3px rgba(60,40,8,0.6); }
+.wa-skinsel-arrow { font-size: 8px; opacity: 0.85; }
 .wa-skinsel-menu {
   display: none; position: absolute; right: 0; top: 100%; margin-top: 2px;
-  z-index: 50; min-width: 130px;
-  background: var(--wa-btn-bg, #d6d6d6);
-  border: 2px solid; border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.55);
+  z-index: 50; min-width: 132px;
+  font: 700 10px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(180deg, #2a241a, #1c1812);
+  border: 1px solid; border-color: #d9b25a #4a3810 #4a3810 #d9b25a;
+  box-shadow: 2px 3px 6px rgba(0,0,0,0.6);
 }
 .wa-skinsel-menu.open { display: block; }
-.wa-skinsel-item { padding: 4px 9px; font: 700 9px/1 var(--wa-font); color: var(--wa-btn-fg); cursor: pointer; white-space: nowrap; }
-.wa-skinsel-item:hover { background: var(--wa-accent, #1d2864); color: #fff; }
-.wa-skinsel-item.load { border-top: 1px solid var(--wa-bevel-dark); }
+.wa-skinsel-item { padding: 5px 10px; color: #e7d2a0; cursor: pointer; white-space: nowrap; }
+/* gold selection highlight (was a harsh bright-green accent) */
+.wa-skinsel-item:hover { background: linear-gradient(180deg, #e7c878, #b8923c); color: #2a1d08; }
+.wa-skinsel-item.load { border-top: 1px solid #4a3810; color: #c9a44a; }
 
 /* =======================================================================
    LAUNCHER
