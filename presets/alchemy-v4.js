@@ -74,7 +74,7 @@
     "  vec3 s = vec3(0.0);\n" +
     "  for (int ri = 0; ri < 3; ri++) {\n" +
     "    float rp = ph + float(ri) * 0.16;\n" +
-    "    float ringR = r0 + rp * 0.20 + 0.013 * sin(oda * 7.0 + t2 * 2.0);\n" +
+    "    float ringR = r0 + rp * 0.20 + 0.006 * sin(oda * 3.0 + t2 * 2.0);\n" +
     "    float band = smoothstep(0.013, 0.0, abs(odl - ringR)) * step(rp, 1.0);\n" +
     "    s += rc * band * (1.0 - rp) * (1.0 - rp) * 0.6;\n" +
     "  }\n" +
@@ -120,11 +120,11 @@
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
     "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
-    "  if (q29 < 1.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.6); }\n" +                 // moiré
-    "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" +  // marble
-    "  else if (q29 < 3.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" +              // horizon bands
-    "  else if (q29 < 4.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" +  // ribbon stripes
-    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" +        // aurora swirl
+    "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" +                // moiré (threshold <0.5 so only ONE picker index maps here — was <1.5 → showed ~2x too often)
+    "  else if (q29 < 1.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" +  // marble (1)
+    "  else if (q29 < 2.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" +              // horizon bands (2)
+    "  else if (q29 < 3.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" +  // ribbon stripes (3)
+    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" +        // aurora swirl (4)
     // BOLD kaleidoscope wedges — when a fold is active, split the (already-mirrored) field into two
     // distinct LUMINOUS colour panes along the fold axes so it reads as bold colour wedges (orig
     // sweep_08 = a green/mauve bowtie-X), NOT the uniform symmetric blob a low-contrast fbm fold gives.
@@ -224,7 +224,7 @@
   }
 
   // ── central-motif modes: each = a kit-factory point fn (one wave). Dispatched per-frame by q30. ──
-  var fAnem = alcAnemone(24, ALC_PAL.roseGreen).point_eqs;
+  var fAnem = alcAnemone(10, ALC_PAL.roseGreen).point_eqs;   // 10 arms (was 24) → a cleaner, softer flower, not a dense spirograph lattice (#21)
   var fSpin = alcSpindle(ALC_PAL.redCyan).point_eqs;
   // NOTE: no nested-polygon "mandala" mode. In the original (frames w_sweep f_14/20/26) the mandala
   // is a SMALL central waveform MIRRORED by the kaleidoscope fold into big soft wedges — NOT a thin
@@ -298,7 +298,7 @@
   var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.80, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50, 0.80];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan
+  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50, 0.80];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan (anemone lowered → softer, less dense)
   function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
@@ -328,7 +328,7 @@
   var lastT = 0, huePhase = 0, ripplePh = 0, waveAmt = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
-  var bgPick    = makePicker(6, 14, 26, 5.0);             // background variant (6: moiré/marble/horizon/ribbon/aurora) — own slow clock
+  var bgPick    = makePicker(5, 14, 26, 5.0);             // 5 DISTINCT bg variants (moiré/marble/horizon/ribbon/aurora), one per index — own slow clock
   var motifPick = makePicker(MODES.length, 6, 12, 2.0);   // central motif — own clock, dip-swap
 
   function frame(t) {
@@ -414,6 +414,7 @@
       t.q25 = Math.max(t.q25, wa); t.q14 = Math.max(t.q14, wa);         // both orbs present
       t.q13 *= (1 - wa);                                               // #24 is NOT folded — fade out any kaleidoscope fold strength
       if (wa > 0.5) t.q12 = 1;                                        // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
+      t.q29 += (4.9 - t.q29) * wa;                                    // calm aurora ground (the orig #24 is plain/dark, not the busy moiré dot-grid)
     }
     // RIPPLE phase (q11) — INTERMITTENT beat-shed: only when orb A is present, NOT during swirl
     // scenes (q17), and on a slow on/off clock. Resets on a beat then expands fast and fully fades,
