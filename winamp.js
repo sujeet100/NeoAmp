@@ -757,6 +757,35 @@
   }
   // "Now Playing" panel — our own info window (Winamp 2 has no art region),
   // docked between Main and EQ, skin-width, with album art + track details.
+  // --- backdrop: dim the busy YTM page behind NeoAmp so the player reads cleaner ---
+  var BG_MODES = ["dark", "black", "off"];   // default dark; cycle dark → black → off
+  var bgMode = "dark";
+  function applyBackdrop() {
+    var bd = document.getElementById("neoamp-backdrop");
+    if (bd) {
+      bd.style.background = bgMode === "black" ? "rgba(0,0,0,0.92)" : bgMode === "dark" ? "rgba(0,0,0,0.55)" : "transparent";
+      bd.style.display = bgMode === "off" ? "none" : "";
+    }
+    if (els.npBG) {
+      els.npBG.classList.toggle("on", bgMode !== "off");
+      els.npBG.title = "Backdrop behind NeoAmp — click to cycle dark → black → off (now: " + bgMode + ")";
+    }
+  }
+  function ensureBackdrop() {
+    if (!root || document.getElementById("neoamp-backdrop")) return;
+    var bd = h("div", { id: "neoamp-backdrop" });
+    // full-viewport scrim INSIDE root's stacking context, below the windows (z 20+);
+    // pointer-events:none so it never blocks clicks to YTM or the player.
+    bd.style.cssText = "position:fixed; inset:0; z-index:1; pointer-events:none; transition:background .2s ease;";
+    root.insertBefore(bd, root.firstChild);
+    applyBackdrop();
+  }
+  function cycleBackdrop() {
+    bgMode = BG_MODES[(BG_MODES.indexOf(bgMode) + 1) % BG_MODES.length];
+    applyBackdrop();
+    NA.storage.set({ neoampBg: bgMode });
+  }
+
   function ensureNowPlaying() {
     if (wins["wa-np"]) return;
     var img = h("img", { class: "wa-np-art", alt: "" });
@@ -797,10 +826,17 @@
     ]);
     var npSkinSel = buildSkinSelect();
     npSkinSel.value = "wsz:" + (CLASSIC_SKINS[0] && CLASSIC_SKINS[0].id);
+    // BG: cycle the page-darkening backdrop (dark / black / off)
+    var bgBtn = h("div", { class: "wa-np-tog", text: "BG" });
+    bgBtn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    bgBtn.addEventListener("click", function (e) { e.stopPropagation(); cycleBackdrop(); });
+    els.npBG = bgBtn;
     var toggles = h("div", { class: "wa-np-toggles" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
+      bgBtn,
     ]);
+    applyBackdrop(); // sync the BG button to the current/persisted mode
     // two columns: like/dislike on the left, VIS+LIB row over the skin picker on the right
     var col2 = h("div", { class: "wa-np-col2" }, [toggles, npSkinSel]);
     var btns = h("div", { class: "wa-np-btns" }, [rate, col2]);
@@ -1371,6 +1407,8 @@
     if (root) return;
     root = h("div", { id: "neoamp-root" });
     document.documentElement.appendChild(root);
+    ensureBackdrop();
+    NA.storage.get("neoampBg", function (m) { if (m && BG_MODES.indexOf(m) >= 0) bgMode = m; applyBackdrop(); });
     buildMain();
     buildEq();
     buildViz();
