@@ -292,13 +292,37 @@
     });
     window.addEventListener("mousemove", function (e) {
       if (!sizing) return;
-      if (!lockWidth) el.style.width = Math.max(minW, sw + (e.clientX - sx)) + "px";
-      el.style.height = Math.max(minH, sh + (e.clientY - sy)) + "px";
+      // cap so the bottom-right resize handle can't be pushed off-screen (it'd be
+      // unreachable to drag back smaller). Keep a 2px margin inside the viewport.
+      var maxW = Math.max(minW, window.innerWidth - el.offsetLeft - 2);
+      var maxH = Math.max(minH, window.innerHeight - el.offsetTop - 2);
+      if (!lockWidth) el.style.width = Math.min(maxW, Math.max(minW, sw + (e.clientX - sx))) + "px";
+      el.style.height = Math.min(maxH, Math.max(minH, sh + (e.clientY - sy))) + "px";
     });
     var stop = function () { if (!sizing) return; sizing = false; shield(false); saveLayout(); };
     window.addEventListener("mouseup", stop);
     window.addEventListener("blur", stop);
   }
+
+  // Keep every window reachable: cap any window bigger than the viewport, then clamp
+  // its position back into view. Without this a window stranded off-screen (after the
+  // browser shrinks, or an oversized viz) has its resize handle out of reach.
+  function clampWindowsIntoView() {
+    if (!root) return;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    Object.keys(wins).forEach(function (k) {
+      var e = wins[k] && wins[k].el;
+      if (!e || e.style.display === "none") return;
+      if (e.style.width && e.offsetWidth > vw) e.style.width = vw + "px";    // only resizable windows carry inline w/h
+      if (e.style.height && e.offsetHeight > vh) e.style.height = vh + "px";
+      var x = Math.max(0, Math.min(vw - e.offsetWidth, e.offsetLeft));
+      var y = Math.max(0, Math.min(vh - e.offsetHeight, e.offsetTop));
+      if (x !== e.offsetLeft) e.style.left = x + "px";
+      if (y !== e.offsetTop) e.style.top = y + "px";
+    });
+  }
+  var clampTimer = 0;
+  window.addEventListener("resize", function () { clearTimeout(clampTimer); clampTimer = setTimeout(function () { clampWindowsIntoView(); saveLayout(); }, 150); });
 
   // ---- layout persistence --------------------------------------------------
   function saveLayout() {
