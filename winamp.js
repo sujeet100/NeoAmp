@@ -550,7 +550,9 @@
   }
   function showShortcuts() {
     if (shortcutsEl) { closeShortcuts(); return; }   // toggle off if already open
-    var list = h("div", { class: "neoamp-sc-list" }, SHORTCUTS.map(function (r) {
+    var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
+    var rows = SHORTCUTS.filter(function (r) { return !(r[0] === "L" && caps.library === false); });
+    var list = h("div", { class: "neoamp-sc-list" }, rows.map(function (r) {
       return h("div", { class: "neoamp-sc-row" }, [
         h("kbd", { class: "neoamp-sc-key", text: r[0] }),
         h("span", { class: "neoamp-sc-desc", text: r[1] }),
@@ -1060,6 +1062,7 @@
     makeDraggable(el, el);
     root.appendChild(el);
     wins["wa-np"] = { el: el, body: el, titlebar: el, img: img };
+    applyCapabilities();   // buttons now exist — hide controls the active provider lacks
   }
   // Dock the classic stack flush, top to bottom: Main → Now-Playing → EQ →
   // Playlist → Library (each shown one sits directly under the previous one).
@@ -1255,15 +1258,24 @@
   // Rebuild the row list only when the queue actually changed (signature check),
   // so the 400ms track tick + the slow poll don't thrash the DOM / scroll.
   var plSig = "";
-  function refreshQueue(force) {
+  function refreshQueue(force, _noOpen) {
     if (!els.plList) return;
     var q = NA.getQueue ? NA.getQueue() : [];
+    // explicit open + empty mirror → ask the site to open its own queue panel (Spotify
+    // renders queue rows only when it's open), then re-read once (the _noOpen guard
+    // prevents a re-open loop if the rows still don't show).
+    if (force && !_noOpen && !q.length && NA.control.ensureQueueOpen && NA.control.ensureQueueOpen()) {
+      setTimeout(function () { refreshQueue(true, true); }, 700);
+    }
     var sig = q.map(function (x) { return (x.playing ? "*" : "") + (x.art ? "a" : "") + x.title; }).join("|");
     if (!force && sig === plSig) return;
     plSig = sig;
     els.plList.innerHTML = "";
     if (!q.length) {
-      els.plList.appendChild(h("div", { class: "wa-pl-empty", text: "Queue empty — play a track or open Up Next in YouTube Music." }));
+      var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
+      els.plList.appendChild(h("div", { class: "wa-pl-empty", text: caps.queue === false
+        ? "Live queue mirroring isn't available on this site — use its own queue. NeoAmp still gives you the EQ + visualizer."
+        : "Queue empty — play a track or open Up Next in YouTube Music." }));
     } else {
       q.forEach(function (item) {
         var thumb = makeThumb("wa-pl-thumb", item.art);
@@ -1604,13 +1616,14 @@
   }
 
   function focusYtSearch() {
-    var s = document.querySelector("ytmusic-search-box input, input.search, ytmusic-search-box");
-    if (s && s.focus) { s.focus(); s.scrollIntoView({ block: "center" }); }
-    else NA.toast("Use YouTube Music's own search box");
+    if (NA.control.focusSearch && NA.control.focusSearch()) return;   // provider-aware
+    NA.toast("Use the music site's own search box");
   }
 
   // keyboard "L": open the Library/search window (if hidden) and focus its box
   function focusLibrary() {
+    var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
+    if (caps.library === false) { focusYtSearch(); return; }   // no in-app library → the site's own search
     if (!isShown("wa-lib")) { toggleWin("wa-lib", els.libTog); libBecameVisible(); }
     else if (wins["wa-lib"]) raise(wins["wa-lib"].el);
     if (els.libInput) setTimeout(function () { try { els.libInput.focus(); els.libInput.select(); } catch (_) {} }, 30);
@@ -1669,8 +1682,18 @@
     });
   }
 
+  // Hide controls the active provider doesn't support (read from content's capability
+  // flags) so e.g. on Spotify the dislike + library/search buttons don't show as dead.
+  function applyCapabilities() {
+    var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
+    var noLib = caps.library === false ? "none" : "";
+    if (els.npDislike) els.npDislike.style.display = caps.dislike === false ? "none" : "";
+    if (els.npLIB) els.npLIB.style.display = noLib;
+    if (els.libTog) els.libTog.style.display = noLib;   // main-window LIB toggle too
+  }
   function showUI() {
     buildUI();
+    applyCapabilities();
     root.style.display = "";
     // backdrop lives on documentElement (zoom-immune), so toggle it with the player
     var bd = document.getElementById("neoamp-backdrop"); if (bd) bd.style.visibility = "";
@@ -1741,10 +1764,10 @@
     // During the real-EQ rebuild this button toggles the EQ capture (relayed to the
     // service worker, which owns the gesture-gated tabCapture). It will fold back into
     // the full player launch once the EQ is integrated.
-    launcher = h("button", { id: "neoamp-launch", title: "Open NeoAmp — click the gold ‘N’ toolbar icon, or right-click → Open NeoAmp player", text: "◢◤ NeoAmp" });
+    launcher = h("button", { id: "neoamp-launch", title: "Open NeoAmp — click the gold ‘N’ toolbar icon, or press ⌘⇧E (Ctrl+Shift+E)", text: "◢◤ NeoAmp" });
     // a webpage button can't start tab-capture (Chrome security) — the gold "N"
     // toolbar icon (or right-click) can. Guide the user there.
-    launcher.addEventListener("click", function () { NA.toast("To open NeoAmp: click the gold “N” toolbar icon, or right-click the page → “Open NeoAmp player”."); });
+    launcher.addEventListener("click", function () { NA.toast("To open NeoAmp: click the gold “N” toolbar icon, or press ⌘⇧E (Ctrl+Shift+E)."); });
     document.documentElement.appendChild(launcher);
   }
 
@@ -1757,7 +1780,7 @@
       var card = h("div", { id: "neoamp-onboard" }, [
         h("div", { class: "neoamp-onboard-h", text: "◢◤ NeoAmp is ready" }),
         h("div", { class: "neoamp-onboard-b", html:
-          "To open: click the gold <b>N</b> toolbar icon, or <b>right-click the page → “Open NeoAmp player”</b>." +
+          "To open: click the gold <b>N</b> toolbar icon, or press <b>⌘⇧E</b> (Ctrl+Shift+E)." +
           "<br>While running: <b>Z</b> prev · <b>X</b> play · <b>C</b> pause · <b>V</b> stop · <b>B</b> next · <b>Space</b> play/pause." }),
       ]);
       var ok = h("button", { class: "neoamp-onboard-ok", text: "Got it" });

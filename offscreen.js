@@ -22,7 +22,7 @@
   var preampNode = null, filters = [], balanceNode = null, masterNode = null;
   var analyser = null, pumpTimer = 0, packed = null;
   // live EQ state — flat = transparent
-  var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], preamp = 0, balance = 0, enabled = true;
+  var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], preamp = 0, balance = 0, enabled = true, volume = 1;
 
   function dbToGain(db) { return Math.pow(10, db / 20); }
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
@@ -34,7 +34,7 @@
 
   // restore saved EQ on load (the SW may start capture before the UI ever opens)
   try {
-    chrome.storage.local.get("neoampEq", function (r) {
+    chrome.storage.local.get(["neoampEq", "neoampVolume"], function (r) {
       var e = r && r.neoampEq;
       if (e && e.bands && e.bands.length === 10) {
         bands = e.bands.map(Number);
@@ -43,6 +43,7 @@
         enabled = e.enabled !== false;
         applyEq();
       }
+      if (r && typeof r.neoampVolume === "number") { volume = clamp(r.neoampVolume, 0, 1); applyVolume(); }
     });
   } catch (_) {}
 
@@ -53,6 +54,9 @@
     if (preampNode) preampNode.gain.value = dbToGain(enabled ? preamp : 0);
     if (balanceNode) balanceNode.pan.value = clamp(balance, -1, 1);
   }
+  // master output gain = the player's volume (independent of EQ); provider-agnostic since
+  // it shapes our replayed copy, not the tab's own (often uncontrollable) media element.
+  function applyVolume() { if (masterNode) masterNode.gain.value = clamp(volume, 0, 1); }
 
   chrome.runtime.onMessage.addListener(function (msg) {
     if (!msg || msg.target !== "offscreen") return;
@@ -64,6 +68,9 @@
       if (typeof msg.balance === "number") balance = clamp(msg.balance, -1, 1);
       if (typeof msg.enabled === "boolean") enabled = msg.enabled;
       applyEq();
+    }
+    else if (msg.type === "setVolume") {
+      if (typeof msg.volume === "number") { volume = clamp(msg.volume, 0, 1); applyVolume(); }
     }
   });
 
@@ -95,7 +102,7 @@
       node.connect(analyser);
 
       masterNode = ctx.createGain();
-      masterNode.gain.value = 1;
+      masterNode.gain.value = clamp(volume, 0, 1);   // restore the player's volume
       balanceNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       if (balanceNode) { node.connect(balanceNode); balanceNode.connect(masterNode); }
       else { node.connect(masterNode); }

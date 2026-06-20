@@ -6,14 +6,23 @@
       "next": ["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"],
       "prev": ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
       "shuffle": ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
-      "repeat": ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]
+      "repeat": ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
+      "searchBox": ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"]
     },
     "open.spotify.com": {
       "playPause": ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
       "next": ["[data-testid='control-button-skip-forward']", "button[aria-label='Next']"],
       "prev": ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
-      "shuffle": ["[data-testid='control-button-shuffle']", "button[aria-label*='shuffle' i]"],
-      "repeat": ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"]
+      "shuffle": ["button[aria-label*='shuffle' i]", "[data-testid='control-button-shuffle']"],
+      "repeat": ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"],
+      "like": ["[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]", "[data-testid='now-playing-widget'] button[data-testid='add-button']"],
+      "searchBox": ["[data-testid='search-input']", "input[data-testid='search-input']"],
+      "posElapsed": ["[data-testid='playback-position']"],
+      "posDuration": ["[data-testid='playback-duration']"],
+      "queueOpen": ["[data-testid='control-button-queue']"],
+      "queueRow": ["li[role='row']"],
+      "queueTitle": ["[id^='listrow-title']"],
+      "queueArtist": ["a[href*='/artist/']"]
     }
   }
 }

@@ -27,6 +27,31 @@ via `chrome.tabCapture` in an **offscreen document** + a **service worker**, NOT
 getDisplayMedia — so the EQ shapes what you hear), plus state-sync + keyboard. The viz
 still gets FFT via `postMessage`; only the audio *source* changed. See HANDOFF.md §3/§5.
 
+**MULTI-PROVIDER + selector robustness (player UI).** NeoAmp runs on **multiple streaming
+sites** now (YouTube Music + Spotify, more planned) — the audio path (`tabCapture` → EQ)
+and the UI are provider-agnostic; only `content.js` is provider-coupled. Two load-bearing
+principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
+1. **Prefer stable, standard sources over CSS-class scraping.** Read now-playing from the
+   web-standard `navigator.mediaSession` (via a `world:"MAIN"` content script,
+   `mediasession.js`) and playback state/position from the media element — both far less
+   fragile than site CSS classes, and identical across providers. CSS selectors are the
+   *last* resort, not the first. When one IS unavoidable, anchor on **stable semantics** —
+   `data-testid`, `aria-label`, `role`, `id`-prefix (`[id^='listrow-title']`), `href`
+   patterns (`a[href*='/artist/']`), or structural tags (Spotify's queue rows are
+   `li[role='row']` vs the Library sidebar's `div[role='row']`) — and **NEVER** on
+   obfuscated/hashed class names (e.g. Spotify's `q8mQFn7r8UYsKdHE`), which regenerate per
+   build. **Verify selectors against the live DOM** before shipping: launch a headful
+   Chrome with `--remote-debugging-port`, have the user log in, and read the real DOM over
+   CDP (see `tools/` / scratchpad probes) rather than guessing.
+2. **Per-provider selectors are DATA, not code, and live in config.** The site-specific
+   bits that remain (transport buttons, search box, like, position) are declared per
+   provider in the `PROVIDERS` registry in `content.js`, **mirrored in `selectors.json`**.
+   `selectors.json` is fetched at runtime from this repo (GitHub raw) so a broken selector
+   is **hot-fixed by editing + pushing that one file — no extension release**. Each
+   provider also declares `capabilities` so the UI hides controls a site lacks (e.g.
+   Spotify has no dislike / queue / library-search). Adding a provider = a registry entry
+   + manifest `matches`, not new control logic.
+
 ## How to run / test (manual — there is no automated UI test)
 
 1. `chrome://extensions` (Arc: `arc://extensions`) → enable **Developer mode** →

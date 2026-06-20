@@ -144,6 +144,10 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     // EQ window faders → offscreen graph (live)
     chrome.runtime.sendMessage({ target: "offscreen", type: "setEq", bands: msg.eq.bands, preamp: msg.eq.preamp, balance: msg.eq.balance, enabled: msg.eq.enabled }).catch(() => {});
   }
+  else if (msg.type === "relay-volume") {
+    // volume slider → offscreen master gain (live)
+    chrome.runtime.sendMessage({ target: "offscreen", type: "setVolume", volume: msg.volume }).catch(() => {});
+  }
   else if (msg.type === "fft") {
     // offscreen analyser → content script (drives the visualizer + spectrum)
     if (capturedTabId != null) chrome.tabs.sendMessage(capturedTabId, { target: "content", type: "fft", b64: msg.b64 }).catch(() => {});

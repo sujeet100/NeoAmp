@@ -105,7 +105,7 @@
   // ask the SW to stop capture (stopping needs no gesture, unlike starting)
   function requestStop() { try { chrome.runtime.sendMessage({ target: "sw", type: "stop-capture" }); } catch (_) {} }
   // a page button can't START capture — guide the user to the right-click menu
-  function startHint() { toast("To open NeoAmp: click the gold “N” toolbar icon, or right-click the page → “Open NeoAmp player”."); }
+  function startHint() { toast("To open NeoAmp: click the gold “N” toolbar icon, or press ⌘⇧E (Ctrl+Shift+E)."); }
 
   // --- now-playing + transport ---------------------------------------------
   function q(sel) { return document.querySelector(sel); }
@@ -142,6 +142,15 @@
     return q("ytmusic-player-bar #like-button-renderer") || q("ytmusic-player-bar ytmusic-like-button-renderer");
   }
   function readLikeStatus() {
+    if (typeof PROVIDER !== "undefined" && PROVIDER && PROVIDER.like) {
+      // binary-save providers (Spotify): "saved" reads as LIKE so the heart lights up
+      var sb = qa(PROVIDER.like);
+      if (sb) {
+        var al = (sb.getAttribute("aria-label") || "").toLowerCase();
+        if (sb.getAttribute("aria-checked") === "true" || sb.getAttribute("aria-pressed") === "true" || /\bremove\b/.test(al)) return "LIKE";
+      }
+      return "INDIFFERENT";
+    }
     var r = likeRenderer();
     if (!r) return "INDIFFERENT";
     var attr = r.getAttribute("like-status");
@@ -194,6 +203,11 @@
     // back to YTM's DOM scrape for fields MediaSession doesn't carry (album/year/plays/
     // likes) and for the brief window before the first snapshot arrives.
     var ms = mediaMeta || {};
+    // position: the media element when it exposes a real duration, else the provider's DOM
+    // position text (e.g. Spotify has no media element we can read) so the seek bar moves.
+    var cur = 0, dur = 0;
+    if (v && isFinite(v.duration) && v.duration > 0) { cur = v.currentTime || 0; dur = v.duration; }
+    else if (PROVIDER.posElapsed || PROVIDER.posDuration) { dur = parseTime(textOf(PROVIDER.posDuration)); cur = parseTime(textOf(PROVIDER.posElapsed)); }
     return {
       title: ms.title || clean(titleEl && titleEl.textContent),
       artist: ms.artist || by.artist,
@@ -202,10 +216,10 @@
       plays: by.plays,                                 // best-effort; often ""
       likeStatus: readLikeStatus(),
       art: ms.art || (artEl ? artEl.src : ""),
-      currentTime: v ? v.currentTime : 0,
-      duration: v && isFinite(v.duration) ? v.duration : 0,
-      paused: v ? v.paused : (ms.playbackState ? ms.playbackState !== "playing" : true),
-      volume: v ? v.volume : 1,
+      currentTime: cur,
+      duration: dur,
+      paused: isPaused(),                              // provider-aware (button on EME sites, else media element)
+      volume: playerVolume,                            // our master-gain volume (provider-agnostic)
       shuffle: readShuffle(),                          // true | false | null (unknown)
       repeat: readRepeat(),                            // true | false | null (unknown)
     };
@@ -216,6 +230,7 @@
   // The "Up Next" queue, read straight from YTM's DOM. Each row is a
   // <ytmusic-player-queue-item>; the currently-playing one carries [selected].
   function readQueue() {
+    if (PROVIDER.queueRow) return readQueueGeneric();   // provider-configured queue (e.g. Spotify)
     var items = document.querySelectorAll("ytmusic-player-queue-item");
     var out = [];
     for (var i = 0; i < items.length; i++) {
@@ -233,6 +248,25 @@
         plays: matchPlays(byline),               // from the byline only (usually absent)
         art: img && /^https?:/.test(img.src) ? img.src : "",
         playing: it.hasAttribute("selected") || pbs === "playing" || pbs === "paused",
+      });
+    }
+    return out;
+  }
+  // Provider-configured queue (e.g. Spotify's "Next in queue" rows). The now-playing
+  // track isn't in this list (it shows in NeoAmp's now-playing strip), so playing=false.
+  function readQueueGeneric() {
+    var rows = qaAll(PROVIDER.queueRow), out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var title = clean(firstTextIn(r, PROVIDER.queueTitle));
+      if (!title) continue;
+      var img = r.querySelector("img");
+      out.push({
+        index: i, title: title,
+        artist: clean(firstTextIn(r, PROVIDER.queueArtist)),
+        duration: "", plays: "",
+        art: img && /^https?:/.test(img.src) ? img.src : "",
+        playing: false,
       });
     }
     return out;
@@ -379,7 +413,7 @@
   }
 
   function search(query, cb) {
-    if (!triggerSearch(query)) { cb({ error: "YouTube Music search box not found" }); return; }
+    if (!triggerSearch(query)) { cb({ error: "search box not found" }); return; }
     // submit after a tick so autocomplete doesn't swallow the Enter
     setTimeout(function () {
       var input = q("ytmusic-search-box input#input") || q("ytmusic-search-box input");
@@ -413,16 +447,38 @@
       prev: ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
       shuffle: ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
       repeat: ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
+      searchBox: ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"],
     },
     "open.spotify.com": {
       id: "spotify",
+      // No library-search or dislike for us → gated off in the UI. Queue IS mirrored.
+      capabilities: { library: false, dislike: false },
       // Spotify is an EME player — drive its own DOM buttons (data-testids are stable;
       // aria-label fallbacks add resilience). Direct media-element control is unreliable.
       playPause: ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
       next: ["[data-testid='control-button-skip-forward']", "button[aria-label='Next']"],
       prev: ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
-      shuffle: ["[data-testid='control-button-shuffle']", "button[aria-label*='shuffle' i]"],
+      // shuffle has NO data-testid (live DOM); its aria-label is dynamic ("Enable/Disable Shuffle …")
+      shuffle: ["button[aria-label*='shuffle' i]", "[data-testid='control-button-shuffle']"],
       repeat: ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"],
+      // single "Add to Liked Songs" (binary) — wired to like(); no dislike
+      // "Add to Liked Songs" / "Remove from Liked Songs" — scoped to the now-playing widget
+      // so we never hit a track ROW's add-button (which shares data-testid='add-button').
+      like: ["[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]", "[data-testid='now-playing-widget'] button[data-testid='add-button']"],
+      searchBox: ["[data-testid='search-input']", "input[data-testid='search-input']"],
+      // Spotify has no readable media element for us, so read position from its DOM text
+      // (lets the seek bar show progress); times are "m:ss" → parsed to seconds. Flat array
+      // keys (not a nested object) so they're remotely hot-fixable like every other selector.
+      posElapsed: ["[data-testid='playback-position']"],
+      posDuration: ["[data-testid='playback-duration']"],
+      // Queue (right panel): "Next in queue" rows are <li role="row"> — the Library
+      // sidebar uses <div role="row">, so the li scopes us to the queue. Title via the
+      // aria-labelledby target (#listrow-title-…), artist via the artist link. Robust
+      // role/aria/href anchors only — NEVER Spotify's hashed CSS classes (e.g. q8mQFn…).
+      queueOpen: ["[data-testid='control-button-queue']"],
+      queueRow: ["li[role='row']"],
+      queueTitle: ["[id^='listrow-title']"],
+      queueArtist: ["a[href*='/artist/']"],
     },
   };
   function activeProvider() {
@@ -463,7 +519,28 @@
 
   function mediaEl() { return q("video") || q("audio"); }
   function clickSel(list) { var b = list && qa(list); if (b) { b.click(); return true; } return false; }
+  function textOf(list) { var el = list && qa(list); return el ? clean(el.textContent) : ""; }
+  function qaAll(list) { if (!list) return []; for (var i = 0; i < list.length; i++) { try { var n = document.querySelectorAll(list[i]); if (n.length) return n; } catch (_) {} } return []; }
+  function firstTextIn(root, list) { if (!list) return ""; for (var i = 0; i < list.length; i++) { var el = root.querySelector(list[i]); if (el) return el.textContent; } return ""; }
+  function parseTime(s) {  // "m:ss" / "h:mm:ss" → seconds
+    if (!s) return 0;
+    var p = String(s).split(":").map(function (n) { return parseInt(n, 10); });
+    if (p.some(isNaN)) return 0;
+    return p.reduce(function (a, n) { return a * 60 + n; }, 0);
+  }
+  // Player volume runs on the offscreen master gain (provider-agnostic — works even when a
+  // site exposes no controllable media element, e.g. Spotify). Persisted + relayed live.
+  var playerVolume = 1;
+  function relayVolume() { try { chrome.runtime.sendMessage({ target: "sw", type: "relay-volume", volume: playerVolume }); } catch (_) {} }
+  function persistVolume() { try { chrome.storage.local.set({ neoampVolume: playerVolume }); } catch (_) {} }
   function isPaused() {
+    if (PROVIDER.playPause) {                       // EME providers (Spotify): <video>.paused is unreliable
+      var b = qa(PROVIDER.playPause);
+      var al = (b && b.getAttribute("aria-label") || "").toLowerCase();
+      if (/pause/.test(al)) return false;           // button labeled "Pause" ⇒ currently playing
+      if (/play/.test(al)) return true;             // button labeled "Play"  ⇒ currently paused
+      return mediaMeta.playbackState ? mediaMeta.playbackState !== "playing" : true;
+    }
     var v = mediaEl();
     if (v) return v.paused;
     return mediaMeta.playbackState ? mediaMeta.playbackState !== "playing" : true;
@@ -492,9 +569,24 @@
         v.currentTime = Math.max(0, Math.min(dur, v.currentTime + d)); sendTrack();
       }
     },
-    setVolume: function (x) { var v = mediaEl(); if (v) { v.volume = Math.max(0, Math.min(1, x)); } },
-    nudgeVolume: function (d) { var v = mediaEl(); if (v) { v.volume = Math.max(0, Math.min(1, v.volume + d)); sendTrack(); } },
-    getVolume: function () { var v = mediaEl(); return v ? v.volume : 1; },
+    // volume = the offscreen master gain (provider-agnostic; works on sites with no
+    // controllable media element, e.g. Spotify). Relayed live + persisted.
+    setVolume: function (x) { playerVolume = clamp(+x || 0, 0, 1); relayVolume(); persistVolume(); },
+    nudgeVolume: function (d) { playerVolume = clamp(playerVolume + d, 0, 1); relayVolume(); persistVolume(); sendTrack(); },
+    getVolume: function () { return playerVolume; },
+    getCapabilities: function () { return (PROVIDER && PROVIDER.capabilities) || {}; },
+    focusSearch: function () {   // focus the active site's own search box (provider-aware)
+      var s = PROVIDER.searchBox && qa(PROVIDER.searchBox);
+      if (s && s.focus) { s.focus(); if (s.scrollIntoView) s.scrollIntoView({ block: "center" }); return true; }
+      return false;
+    },
+    // open the site's own queue panel if the queue DOM isn't rendered yet (e.g. Spotify
+    // only mounts its queue rows when its queue panel is open). No-op once rows exist.
+    ensureQueueOpen: function () {
+      if (!PROVIDER.queueRow || !PROVIDER.queueOpen) return false;
+      if (qaAll(PROVIDER.queueRow).length) return false;
+      return clickSel(PROVIDER.queueOpen);
+    },
     // click the provider's shuffle/repeat button, then re-read shortly after so the UI
     // reflects the ACTUAL resulting state (sites flip it async; like the like/dislike path).
     toggleShuffle: function () { if (clickSel(PROVIDER.shuffle)) setTimeout(sendTrack, 250); },
@@ -550,6 +642,8 @@
     // like/dislike toggle the current track (3-state — clicking when already
     // set returns to neutral). Anchor on the unambiguous #button-shape-* ids.
     like: function () {
+      // binary-save providers (Spotify "Add to Liked Songs") click their own button
+      if (PROVIDER.like) { if (clickSel(PROVIDER.like)) setTimeout(sendTrack, 300); return; }
       var r = likeRenderer(); if (!r) return;
       var b = r.querySelector("#button-shape-like > button") || r.querySelector("#button-shape-like button") || r.querySelector("button[aria-label='Like']");
       // YTM flips like-status asynchronously — re-read after a tick so the LED
@@ -557,6 +651,7 @@
       if (b) { b.click(); setTimeout(sendTrack, 250); }
     },
     dislike: function () {
+      if (PROVIDER.capabilities && PROVIDER.capabilities.dislike === false) return;  // no dislike (Spotify)
       var r = likeRenderer(); if (!r) return;
       var b = r.querySelector("#button-shape-dislike > button") || r.querySelector("#button-shape-dislike button") || r.querySelector("button[aria-label='Dislike']");
       if (b) { b.click(); setTimeout(sendTrack, 250); }
@@ -591,6 +686,9 @@
     eqState.bands = e.bands.map(Number);
     eqState.balance = clamp(+e.balance || 0, -1, 1);
     relayEq();   // if capture is already live, push the restored curve to the engine
+  });
+  storage.get("neoampVolume", function (v) {
+    if (typeof v === "number") { playerVolume = clamp(v, 0, 1); relayVolume(); }
   });
 
   function toast(msg) {
