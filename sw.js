@@ -85,7 +85,7 @@ chrome.commands.onCommand.addListener((command, tab) => {
 const YTM = ["https://music.youtube.com/*"];
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: "neoamp-toggle-eq", title: "Toggle NeoAmp player + EQ (capture this tab's audio)", contexts: ["all"], documentUrlPatterns: YTM });
+    chrome.contextMenus.create({ id: "neoamp-toggle-eq", title: "Open NeoAmp player", contexts: ["all"], documentUrlPatterns: YTM });
   });
 });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -120,8 +120,12 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     // offscreen analyser → content script (drives the visualizer + spectrum)
     if (capturedTabId != null) chrome.tabs.sendMessage(capturedTabId, { target: "content", type: "fft", b64: msg.b64 }).catch(() => {});
   }
+  else if (msg.type === "audioInfo") {
+    // offscreen → content: the captured AudioContext's real sample rate (kHz readout)
+    if (capturedTabId != null) chrome.tabs.sendMessage(capturedTabId, { target: "content", type: "audioInfo", sampleRate: msg.sampleRate }).catch(() => {});
+  }
   else if (msg.type === "error") {
     console.error("[NeoAmp offscreen]", msg.error);
-    notify(capturedTabId, "NeoAmp EQ error: " + msg.error);
+    notify(capturedTabId, "NeoAmp error: " + msg.error);
   }
 });

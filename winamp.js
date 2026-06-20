@@ -125,6 +125,7 @@
     var bar = h("div", { class: "wa-titlebar" }, [titleSpan, opts.gadget || null, tbtns]);
     var body = h("div", { class: "wa-body" });
     var el = h("div", { class: "wa-win inactive", id: id }, [bar, body]);
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", title);   // SR window landmark
 
     // optional extra titlebar buttons (e.g. fullscreen), then shade, then close.
     // b.html lets a button use a crisp inline-SVG icon instead of a text glyph.
@@ -504,6 +505,11 @@
       var load = h("div", { class: "wa-skinsel-item load", text: "＋ Load skin…" });
       load.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__load__"); });
       menu.appendChild(load);
+      // keyboard-shortcut reference — the Z/X/C/V/B transport keys are otherwise hidden
+      menu.appendChild(h("div", { class: "wa-gear-head", text: "Help" }));
+      var keys = h("div", { class: "wa-skinsel-item wa-gear-sc", text: "⌨  Keyboard shortcuts" });
+      keys.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); showShortcuts(); });
+      menu.appendChild(keys);
       markActive();
     };
     btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a window drag
@@ -516,6 +522,50 @@
     wrap.populate();
     skinSelectors.push(wrap);
     return wrap;
+  }
+
+  // Keyboard-shortcut reference, opened from the gear menu's Help section. A centered
+  // overlay (unscaled, appended to <html> so it's readable regardless of UI zoom).
+  // Toggles; closes on the ✕, a backdrop click, or Esc.
+  var shortcutsEl = null;
+  var SHORTCUTS = [
+    ["⇧ V", "Close NeoAmp (open it from the gold N icon)"],
+    ["Z", "Previous track"],
+    ["X", "Play"],
+    ["C", "Pause"],
+    ["V", "Stop"],
+    ["B", "Next track"],
+    ["Space", "Play / pause"],
+    ["← / →", "Seek −5s / +5s"],
+    ["↑ / ↓", "Volume up / down"],
+    ["L", "Open Media Library"],
+    ["−  =  \\", "Zoom out / in / reset"],
+    ["⌘ ⇧ E", "Start / stop EQ capture"],
+  ];
+  function scEsc(e) { if (e.key === "Escape") { e.stopPropagation(); closeShortcuts(); } }
+  function closeShortcuts() {
+    if (!shortcutsEl) return;
+    document.removeEventListener("keydown", scEsc, true);
+    shortcutsEl.remove(); shortcutsEl = null;
+  }
+  function showShortcuts() {
+    if (shortcutsEl) { closeShortcuts(); return; }   // toggle off if already open
+    var list = h("div", { class: "neoamp-sc-list" }, SHORTCUTS.map(function (r) {
+      return h("div", { class: "neoamp-sc-row" }, [
+        h("kbd", { class: "neoamp-sc-key", text: r[0] }),
+        h("span", { class: "neoamp-sc-desc", text: r[1] }),
+      ]);
+    }));
+    var close = h("button", { class: "neoamp-sc-x", title: "Close", "aria-label": "Close", text: "✕" });
+    close.addEventListener("click", closeShortcuts);
+    var panel = h("div", { class: "neoamp-sc", role: "dialog", "aria-label": "Keyboard shortcuts" }, [
+      h("div", { class: "neoamp-sc-h" }, [h("span", { text: "Keyboard shortcuts" }), close]),
+      list,
+    ]);
+    shortcutsEl = h("div", { class: "neoamp-sc-back" }, [panel]);
+    shortcutsEl.addEventListener("click", function (e) { if (e.target === shortcutsEl) closeShortcuts(); });
+    document.addEventListener("keydown", scEsc, true);
+    document.documentElement.appendChild(shortcutsEl);
   }
 
   // ---- user-loaded .wsz skins (drag-drop / file picker), persisted -----------
@@ -607,8 +657,10 @@
 
     els.analyzer = h("canvas", { class: "wa-analyzer", width: "260", height: "72" });
     var bitline = h("div", { class: "wa-bitline" }, [
-      (els.kbps = h("span", { text: "—— kbps" })),
-      (els.khz = h("span", { text: "44 kHz" })),
+      // kbps isn't exposed by YouTube Music → a dash placeholder (not a blank box,
+      // which reads as broken). kHz is filled live from the capture's real rate.
+      (els.kbps = h("span", { text: "— kbps", title: "Bitrate isn't exposed by YouTube Music" })),
+      (els.khz = h("span", { text: "—— kHz" })),
     ]);
     els.stereo = h("div", { class: "wa-stereo" }, [
       h("span", { text: "mono" }),
@@ -1070,6 +1122,9 @@
       stopped: !t.title,
       paused: !!t.paused,
       playing: !t.paused && !!t.title,
+      // skinned-skin info boxes: real kHz number, dashed kbps (YTM doesn't expose it)
+      khz: t.sampleRate ? String(Math.round(t.sampleRate / 1000)) : "",
+      kbps: "--",
     };
     // only set the toggles when YTM's state is actually known (null → keep the
     // optimistic value rather than overwriting it with undefined/false), and not
@@ -1143,7 +1198,7 @@
       titleButtons: [{ html: FS_SVG, cls: "wa-fsbtn", title: "Fullscreen (Esc to exit)", onClick: toggleVizFullscreen }],
       onClose: function () { hideWin("wa-viz"); },
     });
-    vizFrame = h("iframe", { class: "wa-viz-frame", src: chrome.runtime.getURL("viz.html"), frameborder: "0", allowtransparency: "false" });
+    vizFrame = h("iframe", { class: "wa-viz-frame", src: chrome.runtime.getURL("viz.html"), frameborder: "0", allowtransparency: "false", title: "NeoAmp visualizer" });
     vizFrame.style.border = "0"; vizFrame.style.outline = "none";
     win.body.appendChild(vizFrame);
     var rs = h("div", { class: "wa-resize", title: "Resize" });
@@ -1178,20 +1233,14 @@
   function buildPlaylist() {
     var win = makeWindow("wa-pl", "Playlist", { shade: false, onClose: function () { hideWin("wa-pl"); } });
     var list = h("div", { class: "wa-pl-list" });
-    var mk = function (lbl, title, fn) {
-      var b = h("div", { class: "wa-pl-btn", title: title, text: lbl });
-      if (fn) b.addEventListener("click", fn);
-      return b;
-    };
-    var btns = h("div", { class: "wa-pl-btns" }, [
-      mk("ADD", "Add tracks (opens YouTube Music search)", focusYtSearch),
-      mk("REM", "Remove — use YTM's queue menu (not yet supported)"),
-      mk("SEL", "Select"),
-      mk("MISC", "Refresh queue", function () { refreshQueue(true); }),
-    ]);
+    // No footer buttons. The playlist is a read-only mirror of YTM's queue: it auto-
+    // refreshes when the queue changes, search lives in the Library window, and queue
+    // management (add/remove/reorder) stays in YouTube Music itself — driving YTM's
+    // queue DOM proved too fragile (it's often not even rendered until "Up Next" is
+    // open). The footer just shows the item count + total time.
     els.plCount = h("div", { class: "wa-pl-count", text: "0 items" });
     els.plTime = h("div", { class: "wa-pl-time wa-lcd", text: "0:00 / 0:00" });
-    var foot = h("div", { class: "wa-pl-foot" }, [btns, els.plCount, els.plTime]);
+    var foot = h("div", { class: "wa-pl-foot" }, [els.plCount, els.plTime]);
 
     win.body.appendChild(list);
     win.body.appendChild(foot);
@@ -1434,6 +1483,8 @@
       else els.artImg.removeAttribute("src");
     }
     if (els.art) els.art.classList.toggle("empty", !hasArt);
+    // real sample rate (from the offscreen capture) drives the kHz box; kbps stays dashed
+    if (els.khz) els.khz.textContent = t.sampleRate ? Math.round(t.sampleRate / 1000) + " kHz" : "—— kHz";
     if (!seeking && els.seek) {
       var pct = trackDur > 0 ? (t.currentTime / trackDur) * 1000 : 0;
       els.seek.value = String(Math.round(pct));
@@ -1625,6 +1676,14 @@
     var bd = document.getElementById("neoamp-backdrop"); if (bd) bd.style.visibility = "";
     if (launcher) launcher.style.display = "none";
     var cur = NA.getTrack(); if (cur) onTrack(cur);
+    buttonizeAll();   // give the freshly-built chrome button semantics
+    // auto-buttonize controls added to dynamic containers later (queue refresh,
+    // search/home results, skin-menu re-populate)
+    var dyn = [els.libList];
+    [].forEach.call(root.querySelectorAll(".wa-skinsel-menu"), function (m) { dyn.push(m); });
+    dyn.forEach(function (c) {
+      if (c && !c.__a11yObs) { c.__a11yObs = true; new MutationObserver(function () { buttonizeAll(c); }).observe(c, { childList: true }); }
+    });
   }
   function hideUI() {
     if (root) root.style.display = "none";
@@ -1632,30 +1691,98 @@
     if (launcher) launcher.style.display = "";
   }
 
+  // ---- accessibility -------------------------------------------------------
+  // Our chrome is built from <div>/<span> "buttons"; give them button semantics so
+  // keyboard + screen-reader users can operate them. Native <button>/<input> controls
+  // (library GO/HOME, EQ on/off, sliders) are already accessible and left alone. The
+  // skinned Main/EQ windows are a single <canvas> with internal hit-tests, which can't
+  // carry per-control ARIA — the global transport shortcuts cover those.
+  function reflectPressed(el) { el.setAttribute("aria-pressed", el.classList.contains("on") ? "true" : "false"); }
+  var A11Y_SEL = ".wa-tog,.wa-np-tog,.wa-tbtn,.wa-pl-btn,.wa-skinsel-btn,.wa-skinsel-item,.wa-gear-click,.wa-gear-step,.wa-lib-row";
+  function buttonizeAll(scope) {
+    scope = scope || root; if (!scope) return;
+    [].forEach.call(scope.querySelectorAll(A11Y_SEL), function (el) {
+      if (el.__a11y) return; el.__a11y = true;
+      el.setAttribute("role", "button");
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+      if (!el.getAttribute("aria-label") && el.title) el.setAttribute("aria-label", el.title);
+      if (el.classList.contains("wa-gear-btn") || el.classList.contains("wa-skinsel-btn")) {
+        // menu trigger (not a toggle): reflect open/closed via aria-expanded by watching
+        // the sibling menu's .open class — catches every open/close path at once.
+        el.setAttribute("aria-haspopup", "menu"); el.setAttribute("aria-expanded", "false");
+        var menuEl = el.parentNode && el.parentNode.querySelector(".wa-skinsel-menu");
+        if (menuEl) {
+          var syncExp = function () { el.setAttribute("aria-expanded", menuEl.classList.contains("open") ? "true" : "false"); };
+          syncExp();
+          new MutationObserver(syncExp).observe(menuEl, { attributes: true, attributeFilter: ["class"] });
+        }
+      } else if (el.classList.contains("wa-tog") || el.classList.contains("wa-np-tog")) {
+        reflectPressed(el);                                         // toggle key (VIS/LIB/EQ/PL/like…)
+        new MutationObserver(function () { reflectPressed(el); }).observe(el, { attributes: true, attributeFilter: ["class"] });
+      }
+    });
+  }
+  // Enter / Space activate any of our role=button divs (native buttons do this on their
+  // own). Capturing so it beats YTM; Space is prevented from scrolling the page.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+    var el = e.target;
+    if (!el || !el.getAttribute || el.getAttribute("role") !== "button") return;
+    e.preventDefault(); e.stopPropagation();
+    // library rows play on dblclick (plain song rows have no click handler), so keyboard
+    // activation must synthesize a dblclick — el.click() alone wouldn't play them.
+    if (el.classList.contains("wa-lib-row")) el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    else el.click();
+  }, true);
+
   // ---- launcher + keyboard -------------------------------------------------
   function ensureLauncher() {
     if (document.getElementById("neoamp-launch")) return;
     // During the real-EQ rebuild this button toggles the EQ capture (relayed to the
     // service worker, which owns the gesture-gated tabCapture). It will fold back into
     // the full player launch once the EQ is integrated.
-    launcher = h("button", { id: "neoamp-launch", title: "Click the gold ‘N’ NeoAmp icon in the toolbar to start", text: "◢◤ NeoAmp" });
+    launcher = h("button", { id: "neoamp-launch", title: "Open NeoAmp — click the gold ‘N’ toolbar icon, or right-click → Open NeoAmp player", text: "◢◤ NeoAmp" });
     // a webpage button can't start tab-capture (Chrome security) — the gold "N"
     // toolbar icon (or right-click) can. Guide the user there.
-    launcher.addEventListener("click", function () { NA.toast("Click the gold “N” NeoAmp icon in Arc’s toolbar to start  (or right-click → “Toggle NeoAmp player + EQ”)"); });
+    launcher.addEventListener("click", function () { NA.toast("To open NeoAmp: click the gold “N” toolbar icon, or right-click the page → “Open NeoAmp player”."); });
     document.documentElement.appendChild(launcher);
+  }
+
+  // One-time first-run callout. NeoAmp has no obvious on-page trigger (Chrome forbids a
+  // page button from starting tabCapture), so a brand-new user sees nothing — this card
+  // explains how to start + the key shortcuts, then never shows again (persisted flag).
+  function maybeOnboard() {
+    NA.storage.get("neoampOnboarded", function (done) {
+      if (done || document.getElementById("neoamp-onboard")) return;
+      var card = h("div", { id: "neoamp-onboard" }, [
+        h("div", { class: "neoamp-onboard-h", text: "◢◤ NeoAmp is ready" }),
+        h("div", { class: "neoamp-onboard-b", html:
+          "To open: click the gold <b>N</b> toolbar icon, or <b>right-click the page → “Open NeoAmp player”</b>." +
+          "<br>While running: <b>Z</b> prev · <b>X</b> play · <b>C</b> pause · <b>V</b> stop · <b>B</b> next · <b>Space</b> play/pause." }),
+      ]);
+      var ok = h("button", { class: "neoamp-onboard-ok", text: "Got it" });
+      ok.addEventListener("click", function () { card.remove(); NA.storage.set({ neoampOnboarded: 1 }); });
+      card.appendChild(ok);
+      document.documentElement.appendChild(card);
+    });
   }
 
   NA.on("start", showUI);
   NA.on("stop", hideUI);
 
-  // Shift+V launches/stops NeoAmp anywhere. The classic Winamp transport keys
-  // (Z X C V B, Space, arrows, L) are active only while NeoAmp is running, so
-  // they don't hijack YTM when the player is closed. Guarded against text fields
+  // Shift+V CLOSES NeoAmp when running. A page script can't START tabCapture (Chrome's
+  // gesture rule), so when closed it can't open the player — it just shows the how-to-
+  // open hint (startHint). The classic Winamp transport keys (Z X C V B, Space, arrows,
+  // L) are active only while NeoAmp is running, so they don't hijack YTM when closed.
+  // Guarded against text fields
   // + modifier combos; handled keys preventDefault + stopPropagation so YTM's own
   // shortcut (Space/arrows) doesn't also fire and double-toggle.
   window.addEventListener("keydown", function (e) {
     var tgt = e.target;
-    if (tgt && (/^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName) || tgt.isContentEditable)) return;
+    // bail for text fields AND our focusable role=button controls (so Enter/Space/letters
+    // activate the focused button instead of firing a transport shortcut)
+    if (tgt && (/^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName) || tgt.isContentEditable ||
+        (tgt.getAttribute && tgt.getAttribute("role") === "button"))) return;
     if (e.shiftKey && (e.key === "V" || e.key === "v")) { e.preventDefault(); NA.isRunning() ? NA.stop() : NA.start(); return; }
     // Shift excluded too (Shift+V handled above); CapsLock letters still work (shiftKey false)
     if (!NA.isRunning() || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
@@ -1680,10 +1807,11 @@
     if (handled) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 
-  // In-page ◢◤ launcher is DISABLED — the gold "N" toolbar icon (+ right-click) launches
-  // now, so the on-page button has no function. Kept in code (ensureLauncher above) in
-  // case we want it back. Re-enable by uncommenting this + the observer below.
-  // ensureLauncher();
+  // In-page ◢◤ launcher: a persistent, subtle bottom-right affordance for discoverability.
+  // By Chrome's rules it can't itself START tabCapture (only the toolbar icon / right-click
+  // / ⌘⇧E can), so clicking it guides the user there. showUI/hideUI hide it while running.
+  ensureLauncher();
+  maybeOnboard();
 
   // DEV auto-launch is OFF during the real-EQ rebuild: the in-page getDisplayMedia
   // capture fights the new tabCapture EQ path (Chrome won't capture one tab twice),
@@ -1701,10 +1829,9 @@
     }
   } catch (_) {}
 
-  // YTM is a SPA; this re-added the in-page launcher after a navigation wiped it.
-  // Disabled with the launcher (above) — restore both together if we bring it back.
-  // var mo = new MutationObserver(function () {
-  //   if (!document.getElementById("neoamp-launch") && !NA.isRunning()) ensureLauncher();
-  // });
-  // mo.observe(document.documentElement, { childList: true });
+  // YTM is a SPA; re-add the launcher after a client-side navigation wipes it.
+  var mo = new MutationObserver(function () {
+    if (!document.getElementById("neoamp-launch") && !NA.isRunning()) ensureLauncher();
+  });
+  mo.observe(document.documentElement, { childList: true });
 })();

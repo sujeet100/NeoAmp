@@ -58,10 +58,13 @@
 
   // --- audio lifecycle (driven by the service worker + offscreen engine) ----
   // tabCapture must be started by something that "invokes" the extension (the
-  // right-click "Toggle NeoAmp EQ") — a page button can't (Chrome gesture rule). The
+  // right-click "Open NeoAmp player") — a page button can't (Chrome gesture rule). The
   // SW tells us when capture begins/ends; we raise the player UI + poll the track, and
   // the offscreen streams FFT frames here for the visuals.
   var frame = { time: null, freq: null };
+  // Real output sample rate, reported by the offscreen AudioContext at capture start.
+  // Carried on each track tick so the UI's kHz readout never races the UI build order.
+  var audioSampleRate = 0;
   function onEqStarted() {
     if (running) return;
     running = true;
@@ -94,7 +97,7 @@
   // ask the SW to stop capture (stopping needs no gesture, unlike starting)
   function requestStop() { try { chrome.runtime.sendMessage({ target: "sw", type: "stop-capture" }); } catch (_) {} }
   // a page button can't START capture — guide the user to the right-click menu
-  function startHint() { toast("Right-click the page → “Toggle NeoAmp EQ” to start"); }
+  function startHint() { toast("To open NeoAmp: click the gold “N” toolbar icon, or right-click the page → “Open NeoAmp player”."); }
 
   // --- now-playing + transport ---------------------------------------------
   function q(sel) { return document.querySelector(sel); }
@@ -195,7 +198,7 @@
     };
   }
   function getTrack() { return lastTrack || readTrack(); }
-  function sendTrack() { lastTrack = readTrack(); emit("track", lastTrack); }
+  function sendTrack() { lastTrack = readTrack(); lastTrack.sampleRate = audioSampleRate; emit("track", lastTrack); }
 
   // The "Up Next" queue, read straight from YTM's DOM. Each row is a
   // <ytmusic-player-queue-item>; the currently-playing one carries [selected].
@@ -513,6 +516,7 @@
       if (!msg || msg.target !== "content") return;
       if (msg.type === "lifecycle") { msg.state === "started" ? onEqStarted() : onEqStopped(); }
       else if (msg.type === "fft") onFft(msg.b64);
+      else if (msg.type === "audioInfo") audioSampleRate = +msg.sampleRate || 0;
       else if (msg.type === "toast") toast(msg.text);
     });
   } catch (_) {}

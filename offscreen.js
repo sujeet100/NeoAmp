@@ -103,6 +103,9 @@
 
       applyEq(); // apply current bands/preamp/balance to the fresh graph
       startPump();
+      // hand the UI the real output sample rate (drives its kHz readout). kbps isn't
+      // knowable here — YTM doesn't expose the stream bitrate — so the UI dashes it.
+      try { chrome.runtime.sendMessage({ target: "sw", type: "audioInfo", sampleRate: ctx.sampleRate }).catch(function () {}); } catch (_) {}
       console.log("[NeoAmp offscreen] capturing + playing EQ'd audio; ctx", ctx.state);
     } catch (e) { reportError(e); }
   }

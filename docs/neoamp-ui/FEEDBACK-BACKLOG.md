@@ -9,6 +9,45 @@ Read `HANDOFF.md` first for architecture. Verify UI with `node tools/render-neoa
 
 ---
 
+## ✅ Session status — 2026-06-20 (session 2)
+
+**Implemented + committed this session:**
+- **A1 / A2** (contrast-derived key labels, flat pixel LED) — shipped earlier (commit `fdce077`).
+- **B2.4 kHz/kbps** — real kHz wired from the offscreen `AudioContext.sampleRate`
+  (offscreen → sw → content → UI, carried on each track tick so it can't race the UI build);
+  both the procedural NP strip and the skinned wsz box. kbps shows a **dash** (YTM doesn't
+  expose stream bitrate) instead of a blank box.
+- **B2.1 + B3 launcher / onboarding / shortcuts** — re-enabled the persistent in-page ◢◤
+  launcher (+ SPA re-add observer); one-time onboarding card (persisted flag); gear ⚙ →
+  **Keyboard shortcuts** overlay.
+- **B2.5 accessibility** — `role=button` / `tabindex` / `aria-pressed` / `aria-label` on the
+  div controls (synced via observers), global Enter/Space activation, `:focus-visible` rings
+  (incl. the EQ faders), `aria-expanded` on menu triggers, library rows playable by keyboard.
+  Canvas-skin hit-tests can't carry per-control ARIA — the transport shortcuts cover them.
+- **Copy cleanup** — the context menu, Shift+V hint, onboarding, and the ⌘⇧E command now say
+  **"Open NeoAmp player"** (dropped the "Toggle … + EQ (capture this tab's audio)" jargon).
+  **Shift+V reframed as CLOSE-only**: a page script can't start `tabCapture`, so ⇧V never
+  opened the player — we no longer advertise it as a launcher (it closes when running, else
+  shows the how-to-open hint).
+
+**Decision reversal — B2.3 REM/SEL: REMOVED, not implemented.** A real REM/SEL was built
+(drive YTM's per-row ⋮ → "Remove from queue", click-to-select rows) but it's too fragile:
+the queue usually isn't in the DOM until "Up Next" is open, YTM's markup drifts, and an
+adversarial review found the menu-button selector could resolve to the *play* button. Per
+the user, the playlist is now a clean **read-only mirror** of YTM's queue — the whole footer
+button row (REM/SEL **and** the redundant ADD/MISC) was removed, leaving just the item count
++ total time; double-click a row to play. Search lives in the Library window; queue
+management stays in YTM.
+
+**Still open (next session):** kbps stays dashed (not exposable); B2.6 silent DOM-scrape
+failures; B2.7 perf / AudioWorklet + multi-tab; B3 lyrics, real playlist management
+(drag/drop), mute, windowshade, clear "EQ active" indicator.
+
+**Needs LIVE verification** (can't headless-test audio): the kHz readout *value*; the toast /
+context-menu / command copy (all require an extension reload to take effect).
+
+---
+
 ## A. Open visual findings (screenshot-driven — do these first)
 
 ### A1. Button label colour is pulling from the wrong source  ★ high

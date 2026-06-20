@@ -14,7 +14,7 @@
   "commands": {
     "toggle-eq": {
       "suggested_key": { "default": "Ctrl+Shift+E", "mac": "Command+Shift+E" },
-      "description": "NeoAmp: start/stop the equalizer (capture this tab's audio)"
+      "description": "Open / close the NeoAmp player"
     }
   },
   "content_scripts": [

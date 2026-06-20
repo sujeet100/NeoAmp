@@ -809,3 +809,52 @@
 }
 #neoamp-launch:hover { filter: brightness(1.06); }
 #neoamp-launch:active { border-color: #4a3810 #efdfa6 #fbefcb #5a4514; box-shadow: inset 1px 1px 3px rgba(60,40,8,0.6); }
+
+/* one-time first-run onboarding card (sits just above the launcher pill) */
+#neoamp-onboard {
+  position: fixed; right: 18px; bottom: 64px; z-index: 2147483602; width: 322px; max-width: 78vw;
+  background: linear-gradient(180deg, #2b2f3a, #1b1e26); color: #e8ecf6;
+  border: 1px solid; border-color: #f1d98c #6a5320 #4a3810 #cda64a; border-radius: 5px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  font: 12px/1.45 "Arial Narrow", "Helvetica Neue", Arial, sans-serif; padding: 12px 14px;
+}
+#neoamp-onboard .neoamp-onboard-h { font-weight: 700; letter-spacing: 0.6px; color: #f1d98c; margin-bottom: 6px; }
+#neoamp-onboard .neoamp-onboard-b { opacity: 0.92; }
+#neoamp-onboard .neoamp-onboard-b b { color: #fff; font-weight: 700; }
+#neoamp-onboard .neoamp-onboard-ok {
+  margin-top: 11px; float: right; cursor: pointer;
+  font: 700 11px/1 "Arial Narrow", Arial, sans-serif; letter-spacing: 0.5px; color: #3a2a06; padding: 6px 15px; border-radius: 3px;
+  background: linear-gradient(180deg, #f1d98c 0%, #cda64a 52%, #ad8631 56%, #7c5e1f 100%);
+  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+}
+#neoamp-onboard::after { content: ""; display: block; clear: both; }
+
+/* keyboard-shortcut reference overlay (opened from the gear menu) */
+.neoamp-sc-back { position: fixed; inset: 0; z-index: 2147483640; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); }
+.neoamp-sc {
+  width: 384px; max-width: 88vw; max-height: 84vh; overflow: auto;
+  background: linear-gradient(180deg, #2b2f3a, #1b1e26); color: #e8ecf6;
+  border: 1px solid; border-color: #f1d98c #6a5320 #4a3810 #cda64a; border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6); font: 13px/1.4 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}
+.neoamp-sc-h { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid rgba(241,217,140,0.25); font-weight: 700; letter-spacing: 0.6px; color: #f1d98c; }
+.neoamp-sc-x { cursor: pointer; background: none; border: 0; color: #cfd5e6; font-size: 15px; line-height: 1; padding: 2px 7px; border-radius: 3px; }
+.neoamp-sc-x:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.neoamp-sc-list { padding: 8px 14px 14px; }
+.neoamp-sc-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.neoamp-sc-row:last-child { border-bottom: 0; }
+.neoamp-sc-key {
+  flex: 0 0 104px; text-align: center; font: 700 11px/1 "Arial Narrow", Arial, sans-serif; letter-spacing: 0.5px; color: #1b1e26;
+  background: linear-gradient(180deg, #f6f8fd, #c7cede); border: 1px solid #8a93a8; border-bottom-width: 2px; border-radius: 4px; padding: 5px 6px;
+}
+.neoamp-sc-desc { flex: 1 1 auto; opacity: 0.92; }
+
+/* keyboard-focus visibility for every operable control (div-based + native). Only
+   :focus-visible so a mouse click doesn't leave a ring, but Tab navigation does. */
+.wa-tog:focus-visible, .wa-np-tog:focus-visible, .wa-tbtn:focus-visible,
+.wa-pl-btn:focus-visible, .wa-skinsel-btn:focus-visible, .wa-skinsel-item:focus-visible,
+.wa-gear-click:focus-visible, .wa-gear-step:focus-visible, .wa-lib-row:focus-visible,
+.wa-pl-row:focus-visible, .wa-lib-go:focus-visible, .wa-lib-input:focus-visible,
+.wa-range:focus-visible, .wa-vrange:focus-visible, .neoamp-sc-x:focus-visible, .neoamp-onboard-ok:focus-visible {
+  outline: 2px solid #7fc7ff; outline-offset: 1px; border-radius: 2px;
+}
