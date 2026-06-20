@@ -39,6 +39,13 @@ chrome.storage = { local: {
     plays: "12M plays", likeStatus: "LIKE",
     art: "", currentTime: 184, duration: 723, paused: false, volume: 0.82,
     shuffle: true, repeat: false,
+    // PLACEHOLDER lyric lines only — never real/copyrighted lyrics (real lyrics come from
+    // the provider's own pane at runtime; hardcoding them gets blocked).
+    lyrics: { source: "preview-mock", isTimeSynced: true, activeLine: 3, lines: [
+      "[ sample lyric line one ]", "[ sample lyric line two ]", "[ sample lyric line three ]",
+      "[ current line — highlighted ]", "[ sample lyric line five ]", "[ sample lyric line six ]",
+      "[ la la la ]", "[ placeholder verse ]", "[ another placeholder line ]", "[ end of sample ]",
+    ] },
   };
   // mock EQ state so the real getEqState()/setEq*/setBalance wiring is exercised
   var eqState = { enabled: true, preamp: 0, bands: [4, 2, 0, -2, -3, 0, 2, 4, 5, 3], balance: 0 };
@@ -71,6 +78,7 @@ chrome.storage = { local: {
     control: {
       playPause:noop, play:noop, pause:noop, prev:noop, next:noop, stop:noop, seek:noop, seekBy:noop,
       setVolume:noop, nudgeVolume:noop, getVolume:function(){return track.volume;},
+      setMute:function(b){track.__muted=(b===undefined)?!track.__muted:!!b;return track.__muted;}, isMuted:function(){return !!track.__muted;},
       toggleShuffle:noop, toggleRepeat:noop, playQueueItem:noop,
       playLibraryItem:noop, openLibraryItem:noop, like:noop, dislike:noop, playHomeItem:noop,
       getEqState:function(){return {enabled:eqState.enabled,preamp:eqState.preamp,bands:eqState.bands.slice(),balance:eqState.balance};},

@@ -416,8 +416,8 @@
   // wa-pl resizes in height only — its width is locked to --wa-stack-w via CSS,
   // so we never apply an inline width to it (that's what let it drift out of
   // alignment with Main/EQ). wa-viz/wa-lib resize freely in both axes.
-  var RESIZABLE_W = { "wa-viz": 1, "wa-lib": 1 };
-  var RESIZABLE_H = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1 };
+  var RESIZABLE_W = { "wa-viz": 1, "wa-lib": 1, "wa-lyrics": 1 };
+  var RESIZABLE_H = { "wa-viz": 1, "wa-pl": 1, "wa-lib": 1, "wa-lyrics": 1 };
   function applyLayout() {
     // viz/lib default to the RIGHT of the classic stack (which is 550px wide at
     // x40 → right edge ~590), so they don't float over the docked windows.
@@ -427,6 +427,7 @@
       "wa-viz": { x: 610, y: 70, w: 380, h: 300 },
       "wa-pl": { x: 40, y: 430, h: 220 },
       "wa-lib": { x: 610, y: 386, w: 380, h: 320, hidden: true },
+      "wa-lyrics": { x: 1000, y: 70, w: 320, h: 360, hidden: true },
     };
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
@@ -903,7 +904,7 @@
   }
   function mixWhite(rgb, t) { return rgb && [rgb[0] + (255 - rgb[0]) * t, rgb[1] + (255 - rgb[1]) * t, rgb[2] + (255 - rgb[2]) * t]; }
 
-  var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz", "wa-np"];
+  var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz", "wa-np", "wa-lyrics"];
   var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   function applyFrame(skin) {
@@ -1119,7 +1120,7 @@
       '<path class="wa-spk-x" d="M16 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
     els.mute = h("div", { class: "wa-np-tog wa-np-mute", title: "Mute (M)", html: SPEAKER_SVG });
     els.mute.addEventListener("mousedown", function (e) { e.stopPropagation(); });
-    els.mute.addEventListener("click", function (e) { e.stopPropagation(); els.mute.classList.toggle("on", NA.control.setMute()); });
+    els.mute.addEventListener("click", function (e) { e.stopPropagation(); if (NA.control.setMute) els.mute.classList.toggle("on", NA.control.setMute()); });
     if (NA.control.isMuted && NA.control.isMuted()) els.mute.classList.add("on");
     // Decluttered: the strip keeps only the often-used controls (like/dislike + the
     // VIS/LIB window toggles). The set-once appearance controls — Background, Zoom and
@@ -1127,6 +1128,7 @@
     var toggles = h("div", { class: "wa-np-toggles" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
+      npBtn("LYR", "Show/hide the lyrics window", "wa-lyrics"),
     ]);
     var gear = buildGearMenu();
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
@@ -1414,6 +1416,51 @@
     makeResizable(win.el, rs, 260, 180);
   }
 
+  // =========================================================================
+  // LYRICS WINDOW — scrolling lyrics for the current track (scraped from the
+  // provider's own lyrics pane; empty-state when none are available). Free-
+  // floating like the viz window (not in the docked 550px stack).
+  // =========================================================================
+  var lastLyrics;   // latest lyrics object so opening the window mid-track fills it
+  function buildLyrics() {
+    var win = makeWindow("wa-lyrics", "Lyrics", { onClose: function () { hideWin("wa-lyrics"); } });
+    els.lyricsList = h("div", { class: "wa-lyrics-list wa-inset" });
+    els.lyricsStatus = h("div", { class: "wa-lyrics-status", text: "" });
+    win.body.appendChild(els.lyricsList);
+    win.body.appendChild(els.lyricsStatus);
+    var rs = h("div", { class: "wa-resize", title: "Resize" });
+    win.el.appendChild(rs);
+    makeResizable(win.el, rs, 200, 160);
+    renderLyrics(lastLyrics);
+  }
+  // lyr: { lines:[str], source?:str, isTimeSynced?:bool, activeLine?:int } | null | undefined.
+  // undefined = not fetched yet (hint to open the provider's pane); null/empty = none.
+  function renderLyrics(lyr) {
+    var list = els.lyricsList; if (!list) return;
+    var lines = lyr && lyr.lines && lyr.lines.length ? lyr.lines : null;
+    list.innerHTML = "";
+    if (!lines) {
+      list.classList.add("empty");
+      list.appendChild(h("div", { class: "wa-lyrics-empty", text: (lyr === undefined)
+        ? "♪  Open the lyrics pane in the player to load lyrics."
+        : "No lyrics available for this track." }));
+      els.lyricsStatus.textContent = "";
+      return;
+    }
+    list.classList.remove("empty");
+    lines.forEach(function (ln, i) {
+      var row = h("div", { class: "wa-lyrics-line", text: ln || " " });
+      if (lyr.isTimeSynced && i === lyr.activeLine) row.classList.add("active");
+      list.appendChild(row);
+    });
+    els.lyricsStatus.textContent = lyr.source ? ("source: " + lyr.source) : "";
+    // keep the current (synced) line in view
+    if (lyr.isTimeSynced && lyr.activeLine != null) {
+      var act = list.children[lyr.activeLine];
+      if (act && act.scrollIntoView) act.scrollIntoView({ block: "center" });
+    }
+  }
+
   function renderResults(res) {
     var list = els.libList;
     if (!list) return;
@@ -1587,6 +1634,8 @@
       paintRange(els.seek);
     }
     if (els.plTime) els.plTime.textContent = fmt(t.currentTime) + " / " + fmt(trackDur);
+    if (t.lyrics !== undefined) lastLyrics = t.lyrics;   // undefined = provider didn't supply (keep last)
+    if (els.lyricsList) renderLyrics(lastLyrics);
     refreshQueue();
   }
 
@@ -1736,6 +1785,7 @@
     buildViz();
     buildPlaylist();
     buildLibrary();
+    buildLyrics();
     NA.on("track", onTrack);
     NA.on("audio", onAudio);
     // slow poll so queue edits made in YTM while the same track plays show up

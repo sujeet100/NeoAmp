@@ -532,7 +532,7 @@
 .wa-genskin .wa-close:active { background: var(--gen-close) center / 18px 18px no-repeat; }
 .wa-plskin .wa-close:active { background: var(--plf-close) center / 18px 18px no-repeat; }
 /* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
-#wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body {
+#wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body, #wa-lyrics.wa-genskin .wa-body {
   margin: 0; padding: 10px 26px 34px 30px;   /* clears the frame borders + breathing room */
   background:
     var(--gen-ml) left top / 22px 58px repeat-y,
@@ -580,7 +580,7 @@
 .wa-plskin .wa-title .wa-logo { display: none; }
 .wa-win.wa-plskin .wa-tbtns { position: static; margin-right: 54px; }
 /* (framed .wa-tbtn styling is shared with .wa-genskin above) */
-#wa-pl.wa-plskin .wa-body, #wa-lib.wa-plskin .wa-body, #wa-viz.wa-plskin .wa-body {
+#wa-pl.wa-plskin .wa-body, #wa-lib.wa-plskin .wa-body, #wa-viz.wa-plskin .wa-body, #wa-lyrics.wa-plskin .wa-body {
   margin: 0; padding: 10px 44px 42px 28px;   /* right tile is wider; bottom clears the frame */
   background:
     var(--plf-left) left top / 24px 58px repeat-y,
@@ -689,6 +689,25 @@
 .wa-pl-row { display: flex; align-items: center; gap: 7px; padding: 2px 6px; color: var(--wa-lcd); cursor: pointer; white-space: nowrap; }
 .wa-pl-row:hover { background: rgba(255,255,255,0.07); }
 .wa-pl-row.playing { background: #0a2a5e; color: #fff; text-shadow: 0 0 4px var(--wa-lcd-glow); }
+
+/* =======================================================================
+   LYRICS WINDOW — scrolling, centered lyrics in the LCD font
+   ======================================================================= */
+#wa-lyrics { width: 320px; height: 360px; display: flex; flex-direction: column; min-height: 140px; }
+#wa-lyrics .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
+.wa-lyrics-list {
+  flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 12px 14px;
+  background: var(--pl-normalbg, var(--wa-inset-bg)); border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
+  font-family: var(--wa-lcd-font); font-size: 16px; line-height: 1.5;
+  color: var(--pl-normal, var(--wa-lcd)); text-align: center;
+}
+.wa-lyrics-list.empty { display: flex; align-items: center; justify-content: center; text-align: center; }
+.wa-lyrics-empty { opacity: 0.55; font-size: 14px; padding: 0 16px; }
+.wa-lyrics-line { padding: 1px 0; text-shadow: 0 0 4px var(--wa-lcd-glow); opacity: 0.8; }
+.wa-lyrics-line.active { opacity: 1; color: var(--pl-current, #fff); text-shadow: 0 0 7px var(--wa-lcd-glow); }
+.wa-lyrics-status { flex: 0 0 auto; min-height: 13px; text-align: center; opacity: 0.55;
+  font: 11px/1.3 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); }
 .wa-pl-n { min-width: 22px; text-align: right; opacity: 0.7; }
 .wa-pl-thumb { width: 26px; height: 26px; flex: 0 0 auto; object-fit: cover; image-rendering: pixelated; border: 1px solid #000; background: #000; }
 .wa-pl-thumb.empty { background: #111; }
