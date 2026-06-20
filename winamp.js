@@ -151,14 +151,16 @@
       tbtns.appendChild(btn);
     });
 
-    // shade (collapse to titlebar) + close buttons
+    // shade (collapse to just the titlebar) — the button AND a titlebar double-click
+    // (the WMP/Winamp idiom). State persists across reloads via saveLayout().
     if (opts.shade !== false) {
-      var shadeBtn = h("span", { class: "wa-tbtn", title: "Shade", text: "▬" });
-      shadeBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        body.style.display = body.style.display === "none" ? "" : "none";
-      });
+      var shadeBtn = h("span", { class: "wa-tbtn", title: "Shade (or double-click titlebar)", text: "▬" });
+      shadeBtn.addEventListener("click", function (e) { e.stopPropagation(); setShaded(id); });
       tbtns.appendChild(shadeBtn);
+      bar.addEventListener("dblclick", function (e) {
+        if (e.target.closest(".wa-tbtn, .wa-skinsel-btn")) return;   // not when toggling a titlebar control
+        setShaded(id);
+      });
     }
     var closeBtn = h("span", { class: "wa-tbtn wa-close", title: "Close", text: "✕" });
     closeBtn.addEventListener("click", function (e) { e.stopPropagation(); (opts.onClose || function () { el.style.display = "none"; })(); });
@@ -376,11 +378,38 @@
     if (els.gearZoom) els.gearZoom();   // refresh the gear menu's Zoom readout
   }
 
+  // Visually collapse a window to its titlebar (or expand it) — NO persistence, so
+  // applyLayout can reuse it during restore. Resizable windows carry an inline height
+  // that would keep the empty body's space, so we stash it on the element + clear it.
+  function applyShade(id, shaded) {
+    var w = wins[id]; if (!w) return;
+    w.body.style.display = shaded ? "none" : "";
+    if (shaded) {
+      if (w.el.style.height) w.el.dataset.waH = w.el.style.height;   // remember expanded height
+      w.el.style.height = "";
+    } else if (w.el.dataset.waH) {
+      w.el.style.height = w.el.dataset.waH; delete w.el.dataset.waH;   // restore it
+    }
+    w.el.classList.toggle("wa-shaded", shaded);
+  }
+  // User-facing shade toggle (button / titlebar double-click). `on` omitted = toggle.
+  function setShaded(id, on) {
+    var w = wins[id]; if (!w) return;
+    var shaded = on === undefined ? !w.el.classList.contains("wa-shaded") : !!on;
+    applyShade(id, shaded);
+    if (classicApi) dockClassicStack();   // re-flow the docked stack around the new height
+    saveLayout();
+  }
+
   // ---- layout persistence --------------------------------------------------
   function saveLayout() {
     Object.keys(wins).forEach(function (k) {
       var e = wins[k].el;
-      layout[k] = { x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight, hidden: e.style.display === "none" };
+      // when shaded, offsetHeight is just the titlebar — persist the EXPANDED height
+      // (stashed on dataset) so unshading after a reload restores the right size.
+      var h = (e.classList.contains("wa-shaded") && e.dataset.waH) ? parseInt(e.dataset.waH, 10) : e.offsetHeight;
+      layout[k] = { x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: h,
+        hidden: e.style.display === "none", shaded: e.classList.contains("wa-shaded") };
     });
     NA.storage.set({ neoampLayout: layout });
   }
@@ -407,6 +436,9 @@
       if (d.w && RESIZABLE_W[k]) e.style.width = d.w + "px";
       if (d.h && RESIZABLE_H[k]) e.style.height = d.h + "px";
       e.style.display = d.hidden ? "none" : "";
+      // restore the windowshade state (applyShade stashes the just-set expanded height
+      // so a later unshade restores it)
+      applyShade(k, !!d.shaded);
     });
   }
 
@@ -1283,7 +1315,7 @@
   // PLAYLIST WINDOW (mirrors YTM's "Up Next" queue)
   // =========================================================================
   function buildPlaylist() {
-    var win = makeWindow("wa-pl", "Playlist", { shade: false, onClose: function () { hideWin("wa-pl"); } });
+    var win = makeWindow("wa-pl", "Playlist", { onClose: function () { hideWin("wa-pl"); } });
     var list = h("div", { class: "wa-pl-list" });
     // No footer buttons. The playlist is a read-only mirror of YTM's queue: it auto-
     // refreshes when the queue changes, search lives in the Library window, and queue
@@ -1353,7 +1385,7 @@
   // MEDIA LIBRARY WINDOW (search YTM → sectioned results → play)
   // =========================================================================
   function buildLibrary() {
-    var win = makeWindow("wa-lib", "Media Library", { shade: false, onClose: function () { hideWin("wa-lib"); } });
+    var win = makeWindow("wa-lib", "Media Library", { onClose: function () { hideWin("wa-lib"); } });
     var input = h("input", { class: "wa-lib-input", type: "text", placeholder: "Search songs, artists, albums…" });
     var go = h("button", { class: "wa-lib-go", text: "GO" });
     var home = h("button", { class: "wa-lib-go wa-lib-home", title: "Quick Picks & Listen Again", text: "HOME" });

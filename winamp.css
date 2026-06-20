@@ -99,6 +99,11 @@
   user-select: none;
 }
 .wa-win.dragging { opacity: 0.97; }
+/* windowshade: collapsed to just the titlebar (body is display:none). !important beats
+   the per-window id height/min-height rules (e.g. #wa-pl{height:220px}); the grabber is
+   meaningless on a collapsed window. */
+.wa-win.wa-shaded { height: auto !important; min-height: 0 !important; padding-bottom: 0; }
+.wa-win.wa-shaded .wa-resize { display: none; }
 
 .wa-titlebar {
   height: 17px;
