@@ -204,7 +204,7 @@
     // the motifs bleeding colour AS THEY MOVE). The generated ground is dimmed + desaturated to a SIMPLE base;
     // the blurred/smudged/decaying trails of the moving motifs (wetInk) ARE the dynamic colour field — and
     // because the motifs MOVE, this colour MOVES (vs the old baked-in bg bleed that read static).
-    "  vec3 baseBg = dusty(ground, 0.7) * 0.5;\n" +
+    "  vec3 baseBg = dusty(ground, 0.88) * 0.6;\n" + // simple base, but more SATURATED + a touch brighter (was 0.7*0.5 → too drab/muted)
     "  vec3 col = baseBg + wetInk * 2.0 + sharp * 1.5 + cA * bl;\n" + // moving blurred trails = the dramatic dynamic colour; crisp motif on top
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
@@ -226,8 +226,8 @@
     // POP against more near-black, matching the vibrant 1080p reference. Still luminous, not neon/blown-white.
     "  vec3 toned = col / (col + vec3(0.6));\n" +
     "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
-    "  toned = mix(vec3(tl), toned, 1.22);\n" + // resaturate toward the original's SATMAX (gentler → not neon)
-    "  toned = mix(toned * toned, toned, 0.72);\n" + // deepen darks/mids ONLY (x*x ≤ x) → contrast without lifting highlights to blowout
+    "  toned = mix(vec3(tl), toned, 1.5);\n" + // RESATURATE harder → more NEON/vivid colour (user wants less muted)
+    "  toned = mix(toned * toned, toned, 0.86);\n" + // lighter dark-deepen → brighter, glowier mids (more neon, still Reinhard-capped so no white-out)
     "  ret = clamp(toned, 0.0, 1.0);\n" +
     "}\n";
 
@@ -733,9 +733,9 @@
     lastStrobeT = 0,
     strobeOn = 1;
   var beat = alcBeatFlash({ rise: 1.22 });
-  var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
-  var bgPick = makePicker(6, 14, 26, 5.0); // 6 bg variants: moiré-DOTS/moiré-STRIPES/marble/horizon/ribbon/aurora — own slow clock
-  var motifPick = makePicker(MODES.length, 6, 12, 2.0); // central motif — own clock, dip-swap
+  var lookPick = makePicker(LOOKS.length, 6, 11, 3.0); // camera/look — MORE FREQUENT changes (was 9-16; felt prolonged/boring)
+  var bgPick = makePicker(6, 9, 17, 4.0); // 6 bg variants — more frequent (was 14-26)
+  var motifPick = makePicker(MODES.length, 4, 8, 1.6); // central motif — more frequent (was 6-12), dip-swap
 
   function frame(t) {
     var time = t.time || 0;
