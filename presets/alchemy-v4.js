@@ -69,6 +69,10 @@
     PAL_GLSL +
     ALC_MOIRE_GLSL +
     "vec3 dusty(vec3 c, float s){ float l = dot(c, vec3(0.333)); return mix(vec3(l), c, s); }\n" +
+    // CURL of the fbm potential (90°-rotated gradient) — a DIVERGENCE-FREE flow field. Advecting the
+    // colour domain by it swirls the noise like dye in water (watercolour marbling) and CANNOT shear it
+    // into radial rays (zero divergence) — the safe alternative to the directional advection that "rained".
+    "vec2 curl(vec2 p){ float e = 0.12; float a1 = fbm(p + vec2(0.0, e)); float a2 = fbm(p - vec2(0.0, e)); float a3 = fbm(p + vec2(e, 0.0)); float a4 = fbm(p - vec2(e, 0.0)); return vec2(a1 - a2, a4 - a3) / (2.0 * e); }\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
@@ -115,10 +119,26 @@
     // NEW full DIAGONAL-X kaleidoscope (fold>=8): mirror the BACKGROUND across BOTH diagonals about
     // screen centre (rotate -45°, abs, rotate +45°) → 4 triangular wedges like the original (f_18).
     "  if (q12 > 7.5) { vec2 dr = vec2(pdc.x + pdc.y, pdc.y - pdc.x) * 0.70711; dr = abs(dr); pdc = vec2(dr.x - dr.y, dr.x + dr.y) * 0.70711; }\n" +
-    "  vec2 w = pdc * 1.3 + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
-    "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
-    "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
-    "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
+    // WATERCOLOUR FLUID — curl-advected domain (swirls/marbles, no shear) + a smooth isotropic SCALE-BREATH
+    // (the colour field recedes/advances = moving through space, no shear) + WIDE overlapping bleed bands so
+    // the three pigments blend wet-on-wet (muddy transition zones, no crisp seam). breath/flow applied ONLY to
+    // the noise-sampling coords (npd) — never the screen pdc used by the fold/vignette (would wobble the wedges).
+    "  float ft = time * 0.05;\n" +
+    "  float breath = 1.0 + 0.12 * sin(time * 0.06) + 0.06 * bb;\n" + // slow depth breath + gentle beat push-in
+    "  vec2 npd = pdc * breath;\n" +
+    "  vec2 flow = curl(npd * 1.1 + vec2(ft, -ft));\n" +
+    "  vec2 w = npd * 1.3 + 0.22 * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
+    "  float n1 = fbm(w * 1.3 + 0.10 * flow + time * 0.025);\n" +
+    "  float n2 = fbm(w * 2.0 - 0.10 * flow - time * 0.02 + 3.0);\n" +
+    "  vec3 ground = mix(cB, cC, smoothstep(0.20, 0.80, n1));\n" + // WIDE band → soft feathered bleed
+    "  ground = mix(ground, cA, smoothstep(0.35, 0.95, n2) * 0.55);\n" + // overlaps the cB/cC band → 3-way muddy mix
+    // FLUID BEAT COLOUR-BLOOM — a soft complementary pigment welling from the core, breathing/bleeding OUTWARD
+    // with the beat (q32 = bass + 1.4f now carries the kick). exp() feather + outward mix = wet-on-wet, never a flash.
+    "  float bloomHue = hb + 0.5;\n" +
+    "  float brad = exp(-prad * prad * 4.5);\n" +
+    "  float swell = max(0.0, q32 - 1.0);\n" + // ~0 at rest, spikes on the beat
+    "  ground += dusty(pal(bloomHue), 0.9) * brad * (0.08 + 0.5 * swell);\n" +
+    "  ground = mix(ground, dusty(pal(bloomHue), 0.8), smoothstep(0.0, 0.9, n2) * brad * 0.4 * swell);\n" +
     "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré DOTS (0) — kept
     "  else if (q29 < 1.5) { ground = mix(ground, alcMoireStripes(uv, time, bb, cA), 0.7); }\n" + // moiré vertical STRIPES (1) — NEW (WMP scene F3), mixed stronger so columns read over the fbm ground
     "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (2)
@@ -150,7 +170,7 @@
     "  float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
     "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
-    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" + // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
+    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.60, 1.04, smoothstep(1.5 * breath, 0.15, prad));\n" + // depth vignette coupled to the breath → corners deepen as you push in (darker, higher-contrast ground)
     "  ground *= mix(1.0, 0.05, voidAmt);\n" + // VOID: crush to near-black so wire/X motifs read as the only light (faint corner-pool survives)
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
@@ -722,7 +742,7 @@
     t.q27 = L("py") + pan * Math.sin(time * 0.11);
     t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // stronger 3D plane tilt (side-angle)
     t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
-    t.q32 = bass;
+    t.q32 = bass + 1.4 * f; // carry the BEAT into the shader (raw bass barely crosses 1.0 live) → drives bb + the colour-bloom swell
 
     // BACKGROUND — its OWN slow clock, decoupled from the motif (the same motif now appears over
     // different backgrounds, like the original). Continuous 0..3 → COMP_V4's q29 variant select.
