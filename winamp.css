@@ -351,8 +351,11 @@
   --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 90%, #000000 10%);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 19px; padding: 0 8px; cursor: pointer;
-  /* match the song-title font (the VT323 "NeoAmp LCD" face), not the plain mono --wa-font */
-  font: 700 13px/1 var(--wa-lcd-font); letter-spacing: 0.6px; text-transform: uppercase;
+  /* match the song-title font (the VT323 "NeoAmp LCD" face), not the plain mono --wa-font;
+     turn OFF font smoothing so VT323 renders as crisp pixels (like the skin's bitmap title)
+     instead of anti-aliased/smooth. */
+  font: 700 16px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
   /* contrast-derived from the key face (near-black on light keys, near-white on dark)
      so labels stay readable on every skin — NOT --pl-normal, which went invisible. */
   color: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
