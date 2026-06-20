@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "note": "NeoAmp per-provider transport selectors. Edit + push this file to hot-fix a broken control WITHOUT shipping an extension update: the service worker fetches it from GitHub raw (~5-min cache, so a push is live almost immediately; re-fetched ~every 6h and on extension reload) and the content script tries these selectors BEFORE its bundled defaults (first match wins; defaults remain as fallback). Each value is an ordered list of CSS selectors. Requires the repo to be PUBLIC; if unreachable the extension silently uses its cached/bundled defaults.",
+  "providers": {
+    "music.youtube.com": {
+      "next": ["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"],
+      "prev": ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
+      "shuffle": ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
+      "repeat": ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]
+    },
+    "open.spotify.com": {
+      "playPause": ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
+      "next": ["[data-testid='control-button-skip-forward']", "button[aria-label='Next']"],
+      "prev": ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
+      "shuffle": ["[data-testid='control-button-shuffle']", "button[aria-label*='shuffle' i]"],
+      "repeat": ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"]
+    }
+  }
+}

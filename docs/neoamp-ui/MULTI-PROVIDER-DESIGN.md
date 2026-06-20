@@ -39,7 +39,7 @@ content.js             ── scrape track/queue, drive transport ─  the ONLY 
 | Does DRM/EME block `tabCapture` **audio** (Spotify/Apple)? | **No** — DRM blacks out *video frames* (secure compositor); audio routes through the normal mixer. Verified live on Spotify; corroborated by Mozilla Bug 1331763 ("capturing audio from an EME element is fine"). | High (empirical) |
 | Can a content script read the page's `navigator.mediaSession`? | Not from the isolated world (separate realm). **`world:"MAIN"` content script + `postMessage` relay** works. Poll (no change event). | High |
 | Can we trigger play/pause/next via MediaSession? | **No** — action handlers are invoked *by* the browser only; read-only for control. Transport must use the media element or DOM buttons. | High |
-| Remote JSON config from the SW? | Allowed (JSON is *not* remote code). SW fetch needs `host_permissions`, is **not** subject to the page CSP, gets a CORS bypass. **jsDelivr pinned to a tag** > raw.githubusercontent (60 req/hr/IP → 429s). | High |
+| Remote JSON config from the SW? | Allowed (JSON is *not* remote code). SW fetch needs `host_permissions`, is **not** subject to the page CSP, gets a CORS bypass. Research preferred jsDelivr-pinned-tag; **we chose plain `raw.githubusercontent@main`** — edit+push, ~5-min propagation, no deploy overhead. The 60-req/hr/IP limit is moot at a ~6h fetch cadence, and the storage cache + bundled defaults cover any failure. | High |
 | Which providers next? | **plain YouTube** (reuses code), **Spotify** (done), **Apple Music** (heavier SPA), **Bandcamp** (DRM-free, cleanest, niche). SoundCloud/Deezer/Tidal/Amazon = weak/absent MediaSession → more fragile. | Medium |
 
 ## Architecture
@@ -107,17 +107,20 @@ if the FFT is all-zeros for ~N seconds while the page reports "playing," surface
 gracefully handles any future provider where protected audio does *not* pass capture —
 the one residual EME risk the research flagged as "likely fine, must test per service."
 
-### 5. Remote selector config — GitHub via jsDelivr (the hot-fix channel)
+### 5. Remote selector config — plain GitHub raw (the hot-fix channel) — **SHIPPED**
 
 Decouples "site changed its DOM" from "user must wait for a store update."
 
-- **Host:** `cdn.jsdelivr.net/gh/sujeet100/NeoAmp@<tag>/selectors.json`, pinned to an
-  **immutable git tag/commit** (jsDelivr caches those ~1yr immutable; floating `@main`/
-  `@latest` propagate slowly and raw.githubusercontent caps at 60 req/hr/IP → 429s).
-  Roll out a fix by bumping the tag.
+- **Host:** `raw.githubusercontent.com/sujeet100/NeoAmp/main/selectors.json` — the config
+  lives in this repo, so maintaining it is just **edit `selectors.json` + commit + push**;
+  no deploy/purge/tag step. raw has only a **~5-min cache**, so a push is live almost
+  immediately. (We deliberately did NOT use jsDelivr: its `@main` CDN copy lingers ~12h,
+  so a fast update would need a purge call = the deploy overhead we're avoiding. raw's
+  60-req/hr/IP limit is irrelevant at our ~6h fetch cadence, and the cache + bundled
+  defaults below mean a rare failed fetch never matters — so no CDN/fallback is needed.)
 - **Fetch from the service worker**, NOT the content script: content-script `fetch` is
   bound by the *page's* CSP (`connect-src`) — YTM would block GitHub; the SW's fetch is
-  governed by `host_permissions` instead. Add `https://cdn.jsdelivr.net/*` to
+  governed by `host_permissions` instead. Add `https://raw.githubusercontent.com/*` to
   `host_permissions`.
 - **Pattern:** bundle a default `selectors.json` in the extension (must work offline); SW
   fetches on install + a `chrome.alarms` interval (hours, not per page load), validates the
@@ -149,7 +152,8 @@ Decouples "site changed its DOM" from "user must wait for a store update."
 - [ ] **Provider adapter refactor**: extract the registry + base provider + a
       `youtube-music` provider from `content.js`; add a `spotify` provider.
 - [ ] **Silence/zero-FFT detector** + capability-aware control disabling.
-- [ ] **Remote selector config** (jsDelivr-pinned, SW-fetched, bundled fallback).
+- [x] **Remote selector config** — `selectors.json` in the repo, SW-fetched from GitHub
+      raw (~5-min propagation, edit+push), layered over bundled defaults; cached in storage.
 - [ ] Add **plain YouTube** (cheapest, reuses code) and evaluate **Bandcamp** (DRM-free).
 - [ ] Self-test on load → surface scrape breakage (backlog B2.6).
 

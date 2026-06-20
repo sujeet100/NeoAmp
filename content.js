@@ -432,6 +432,35 @@
   }
   var PROVIDER = activeProvider() || { id: "unknown" };
 
+  // Pristine copy of the bundled selectors so remote overrides always merge over the
+  // ORIGINALS (idempotent across refreshes), then a remote-config layer: the SW fetches
+  // GitHub-hosted selectors (raw.githubusercontent) and caches them in chrome.storage; here we try
+  // them BEFORE the bundled defaults (qa = first match wins; defaults kept as fallback),
+  // so a broken transport selector can be hot-fixed without an extension release.
+  // See docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md.
+  var DEFAULT_PROVIDERS = JSON.parse(JSON.stringify(PROVIDERS));
+  function applySelectorOverrides(cfg) {
+    for (var h in DEFAULT_PROVIDERS) PROVIDERS[h] = JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[h]));
+    if (cfg && cfg.providers && typeof cfg.providers === "object") {
+      Object.keys(cfg.providers).forEach(function (host) {
+        var ov = cfg.providers[host]; if (!ov || typeof ov !== "object") return;
+        if (!PROVIDERS[host]) PROVIDERS[host] = { id: host };
+        Object.keys(ov).forEach(function (key) {
+          var arr = ov[key];
+          if (Array.isArray(arr) && arr.length && arr.every(function (s) { return typeof s === "string"; })) {
+            var defs = PROVIDERS[host][key] || [];
+            PROVIDERS[host][key] = arr.concat(defs.filter(function (s) { return arr.indexOf(s) === -1; }));
+          }
+        });
+      });
+    }
+    PROVIDER = activeProvider() || PROVIDER;   // re-point at the rebuilt active entry
+  }
+  try {
+    chrome.storage.local.get("neoampSelectors", function (r) { applySelectorOverrides(r && r.neoampSelectors); });
+    chrome.storage.onChanged.addListener(function (ch, area) { if (area === "local" && ch.neoampSelectors) applySelectorOverrides(ch.neoampSelectors.newValue); });
+  } catch (_) {}
+
   function mediaEl() { return q("video") || q("audio"); }
   function clickSel(list) { var b = list && qa(list); if (b) { b.click(); return true; } return false; }
   function isPaused() {
