@@ -292,6 +292,18 @@ var ALC_MOIRE_GLSL =
   "  float by = 0.5 + 0.5 * cos((m.y * pitch * 0.6 - pan) * 6.2832);\n" + // second axis -> butterfly moiré
   "  float bars = pow(bx * by, 2.5);\n" + // product of two mirrored stripe sets
   "  return mix(vec3(0.01,0.03,0.01), barCol * (0.4 + 0.2*b), bars);\n" +
+  "}\n" +
+  // alcMoireStripes — X-ONLY vertical columns. The WMP moiré scene (F3, 1:48-1:55) is a field of
+  // vertical green/olive->magenta STRIPES, NOT the dot lattice the x*y PRODUCT above gives. The L/R
+  // abs-mirror keeps the bright "diamond" pinch at the vertical centerline. Kept ALONGSIDE alcMoire
+  // (dots) so both are selectable — they are different WMP looks.
+  "vec3 alcMoireStripes(vec2 uv, float t, float b, vec3 barCol){\n" +
+  "  vec2 m = abs(uv - 0.5) + 0.5;\n" + // L/R mirror -> centerline pinch
+  "  float pan = t * 0.15 + b * 0.4;\n" +
+  "  float pitch = 20.0 + 5.0 * sin(t * 0.2);\n" +
+  "  float bx = 0.5 + 0.5 * cos((m.x * pitch + pan) * 6.2832);\n" +
+  "  float bars = pow(bx, 2.5);\n" + // X-only -> genuine vertical columns
+  "  return mix(vec3(0.01,0.03,0.01), barCol * (0.4 + 0.2*b), bars);\n" +
   "}\n";
 
 // bgSolidSnap (T2.5) — instant SOLID-COLOUR flip background: returns one of N dusty preset

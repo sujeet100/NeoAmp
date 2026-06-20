@@ -47,7 +47,7 @@
     "  pd = mix(pd, pdf, q13);\n" +
     "  pd /= max(1.0 + q28 * pd.y, 0.25);\n" +
     "  float pr = length(pd);\n" +
-    "  float pang = q16 + q17 * pr;\n" +
+    "  float pang = q16 + q17 * pr + q17 * 0.10 / (pr * 6.0 + 1.0);\n" + // +center-growing twist (q17-gated) -> inward log-spiral DRAIN (Vortex); zero effect on swirl=0 looks
     "  float cs = cos(pang), sn = sin(pang);\n" +
     "  pd = mat2(cs, -sn, sn, cs) * pd;\n" +
     "  pd *= (1.0 + q15);\n" +
@@ -109,11 +109,12 @@
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
     "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
-    "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré (threshold <0.5 so only ONE picker index maps here — was <1.5 → showed ~2x too often)
-    "  else if (q29 < 1.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (1)
-    "  else if (q29 < 2.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" + // horizon bands (2)
-    "  else if (q29 < 3.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" + // ribbon stripes (3)
-    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" + // aurora swirl (4)
+    "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré DOTS (0) — kept
+    "  else if (q29 < 1.5) { ground = mix(ground, alcMoireStripes(uv, time, bb, cA), 0.7); }\n" + // moiré vertical STRIPES (1) — NEW (WMP scene F3), mixed stronger so columns read over the fbm ground
+    "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (2)
+    "  else if (q29 < 3.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" + // horizon bands (3)
+    "  else if (q29 < 4.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" + // ribbon stripes (4)
+    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" + // aurora swirl (5)
     // BOLD kaleidoscope wedges — when a fold is active, split the (already-mirrored) field into two
     // distinct LUMINOUS colour panes along the fold axes so it reads as bold colour wedges (orig
     // sweep_08 = a green/mauve bowtie-X), NOT the uniform symmetric blob a low-contrast fbm fold gives.
@@ -140,6 +141,17 @@
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
+    // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
+    // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
+    "  float foc = clamp(q11, 0.0, 1.0);\n" +
+    "  if (foc > 0.01) {\n" +
+    "    vec2 pe = pdc - vec2(0.10, -0.03);\n" + // slightly off-center pupil (reads for both the 3D eye and the tunnel throat)
+    "    float pupil = 1.0 - 0.55 * exp(-dot(pe, pe) * 110.0);\n" +
+    "    col *= mix(1.0, pupil, foc);\n" + // dark central pupil
+    "    col += cA * exp(-prad * prad * 80.0) * 0.12 * foc;\n" + // warm focus plume at the very center
+    "    float isTunnel = (1.0 - step(6.5, q30)) * step(5.5, q30);\n" + // mode 6 (rotline/tunnel) ONLY
+    "    col *= mix(1.0, 1.0 - 0.22 * smoothstep(0.0, 1.2, prad), foc * isTunnel);\n" + // tunnel DEPTH: darken toward the edges
+    "  }\n" +
     // DE-WASH (measured vs the original: ours was too BRIGHT + UNDER-saturated → washed/pastel). Reinhard
     // compresses highlights toward white and dusty()/bloom average colour out, so after tone-mapping we
     // RE-SATURATE (luminance-preserving) + apply a gentle contrast that deepens darks → saturated elements
@@ -213,6 +225,44 @@
         s.border_g = bg * 0.32;
         s.border_b = bb * 0.32;
         s.border_a = 0.95 * vis; // DARK contrast-hue rim (thickened by the comp dilation)
+        return s;
+      },
+    };
+  }
+
+  // GRADIENT-GLOW HALO (NEW, additive) — a soft hot-core→translucent-halo glow co-located with each
+  // orb: the WMP "gradient orb" signature. A SEPARATE layer in the free shape slots; the existing
+  // flat-fill orbShape is left UNTOUCHED. Additive, so it surrounds the opaque core as a glow without
+  // occluding it (no draw-order reshuffle needed). Hue follows the shared q8 clock; halo pushed teal.
+  function orbGlow(qx, qy, hueOff, visVar) {
+    return {
+      baseVals: Object.assign({}, SHAPE_BASE, {
+        enabled: 1,
+        sides: 40,
+        additive: 1,
+        thickoutline: 0,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: function (s) {
+        var vis = visVar ? (s[visVar] !== undefined ? s[visVar] : 1) : 1;
+        var cx = s[qx] !== undefined ? s[qx] : 0.5,
+          cy = s[qy] !== undefined ? s[qy] : 0.5;
+        var be = Math.max(0, (s.bass_att || 1) - 1);
+        var hf = (s.q8 || 0) + (hueOff || 0);
+        var gr = orbCol(hf, 0),
+          gg = orbCol(hf, 0.33),
+          gb = orbCol(hf, 0.67);
+        s.x = cx;
+        s.y = cy;
+        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be); // WIDER than the core → a surrounding halo
+        s.r = gr * 0.85;
+        s.g = gg * 0.85;
+        s.b = Math.min(1, gb * 1.5 + 0.15); // push the halo toward teal (orig glow)
+        s.a = 0.32 * vis; // bright-ish glow center (additive)
+        s.r2 = gr * 0.4;
+        s.g2 = gg * 0.4;
+        s.b2 = gb * 0.5;
+        s.a2 = 0.0; // → fully transparent at the rim = the soft gradient falloff
         return s;
       },
     };
@@ -312,18 +362,25 @@
       seg = Math.floor(fk),
       u = fk - seg,
       s = u * 2 - 1;
-    var th = (a.q9 || 0) * 4.0 + seg * (3.14159 / N);
+    // PARALLEL-MERGED: all 3 copies share ONE rotation angle (no 60° spread) and are offset by a tiny
+    // perpendicular GAP → they merge into ONE fat diameter (the v2 Net Tunnel line), not 3 separate
+    // spokes. q9 is driven fast + CONSTANT from frame() while the tunnel is engaged (≈3.4 rad/s ×4).
+    var th = (a.q9 || 0) * 4.0;
     var len = (a.q5 || 0.4) * 1.45,
       disp = (a.value1 || 0) * (a.q6 || 0.05) * 1.8;
+    var off = disp + (seg - 1) * 0.0012; // perpendicular = live-waveform jag + thin thickness gap
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + s * len * Math.cos(th) - disp * Math.sin(th);
-    a.y = cy + s * len * Math.sin(th) + disp * Math.cos(th);
+    a.x = cx + s * len * Math.cos(th) - off * Math.sin(th);
+    a.y = cy + s * len * Math.sin(th) + off * Math.cos(th);
     var h = a.q8 || 0;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+    if (u < 0.02) a.a = 0; // hide the copy-to-copy jump
+    // STROBE (tunnel): once engaged (q11>0.5) stamp the spoke ONLY on strobe frames (q10) so discrete
+    // spokes accumulate into a fan under the still high-decay camera, instead of a continuous smear.
+    if ((a.q11 || 0) > 0.5 && (a.q10 || 0) < 0.5) a.a = 0;
     return a;
   }
   // FOUNTAIN — the v2 radial-burst "fountain": ~48 waveform spokes spraying OUTWARD from the centre
@@ -363,10 +420,30 @@
     a.b = orbCol(h, 0.67);
     return a;
   }
-  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan];
+  // RIBBON (mode 9) — the iridescent 3D ribbon plane (orig scenes 21-23, 1:55-2:11): a WIDE real-
+  // waveform BAND on a STEEP diagonal axis, FULL-RAINBOW along its length (the v2 duotone miss). The
+  // ribbon LOOK's diagonal feedback push + high decay smear it into the combed iridescent sheet.
+  function fRibbon(a) {
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var ct = Math.cos(0.65),
+      st = Math.sin(0.65); // ~37° steep diagonal axis (matches the v2 Ribbon ANGLE)
+    var width = (a.q5 || 0.4) * 2.1,
+      amp = (a.q6 || 0.05) * 4.2;
+    var along = (a.sample - 0.5) * width;
+    var disp = (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25; // real-waveform jag (primary-motif rule)
+    a.x = cx + along * ct - disp * st;
+    a.y = cy + along * st + disp * ct;
+    var h = (a.q8 || 0) + a.sample * 0.85; // FULL rainbow along the axis: cyan→green→magenta→gold
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
+  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan, fRibbon];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8]; // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan (anemone lowered → softer, less dense)
+  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8, 0.55]; // …·wavefan·ribbon (ribbon additive + long-trailed → low alpha vs milky-out)
   function scaleFor(m) {
     return m === 0 ? 0.46 : m === 1 ? 0.4 : 0.5;
   }
@@ -375,6 +452,13 @@
     if (m < 0) m = 0;
     if (m >= MODES.length) m = MODES.length - 1;
     MODES[m](a);
+    // PULSAR oblate squash — the anemone/urchin (modes 0/5) read as a TILTED 3D eye, not a flat
+    // face-on circle. Vertical squash about center; strength = focus amount (q11). Disabled under a
+    // fold (q12>1.5) so the mirrored kaleido wedges stay clean (gotcha §8c).
+    if ((m === 0 || m === 5) && (a.q12 || 1) < 1.5) {
+      var cyS = a.q3 !== undefined ? a.q3 : 0.5;
+      a.y = cyS + (a.y - cyS) * (1.0 - 0.34 * (a.q11 || 0));
+    }
     a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m]; // q4 = visibility dip-swap
     return a;
   }
@@ -511,10 +595,15 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
-    waveAmt = 0;
+    waveAmt = 0,
+    tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
+    focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
+    ribAmt = 0, // mode 9 active → diagonal ribbon feedback streak
+    lastStrobeT = 0,
+    strobeOn = 1;
   var beat = alcBeatFlash({ rise: 1.22 });
   var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
-  var bgPick = makePicker(5, 14, 26, 5.0); // 5 DISTINCT bg variants (moiré/marble/horizon/ribbon/aurora), one per index — own slow clock
+  var bgPick = makePicker(6, 14, 26, 5.0); // 6 bg variants: moiré-DOTS/moiré-STRIPES/marble/horizon/ribbon/aurora — own slow clock
   var motifPick = makePicker(MODES.length, 6, 12, 2.0); // central motif — own clock, dip-swap
 
   function frame(t) {
@@ -571,12 +660,16 @@
     // #24 SCENE amount — eased toward 1 while the WAVEFAN motif (mode 8) is active, so the 2:40-2:50 look
     // (big clustered orbs + downward comb-fan) BLEEDS in/out rather than cutting.
     waveAmt += ((mCur === 8 ? 1 : 0) - waveAmt) * Math.min(1, dt * 0.8);
+    tunnelAmt += ((mCur === 6 ? 1 : 0) - tunnelAmt) * Math.min(1, dt * 0.6);
+    focusAmt +=
+      ((mCur === 0 || mCur === 5 || mCur === 6 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6);
+    ribAmt += ((mCur === 9 ? 1 : 0) - ribAmt) * Math.min(1, dt * 0.8);
 
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5;
     t.q3 = 0.5;
     t.q5 = scaleFor(mCur) * (0.82 + 0.4 * (bassA - 1) + 0.22 * f); // breathing + per-beat pop
-    if (fold > 1.5 && mCur !== 6) t.q5 *= 0.52; // small mirrored flower under a fold (orig f_26); but keep the rotline SWEEP (mode 6) LONG → radiating X-fan (orig sweep_08)
+    if (fold > 1.5 && mCur !== 6 && mCur !== 9) t.q5 *= 0.52; // small mirrored flower under a fold; keep rotline (6) + ribbon (9) FULL-length
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1); // twist scales with bass
@@ -616,9 +709,43 @@
       t.q14 = Math.max(t.q14, wa); // both orbs present
       t.q13 *= 1 - wa; // #24 is NOT folded — fade out any kaleidoscope fold strength
       if (wa > 0.5) t.q12 = 1; // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
-      t.q29 += (4.9 - t.q29) * wa; // calm aurora ground (the orig #24 is plain/dark, not the busy moiré dot-grid)
+      t.q29 += (5.5 - t.q29) * wa; // calm aurora ground (aurora is index 5 now there are 6 bg variants)
     }
-    t.q11 = 0; // orb ripples removed — the original's orb rings are a 3D feedback trace, not a drawn ring
+    // NET TUNNEL coupling (mode 6): hold the buffer STILL at high decay so the brisk STROBED spokes
+    // accumulate into a fan/tunnel (the v2 Net Tunnel mechanism); bias the bg to aurora edge-bleed.
+    if (tunnelAmt > 0.01) {
+      var ta = tunnelAmt;
+      t.q9 = time * 0.06 * (1 - ta) + time * 0.85 * ta; // brisk CONSTANT spin (×4 in fRotLine ≈ 3.4 rad/s, the v2 rate)
+      t.q15 += (0.0 - t.q15) * ta; // kill zoom
+      t.q16 += (0.0 - t.q16) * ta; // kill roll (else the held spokes spiral — gotcha §8b)
+      t.q17 += (0.0 - t.q17) * ta; // kill swirl
+      t.q18 += (0.0 - t.q18) * ta;
+      t.q19 += (0.0 - t.q19) * ta; // kill translate
+      t.q28 += (0.0 - t.q28) * ta; // kill tilt
+      t.q13 *= 1 - ta; // no fold strength
+      if (ta > 0.5) t.q12 = 1; // no fold geometry (a tunnel is unfolded)
+      t.q1 += (0.972 - t.q1) * ta; // raise decay → long hold (safe ONLY because the strobe keeps input sparse)
+      t.q29 += (5.5 - t.q29) * ta; // aurora edge-bleed bg
+      if (mCur === 6) {
+        // strobe ~33/s → discrete spokes (set AFTER the q10 twist assignment above so it wins for mode 6)
+        if (time - lastStrobeT >= 0.03) {
+          strobeOn = 1;
+          lastStrobeT = time;
+        } else strobeOn = 0;
+        t.q10 = strobeOn;
+      }
+    }
+    // RIBBON coupling (mode 9): diagonal feedback push + high decay → the combed iridescent streak.
+    if (ribAmt > 0.01) {
+      var ra = ribAmt;
+      t.q1 += (0.95 - t.q1) * ra; // longer streak trail
+      t.q18 += (-0.0015 - t.q18) * ra; // push down-left ALONG the ~37° ribbon axis
+      t.q19 += (-0.0011 - t.q19) * ra;
+      t.q15 += (-0.004 - t.q15) * ra; // slight vanishing-point recede
+      t.q13 *= 1 - ra; // no fold (a flowing band folds into a spirograph tangle — gotcha §8c)
+      if (ra > 0.5) t.q12 = 1;
+    }
+    t.q11 = focusAmt; // COMP pupil amount + anemone-squash strength (high for modes 0/5/6)
     return t;
   }
 
@@ -674,6 +801,8 @@
   };
   preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25"); // orb A (near-persistent anchor)
   preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14"); // orb B (comes & goes; different hue)
+  preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25"); // NEW gradient glow-halo for orb A (existing orb UNCHANGED)
+  preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14"); // NEW gradient glow-halo for orb B
 
   P["Alchemy V4: Random"] = preset;
 })();
