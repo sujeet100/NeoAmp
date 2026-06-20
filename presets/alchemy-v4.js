@@ -33,6 +33,7 @@
   // ── shared WARP: fold + camera (tilt/zoom/rot/swirl/translate about a pivot) + light blur + decay ──
   var WARP_V4 =
     ALC_KALEIDO_GLSL +
+    PAL_GLSL +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 piv = vec2(q20, q27);\n" +
@@ -60,6 +61,15 @@
     "  acc += texture2D(sampler_main, suv + vec2(0.0, wp.y * br)).rgb * 0.1;\n" +
     "  acc += texture2D(sampler_main, suv - vec2(0.0, wp.y * br)).rgb * 0.1;\n" +
     "  ret = acc * q1;\n" +
+    // 3D-SPACE COLOUR FLOW (keystone) — inject a faint palette colour at the WARPED coord so the
+    // BACKGROUND COLOUR itself lives in the feedback buffer and RECEDES/STREAMS with the camera (it
+    // used to be rebuilt static in COMP). Sampled at suv (the receding coord) + re-warped each frame →
+    // streaked bands flowing through 3D space, like the original. Dose is decay-COMPENSATED (eq ≈
+    // 0.15·(1-q1)/(1-q1)) so it can't milk out at any decay. Guarded OFF for the still tunnel (mode 6)
+    // and the VOID stage (q29>5.5), where a colour haze would spoil the wires-on-black read.
+    "  float isTun = step(5.5, q30) * (1.0 - step(6.5, q30));\n" +
+    "  float echoG = (1.0 - isTun) * (1.0 - smoothstep(5.5, 5.9, q29));\n" +
+    "  ret += pal(q8 + length(suv - piv) * 0.4) * (0.15 * (1.0 - q1) * (0.6 + 0.4 * q32) * echoG);\n" +
     "}\n";
 
   // ── shared COMP: vibrant multi-colour-fusion background (q29 variant) UNDER the kit-coloured
@@ -144,6 +154,11 @@
     "    wedge += dusty(pal(hb + 0.37), 0.9) * seam * 0.45;\n" + // luminous seam-X glow
     "    ground = mix(ground, wedge, 0.68 * foldOn);\n" +
     "  }\n" +
+    // BEAT COLOUR-SPLAT — a discrete on-pulse hue burst born at center and propagating outward (orig
+    // flips green↔magenta from the vanishing point on the kick). Driven by bass (q32) since q33 isn't
+    // exposed; routed through dusty() + bounded mix so it stays muted (Reinhard compresses the rest).
+    "  float beatE = clamp((q32 - 1.05) / 0.45, 0.0, 1.0);\n" +
+    "  ground = mix(ground, dusty(pal(hb + 0.5 + prad * 0.6), 0.95), beatE * exp(-prad * prad * 3.0) * 0.5);\n" +
     // ASYMMETRIC corner bleed — the original is NEVER flat: a drifting OFF-CENTER colour pool + a
     // warm plume rising from one edge, so colour always bleeds into a corner (not a centred vignette).
     "  vec2 poolC = 0.42 * vec2(cos(time * 0.05 + hb * 6.2832), sin(time * 0.037 + 1.3));\n" +
@@ -152,7 +167,7 @@
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
     "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" + // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
     "  ground *= mix(1.0, 0.05, voidAmt);\n" + // VOID: crush to near-black so wire/X motifs read as the only light (faint corner-pool survives)
-    "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
+    "  vec3 col = ground * 0.62 + sharp * 1.25 + cA * bl;\n" + // ground scaled DOWN: the receding colour echo now rides in the feedback (sharp), so don't double-count the fresh ground
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
@@ -692,9 +707,10 @@
     var energy = typeof alcEnergy === "function" ? alcEnergy(t) : bassA;
     var f = beat(t.bass || 1, dt); // per-beat flash (fast decay)
 
-    // shared HUE clock (fg + bg) — mostly clock-driven, faster when loud, tiny per-beat warm nudge
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.05);
-    t.q8 = huePhase + 0.04 * f;
+    // shared HUE clock (fg + bg) — clock-driven base + STRONGER music coupling so colour migration is
+    // FELT within a loud passage (was a ~30-60s drift, invisible in a short span) + a per-beat nudge.
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.08);
+    t.q8 = huePhase + 0.08 * f + 0.03 * (bassA - 1);
 
     // LOOK — camera + exposure + fold eased between two looks on a slow clock
     var lk = lookPick(time, dt, f > 0.6),
@@ -711,7 +727,7 @@
       fold > 1.5 && fold < 7.5
         ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07))
         : 0; // fold>=8 = the COMP diagonal full-mirror (WARP itself doesn't fold it)
-    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (no global recede — it smeared bristles into a net)
+    t.q15 = L("zoom") + 0.012 * (bassA - 1) + 0.004 * Math.sin(time * 0.13) + L("zoom") * 0.9 * f; // per-look zoom + a BEAT PUNCH: each kick amplifies the look's own push direction (dive in / stream out) → felt 3D lurch on the pulse
     t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
@@ -771,6 +787,17 @@
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
     t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
+    // REVERSE PARALLAX — on the beat the orbs slide OUTWARD from center + grow, while the feedback field
+    // recedes INWARD: two layers in opposite radial senses = the "rushing past in 3D space" depth cue.
+    var po = 1 + 0.1 * f + 0.04 * Math.max(0, bassA - 1);
+    var clmp = function (v) {
+      return v < -0.1 ? -0.1 : v > 1.1 ? 1.1 : v;
+    };
+    t.q21 = clmp(0.5 + (t.q21 - 0.5) * po);
+    t.q22 = clmp(0.5 + (t.q22 - 0.5) * po);
+    t.q23 = clmp(0.5 + (t.q23 - 0.5) * po);
+    t.q24 = clmp(0.5 + (t.q24 - 0.5) * po);
+    t.q7 *= po; // discs enlarge as they "pass the camera"
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
