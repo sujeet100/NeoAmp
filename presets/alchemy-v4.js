@@ -200,9 +200,12 @@
     // so the DEFINED colour pools survive — only the edges smudge. The crisp sharp_main is composited ON TOP.
     "  vec2 smudge = vec2(fbm(uv * 2.2 + time * 0.1), fbm(uv * 2.2 - time * 0.1 + 5.0)) * (0.016 + 0.03 * sw1);\n" +
     "  vec3 wetInk = texture2D(sampler_blur1, uv + smudge).rgb * 0.62 + texture2D(sampler_blur2, uv + smudge).rgb * 0.38;\n" +
-    "  float stain = smoothstep(0.05, 0.32, dot(wetInk, vec3(0.333)));\n" +
-    "  ground = mix(ground, ground * 0.6 + wetInk * 1.25, stain * 0.5);\n" + // gentler than before → defined pools survive
-    "  vec3 col = ground + sharp * 1.4 + cA * bl;\n" + // sharp motif bumped (1.25→1.4) → stays DEFINED on top of the smudge
+    // ★ THE COLOUR COMES FROM THE MOVING MOTIF TRAILS, not the bg (the original's bg is simple; the drama is
+    // the motifs bleeding colour AS THEY MOVE). The generated ground is dimmed + desaturated to a SIMPLE base;
+    // the blurred/smudged/decaying trails of the moving motifs (wetInk) ARE the dynamic colour field — and
+    // because the motifs MOVE, this colour MOVES (vs the old baked-in bg bleed that read static).
+    "  vec3 baseBg = dusty(ground, 0.7) * 0.5;\n" +
+    "  vec3 col = baseBg + wetInk * 2.0 + sharp * 1.5 + cA * bl;\n" + // moving blurred trails = the dramatic dynamic colour; crisp motif on top
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
@@ -894,6 +897,7 @@
     // VOID stage (modes 10/11 — wire star-net / crossed-X): steer the bg toward near-black, eased so it
     // fades in/out (q29 5.5..5.9 → COMP voidAmt crush) and the wires read as the only light.
     if (netVoid > 0.01) t.q29 = 5.5 + 0.4 * netVoid;
+    t.q1 = Math.max(t.q1, 0.92); // floor decay → motif trails PERSIST + build the moving colour field (longer orb smudge); dim base gives milky-out headroom
     t.q11 = focusAmt; // COMP pupil amount + anemone-squash strength (high for modes 0/5/6)
     return t;
   }
