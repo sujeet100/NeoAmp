@@ -339,6 +339,11 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
 ### Chrome extension / MV3
 - **No remotely-hosted code** (MV3 bans it) — keep all libs vendored in `vendor/`.
 - **No inline scripts** in extension pages (CSP) — all JS in separate files.
+- **Bundled fonts need ABSOLUTE urls in content-script land.** A relative `url()` in
+  content-script-injected CSS (e.g. an `@font-face` in `winamp.css`) does NOT resolve to the
+  extension — it 404s and text silently falls back to a system font. Inject the `@font-face`
+  from JS with `chrome.runtime.getURL(...)` and list the file in `web_accessible_resources`
+  (see `injectFonts()` in `winamp.js`; this is why VT323 wasn't rendering live).
 - **Least privilege:** keep `host_permissions` to `music.youtube.com`; add
   permissions only when needed.
 - **Service workers are ephemeral** (if one is added later): don't keep state in
