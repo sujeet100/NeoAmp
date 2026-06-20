@@ -5,7 +5,16 @@ Butterchurn *visualizer presets*, which CLAUDE.md and `docs/alchemy-*` cover). T
 is the floating windowed player overlaid on YouTube Music, **now with a real
 equalizer**.
 
-Last updated: 2026-06-19. Repo state: on `main`.
+Last updated: 2026-06-20 (session 4). Repo state: on `main`, all pushed.
+
+**Session 4 shipped** (full detail: `FEEDBACK-BACKLOG.md` → "Session status — session 4"):
+**Lyrics window** (YTM + Spotify, per-track cached, auto-opens the provider's pane) ·
+**Spotify in-app search results** · **Spotify queue-disappears fix** (treegrid-scoped rows) ·
+**mute + numeric volume/seek** · **windowshade** (persisted) · NP-strip redesign (per-skin
+themed keys, hard pixel LEDs, segmented VIS|LIB|LYR rack, **1-row + scrolling marquee title**) ·
+**settings moved to right-click any window + the skin's top-left logo** (gear removed) ·
+pixel-art lit states. Selectors live-verified via `tools/cdp-eval.mjs`; UI via
+`tools/render-neoamp.mjs`. **Open:** confirm those provider features end-to-end while playing.
 
 ---
 

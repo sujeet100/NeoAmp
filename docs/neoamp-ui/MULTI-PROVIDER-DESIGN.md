@@ -154,16 +154,25 @@ Decouples "site changed its DOM" from "user must wait for a store update."
       ms-scaled); position read from `playback-position/duration` text. Verified 3:21→0:45.
 - [x] **Like** → matches the save toggle's stable `aria-checked` (its aria-label flips
       "Add to Liked Songs" ⇄ "Add to playlist"); heart LED reflects saved state.
-- [x] **Queue mirror** — Spotify "Next in queue" `li[role=row]` rows; `ensureQueueOpen()`
-      opens its panel on demand; double-click plays via the row's `play-button`.
-- [x] **Capability gating** — `dislike` hidden on Spotify; **LIB focuses Spotify's own
-      search box** (in-app library is YTM-only); no YTM-specific copy leaks.
+- [x] **Queue mirror** — Spotify rows scoped to `ul[role='treegrid'] li[role='row']` (the
+      Now-playing + Next-up grids); `ensureQueueOpen()` opens the panel; double-click plays via
+      the row's `play-button`. (Fixed session 4: a bare `li[role=row]` matched a stray off-panel
+      row, collapsing the mirror to 1 item when the queue closed.)
+- [x] **In-app Spotify search RESULTS** (session 4) — `searchSpotify()` types into Spotify's box
+      (SPA route, no reload — verified), clicks the Songs chip, scrapes `[data-testid=tracklist-row]`
+      (title `a[href*='/track/']`, artist `a[href*='/artist/']`, play `button[aria-label^='Play']`);
+      `capabilities.library` is on. Click-to-play caches row refs.
+- [x] **Lyrics** (session 4) — both providers: Spotify `[data-testid='lyrics-line']`, YTM
+      `ytmusic-description-shelf-renderer yt-formatted-string.description` (\n-split). Per-track
+      cached; **auto-opens** the provider's pane (Spotify lyrics button; YTM `tp-yt-paper-tabs.selected`).
+- [x] **Capability gating** — `dislike` hidden on Spotify; no YTM-specific copy leaks.
 - [x] **Remote selector config** — `selectors.json` (GitHub raw, ~5-min edit+push), layered
       over bundled defaults; cached in storage. (Repo must be PUBLIC for the channel to fire.)
 
 **Pending (next sessions):**
-- [ ] **In-app Spotify search RESULTS** — today LIB only focuses Spotify's own search box;
-      showing results inside NeoAmp's library window needs scraping Spotify's search DOM.
+- [ ] **Live end-to-end confirm** of the session-4 Spotify search + lyrics + queue fix while a
+      track actually plays (selectors are CDP-verified; full extension play-through not yet checked).
+- [ ] **Lyrics v2** — time-synced highlight + auto-scroll (window supports `activeLine` already).
 - [ ] **Silence / zero-FFT detector** — if a provider's audio ever doesn't pass capture,
       toast instead of a frozen viz (graceful degrade for future EME providers).
 - [ ] **Provider adapter FILE-split** — the inline `content.js` `PROVIDERS` registry → a
