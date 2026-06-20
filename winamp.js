@@ -1260,10 +1260,12 @@
   function refreshQueue(force, _noOpen) {
     if (!els.plList) return;
     var q = NA.getQueue ? NA.getQueue() : [];
-    // explicit open + empty mirror → ask the site to open its own queue panel (Spotify
-    // renders queue rows only when it's open), then re-read once (the _noOpen guard
-    // prevents a re-open loop if the rows still don't show).
-    if (force && !_noOpen && !q.length && NA.control.ensureQueueOpen && NA.control.ensureQueueOpen()) {
+    // explicit open → ask the site to open its own queue panel if it's closed (Spotify
+    // renders queue rows only when it's open), then re-read once to refresh the mirror.
+    // ensureQueueOpen self-gates on rows-present, so this is a no-op when already open;
+    // the _noOpen guard prevents a re-open loop. (The cached last-known queue keeps the
+    // list visible in between, so it never blanks when the panel is closed.)
+    if (force && !_noOpen && NA.control.ensureQueueOpen && NA.control.ensureQueueOpen()) {
       setTimeout(function () { refreshQueue(true, true); }, 700);
     }
     var sig = q.map(function (x) { return (x.playing ? "*" : "") + (x.art ? "a" : "") + x.title; }).join("|");

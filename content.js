@@ -254,6 +254,9 @@
   }
   // Provider-configured queue (e.g. Spotify's "Next in queue" rows). The now-playing
   // track isn't in this list (it shows in NeoAmp's now-playing strip), so playing=false.
+  // last non-empty provider queue — persists so NeoAmp's mirror doesn't vanish when the
+  // site's queue panel is closed (the rows only exist in the DOM while it's open).
+  var lastProviderQueue = [];
   function readQueueGeneric() {
     var rows = qaAll(PROVIDER.queueRow), out = [];
     for (var i = 0; i < rows.length; i++) {
@@ -269,7 +272,8 @@
         playing: false,
       });
     }
-    return out;
+    if (out.length) { lastProviderQueue = out; return out; }
+    return lastProviderQueue;   // panel closed → keep showing the last-known queue
   }
 
   // --- search (drives YTM's own search box) --------------------------------
@@ -638,10 +642,15 @@
     },
     playQueueItem: function (i) {
       if (PROVIDER.queueRow) {   // provider-configured queue (Spotify): click the row's own play button
-        var rows = qaAll(PROVIDER.queueRow), r = rows[i];
-        if (!r) return;
-        var pb = firstIn(r, PROVIDER.queuePlay);
-        if (pb) pb.click();
+        var play = function () {
+          var rows = qaAll(PROVIDER.queueRow), r = rows[i];
+          if (!r) return false;
+          var pb = firstIn(r, PROVIDER.queuePlay);
+          if (pb) { pb.click(); return true; }
+          return false;
+        };
+        if (play()) return;
+        if (control.ensureQueueOpen()) setTimeout(play, 700);   // panel closed → open it, then retry
         return;
       }
       var items = document.querySelectorAll("ytmusic-player-queue-item");
