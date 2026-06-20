@@ -361,20 +361,21 @@
 .wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 13px; }
 .wa-np-rate { display: flex; flex-direction: row; gap: 6px; }       /* like + dislike inline */
 .wa-np-toggles { display: flex; gap: 6px; }
-/* VIS/LIB/BG/zoom + like/dislike: small metal keys that match the skin's REAL
-   transport buttons. --wa-btn-face is sampled (in JS) from the skin's CBUTTONS
-   play/pause sprite, so the keys take on that exact metal — they read as part of
-   the same button set. Fallback: the panel bg (--pl-normalbg) nudged lighter, so
-   it's still light-on-light / dark-on-dark on skins we can't sample. The LABEL is
-   the skin's playlist text (--pl-normal), the LED its highlight (--pl-current).
-   Bevels/shadows use translucent white/black so they read on either polarity. */
+/* VIS/LIB/LYR/mute/like/gear: small metal keys THEMED from the skin's palette. We tried
+   sampling the skin's real CBUTTONS sprite, but round-knob skins (Nucleo) sample their dark
+   corners → grey, reintroducing the dullness. So the key metal is derived from the skin's
+   own panel colour + selection accent (below): warm skins → warm keys, cool/teal/blue skins
+   → matching keys — never a flat grey. The LED is the skin's indicator colour (--wa-led-on),
+   the LABEL contrast-derived (JS, from the same panel). Bevels use translucent white/black. */
 .wa-np-tog {
-  /* base = the skin's sampled transport-button metal (fallback: panel bg lightened).
-     key-face is nudged lighter + given a strong top gloss so the keys sit at the SAME
-     brightness/sheen as the skin's play/pause buttons (they read recessed otherwise). */
-  --wa-key-base: var(--wa-btn-face, color-mix(in srgb, var(--pl-normalbg, #2b2b34) 60%, #ffffff 40%));
-  --wa-key-face: color-mix(in srgb, var(--wa-key-base) 84%, #ffffff 16%);
-  --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 90%, #000000 10%);
+  /* key metal harmonised with the skin: lift its panel colour ~50% toward white (so warm
+     skins → warm keys, light skins → light keys) and tint 22% with the selection accent so
+     it carries the theme hue instead of washing out to grey. */
+  --wa-panel: var(--pl-normalbg, #2b2b34);
+  --wa-acc:   var(--pl-selectedbg, var(--wa-btn-face, var(--wa-panel)));
+  --wa-key-base: color-mix(in srgb, color-mix(in srgb, var(--wa-panel) 50%, #ffffff 50%) 78%, var(--wa-acc) 22%);
+  --wa-key-face: color-mix(in srgb, var(--wa-key-base) 86%, #ffffff 14%);
+  --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 84%, #000000 16%);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 19px; padding: 0 8px; cursor: pointer;
   /* crisp PIXEL font (Silkscreen Bold) for the key labels — VT323's rounded LCD read too
@@ -388,10 +389,15 @@
      read as engraved-into-the-key, not a stark black sticker (the old pure #15171d was the
      "too dark" complaint). Polarity is preserved on dark skins (near-white softened too). */
   color: color-mix(in srgb, var(--wa-key-fg, var(--pl-normal, #cdd2e6)) 78%, var(--wa-key-base) 22%);
+  /* Winamp-metal lighting on the theme-tinted key: a bright specular at the very top, a
+     sheen band, the mid face, then a darker base — the lighting profile real Winamp button
+     sprites use, but built from the skin's own colour so it stays vibrant + theme-matched
+     on every skin (raw-sampling the sprite reintroduced grey on round-knob skins). */
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--wa-key-face) 70%, #fff 30%) 0%,
-    var(--wa-key-face) 44%,
-    var(--wa-key-lo) 100%);
+    color-mix(in srgb, var(--wa-key-face) 52%, #fff 48%) 0%,
+    color-mix(in srgb, var(--wa-key-face) 84%, #fff 16%) 16%,
+    var(--wa-key-face) 50%,
+    color-mix(in srgb, var(--wa-key-lo) 88%, #000 12%) 100%);
   border: 1px solid;
   border-color: rgba(255,255,255,0.62) rgba(0,0,0,0.46) rgba(0,0,0,0.56) rgba(255,255,255,0.44);
   border-radius: 2px;
@@ -405,23 +411,23 @@
   border-color: rgba(0,0,0,0.5) rgba(255,255,255,0.32) rgba(255,255,255,0.45) rgba(0,0,0,0.42);
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-/* FLAT pixel LED (the glossy 3D dome read too modern for these pixel skins). Off: a
-   dark recessed square. On: a solid square in the skin's OWN indicator colour
-   (--wa-led-on, sampled from its shuffle light) with a chunky 1px pixel bevel — light
-   top-left, dark bottom-right — and only a tight 2px glow. No specular, no soft bloom. */
+/* PIXEL-ART LED — drawn the way a 90s skin artist would: hard 1px edges, ZERO blur (no
+   modern CSS bloom). Off: a punched hole — dark inset top-left, faint light rim bottom-
+   right. On: a raised diode in the skin's OWN indicator colour (--wa-led-on) — bright 1px
+   inner top-left corner (specular), darker 1px inner bottom-right, and a hard 1px drop. */
 .wa-np-tog::before {
-  content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 0;
-  background: rgba(0,0,0,0.5);
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.55), inset -1px -1px 0 rgba(255,255,255,0.10);
+  content: ""; width: 7px; height: 7px; flex: 0 0 auto; border-radius: 0;
+  background: rgba(0,0,0,0.62);
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.75), inset -1px -1px 0 rgba(255,255,255,0.14), 1px 1px 0 rgba(255,255,255,0.12);
   image-rendering: pixelated;
 }
 .wa-np-tog.on::before {
   --led: var(--wa-led-on, var(--pl-current, var(--wa-accent, #16e651)));
   background: var(--led);
   box-shadow:
-    inset 1px 1px 0 color-mix(in srgb, var(--led) 72%, #fff),
-    inset -1px -1px 0 color-mix(in srgb, var(--led) 60%, #000),
-    0 0 2px color-mix(in srgb, var(--led) 65%, transparent);
+    inset 1px 1px 0 color-mix(in srgb, var(--led) 50%, #fff),
+    inset -1px -1px 0 color-mix(in srgb, var(--led) 55%, #000),
+    1px 1px 0 rgba(0,0,0,0.55);
 }
 /* ⚙ gear key: icon only (no LED, no text label), square-ish, themed like the keys */
 .wa-gear-btn { padding: 0 6px; }

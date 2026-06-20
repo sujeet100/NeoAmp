@@ -936,15 +936,15 @@
       if (p.normalbg) root.style.setProperty("--pl-normalbg", p.normalbg);
       if (p.selectedbg) root.style.setProperty("--pl-selectedbg", p.selectedbg);
     }
-    // Contrast-safe LABEL colour: the key face is the sampled button metal (or, with
-    // no sample, the panel bg lightened ~40% toward white). Pick near-black text on a
-    // light face / near-white on a dark face — so VIS/LIB/gear labels are always
-    // readable (the old --pl-normal went invisible / mismatched the skin on some skins).
-    var baseRgb = parseColor(face) || (p && mixWhite(parseColor(p.normalbg), 0.4)) || null;
+    // Contrast-safe LABEL colour, computed from the SAME thing the key face is now built
+    // from — the skin's panel bg lifted ~50% toward white (matches the CSS --wa-key-base).
+    // Near-black text on a light key / near-white on a dark key, so VIS/LIB/gear labels stay
+    // readable on every skin. (Falls back to the sampled button metal if no panel colour.)
+    var panelRgb = (p && parseColor(p.normalbg)) || parseColor(face) || null;
+    var baseRgb = panelRgb ? mixWhite(panelRgb, 0.5) : null;
     if (baseRgb) {
       var L = (0.299 * baseRgb[0] + 0.587 * baseRgb[1] + 0.114 * baseRgb[2]) / 255;
-      L = L * 0.84 + 0.16;   // CSS lightens the face ~16% toward white for the visible top
-      root.style.setProperty("--wa-key-fg", L > 0.55 ? "#15171d" : "#eef1f8");
+      root.style.setProperty("--wa-key-fg", L > 0.62 ? "#15171d" : "#eef1f8");
     } else root.style.removeProperty("--wa-key-fg");
     // unify width with the 550px (275*2) skin stack (explicit on each framed
     // window so the gold titlebar always spans the full window width)
