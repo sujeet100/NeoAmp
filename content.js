@@ -397,29 +397,79 @@
     }, 350);
   }
 
+  // --- provider abstraction --------------------------------------------------
+  // Metadata is already provider-agnostic (MediaSession, above). Only the TRANSPORT
+  // controls + shuffle/repeat differ per site, so each provider just supplies selector
+  // lists and the control methods click the first that matches. Picked by hostname.
+  // (Inline for now; the design doc's providers/*.js split is a later refactor.)
+  // play/pause/seek/volume use the media element generically; next/prev/shuffle/repeat
+  // have no media-element equivalent, so they're button clicks (the one fragile bit —
+  // destined for the remote selector-config hot-fix channel).
+  var PROVIDERS = {
+    "music.youtube.com": {
+      id: "youtube-music",
+      // play/pause uses the media element here (works + instant) — no button needed
+      next: ["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"],
+      prev: ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
+      shuffle: ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
+      repeat: ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
+    },
+    "open.spotify.com": {
+      id: "spotify",
+      // Spotify is an EME player — drive its own DOM buttons (data-testids are stable;
+      // aria-label fallbacks add resilience). Direct media-element control is unreliable.
+      playPause: ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
+      next: ["[data-testid='control-button-skip-forward']", "button[aria-label='Next']"],
+      prev: ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
+      shuffle: ["[data-testid='control-button-shuffle']", "button[aria-label*='shuffle' i]"],
+      repeat: ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"],
+    },
+  };
+  function activeProvider() {
+    var host = location.hostname;
+    for (var k in PROVIDERS) { if (PROVIDERS.hasOwnProperty(k) && (host === k || host.endsWith("." + k))) return PROVIDERS[k]; }
+    return null;
+  }
+  var PROVIDER = activeProvider() || { id: "unknown" };
+
+  function mediaEl() { return q("video") || q("audio"); }
+  function clickSel(list) { var b = list && qa(list); if (b) { b.click(); return true; } return false; }
+  function isPaused() {
+    var v = mediaEl();
+    if (v) return v.paused;
+    return mediaMeta.playbackState ? mediaMeta.playbackState !== "playing" : true;
+  }
+  // Prefer the provider's own play/pause toggle button (reliable on EME players like
+  // Spotify); fall back to the media element (YTM, and any site without a button sel).
+  function doPlayPause() {
+    if (PROVIDER.playPause && clickSel(PROVIDER.playPause)) { setTimeout(sendTrack, 200); return; }
+    var v = mediaEl();
+    if (v) { v.paused ? v.play() : v.pause(); sendTrack(); }
+  }
+
   var control = {
-    playPause: function () { var v = q("video"); if (v) { v.paused ? v.play() : v.pause(); sendTrack(); } },
-    play: function () { var v = q("video"); if (v && v.paused) { v.play(); sendTrack(); } },
-    pause: function () { var v = q("video"); if (v && !v.paused) { v.pause(); sendTrack(); } },
-    next: function () { var b = qa(["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"]); if (b) b.click(); },
-    prev: function () { var b = qa(["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"]); if (b) b.click(); },
-    stop: function () { var v = q("video"); if (v) { v.pause(); try { v.currentTime = 0; } catch (_) {} sendTrack(); } },
-    seek: function (t) { var v = q("video"); if (v && isFinite(t)) { v.currentTime = t; sendTrack(); } },
+    playPause: function () { doPlayPause(); },
+    play: function () { if (isPaused()) doPlayPause(); },
+    pause: function () { if (!isPaused()) doPlayPause(); },
+    next: function () { clickSel(PROVIDER.next); },
+    prev: function () { clickSel(PROVIDER.prev); },
+    stop: function () { if (!isPaused()) doPlayPause(); var v = mediaEl(); if (v) { try { v.currentTime = 0; } catch (_) {} } sendTrack(); },
+    seek: function (t) { var v = mediaEl(); if (v && isFinite(t)) { v.currentTime = t; sendTrack(); } },
     // relative seek (keyboard ←/→) — reads the live time so it isn't stale-by-a-tick
     seekBy: function (d) {
-      var v = q("video");
+      var v = mediaEl();
       if (v && isFinite(v.currentTime)) {
         var dur = isFinite(v.duration) ? v.duration : Infinity;
         v.currentTime = Math.max(0, Math.min(dur, v.currentTime + d)); sendTrack();
       }
     },
-    setVolume: function (x) { var v = q("video"); if (v) { v.volume = Math.max(0, Math.min(1, x)); } },
-    nudgeVolume: function (d) { var v = q("video"); if (v) { v.volume = Math.max(0, Math.min(1, v.volume + d)); sendTrack(); } },
-    getVolume: function () { var v = q("video"); return v ? v.volume : 1; },
-    // toggle YTM's own control, then re-read shortly after so the UI reflects the
-    // ACTUAL resulting state (YTM flips it async; same pattern as like/dislike).
-    toggleShuffle: function () { var b = qa(["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"]); if (b) { b.click(); setTimeout(sendTrack, 250); } },
-    toggleRepeat: function () { var b = qa(["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"]); if (b) { b.click(); setTimeout(sendTrack, 250); } },
+    setVolume: function (x) { var v = mediaEl(); if (v) { v.volume = Math.max(0, Math.min(1, x)); } },
+    nudgeVolume: function (d) { var v = mediaEl(); if (v) { v.volume = Math.max(0, Math.min(1, v.volume + d)); sendTrack(); } },
+    getVolume: function () { var v = mediaEl(); return v ? v.volume : 1; },
+    // click the provider's shuffle/repeat button, then re-read shortly after so the UI
+    // reflects the ACTUAL resulting state (sites flip it async; like the like/dislike path).
+    toggleShuffle: function () { if (clickSel(PROVIDER.shuffle)) setTimeout(sendTrack, 250); },
+    toggleRepeat: function () { if (clickSel(PROVIDER.repeat)) setTimeout(sendTrack, 250); },
     // --- equalizer + balance (relayed live to the offscreen audio engine) ---
     getEqState: function () { return { enabled: eqState.enabled, preamp: eqState.preamp, bands: eqState.bands.slice(), balance: eqState.balance }; },
     setEqEnabled: function (on) { eqState.enabled = !!on; relayEq(); persistEq(); },
