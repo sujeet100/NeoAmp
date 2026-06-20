@@ -1128,7 +1128,7 @@
     var toggles = h("div", { class: "wa-np-toggles" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
-      npBtn("LYR", "Show/hide the lyrics window", "wa-lyrics"),
+      npBtn("LYR", "Show/hide the lyrics window", "wa-lyrics", maybeLoadLyrics),
     ]);
     var gear = buildGearMenu();
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
@@ -1422,6 +1422,10 @@
   // floating like the viz window (not in the docked 550px stack).
   // =========================================================================
   var lastLyrics;   // latest lyrics object so opening the window mid-track fills it
+  // Ask the provider to open its OWN lyrics pane (lyrics are lazy — they only load into the
+  // DOM after the user opens the provider's Lyrics tab/view). Self-gating + only while the
+  // NeoAmp lyrics window is open, so it never hijacks the provider's UI unprompted.
+  function maybeLoadLyrics() { if (isShown("wa-lyrics") && NA.control.ensureLyrics) NA.control.ensureLyrics(); }
   function buildLyrics() {
     var win = makeWindow("wa-lyrics", "Lyrics", { onClose: function () { hideWin("wa-lyrics"); } });
     els.lyricsList = h("div", { class: "wa-lyrics-list wa-inset" });
@@ -1442,7 +1446,7 @@
     if (!lines) {
       list.classList.add("empty");
       list.appendChild(h("div", { class: "wa-lyrics-empty", text: (lyr === undefined)
-        ? "♪  Open the lyrics pane in the player to load lyrics."
+        ? "♪  Loading lyrics…"
         : "No lyrics available for this track." }));
       els.lyricsStatus.textContent = "";
       return;
@@ -1636,8 +1640,12 @@
     if (els.plTime) els.plTime.textContent = fmt(t.currentTime) + " / " + fmt(trackDur);
     if (t.lyrics !== undefined) lastLyrics = t.lyrics;   // undefined = provider didn't supply (keep last)
     if (els.lyricsList) renderLyrics(lastLyrics);
+    // new track → re-open the provider's lyrics pane if our Lyrics window is showing
+    var tkey = (t.title || "") + "|" + (t.artist || "");
+    if (tkey !== lastLyricsTrack) { lastLyricsTrack = tkey; maybeLoadLyrics(); }
     refreshQueue();
   }
+  var lastLyricsTrack = "";
 
   var marqueeAnim = null, lastMarquee = "";
   function setMarquee(text) {

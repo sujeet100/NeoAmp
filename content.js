@@ -725,6 +725,36 @@
       if (qaAll(PROVIDER.queueRow).length) return false;
       return clickSel(PROVIDER.queueOpen);
     },
+    // open the provider's OWN lyrics pane so its lyrics load into the DOM (they're lazy —
+    // YTM only populates the description shelf once its Lyrics tab is activated; Spotify
+    // only renders lyrics-line nodes once its lyrics view is opened). Self-gating: no-op if
+    // lyrics are already present. Called when NeoAmp's Lyrics window opens. On YTM the queue
+    // items stay in the DOM under the inactive Up-Next tab (verified), so the mirror is safe.
+    ensureLyrics: function () {
+      if (PROVIDER.lyricsText) {                       // YTM: activate the Lyrics tab
+        if (qa(PROVIDER.lyricsText)) return;           // already loaded
+        var tabs = qaAll(PROVIDER.lyricsTab);
+        for (var i = 0; i < tabs.length; i++) {
+          if (!/lyric/i.test(tabs[i].textContent || "")) continue;
+          if (tabs[i].getAttribute("aria-selected") === "true") return;   // already on Lyrics
+          // YTM's tabs are Polymer paper-tabs: a synthetic .click() does NOT switch them.
+          // Setting the parent tp-yt-paper-tabs `.selected` index DOES (switches + lazy-loads).
+          var parent = tabs[i].parentElement;
+          while (parent && !/paper-tabs/i.test(parent.tagName)) parent = parent.parentElement;
+          if (parent && "selected" in parent) {
+            var sibs = parent.querySelectorAll("tp-yt-paper-tab");
+            parent.selected = [].indexOf.call(sibs, tabs[i]);
+          } else { tabs[i].click(); }                  // fallback
+          setTimeout(sendTrack, 1200);                 // let the lazy lyrics render, then push
+          return;
+        }
+        return;
+      }
+      if (PROVIDER.lyricsLine && PROVIDER.lyricsBtn) {  // Spotify: open the lyrics view
+        if (qaAll(PROVIDER.lyricsLine).length) return;  // already open
+        if (clickSel(PROVIDER.lyricsBtn)) setTimeout(sendTrack, 800);
+      }
+    },
     // click the provider's shuffle/repeat button, then re-read shortly after so the UI
     // reflects the ACTUAL resulting state (sites flip it async; like the like/dislike path).
     toggleShuffle: function () { if (clickSel(PROVIDER.shuffle)) setTimeout(sendTrack, 250); },
