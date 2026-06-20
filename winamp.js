@@ -1159,9 +1159,18 @@
       prev = w.el;
     });
   }
+  // Reflect EVERY window's open/closed state onto ALL its toggle buttons — both the
+  // NP-strip keys (VIS/LIB/LYR) and the procedural main keys (EQ/PL/VIS/LIB). Closing a
+  // window by its own ✕ (hideWin) or any toggle path calls this, so the keys never get
+  // stuck lit (the bug: hideWin only cleared the procedural keys, not the NP-strip ones).
   function syncNpButtons() {
     if (els.npVIS) els.npVIS.classList.toggle("on", isShown("wa-viz"));
     if (els.npLIB) els.npLIB.classList.toggle("on", isShown("wa-lib"));
+    if (els.npLYR) els.npLYR.classList.toggle("on", isShown("wa-lyrics"));
+    if (els.visTog) els.visTog.classList.toggle("on", isShown("wa-viz"));
+    if (els.libTog) els.libTog.classList.toggle("on", isShown("wa-lib"));
+    if (els.eqTog) els.eqTog.classList.toggle("on", isShown("wa-eq") || isShown("wa-eq-skin"));
+    if (els.plTog) els.plTog.classList.toggle("on", isShown("wa-pl"));
   }
   function pushNowPlaying(t) {
     var w = wins["wa-np"]; if (!w) return;
@@ -1745,14 +1754,12 @@
     w.el.style.display = hidden ? "" : "none";
     if (togEl) togEl.classList.toggle("on", hidden);
     if (hidden) raise(w.el);
+    syncNpButtons();   // reflect on every toggle key (NP-strip + procedural), not just togEl
     saveLayout();
   }
   function hideWin(id) {
     if (wins[id]) wins[id].el.style.display = "none";
-    if (id === "wa-eq" && els.eqTog) els.eqTog.classList.remove("on");
-    if (id === "wa-pl" && els.plTog) els.plTog.classList.remove("on");
-    if (id === "wa-viz" && els.visTog) els.visTog.classList.remove("on");
-    if (id === "wa-lib" && els.libTog) els.libTog.classList.remove("on");
+    syncNpButtons();   // clears the lit key on whichever toggles point at this window
     saveLayout();
   }
 
