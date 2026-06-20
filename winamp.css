@@ -449,7 +449,9 @@
 /* context-menu mode: the gear button is hidden (settings open via right-click / the skin
    logo); the wrap is a zero-size, absolutely-positioned host so its dropdown appears at the
    click point (openGearAt sets left/top). */
-.wa-gear-ctx { position: absolute; width: 0; height: 0; z-index: 30; }
+/* pointer-events:auto — it's a direct child of #neoamp-root (which is none so the page
+   stays clickable in the gaps); without this the open menu inherits none and ignores clicks. */
+.wa-gear-ctx { position: absolute; width: 0; height: 0; z-index: 30; pointer-events: auto; }
 .wa-gear-ctx .wa-gear-btn { display: none; }
 /* 🔊 mute key: icon only (no LED). One SVG; CSS swaps the sound-wave for an ✕ on .on,
    and recolours the whole glyph red while muted (a clear "silenced" warning). */
