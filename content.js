@@ -65,6 +65,14 @@
   // Real output sample rate, reported by the offscreen AudioContext at capture start.
   // Carried on each track tick so the UI's kHz readout never races the UI build order.
   var audioSampleRate = 0;
+
+  // Latest now-playing snapshot from the MediaSession bridge (mediasession.js, main world).
+  // Provider-agnostic + far more stable than site CSS classes; readTrack prefers it.
+  var mediaMeta = {};
+  window.addEventListener("message", function (e) {
+    if (e.source !== window || !e.data || e.data.__neoamp_ms !== 1) return;
+    mediaMeta = e.data.data || {};
+  });
   function onEqStarted() {
     if (running) return;
     running = true;
@@ -176,22 +184,27 @@
   }
 
   function readTrack() {
-    var v = q("video");
+    var v = q("video") || q("audio");
     var titleEl = q("ytmusic-player-bar .title");
     var bylineEl = q("ytmusic-player-bar .byline");
     var artEl = q("ytmusic-player-bar img.image") || q("ytmusic-player-bar img");
     var by = parseByline(bylineEl && bylineEl.textContent);
+    // Prefer the MediaSession snapshot (web standard every major player sets for the OS
+    // media controls — provider-agnostic + far more stable than site CSS classes). Fall
+    // back to YTM's DOM scrape for fields MediaSession doesn't carry (album/year/plays/
+    // likes) and for the brief window before the first snapshot arrives.
+    var ms = mediaMeta || {};
     return {
-      title: clean(titleEl && titleEl.textContent),
-      artist: by.artist,
-      album: by.album,
+      title: ms.title || clean(titleEl && titleEl.textContent),
+      artist: ms.artist || by.artist,
+      album: ms.album || by.album,
       year: by.year,
       plays: by.plays,                                 // best-effort; often ""
       likeStatus: readLikeStatus(),
-      art: artEl ? artEl.src : "",
+      art: ms.art || (artEl ? artEl.src : ""),
       currentTime: v ? v.currentTime : 0,
       duration: v && isFinite(v.duration) ? v.duration : 0,
-      paused: v ? v.paused : true,
+      paused: v ? v.paused : (ms.playbackState ? ms.playbackState !== "playing" : true),
       volume: v ? v.volume : 1,
       shuffle: readShuffle(),                          // true | false | null (unknown)
       repeat: readRepeat(),                            // true | false | null (unknown)

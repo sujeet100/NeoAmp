@@ -82,7 +82,7 @@ chrome.commands.onCommand.addListener((command, tab) => {
 // (granting activeTab), which tabCapture.getMediaStreamId requires — unlike an in-page
 // webpage button. Works in Arc too, where the toolbar icon is hidden. Starting opens
 // the NeoAmp player; the EQ is then driven entirely from the player's EQ window.
-const YTM = ["https://music.youtube.com/*"];
+const YTM = ["https://music.youtube.com/*", "https://open.spotify.com/*"];
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: "neoamp-toggle-eq", title: "Open NeoAmp player", contexts: ["all"], documentUrlPatterns: YTM });
