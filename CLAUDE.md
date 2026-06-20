@@ -29,8 +29,16 @@ still gets FFT via `postMessage`; only the audio *source* changed. See HANDOFF.m
 
 **MULTI-PROVIDER + selector robustness (player UI).** NeoAmp runs on **multiple streaming
 sites** now (YouTube Music + Spotify, more planned) — the audio path (`tabCapture` → EQ)
-and the UI are provider-agnostic; only `content.js` is provider-coupled. Two load-bearing
+and the UI are provider-agnostic; only `content.js` is provider-coupled. Load-bearing
 principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
+0. **★ EVERY new feature must work for ALL supported providers — no exceptions.** When you
+   add a player-UI feature (lyrics, search, mute, …), implement AND live-verify it for
+   *every* provider we support (YouTube Music **and** Spotify today), not just one. The UI
+   half is provider-agnostic; the provider-coupled half is per-provider DATA in the
+   `PROVIDERS` registry + `selectors.json` (see principle 2). A feature that only works on
+   one provider is **not done**. If a provider genuinely can't support it, gate it via that
+   provider's `capabilities` flag (so the UI hides it there) and say so explicitly — don't
+   silently ship it half-covered.
 1. **Prefer stable, standard sources over CSS-class scraping.** Read now-playing from the
    web-standard `navigator.mediaSession` (via a `world:"MAIN"` content script,
    `mediasession.js`) and playback state/position from the media element — both far less
