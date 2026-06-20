@@ -89,7 +89,9 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
   }
   await clipShot("np_focus", { x: 38, y: 300, width: 562, height: 103 });   // the whole Now-Playing panel
   await clipShot("eqpl_focus", { x: 470, y: 175, width: 130, height: 24 });  // main-window EQ/PL bitmap buttons
-  await clipShot("viz_titlebar", { x: 892, y: 62, width: 120, height: 56 }); // viz titlebar RIGHT corner (fullscreen + close)
+  await clipShot("viz_titlebar", { x: 606, y: 62, width: 392, height: 56 }); // full viz titlebar (title + buttons)
+  const vizTitleInfo = await evalJs(send, `(function(){var v=document.getElementById('wa-viz'); var t=v&&v.querySelector('.wa-title'); if(!t)return 'no-title'; var cs=getComputedStyle(t); return JSON.stringify({win:v.className, pos:cs.position, left:cs.left, ls:cs.letterSpacing}); })()`);
+  console.log("VIZ TITLE:", vizTitleInfo);
   // open the NP skin-picker dropdown (raise NP above the playlist first) + capture it
   await evalJs(send, `(function(){var n=document.getElementById('wa-np'); if(n)n.style.zIndex=9999; var b=document.querySelector('.wa-np-btns .wa-skinsel-btn'); if(b)b.click(); return !!b;})()`);
   await sleep(250);
@@ -123,6 +125,8 @@ const evalJs = (send, expr) => send("Runtime.evaluate", { expression: expr, retu
     const picked = await evalJs(send, `(function(){var it=[].slice.call(document.querySelectorAll('.wa-skinsel-item')).filter(function(i){return new RegExp(${JSON.stringify(SKIN)},'i').test(i.textContent);})[0]; if(it){it.click();return it.textContent;} return 'NOT FOUND';})()`);
     console.log("SKIN SWITCH:", picked);
     await sleep(2800); await shot(send, "skin_" + SKIN.replace(/[^a-z0-9]+/gi, "_"));
+    const vt = await evalJs(send, `(function(){var v=document.getElementById('wa-viz'); var t=v&&v.querySelector('.wa-title'); if(!t)return 'no'; var r=t.getBoundingClientRect(), vr=v.getBoundingClientRect(); var cs=getComputedStyle(t); return JSON.stringify({win:v.className, pos:cs.position, left:cs.left, ls:cs.letterSpacing, titleCenterPct: Math.round(((r.left+r.width/2)-vr.left)/vr.width*100), vizW: Math.round(vr.width)}); })()`);
+    console.log("VIZ TITLE (skin):", vt);
   }
 
   // measure the NP buttons + skin picker so I can check sizes objectively
