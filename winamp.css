@@ -361,12 +361,15 @@
   height: 19px; padding: 0 8px; cursor: pointer;
   /* crisp PIXEL font (Silkscreen Bold) for the key labels — VT323's rounded LCD read too
      smooth/thin at this small size; Silkscreen is a hard bitmap face. The Bold .ttf IS the
-     face (so weight 400), and font-smoothing off keeps the pixel edges sharp. */
-  font: 400 12px/1 var(--wa-pixel-font); letter-spacing: 1px; text-transform: uppercase;
+     face (so weight 400), and font-smoothing off keeps the pixel edges sharp. Kept SMALL
+     (8px) so the labels sit quietly beside the skin's own embossed keys instead of shouting. */
+  font: 400 8px/1 var(--wa-pixel-font); letter-spacing: 1px; text-transform: uppercase;
   -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  /* contrast-derived from the key face (near-black on light keys, near-white on dark)
-     so labels stay readable on every skin — NOT --pl-normal, which went invisible. */
-  color: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
+  /* contrast-derived from the key face (near-black on light keys, near-white on dark) so
+     labels stay readable on every skin — but softened ~22% toward the key metal so they
+     read as engraved-into-the-key, not a stark black sticker (the old pure #15171d was the
+     "too dark" complaint). Polarity is preserved on dark skins (near-white softened too). */
+  color: color-mix(in srgb, var(--wa-key-fg, var(--pl-normal, #cdd2e6)) 78%, var(--wa-key-base) 22%);
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--wa-key-face) 70%, #fff 30%) 0%,
     var(--wa-key-face) 44%,
