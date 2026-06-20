@@ -71,14 +71,14 @@
   var layout = {};              // id -> {x,y,w,h}
 
   // real Winamp skins (.wsz) rendered by wsz.js. id -> vendored resource path.
+  // We bundle ONLY the default base skin (following Webamp's precedent — it ships one
+  // base skin and disclaims it; see THIRD-PARTY-NOTICES.md). We deliberately do NOT
+  // redistribute community skins we have no license for: users get those on demand by
+  // browsing the Winamp Skin Museum and dropping the .wsz in (＋ Load skin… / drag-drop),
+  // which is persisted alongside this list as a `custom` entry.
+  var MUSEUM_URL = "https://skins.webamp.org/";
   var CLASSIC_SKINS = [
     { id: "base-2.91", name: "Winamp Classic", file: "vendor/skins/base-2.91.wsz" },
-    { id: "topazamp", name: "TopazAmp", file: "vendor/skins/topazamp.wsz" },
-    { id: "sony-esprit", name: "Sony Esprit", file: "vendor/skins/sony-esprit.wsz" },
-    { id: "nucleo-nlog", name: "Nucleo NLog", file: "vendor/skins/nucleo-nlog.wsz" },
-    { id: "winamp3-classified", name: "Winamp3 Classified", file: "vendor/skins/winamp3-classified.wsz" },
-    { id: "winamp5-classified", name: "Winamp5 Classified", file: "vendor/skins/winamp5-classified.wsz" },
-    { id: "bento-classified", name: "Bento Classified", file: "vendor/skins/bento-classified.wsz" },
   ];
   var classicApi = null;        // mounted Main-window renderer (null = procedural mode)
 
@@ -477,6 +477,9 @@
       var load = h("div", { class: "wa-skinsel-item load", text: "＋ Load skin…" });
       load.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__load__"); });
       menu.appendChild(load);
+      var more = h("div", { class: "wa-skinsel-item load", text: "🎨 Get more skins (Skin Museum) →" });
+      more.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__museum__"); });
+      menu.appendChild(more);
     };
     btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a window drag
     btn.addEventListener("click", function (e) {
@@ -497,6 +500,9 @@
   function refreshSkinOptions() { skinSelectors.forEach(function (w) { w.populate(); w.value = activeSkinValue; }); }
   function selectSkin(value) {
     if (value === "__load__") { openSkinPicker(); setSkinSelectors(activeSkinValue); return; }
+    // Browse the Winamp Skin Museum in a new tab, then drag the downloaded .wsz onto
+    // NeoAmp (or use ＋ Load skin…). We don't hotlink/redistribute museum skins.
+    if (value === "__museum__") { window.open(MUSEUM_URL, "_blank", "noopener"); NA.toast("Pick a skin, download the .wsz, then drop it on NeoAmp"); setSkinSelectors(activeSkinValue); return; }
     if (value.indexOf("wsz:") === 0) { enableClassic(value.slice(4)); activeSkinValue = value; }
     else { disableClassic(); applySkin(value); }
     setSkinSelectors(value);
@@ -563,6 +569,9 @@
       var load = h("div", { class: "wa-skinsel-item load", text: "＋ Load skin…" });
       load.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__load__"); });
       menu.appendChild(load);
+      var more = h("div", { class: "wa-skinsel-item load", text: "🎨 Get more skins (Skin Museum) →" });
+      more.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__museum__"); });
+      menu.appendChild(more);
       // keyboard-shortcut reference — the Z/X/C/V/B transport keys are otherwise hidden
       menu.appendChild(h("div", { class: "wa-gear-head", text: "Help" }));
       var keys = h("div", { class: "wa-skinsel-item wa-gear-sc", text: "⌨  Keyboard shortcuts" });

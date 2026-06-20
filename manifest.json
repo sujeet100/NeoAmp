@@ -53,13 +53,7 @@
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",
         "vendor/butterchurnPresetsExtra2.min.js",
-        "vendor/skins/base-2.91.wsz",
-        "vendor/skins/topazamp.wsz",
-        "vendor/skins/sony-esprit.wsz",
-        "vendor/skins/nucleo-nlog.wsz",
-        "vendor/skins/winamp3-classified.wsz",
-        "vendor/skins/winamp5-classified.wsz",
-        "vendor/skins/bento-classified.wsz"
+        "vendor/skins/base-2.91.wsz"
       ],
       "matches": ["https://music.youtube.com/*", "https://open.spotify.com/*"]
     }

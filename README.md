@@ -1,85 +1,163 @@
 # NeoAmp 🎵◢◤
 
-**Winamp / Windows Media Player–style music visualizations, overlaid on YouTube Music.**
+**A Winamp-style player + Windows Media Player / MilkDrop visualizations, overlaid on the music you stream in your browser.**
 
-NeoAmp is a Manifest V3 Chrome/Arc extension that renders **MilkDrop**
-visualizations (via [Butterchurn](https://github.com/jberg/butterchurn)) on top of
-YouTube Music, driven by the live audio of the tab. On top of Butterchurn's bundled
-MilkDrop presets, NeoAmp ships **hand-authored presets that recreate the classic
-Windows Media Player visualizers** — the *Alchemy*, *Battery*, and *Ambience*
-families — behind a Winamp-flavored launcher.
+NeoAmp is a **Manifest V3** Chrome / Arc / Edge extension that drops a floating,
+skinnable **Winamp-style player** onto streaming sites (YouTube Music and Spotify
+today) and renders **MilkDrop visualizations** — via
+[Butterchurn](https://github.com/jberg/butterchurn) — driven by the **live audio of
+the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
+**hand-authored presets that recreate the classic Windows Media Player visualizers**
+— the *Alchemy*, *Battery*, and *Ambience* families.
 
-> Nostalgic for WMP's swirling Alchemy flower and Winamp's MilkDrop? NeoAmp brings
-> that look back, reacting to whatever you're playing.
+> Nostalgic for Winamp's MilkDrop and WMP's swirling Alchemy flower? NeoAmp brings
+> that look — and a real, audio-shaping graphic EQ — back to the music you stream today.
+
+<!-- TODO: add a screenshot / GIF here — it's the single biggest thing a README can do. -->
+
+---
 
 ## Features
 
-- 🌀 **MilkDrop visuals on YouTube Music**, reacting to the live track.
-- 🎛️ **Hand-authored WMP recreations** — notably **Alchemy Random**, a 10-scene
-  engine (the two-orb "Dance" waveform, dandelion/urchin bursts, spiral arms,
-  kaleidoscope lens-bands, hexagon mesh, smoke plumes, comet streaks, spiderweb,
-  vertical-comb, landscape strata), plus Battery and Ambience families.
-- 🔀 Grouped preset dropdown + ⏮ / ⏭ / 🎲 navigation.
-- ⌨️ Launch with the **◢◤ Visualizer** button (bottom-right) or **Shift+V**.
-- 🔒 Fully local — no remote code, no tracking; only `music.youtube.com` host access.
+- 🪟 **Floating Winamp-style player UI** — draggable windows (main / equalizer /
+  playlist / library), classic LCD readout, transport controls, volume/balance.
+- 🎚️ **A real 10-band graphic EQ** — audio is captured with `chrome.tabCapture`
+  in an offscreen document, so the EQ actually *shapes what you hear*, not just the
+  visuals.
+- 🌀 **MilkDrop visuals** reacting to the live track, including **hand-authored WMP
+  recreations** — notably **Alchemy Random**, a self-sequencing engine (two-orb
+  "Dance" waveform, dandelion/urchin bursts, spiral arms, kaleidoscope lens-bands,
+  hexagon mesh, smoke plumes, comet streaks, …), plus the **Battery** and
+  **Ambience** families.
+- 🎨 **Skins** — real Winamp **`.wsz`** skins (rendered Webamp-style) plus
+  lightweight CSS-variable themes. Ships with the classic base skin; load any other
+  from the **[Winamp Skin Museum](https://skins.webamp.org/)** on demand (drag-drop /
+  picker) — see the [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins).
+- 🔀 **Multi-provider** — works on **YouTube Music** and **Spotify**, with
+  transport / seek / like / queue / volume / in-app search / **synced lyrics**.
+  New providers are a data entry, not new code (see below).
+- 📝 **Lyrics**, in-app **search**, **mute**, and keyboard shortcuts.
+- 🔒 **Local & private** — no analytics, no tracking, no remote code. The only
+  network call is fetching `selectors.json` for hot-fixable site selectors (see
+  [PRIVACY.md](./PRIVACY.md)).
 
 ## Install (load unpacked)
 
-1. Go to `chrome://extensions` (Arc: `arc://extensions`) and enable **Developer mode**.
-2. **Load unpacked** → select this folder.
-3. Open <https://music.youtube.com> and play a track.
-4. Click the **◢◤ Visualizer** launcher (bottom-right) or press **Shift+V**.
-5. In the screen-share dialog, pick **this tab** and **tick "Also share tab audio"**
-   — this is required (no audio = frozen visuals; only the *Tab* option exposes the
-   audio checkbox).
+There is no Chrome Web Store listing yet — install from source:
+
+1. Clone this repo.
+2. Go to `chrome://extensions` (Arc: `arc://extensions`, Edge: `edge://extensions`)
+   and enable **Developer mode**.
+3. **Load unpacked** → select this folder.
+4. Open <https://music.youtube.com> or <https://open.spotify.com> and play a track.
+5. Click the extension's toolbar icon (or press **Ctrl/Cmd + Shift + E**) to open
+   the player + EQ. Use the **◢◤ Visualizer** launcher (or **Shift+V**) for the
+   full-screen visuals.
+
+> After editing `manifest.json`, click the **reload (↻)** icon on the extensions
+> page. After editing other JS/CSS, reload the extension **and** the tab.
 
 ## How it works
 
 ```
-content.js  (runs on music.youtube.com)
-  getDisplayMedia({video,audio}) → AudioContext → AnalyserNode (fftSize 1024)
-  → each frame: postMessage(time-domain bytes) ─┐
-                                                 │
-viz.html  (sandboxed extension page, fullscreen iframe)
-  Butterchurn (WebGL) ◄──── postMessage ◄────────┘  → renders the <canvas>
+                       ┌──────────────────────────────────────────────┐
+ service worker (sw.js)│  coordinates capture + offscreen lifecycle    │
+                       └──────────────────────────────────────────────┘
+                                          │
+ offscreen.js  ──  chrome.tabCapture  →  AudioContext  →  10-band EQ  →  speakers
+                                              │                    └→ AnalyserNode (FFT)
+                                              │                            │ postMessage
+ content.js     (music.youtube.com / open.spotify.com — provider-coupled) │
+   • injects the Winamp-style UI (winamp.js / winamp.css / wsz.js / skins.js)
+   • reads now-playing from navigator.mediaSession (mediasession.js, world:MAIN)
+   • drives transport via per-provider selectors (PROVIDERS registry + selectors.json)
+                                              │
+ viz.html  (sandboxed extension page, fullscreen iframe)                  ▼
+   Butterchurn (WebGL, needs unsafe-eval)  ◄──────── postMessage (FFT bytes) ◄┘
+   → renders the <canvas>  +  preset selector
 ```
 
-Two deliberate design choices (full rationale in `CLAUDE.md`):
+Three deliberate, load-bearing design choices (full rationale in
+[`CLAUDE.md`](./CLAUDE.md)):
 
-- **Tab capture via `getDisplayMedia`** — `createMediaElementSource` on YouTube's
-  `<video>` returns all-zeros due to cross-origin tainting, so NeoAmp captures the
-  tab's audio instead (keeping it audible) and analyzes that.
-- **A sandboxed iframe for rendering** — Butterchurn compiles MilkDrop equations
+- **A sandboxed iframe for rendering.** Butterchurn compiles MilkDrop equations
   with `new Function`, which needs `unsafe-eval`. MV3 only allows that in a
   **sandboxed extension page**, so Butterchurn runs in `viz.html`.
+- **Audio via `chrome.tabCapture` in an offscreen document.**
+  `createMediaElementSource` on the site's `<video>` returns all-zeros (cross-origin
+  tainting), and content scripts can't keep an `AudioContext` alive across the SPA.
+  Capturing the tab in an offscreen doc keeps audio audible **and** lets the EQ
+  reshape it before it reaches the speakers.
+- **Provider logic is data, not code.** The site-specific selectors live in a
+  `PROVIDERS` registry mirrored in [`selectors.json`](./selectors.json), fetched at
+  runtime — so a broken selector is hot-fixed by editing one file, no extension
+  release. Now-playing comes from the web-standard `navigator.mediaSession`, not
+  CSS scraping. Adding a provider = a registry entry + a manifest `matches` line.
 
 ## Repo layout
 
 | Path | Role |
 | --- | --- |
-| `manifest.json` | MV3 manifest (content script, sandbox page, CSP, web-accessible resources). |
-| `content.js` | Launcher, tab-audio capture, analyser, iframe, audio message pump. |
+| `manifest.json` | MV3 manifest (content scripts, sandbox page, CSP, offscreen, web-accessible resources). |
+| `content.js` | UI injection, provider registry, transport wiring, audio-capture trigger. |
+| `sw.js` / `offscreen.html` / `offscreen.js` | Service worker + offscreen tab-capture + EQ + FFT. |
+| `mediasession.js` | `world:MAIN` script that reads `navigator.mediaSession` metadata. |
+| `winamp.js` / `winamp.css` | The floating Winamp-style player UI. |
+| `wsz.js` / `skins.js` | `.wsz` skin parser/renderer (Webamp-derived) + CSS-variable skin registry. |
+| `selectors.json` | Per-provider selectors, fetched at runtime for hot-fixing. |
 | `viz.html` / `viz.js` | Sandboxed renderer: Butterchurn init, canvas sizing, controls, render loop. |
-| `wmp-presets.js` | Hand-authored WMP-style presets (`window.WMP_PRESETS`). |
-| `vendor/*.min.js` | Vendored Butterchurn 2.6.7 core + preset packs. |
-| `docs/alchemy-reference.md` | Frame-by-frame analysis of the original WMP Alchemy visualizer. |
-| `CLAUDE.md` | Developer notes / architecture gotchas / preset-authoring guide. |
+| `presets/*.js` | Hand-authored WMP-style presets (`kit.js` shared kit + family files). |
+| `vendor/*.min.js` | Vendored Butterchurn core + preset packs (MV3 bans remote code). |
+| `vendor/skins/base-2.91.wsz` | The one bundled default skin; others load at runtime — see [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins). |
+| `fonts/` | Bundled bitmap fonts (VT323, Silkscreen) — both SIL OFL. |
+| `tools/` | Headless self-render harnesses (CDP) for iterating on visuals without the browser. |
+| `docs/` | Design notes, reverse-engineering analysis, handoffs. |
+| `CLAUDE.md` | Deep architecture notes + the preset-authoring guide. |
 
 ## Contributing
 
-Most of the work is **authoring presets** in `wmp-presets.js`. A preset is a
-Butterchurn "converted" object (equations are JS functions, shaders are GLSL
-strings). See `CLAUDE.md` for the reverse-engineered authoring rules and the
-validate-before-reload workflow (including a headless ANGLE shader-compile check —
-GLSL can't be validated by Node alone).
+See **[CONTRIBUTING.md](./CONTRIBUTING.md)**. The short version: most of the work is
+**authoring presets** in `presets/` (a preset is a Butterchurn "converted" object —
+equations are JS functions, shaders are GLSL strings) and **wiring providers** in
+`content.js` / `selectors.json`. There's a Node-based validate-before-reload workflow
+(including a headless ANGLE shader-compile check — GLSL can't be validated by Node
+alone) documented in `CLAUDE.md`. This project follows the
+[Contributor Covenant](./CODE_OF_CONDUCT.md).
 
-## Credits
+## Credits & acknowledgements
 
-- [Butterchurn](https://github.com/jberg/butterchurn) by Jordan Berg — the WebGL
-  MilkDrop engine NeoAmp renders with (vendored under `vendor/`, MIT licensed).
-- MilkDrop, Winamp, and Windows Media Player are the inspiration; their visual
-  *character* is reproduced here, not their code (the originals are proprietary).
+NeoAmp stands on the shoulders of a lot of great work. Full details and licenses are
+in **[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)**.
+
+- **[Butterchurn](https://github.com/jberg/butterchurn)** by **Jordan Berg**
+  ([@jberg](https://github.com/jberg)) — the WebGL MilkDrop engine NeoAmp renders
+  with. Vendored under `vendor/` (MIT).
+- **[Webamp](https://github.com/captbaritone/webamp)** by **Jordan Eldredge**
+  ([@captbaritone](https://github.com/captbaritone)) — our `.wsz` skin
+  parsing/rendering (`wsz.js`) is derived from Webamp's `skinSprites` and
+  `main-window.css` sprite geometry (MIT). Webamp is also the reference that proved
+  classic Winamp skins can be rendered faithfully on the web.
+- **MilkDrop** by **Ryan Geiss** — the original Winamp visualization plugin whose
+  preset format and look everything here descends from.
+- **Winamp** (Nullsoft / Llama Group) — the player UI, `.wsz` skin format, and the
+  whole "it really whips the llama's ass" aesthetic we're paying homage to.
+- **Windows Media Player** (Microsoft) — the Alchemy / Battery / Ambience
+  visualizers we reverse-engineered and recreate as Butterchurn presets.
+- Fonts: **[VT323](https://fonts.google.com/specimen/VT323)** by Peter Hull and
+  **[Silkscreen](https://fonts.google.com/specimen/Silkscreen)** by Jason Kottke —
+  both under the SIL Open Font License (see `fonts/`).
+- The **[Winamp Skin Museum](https://skins.webamp.org/)** by Jordan Eldredge — where
+  users browse and load additional `.wsz` skins (NeoAmp bundles only the base skin and
+  does not redistribute community skins; see the
+  [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins)).
+
+> **Trademarks.** *Winamp*, *Nullsoft*, *Windows Media Player*, *MilkDrop*,
+> *YouTube Music*, and *Spotify* are trademarks of their respective owners. NeoAmp is
+> an independent, unaffiliated fan project. It reproduces the *visual character* of
+> these tools — color, motion, symmetry, audio-reactivity — not their proprietary
+> code.
 
 ## License
 
-[MIT](./LICENSE). Bundled Butterchurn retains its own MIT license.
+NeoAmp's own code is licensed **[MIT](./LICENSE)**. Bundled third-party components
+retain their own licenses — see [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
