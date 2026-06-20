@@ -130,11 +130,11 @@
     // place → looked static). Now the noise-sampling domain ROTATES + DRIFTS + zoom-BREATHES continuously and
     // PARALLAXES opposite the camera's vanishing-point (q20/q27) → colours travel across the frame + through
     // space, coupled to the camera. (Applied to npd ONLY, never the screen pdc used by the fold/vignette.)
-    "  float breath = 1.0 + 0.22 * sin(time * 0.07) + 0.14 * sw1;\n" + // STRONGER depth zoom-breath + beat push-in (was too gentle vs the motif)
-    "  float bgAng = time * 0.09;\n" + // FASTER continuous rotation → colours visibly orbit (was 0.035 → barely moved)
+    "  float breath = 1.0 + 0.15 * sin(time * 0.06) + 0.09 * sw1;\n" + // gentle depth breath + beat push-in (bg is mostly ANCHORED — depth comes from the foreground moving against it)
+    "  float bgAng = time * 0.045;\n" + // slow rotation → a calm bubble, not a fast orbit
     "  mat2 bgR = mat2(cos(bgAng), -sin(bgAng), sin(bgAng), cos(bgAng));\n" +
-    "  vec2 par = vec2(q20 - 0.5, q27 - 0.5) * 3.5;\n" + // PARALLAX: bg shifts OPPOSITE the camera VP orbit (stronger)
-    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.05, time * 0.034) - par;\n" + // rotate + zoom + FASTER continuous drift + parallax
+    "  vec2 par = vec2(q20 - 0.5, q27 - 0.5) * 1.8;\n" + // light parallax off the camera VP
+    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.022, time * 0.015) - par;\n" + // calm bubble + slow drift + light parallax
     "  vec2 flow = curl(npd * 1.1 + vec2(ft, -ft));\n" +
     "  float warpAmt = 0.20 + 0.18 * sw1;\n" + // bass-driven WARP SURGE → colours SPLASH/stretch on the kick, settle when quiet
     "  vec2 w = npd * 1.3 + warpAmt * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
@@ -188,6 +188,13 @@
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
     "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.60, 1.04, smoothstep(1.5 * breath, 0.15, prad));\n" + // depth vignette coupled to the breath → corners deepen as you push in (darker, higher-contrast ground)
     "  ground *= mix(1.0, 0.05, voidAmt);\n" + // VOID: crush to near-black so wire/X motifs read as the only light (faint corner-pool survives)
+    // WATERCOLOUR STAIN (Gemini) — the "paint mixing" is the heavily-BLURRED foreground bleeding into the
+    // bg, not bg texture scrolling. Sample the wide blur buffers (soft out-of-focus motif) and STAIN the
+    // ground with their actual colour where the foreground light pools → colours seamlessly merge/wash, and
+    // when the motif flares on a beat it dumps colour that blooms across the surrounding watercolour field.
+    "  vec3 fgBlur = (texture2D(sampler_blur1, uv).rgb + texture2D(sampler_blur2, uv).rgb) * 0.5;\n" +
+    "  float stain = smoothstep(0.03, 0.35, dot(fgBlur, vec3(0.333)));\n" +
+    "  ground = mix(ground, ground * 0.45 + fgBlur * 1.7, stain * 0.7);\n" +
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
@@ -707,6 +714,9 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
+    hueStep = 0,
+    hueStepTarget = 0,
+    lastSnap = -10,
     waveAmt = 0,
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
@@ -730,8 +740,15 @@
 
     // shared HUE clock (fg + bg) — clock-driven base + STRONGER music coupling so colour migration is
     // FELT within a loud passage (was a ~30-60s drift, invisible in a short span) + a per-beat nudge.
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.08);
-    t.q8 = huePhase + 0.08 * f + 0.03 * (bassA - 1);
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.04);
+    // BEAT-GATED PALETTE SNAP (Gemini) — on a big beat (with cooldown) jump the hue toward a CONTRASTING
+    // target and lerp over ~0.3s → "new paint thrown" dramatic colour change, not a slow predictable drift.
+    if (f > 0.6 && time - lastSnap > 1.4) {
+      hueStepTarget += 0.34 + 0.2 * Math.random();
+      lastSnap = time;
+    }
+    hueStep += (hueStepTarget - hueStep) * Math.min(1, dt * 3.5); // smooth lerp to the new palette (~0.3s)
+    t.q8 = huePhase + hueStep + 0.04 * f;
 
     // LOOK — camera + exposure + fold eased between two looks on a slow clock
     var lk = lookPick(time, dt, f > 0.6),
