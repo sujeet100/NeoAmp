@@ -356,10 +356,14 @@
 }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* button cluster: ONE tidy row, function groups separated by clear gaps; WITHIN a group the
-   keys sit tight (1px) so their bevels divide them like a row of hardware toggles —
-   [♥ 👎]  [🔊]  ❲VIS LIB LYR❳  [⚙]. */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 10px; }
+/* TWO-ROW control deck — stacks the keys so the title/album gets the horizontal room.
+   Row A: [♥ 👎 🔊] track/audio actions.  Row B: ❲VIS|LIB|LYR❳ + ⚙ system/views.
+   Both rows right-aligned; a 1px groove (dark line + light line) joins them like two
+   snapped-together hardware modules. */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
+.wa-np-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.wa-np-row-a { padding-bottom: 4px; }
+.wa-np-row-b { padding-top: 4px; gap: 8px; border-top: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 0 rgba(255,255,255,0.09); }
 .wa-np-rate { display: flex; flex-direction: row; gap: 2px; }       /* like + dislike, tight pair */
 /* window-toggle RACK: the three view toggles read as one cohesive expansion module — a
    recessed tray holding flush keys (1px gaps), Winamp-stereo style. */
@@ -369,9 +373,6 @@
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.12);
 }
 .wa-np-toggles .wa-np-tog { border-radius: 1px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3); }
-/* utilities cluster (mute + gear): quiet, set apart at the far right by a hairline divider */
-.wa-np-utils { display: flex; align-items: center; gap: 5px; padding-left: 11px; margin-left: 1px;
-  border-left: 1px solid rgba(255,255,255,0.10); }
 /* VIS/LIB/LYR/mute/like/gear: small metal keys THEMED from the skin's palette. We tried
    sampling the skin's real CBUTTONS sprite, but round-knob skins (Nucleo) sample their dark
    corners → grey, reintroducing the dullness. So the key metal is derived from the skin's
@@ -440,11 +441,12 @@
     inset 1px 1px 0 color-mix(in srgb, var(--led) 45%, #fff),
     0 0 0 1px color-mix(in srgb, var(--led) 45%, #000);
 }
-/* ⚙ gear key: SHRUNK + recessed — settings are secondary, so it's smaller than the other
-   keys and tucked in the far-right utilities cluster (not competing with the controls). */
-.wa-gear-btn { padding: 0 5px; height: 15px; align-self: center; opacity: 0.92; }
+/* ⚙ gear key: secondary settings — sits at the far right of row B, same KEY HEIGHT as the
+   rest of the row (so it aligns, not the off-looking shrunk version) but with a smaller,
+   slightly dimmed glyph so it reads as secondary. */
+.wa-gear-btn { padding: 0 6px; opacity: 0.9; }
 .wa-gear-btn::before { display: none; }
-.wa-gear-btn svg { width: 12px; height: 12px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+.wa-gear-btn svg { width: 13px; height: 13px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
 /* 🔊 mute key: icon only (no LED). One SVG; CSS swaps the sound-wave for an ✕ on .on,
    and recolours the whole glyph red while muted (a clear "silenced" warning). */
 .wa-np-mute { padding: 0 6px; }

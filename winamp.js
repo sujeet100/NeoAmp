@@ -1132,9 +1132,12 @@
     ]);
     var gear = buildGearMenu();
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
-    // function clusters: [♥ 👎 rate] · [VIS|LIB|LYR rack] · [🔊 mute + ⚙ gear utilities]
-    var utils = h("div", { class: "wa-np-utils" }, [els.mute, gear]);
-    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, utils]);
+    // TWO-ROW control deck (frees horizontal room for the title): row A = track/audio
+    // quick-actions [♥ 👎 🔊]; row B = system/view toggles ❲VIS|LIB|LYR❳ + ⚙. A 1px groove
+    // separates them like two snapped-together hardware modules.
+    var rowA = h("div", { class: "wa-np-row wa-np-row-a" }, [rate, els.mute]);
+    var rowB = h("div", { class: "wa-np-row wa-np-row-b" }, [toggles, gear]);
+    var btns = h("div", { class: "wa-np-btns" }, [rowA, rowB]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
     // async after the .wsz parses. Showing it before that flashes the dark, unframed
