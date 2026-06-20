@@ -330,47 +330,83 @@
 }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* button cluster: TWO columns side by side — like/dislike (stacked) on the left,
-   and VIS+LIB (a row) over the skin picker on the right */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 8px; }
-.wa-np-rate { display: flex; flex-direction: column; gap: 5px; }   /* like over dislike */
-.wa-np-col2 { display: flex; flex-direction: column; gap: 5px; }
-.wa-np-toggles { display: flex; gap: 5px; }
-/* VIS/LIB + like/dislike: small CHROME keys like the EQ/PL buttons — a brushed
-   silver face, a pixelated label, and a square LED. Sized tight like the EQ key
-   (no stretching). (Per-skin bitmap buttons are a follow-up — see notes.) */
+/* button cluster: ONE tidy row, three groups with clear spacing —
+   [like dislike] · [VIS LIB] · [⚙ gear]. (Appearance controls moved into the gear.) */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 13px; }
+.wa-np-rate { display: flex; flex-direction: row; gap: 6px; }       /* like + dislike inline */
+.wa-np-toggles { display: flex; gap: 6px; }
+/* VIS/LIB/BG/zoom + like/dislike: small metal keys that match the skin's REAL
+   transport buttons. --wa-btn-face is sampled (in JS) from the skin's CBUTTONS
+   play/pause sprite, so the keys take on that exact metal — they read as part of
+   the same button set. Fallback: the panel bg (--pl-normalbg) nudged lighter, so
+   it's still light-on-light / dark-on-dark on skins we can't sample. The LABEL is
+   the skin's playlist text (--pl-normal), the LED its highlight (--pl-current).
+   Bevels/shadows use translucent white/black so they read on either polarity. */
 .wa-np-tog {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  height: 18px; padding: 0 6px; cursor: pointer;
-  font: 13px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
-  /* dark pixel label, faux-bolded (VT323 has no bold weight); smaller so the
-     label clears the button top/bottom */
-  color: #15171c; text-shadow: 0.6px 0 0 currentColor;
-  background: linear-gradient(180deg, #f6f6fa 0%, #d2d2da 46%, #aeaeb8 54%, #cccdd4 100%);
-  border: 1px solid; border-color: #ffffff #72727c #5c5c66 #ececf2;
+  /* base = the skin's sampled transport-button metal (fallback: panel bg lightened).
+     key-face is nudged lighter + given a strong top gloss so the keys sit at the SAME
+     brightness/sheen as the skin's play/pause buttons (they read recessed otherwise). */
+  --wa-key-base: var(--wa-btn-face, color-mix(in srgb, var(--pl-normalbg, #2b2b34) 60%, #ffffff 40%));
+  --wa-key-face: color-mix(in srgb, var(--wa-key-base) 84%, #ffffff 16%);
+  --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 90%, #000000 10%);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 19px; padding: 0 8px; cursor: pointer;
+  font: 700 12px/1 var(--wa-font); letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--pl-normal, #cdd2e6);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--wa-key-face) 70%, #fff 30%) 0%,
+    var(--wa-key-face) 44%,
+    var(--wa-key-lo) 100%);
+  border: 1px solid;
+  border-color: rgba(255,255,255,0.62) rgba(0,0,0,0.46) rgba(0,0,0,0.56) rgba(255,255,255,0.44);
   border-radius: 2px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.45);
 }
-.wa-np-tog:hover { filter: brightness(1.04); }
-.wa-np-tog.on, .wa-np-tog:active {   /* pressed-in chrome (incl. like/dislike when active) */
-  border-color: #5c5c66 #ececf2 #ffffff #72727c;
-  background: linear-gradient(180deg, #b6b6c0, #d6d6de);
+.wa-np-tog:hover { filter: brightness(1.08); }
+/* PUSH button (like the skin's EQ/PL): the face only dips while held, then snaps
+   back — the LED alone carries the on/off state, so .on does NOT keep it pressed. */
+.wa-np-tog:active {
+  background: linear-gradient(180deg, var(--wa-key-lo), var(--wa-key-face));
+  border-color: rgba(0,0,0,0.5) rgba(255,255,255,0.32) rgba(255,255,255,0.45) rgba(0,0,0,0.42);
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-/* square LED, a bit bigger: dark when off, neon-green when on (window open) */
+/* LED = a real recessed lamp set into the metal. Off: a dark domed well sunk in with
+   a bezel. On: lit glass — a saturated dome + a small specular highlight + outer glow.
+   Colour is the skin's OWN indicator LED (--wa-led-on, sampled from its shuffle light),
+   falling back to the text-highlight then the green accent. */
 .wa-np-tog::before {
-  content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 0;
-  background: #1d2a20; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);
+  content: ""; width: 9px; height: 9px; flex: 0 0 auto; border-radius: 2px;
+  background: radial-gradient(circle at 50% 38%, #2b2e35, #0b0d0f);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.14);
 }
-.wa-np-tog.on::before { background: var(--wa-accent, #16e651); box-shadow: 0 0 5px var(--wa-accent-glow), inset 0 0 0 1px rgba(0,0,0,0.25); }
+.wa-np-tog.on::before {
+  --led: var(--wa-led-on, var(--pl-current, var(--wa-accent, #16e651)));
+  background:
+    radial-gradient(circle at 36% 30%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 42%),
+    radial-gradient(circle at 50% 62%, var(--led) 0%, color-mix(in srgb, var(--led) 52%, #000) 100%);
+  box-shadow: 0 0 5px var(--led), inset 0 0 0 1px rgba(0,0,0,0.32);
+}
+/* ⚙ gear key: icon only (no LED, no text label), square-ish, themed like the keys */
+.wa-gear-btn { padding: 0 6px; }
+.wa-gear-btn::before { display: none; }
+.wa-gear-btn svg { width: 15px; height: 15px; display: block; fill: var(--pl-normal, #cdd2e6); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
 /* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
    behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
-.wa-np-rate { display: flex; gap: 5px; }
 .wa-rate-btn { padding: 0 7px; }
 .wa-rate-btn::before { display: none; }
-.wa-rate-btn svg { width: 14px; height: 14px; display: block; fill: #34343a; }   /* LED off: dark */
-.wa-rate-btn.wa-like.on svg { fill: #3aff72; filter: drop-shadow(0 0 3px #3aff72) drop-shadow(0 0 7px rgba(60,255,120,0.6)); }       /* neon green ON (distinct from the pink dislike) */
-.wa-rate-btn.wa-dislike.on svg { fill: #ff3b8d; filter: drop-shadow(0 0 3px #ff3b8d) drop-shadow(0 0 7px rgba(255,60,140,0.6)); }   /* neon pink ON */
+/* the icon IS the lamp. Off = dim, unlit, seated with a 1px dark drop. On = lit
+   glass via a tight 3-stage glow (hot near-white core → saturated colour → soft
+   halo) instead of one fat blurry blob. Like = red (love), dislike = blue — both
+   clear of the green VIS/LIB/BG LEDs sitting right beside them. */
+.wa-rate-btn svg { width: 13px; height: 13px; display: block; fill: #3a3a44; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.55)); }
+.wa-rate-btn.wa-like.on svg {
+  fill: #ff415f;
+  filter: drop-shadow(0 0 0.5px rgba(255,224,232,0.95)) drop-shadow(0 0 2px #ff415f) drop-shadow(0 0 5px rgba(255,65,95,0.5));
+}
+.wa-rate-btn.wa-dislike.on svg {
+  fill: #4da6ff;
+  filter: drop-shadow(0 0 0.5px rgba(224,240,255,0.95)) drop-shadow(0 0 2px #4da6ff) drop-shadow(0 0 5px rgba(77,166,255,0.5));
+}
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
 .wa-np-btns .wa-skinsel-btn { height: 19px; padding: 0 11px; font-size: 12px; }
@@ -420,9 +456,15 @@
 .wa-genskin .wa-tbtn, .wa-plskin .wa-tbtn {
   position: relative; z-index: 3;
   width: 18px; height: 18px; padding: 0; font-size: 13px; line-height: 1;
-  display: grid; place-items: center; color: #fce9a0;
-  background: linear-gradient(180deg, rgba(74,55,16,0.92), rgba(34,24,6,0.94));
-  border: 1px solid; border-color: rgba(255,236,160,0.55) rgba(0,0,0,0.6) rgba(0,0,0,0.6) rgba(255,236,160,0.55);
+  display: grid; place-items: center;
+  /* themed to the skin's sampled transport-button metal (like the NP keys) instead
+     of a fixed gold, so the viz fullscreen toggle matches cool skins too. */
+  color: var(--pl-normal, #fce9a0);
+  --wa-key-base: var(--wa-btn-face, color-mix(in srgb, var(--pl-normalbg, #2b2b34) 60%, #fff 40%));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--wa-key-base) 70%, #fff 30%),
+    color-mix(in srgb, var(--wa-key-base) 88%, #000 12%));
+  border: 1px solid; border-color: rgba(255,255,255,0.58) rgba(0,0,0,0.5) rgba(0,0,0,0.5) rgba(255,255,255,0.42);
   border-radius: 2px;
 }
 .wa-genskin .wa-tbtn:hover, .wa-plskin .wa-tbtn:hover { filter: brightness(1.15); }
@@ -619,7 +661,9 @@
 .wa-pl-btn:active { border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark); }
 .wa-pl-count { margin-left: auto; font: 700 9px/1 var(--wa-font); color: var(--wa-fg-dim); }
 .wa-pl-time {
-  font-size: 14px; padding: 3px 6px; color: var(--wa-lcd);
+  /* skin's playlist text colour (matches the rows + keeps Classic's green LCD),
+     not the hardcoded LCD green that ignored the theme */
+  font-size: 14px; padding: 3px 6px; color: var(--pl-normal, var(--wa-lcd));
   border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85);
 }
 
@@ -704,6 +748,45 @@
 /* gold selection highlight (was a harsh bright-green accent) */
 .wa-skinsel-item:hover { background: linear-gradient(180deg, #efd185, #c79a3e); color: #241803; text-shadow: 0 1px 0 rgba(255,250,225,0.5); }
 .wa-skinsel-item.load { border-top: 1px solid #4a3810; color: #c9a44a; }
+
+/* ===== ⚙ gear menu: a neutral dark dropdown (NOT gold) so it doesn't fight cool
+   skins; the active skin is marked with the skin's own accent (--pl-current). It
+   carries the Background + Zoom rows above the skin list. ================= */
+.wa-gear-menu {
+  right: 0; min-width: 178px; padding: 4px 0;
+  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(180deg, #25262e, #191a20);
+  border: 1px solid; border-color: #4a4c58 #0c0d11 #0c0d11 #4a4c58;
+  box-shadow: 2px 4px 10px rgba(0,0,0,0.7);
+}
+.wa-gear-menu .wa-skinsel-item { color: #d6dae6; padding: 6px 12px; }
+.wa-gear-menu .wa-skinsel-item + .wa-skinsel-item { border-top: 1px solid rgba(255,255,255,0.05); }
+.wa-gear-menu .wa-skinsel-item:hover { background: rgba(255,255,255,0.10); color: #fff; text-shadow: none; }
+.wa-gear-menu .wa-skinsel-item.active { color: var(--pl-current, #16e651); }
+.wa-gear-menu .wa-skinsel-item.active::after { content: " ✓"; opacity: 0.9; }
+.wa-gear-menu .wa-skinsel-item.load { border-top: 1px solid rgba(255,255,255,0.12); color: #9fb0c8; }
+/* section header above the skin list */
+.wa-gear-head {
+  padding: 7px 12px 3px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,0.1);
+  font: 700 10px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #8b90a2;
+}
+/* Background + Zoom control rows */
+.wa-gear-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 6px 12px; color: #d6dae6; }
+.wa-gear-click { cursor: pointer; }
+.wa-gear-click:hover { background: rgba(255,255,255,0.08); }
+.wa-gear-k { color: #aeb3c2; letter-spacing: 0.3px; }
+.wa-gear-val { color: var(--pl-current, #cdd2e6); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+.wa-gear-zoom { display: inline-flex; align-items: center; gap: 8px; }
+.wa-gear-zval { min-width: 38px; text-align: center; color: #e7eaf2; }
+.wa-gear-step {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; cursor: pointer;
+  color: #e7eaf2; font-weight: 700; border-radius: 2px;
+  background: linear-gradient(180deg, #44464f, #2c2e36);
+  border: 1px solid; border-color: rgba(255,255,255,0.28) rgba(0,0,0,0.5) rgba(0,0,0,0.5) rgba(255,255,255,0.2);
+}
+.wa-gear-step:hover { filter: brightness(1.15); }
+.wa-gear-step:active { filter: brightness(0.85); box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5); }
 
 /* =======================================================================
    LAUNCHER

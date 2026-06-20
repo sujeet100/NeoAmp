@@ -38,6 +38,15 @@
   })();
 
   var SNAP = 9;                 // px magnetic-docking threshold
+  // Global UI zoom. The whole player is fixed-size (the .wsz skin renders at a
+  // hardcoded 2x and the CSS is in fixed px), so on a short viewport the docked
+  // stack overflows. uiScale CSS-transforms #neoamp-root (origin 0,0) to shrink
+  // everything to fit. Because layout math (offsetLeft/innerWidth) lives in the
+  // UNSCALED coordinate space, pointer deltas and the viewport bounds are divided
+  // by uiScale (see vpW/vpH + the drag/resize handlers) so dragging stays exact.
+  var uiScale = 1;
+  function vpW() { return window.innerWidth / uiScale; }   // viewport width in layout (pre-transform) px
+  function vpH() { return window.innerHeight / uiScale; }
   var root = null, launcher = null;
   var wins = {};                // id -> { el, body, titlebar }
   var vizFrame = null, vizBuilt = false;
@@ -174,7 +183,9 @@
       if (!dragShield) dragShield = h("div", { id: "neoamp-shield" });
       dragShield.style.cssText =
         "position:fixed;inset:0;z-index:2147483640;pointer-events:auto;cursor:" + (cursor || "default") + ";";
-      root.appendChild(dragShield);
+      // on documentElement (NOT root) so it covers the TRUE viewport — root may be
+      // CSS-scaled by uiScale, which would shrink a root-child shield off-coverage.
+      document.documentElement.appendChild(dragShield);
     } else if (dragShield && dragShield.parentNode) {
       dragShield.parentNode.removeChild(dragShield);
     }
@@ -231,7 +242,9 @@
     });
     window.addEventListener("mousemove", function (e) {
       if (!dragging) return;
-      var pos = snap(el, e.clientX - ox, e.clientY - oy, cluster);
+      // ox/oy are visual (post-transform) offsets; /uiScale maps the cursor back to
+      // the window's unscaled layout coordinate so the grab point tracks exactly.
+      var pos = snap(el, (e.clientX - ox) / uiScale, (e.clientY - oy) / uiScale, cluster);
       var dx = pos.x - sl0, dy = pos.y - st0;   // apply the same delta to every member
       cluster.forEach(function (m) { m.el.style.left = (m.sl + dx) + "px"; m.el.style.top = (m.st + dy) + "px"; });
     });
@@ -254,7 +267,7 @@
     var excl = {};
     (cluster || []).forEach(function (m) { excl[m.el.id] = 1; });
     var w = el.offsetWidth, hgt = el.offsetHeight;
-    var vw = window.innerWidth, vh = window.innerHeight;
+    var vw = vpW(), vh = vpH();   // viewport in layout px (zoom-aware)
     var L = x, T = y, R = x + w, B = y + hgt;
     var cand = [{ l: 0, t: 0, r: vw, b: vh }]; // viewport
     Object.keys(wins).forEach(function (k) {
@@ -294,10 +307,11 @@
       if (!sizing) return;
       // cap so the bottom-right resize handle can't be pushed off-screen (it'd be
       // unreachable to drag back smaller). Keep a 2px margin inside the viewport.
-      var maxW = Math.max(minW, window.innerWidth - el.offsetLeft - 2);
-      var maxH = Math.max(minH, window.innerHeight - el.offsetTop - 2);
-      if (!lockWidth) el.style.width = Math.min(maxW, Math.max(minW, sw + (e.clientX - sx))) + "px";
-      el.style.height = Math.min(maxH, Math.max(minH, sh + (e.clientY - sy))) + "px";
+      var maxW = Math.max(minW, vpW() - el.offsetLeft - 2);
+      var maxH = Math.max(minH, vpH() - el.offsetTop - 2);
+      // pointer deltas are visual px; /uiScale converts to unscaled layout px
+      if (!lockWidth) el.style.width = Math.min(maxW, Math.max(minW, sw + (e.clientX - sx) / uiScale)) + "px";
+      el.style.height = Math.min(maxH, Math.max(minH, sh + (e.clientY - sy) / uiScale)) + "px";
     });
     var stop = function () { if (!sizing) return; sizing = false; shield(false); saveLayout(); };
     window.addEventListener("mouseup", stop);
@@ -309,7 +323,7 @@
   // browser shrinks, or an oversized viz) has its resize handle out of reach.
   function clampWindowsIntoView() {
     if (!root) return;
-    var vw = window.innerWidth, vh = window.innerHeight;
+    var vw = vpW(), vh = vpH();   // layout-space viewport (zoom-aware)
     Object.keys(wins).forEach(function (k) {
       var e = wins[k] && wins[k].el;
       if (!e || e.style.display === "none") return;
@@ -323,6 +337,29 @@
   }
   var clampTimer = 0;
   window.addEventListener("resize", function () { clearTimeout(clampTimer); clampTimer = setTimeout(function () { clampWindowsIntoView(); saveLayout(); }, 150); });
+
+  // ---- global zoom (fit the fixed-size player onto short viewports) ---------
+  // transform-origin 0 0 keeps windows anchored near the top-left so they don't
+  // drift off-screen as they shrink. clamp afterwards in case shrinking freed room.
+  function applyUiScale() {
+    if (!root) return;
+    root.style.transformOrigin = "0 0";
+    root.style.transform = uiScale === 1 ? "" : "scale(" + uiScale + ")";
+    clampWindowsIntoView();
+  }
+  function setUiScale(s) {
+    s = Math.max(0.5, Math.min(1, Math.round(s * 20) / 20));   // 50%..100% in 5% steps
+    if (s !== uiScale) {
+      uiScale = s;
+      applyUiScale();
+      NA.storage.set({ neoampZoom: uiScale });
+    }
+    syncZoomBtn();   // refresh the gear readout (after uiScale is updated)
+    NA.toast("NeoAmp zoom: " + Math.round(uiScale * 100) + "%   ( - / = / \\ )");
+  }
+  function syncZoomBtn() {
+    if (els.gearZoom) els.gearZoom();   // refresh the gear menu's Zoom readout
+  }
 
   // ---- layout persistence --------------------------------------------------
   function saveLayout() {
@@ -417,6 +454,69 @@
     setSkinSelectors(value);
   }
   function setSkinSelectors(value) { skinSelectors.forEach(function (w) { w.value = value; }); }
+
+  // The ⚙ gear: a themed key (matches the other NP keys) that opens one popup with
+  // the set-once appearance controls — Background, Zoom, and the Skin list. Registered
+  // in skinSelectors so the active-skin highlight + populate() stay in sync with the
+  // rest of the app. Reuses the .wa-skinsel-menu open/close plumbing.
+  var GEAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.6 7.6 0 0 0 0-1.88l2-1.56-1.92-3.32-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54h-3.84l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96L2.27 9.5l2 1.56a7.6 7.6 0 0 0 0 1.88l-2 1.56 1.92 3.32 2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54h3.84l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96 1.92-3.32-2-1.56ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>';
+  function buildGearMenu() {
+    var btn = h("div", { class: "wa-np-tog wa-gear-btn", title: "Appearance — background, zoom, skin", html: GEAR_SVG });
+    var menu = h("div", { class: "wa-skinsel-menu wa-gear-menu" });
+    var wrap = h("div", { class: "wa-skinsel wa-gear" }, [btn, menu]);
+    var current = "";
+
+    // Background row: click cycles dark → black → off, shows the current mode
+    var bgVal = h("span", { class: "wa-gear-val" });
+    var bgRow = h("div", { class: "wa-gear-row wa-gear-click", title: "Page backdrop behind NeoAmp" }, [h("span", { class: "wa-gear-k", text: "Background" }), bgVal]);
+    bgRow.addEventListener("click", function (e) { e.stopPropagation(); cycleBackdrop(); });
+    var updateBg = function () { bgVal.textContent = bgMode.toUpperCase(); };
+    els.gearBg = updateBg;
+
+    // Zoom row: − / readout / + (companion to the - = \ keys)
+    var zMinus = h("span", { class: "wa-gear-step", title: "Zoom out ( - )", text: "−" });
+    var zPlus = h("span", { class: "wa-gear-step", title: "Zoom in ( = )", text: "+" });
+    var zVal = h("span", { class: "wa-gear-val wa-gear-zval" });
+    zMinus.addEventListener("click", function (e) { e.stopPropagation(); setUiScale(uiScale - 0.05); });
+    zPlus.addEventListener("click", function (e) { e.stopPropagation(); setUiScale(uiScale + 0.05); });
+    var zoomCtl = h("span", { class: "wa-gear-zoom" }, [zMinus, zVal, zPlus]);
+    var zRow = h("div", { class: "wa-gear-row" }, [h("span", { class: "wa-gear-k", text: "Zoom" }), zoomCtl]);
+    var updateZoom = function () { zVal.textContent = Math.round(uiScale * 100) + "%"; };
+    els.gearZoom = updateZoom;
+
+    function markActive() {
+      [].forEach.call(menu.querySelectorAll(".wa-skinsel-item"), function (it) {
+        it.classList.toggle("active", it.dataset && it.dataset.val === current);
+      });
+    }
+    Object.defineProperty(wrap, "value", { get: function () { return current; }, set: function (v) { current = v; markActive(); } });
+    wrap.populate = function () {
+      menu.innerHTML = "";
+      menu.appendChild(bgRow); updateBg();
+      menu.appendChild(zRow); updateZoom();
+      menu.appendChild(h("div", { class: "wa-gear-head", text: "Skin" }));
+      CLASSIC_SKINS.forEach(function (s) {
+        var it = h("div", { class: "wa-skinsel-item", text: s.name + (s.custom ? " ★" : "") });
+        it.dataset.val = "wsz:" + s.id;
+        it.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("wsz:" + s.id); });
+        menu.appendChild(it);
+      });
+      var load = h("div", { class: "wa-skinsel-item load", text: "＋ Load skin…" });
+      load.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.remove("open"); selectSkin("__load__"); });
+      menu.appendChild(load);
+      markActive();
+    };
+    btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a window drag
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var willOpen = !menu.classList.contains("open");
+      skinSelectors.forEach(function (w) { var m = w.querySelector(".wa-skinsel-menu"); if (m) m.classList.remove("open"); });
+      if (willOpen) { updateBg(); updateZoom(); menu.classList.add("open"); }
+    });
+    wrap.populate();
+    skinSelectors.push(wrap);
+    return wrap;
+  }
 
   // ---- user-loaded .wsz skins (drag-drop / file picker), persisted -----------
   function bufToB64(buf) {
@@ -680,6 +780,15 @@
         GEN_WINDOWS.forEach(function (id) { if (wins[id]) wins[id].el.classList.add("wa-plskin"); });
       }
     }
+    // sample the skin's transport-button metal so the DOM keys (VIS/LIB/BG/zoom)
+    // match the skin's REAL buttons (play/pause/…) rather than the playlist bg.
+    var face = window.NeoAmpClassic.buttonFaceColor(skin);
+    if (face) root.style.setProperty("--wa-btn-face", face);
+    else root.style.removeProperty("--wa-btn-face");
+    // match the skin's own indicator-LED colour (Sony red, etc.) for our VIS/LIB LEDs
+    var led = window.NeoAmpClassic.ledColor(skin);
+    if (led) root.style.setProperty("--wa-led-on", led);
+    else root.style.removeProperty("--wa-led-on");
     var p = window.NeoAmpClassic.parsePledit(skin);
     if (p) {
       if (p.normal) root.style.setProperty("--pl-normal", p.normal);
@@ -699,6 +808,8 @@
     ["tl", "gold", "tr", "lend", "cfill", "rend", "ml", "mr", "bl", "br", "bfill", "close"].forEach(function (k) { s.removeProperty("--gen-" + k); });
     ["tl", "tfill", "title", "tr", "left", "right", "bl", "br", "bfill", "close"].forEach(function (k) { s.removeProperty("--plf-" + k); });
     ["normal", "current", "normalbg", "selectedbg"].forEach(function (k) { s.removeProperty("--pl-" + k); });
+    s.removeProperty("--wa-btn-face");
+    s.removeProperty("--wa-led-on");
     s.removeProperty("--wa-stack-w");
     if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "";
     if (wins["wa-pl"]) wins["wa-pl"].el.style.width = "";
@@ -792,18 +903,17 @@
       bd.style.background = bgMode === "black" ? "rgba(0,0,0,0.92)" : bgMode === "dark" ? "rgba(0,0,0,0.55)" : "transparent";
       bd.style.display = bgMode === "off" ? "none" : "";
     }
-    if (els.npBG) {
-      els.npBG.classList.toggle("on", bgMode !== "off");
-      els.npBG.title = "Backdrop behind NeoAmp — click to cycle dark → black → off (now: " + bgMode + ")";
-    }
+    if (els.gearBg) els.gearBg();   // refresh the gear menu's Background readout
   }
   function ensureBackdrop() {
     if (!root || document.getElementById("neoamp-backdrop")) return;
     var bd = h("div", { id: "neoamp-backdrop" });
-    // full-viewport scrim INSIDE root's stacking context, below the windows (z 20+);
+    // full-viewport scrim on documentElement (NOT root) so it covers the TRUE
+    // viewport even when root is CSS-scaled by uiScale. z sits just under root
+    // (root is 2147483600) so it's above the YTM page but below every window.
     // pointer-events:none so it never blocks clicks to YTM or the player.
-    bd.style.cssText = "position:fixed; inset:0; z-index:1; pointer-events:none; transition:background .2s ease;";
-    root.insertBefore(bd, root.firstChild);
+    bd.style.cssText = "position:fixed; inset:0; z-index:2147483599; pointer-events:none; transition:background .2s ease;";
+    document.documentElement.appendChild(bd);
     applyBackdrop();
   }
   function cycleBackdrop() {
@@ -850,23 +960,23 @@
       rateBtn(HEART_SVG, "Like this track", "like"),
       rateBtn(THUMBDOWN_SVG, "Dislike this track", "dislike"),
     ]);
-    var npSkinSel = buildSkinSelect();
-    npSkinSel.value = "wsz:" + (CLASSIC_SKINS[0] && CLASSIC_SKINS[0].id);
-    // BG: cycle the page-darkening backdrop (dark / black / off)
-    var bgBtn = h("div", { class: "wa-np-tog", text: "BG" });
-    bgBtn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
-    bgBtn.addEventListener("click", function (e) { e.stopPropagation(); cycleBackdrop(); });
-    els.npBG = bgBtn;
+    // Decluttered: the strip keeps only the often-used controls (like/dislike + the
+    // VIS/LIB window toggles). The set-once appearance controls — Background, Zoom and
+    // Skin — moved behind the ⚙ gear menu so the now-playing bar reads cleanly.
     var toggles = h("div", { class: "wa-np-toggles" }, [
       npBtn("VIS", "Show/hide the visualization window", "wa-viz"),
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
-      bgBtn,
     ]);
-    applyBackdrop(); // sync the BG button to the current/persisted mode
-    // two columns: like/dislike on the left, VIS+LIB row over the skin picker on the right
-    var col2 = h("div", { class: "wa-np-col2" }, [toggles, npSkinSel]);
-    var btns = h("div", { class: "wa-np-btns" }, [rate, col2]);
+    var gear = buildGearMenu();
+    applyBackdrop(); // sync the gear's Background row to the current/persisted mode
+    // one tidy row, three groups: [like dislike] · [VIS LIB] · [⚙]
+    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, gear]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
+    // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
+    // async after the .wsz parses. Showing it before that flashes the dark, unframed
+    // fallback background (the "shaded on first load" look). enableClassic() reveals it
+    // only after applyFrame() runs.
+    el.style.display = "none";
     img.addEventListener("error", function () { el.classList.add("empty"); img.removeAttribute("src"); });
     el.addEventListener("mousedown", function () { raise(el); }, true);
     makeDraggable(el, el);
@@ -1448,6 +1558,7 @@
       if (w && w.el.style.display !== "none") refreshQueue();
     }, 1500);
     NA.storage.get("neoampLayout", function (l) { layout = l || {}; applyLayout(); syncToggles(); });
+    NA.storage.get("neoampZoom", function (z) { z = parseFloat(z); if (z && z >= 0.5 && z < 1) { uiScale = z; applyUiScale(); } });
     setupSkinDrop();
     // load user-saved skins first so a persisted custom skin id resolves
     loadPersistedSkins(function () {
@@ -1484,11 +1595,14 @@
   function showUI() {
     buildUI();
     root.style.display = "";
+    // backdrop lives on documentElement (zoom-immune), so toggle it with the player
+    var bd = document.getElementById("neoamp-backdrop"); if (bd) bd.style.visibility = "";
     if (launcher) launcher.style.display = "none";
     var cur = NA.getTrack(); if (cur) onTrack(cur);
   }
   function hideUI() {
     if (root) root.style.display = "none";
+    var bd = document.getElementById("neoamp-backdrop"); if (bd) bd.style.visibility = "hidden";
     if (launcher) launcher.style.display = "";
   }
 
@@ -1532,6 +1646,9 @@
       case "ArrowUp": c.nudgeVolume(0.05); break;
       case "ArrowDown": c.nudgeVolume(-0.05); break;
       case "l": case "L": focusLibrary(); break;
+      case "-": case "_": setUiScale(uiScale - 0.05); break;   // zoom out (fit a short screen)
+      case "=": case "+": setUiScale(uiScale + 0.05); break;   // zoom in
+      case "\\": setUiScale(1); break;                          // reset to 100%
       default: handled = false;
     }
     if (handled) { e.preventDefault(); e.stopPropagation(); }

@@ -430,14 +430,18 @@
     }
 
     // ---- interaction: map canvas px -> skin px, hit-test rects ----
+    // Map cursor → skin px via the canvas's ACTUAL on-screen size (b.width / MAIN_W),
+    // not the fixed render `scale`. This stays correct under the global uiScale CSS
+    // transform (which shrinks the canvas) — otherwise zoomed clicks miss the buttons.
     function hit(e, r) {
       var b = canvas.getBoundingClientRect();
-      var x = (e.clientX - b.left) / scale, y = (e.clientY - b.top) / scale;
+      var es = b.width / MAIN_W;
+      var x = (e.clientX - b.left) / es, y = (e.clientY - b.top) / es;
       return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
     }
     function localX(e) {
       var b = canvas.getBoundingClientRect();
-      return (e.clientX - b.left) / scale;
+      return (e.clientX - b.left) / (b.width / MAIN_W);
     }
 
     // value 0..1 for a horizontal slider from the cursor x (thumbW reserved at
@@ -614,7 +618,8 @@
 
     function pos(e) {
       var b = canvas.getBoundingClientRect();
-      return { x: (e.clientX - b.left) / scale, y: (e.clientY - b.top) / scale };
+      var es = b.width / MAIN_W;   // actual on-screen scale (zoom-aware), not fixed render scale
+      return { x: (e.clientX - b.left) / es, y: (e.clientY - b.top) / es };
     }
     function bandAt(p) {
       if (p.y < EQ_LAYOUT.bandY - 2 || p.y > EQ_LAYOUT.bandY + EQ_LAYOUT.thumbRange + 13) return -1;
@@ -718,10 +723,65 @@
     };
   }
 
+  // Representative metal-face colour of the skin's transport buttons, sampled
+  // from the PLAY sprite in CBUTTONS so the player's own DOM keys (VIS/LIB/BG/zoom)
+  // can match the skin's real buttons. We average the button's 2px BORDER RING (the
+  // bevel/face metal) and skip the centre, so the glyph (the play arrow) doesn't
+  // skew the colour. Returns "rgb(r,g,b)" or null if unavailable/unreadable.
+  function buttonFaceColor(skin) {
+    var img = skin && skin.sheets && skin.sheets.CBUTTONS; if (!img) return null;
+    var bx = 23, by = 0, bw = 23, bh = 18;   // PLAY button rect in CBUTTONS
+    try {
+      var c = document.createElement("canvas"); c.width = bw; c.height = bh;
+      var x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+      x.drawImage(img, bx, by, bw, bh, 0, 0, bw, bh);
+      var d = x.getImageData(0, 0, bw, bh).data;
+      var rs = 0, gs = 0, bs = 0, n = 0;
+      var add = function (px, py) {
+        var i = (py * bw + px) * 4; if (d[i + 3] < 8) return;   // skip transparent
+        rs += d[i]; gs += d[i + 1]; bs += d[i + 2]; n++;
+      };
+      for (var px = 0; px < bw; px++) { add(px, 0); add(px, 1); add(px, bh - 2); add(px, bh - 1); }
+      for (var py = 2; py < bh - 2; py++) { add(0, py); add(1, py); add(bw - 2, py); add(bw - 1, py); }
+      if (!n) return null;
+      return "rgb(" + Math.round(rs / n) + "," + Math.round(gs / n) + "," + Math.round(bs / n) + ")";
+    } catch (e) { return null; }   // tainted/unreadable → caller falls back
+  }
+
+  // The skin's OWN indicator-LED colour, so our VIS/LIB LEDs match the skin's
+  // shuffle/repeat/EQ lights (e.g. Sony's are red, not the text-highlight blue we'd
+  // otherwise use). We DIFF the SHUFFLE off vs on (SEL) sprite: the only pixels that
+  // change between them ARE the lit LED, so their (change-weighted) average is the
+  // exact lamp colour — robust regardless of where/what colour it is. Null if the
+  // skin's on-state doesn't introduce a distinct colour (caller falls back).
+  function ledColor(skin) {
+    var sh = skin && skin.sheets && skin.sheets.SHUFREP; if (!sh) return null;
+    var off = [28, 0, 47, 15], on = [28, 30, 47, 15];   // SHUFFLE vs SHUFFLE_SEL
+    try {
+      var read = function (r) {
+        var c = document.createElement("canvas"); c.width = r[2]; c.height = r[3];
+        var x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+        x.drawImage(sh, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+        return x.getImageData(0, 0, r[2], r[3]).data;
+      };
+      var a = read(off), b = read(on), n = a.length / 4;
+      var rs = 0, gs = 0, bs = 0, w = 0;
+      for (var i = 0; i < n; i++) {
+        var o = i * 4; if (b[o + 3] < 8) continue;
+        var d = Math.abs(a[o] - b[o]) + Math.abs(a[o + 1] - b[o + 1]) + Math.abs(a[o + 2] - b[o + 2]);
+        if (d < 60) continue;                        // unchanged → button face, skip
+        rs += b[o] * d; gs += b[o + 1] * d; bs += b[o + 2] * d; w += d;   // weight by how much it changed
+      }
+      if (w < 200) return null;                      // no distinct lit colour
+      return "rgb(" + Math.round(rs / w) + "," + Math.round(gs / w) + "," + Math.round(bs / w) + ")";
+    } catch (e) { return null; }
+  }
+
   window.NeoAmpClassic = {
     loadSkin: loadSkin, loadSkinFromArrayBuffer: loadSkinFromArrayBuffer,
     mountMain: mountMain, mountEq: mountEq,
     genAssets: genAssets, pleditFrameAssets: pleditFrameAssets,
-    parsePledit: parsePledit, MAIN_W: MAIN_W, MAIN_H: MAIN_H,
+    parsePledit: parsePledit, buttonFaceColor: buttonFaceColor, ledColor: ledColor,
+    MAIN_W: MAIN_W, MAIN_H: MAIN_H,
   };
 })();
