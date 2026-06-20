@@ -461,23 +461,23 @@
 .wa-np-mute .wa-spk-x { display: none; }
 .wa-np-mute.on .wa-spk-wave { display: none; }
 .wa-np-mute.on .wa-spk-x { display: inline; }
-.wa-np-mute.on svg { fill: #ff5a5a; color: #ff5a5a; filter: drop-shadow(0 0 3px rgba(255,90,90,0.6)); }
+/* muted = flat red ✕, pixel-lit: hard 1px top-highlight + bottom-shadow, ZERO blur. */
+.wa-np-mute.on svg { fill: #ff5a5a; color: #ff5a5a; filter: drop-shadow(0 -1px 0 #ffb0b0) drop-shadow(0 1px 0 rgba(0,0,0,0.45)); }
 /* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
    behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
 .wa-rate-btn { padding: 0 7px; }
 .wa-rate-btn::before { display: none; }
-/* the icon IS the lamp. Off = dim, unlit, seated with a 1px dark drop. On = lit
-   glass via a tight 3-stage glow (hot near-white core → saturated colour → soft
-   halo) instead of one fat blurry blob. Like = red (love), dislike = blue — both
-   clear of the green VIS/LIB/BG LEDs sitting right beside them. */
+/* the icon IS the lamp. Off = dim, unlit, seated with a 1px dark drop. On = lit via a
+   FLAT saturated fill + a hard 1px top-highlight + bottom-shadow (pixel bevel) — ZERO
+   blur, matching the pixel LEDs (no modern bloom). Like = red, dislike = blue. */
 .wa-rate-btn svg { width: 13px; height: 13px; display: block; fill: color-mix(in srgb, var(--wa-key-fg, #3a3a44) 50%, transparent); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
 .wa-rate-btn.wa-like.on svg {
   fill: #ff415f;
-  filter: drop-shadow(0 0 0.5px rgba(255,224,232,0.95)) drop-shadow(0 0 2px #ff415f) drop-shadow(0 0 5px rgba(255,65,95,0.5));
+  filter: drop-shadow(0 -1px 0 #ffb0c0) drop-shadow(0 1px 0 rgba(0,0,0,0.5));
 }
 .wa-rate-btn.wa-dislike.on svg {
   fill: #4da6ff;
-  filter: drop-shadow(0 0 0.5px rgba(224,240,255,0.95)) drop-shadow(0 0 2px #4da6ff) drop-shadow(0 0 5px rgba(77,166,255,0.5));
+  filter: drop-shadow(0 -1px 0 #b9ddff) drop-shadow(0 1px 0 rgba(0,0,0,0.5));
 }
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
 .wa-np-btns .wa-skinsel { margin-top: 2px; }
