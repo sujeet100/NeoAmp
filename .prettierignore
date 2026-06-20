@@ -6,3 +6,7 @@ icons/
 *.min.js
 *.wsz
 package-lock.json
+
+# Hand-written prose docs — Prettier mangles intentional list/wrap formatting
+# (CLAUDE.md is load-bearing project memory). Format code, not docs.
+*.md

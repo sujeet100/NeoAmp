@@ -50,22 +50,27 @@ async function toggleCapture(tab) {
     if (capturing) {
       chrome.runtime.sendMessage({ target: "offscreen", type: "stop" }).catch(() => {});
       lifecycle(capturedTabId, "stopped");
-      capturing = false; capturedTabId = null;
+      capturing = false;
+      capturedTabId = null;
       console.log("[NeoAmp sw] capture stopped");
       return;
     }
-    if (tabId == null) { console.warn("[NeoAmp sw] no active tab"); return; }
+    if (tabId == null) {
+      console.warn("[NeoAmp sw] no active tab");
+      return;
+    }
     // grab the streamId FIRST, while the gesture activation is fresh (creating the
     // offscreen doc could otherwise burn the gesture window)
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
     await ensureOffscreen();
     chrome.runtime.sendMessage({ target: "offscreen", type: "start", streamId }).catch(() => {});
-    capturing = true; capturedTabId = tabId;
-    lifecycle(tabId, "started");   // content raises the player + EQ window
+    capturing = true;
+    capturedTabId = tabId;
+    lifecycle(tabId, "started"); // content raises the player + EQ window
     console.log("[NeoAmp sw] capture started for tab", tabId);
   } catch (e) {
     console.error("[NeoAmp sw] start failed", e);
-    notify(tabId, "NeoAmp couldn't start: " + (e && e.message || e));
+    notify(tabId, "NeoAmp couldn't start: " + ((e && e.message) || e));
   }
 }
 
@@ -73,7 +78,9 @@ async function toggleCapture(tab) {
 //   1. in-page ◢◤ button → content relays a message (target:sw, type:toggle-eq)
 //   2. toolbar action icon (if reachable in the browser UI)
 //   3. keyboard shortcut (Ctrl/Cmd+Shift+E) — onCommand passes the active tab (Chrome 105+)
-chrome.action.onClicked.addListener((tab) => { toggleCapture(tab); });
+chrome.action.onClicked.addListener((tab) => {
+  toggleCapture(tab);
+});
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "toggle-eq") toggleCapture(tab);
 });
@@ -85,7 +92,12 @@ chrome.commands.onCommand.addListener((command, tab) => {
 const YTM = ["https://music.youtube.com/*", "https://open.spotify.com/*"];
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: "neoamp-toggle-eq", title: "Open NeoAmp player", contexts: ["all"], documentUrlPatterns: YTM });
+    chrome.contextMenus.create({
+      id: "neoamp-toggle-eq",
+      title: "Open NeoAmp player",
+      contexts: ["all"],
+      documentUrlPatterns: YTM,
+    });
   });
 });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -114,11 +126,20 @@ async function fetchSelectors() {
       chrome.storage.local.set({ neoampSelectors: cfg });
       console.log("[NeoAmp sw] selector config v" + (cfg.version || "?") + " cached");
     }
-  } catch (e) { /* keep cached / bundled defaults */ }
+  } catch (e) {
+    /* keep cached / bundled defaults */
+  }
 }
-chrome.runtime.onInstalled.addListener(() => { fetchSelectors(); chrome.alarms.create("neoamp-selectors", { periodInMinutes: 360 }); });
-chrome.runtime.onStartup.addListener(() => { fetchSelectors(); });
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === "neoamp-selectors") fetchSelectors(); });
+chrome.runtime.onInstalled.addListener(() => {
+  fetchSelectors();
+  chrome.alarms.create("neoamp-selectors", { periodInMinutes: 360 });
+});
+chrome.runtime.onStartup.addListener(() => {
+  fetchSelectors();
+});
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === "neoamp-selectors") fetchSelectors();
+});
 
 // tell the content script capture has begun/ended so it raises/hides the player
 function lifecycle(tabId, state) {
@@ -130,33 +151,51 @@ function lifecycle(tabId, state) {
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.target !== "sw") return;
   if (msg.type === "toggle-eq") toggleCapture(sender.tab || null);
-  else if (msg.type === "stop-capture") { if (capturing) toggleCapture(null); }
-  else if (msg.type === "content-loaded") {
+  else if (msg.type === "stop-capture") {
+    if (capturing) toggleCapture(null);
+  } else if (msg.type === "content-loaded") {
     // the captured tab reloaded → its capture is dead; reset to idle so ONE click
     // restarts cleanly (otherwise the first click just stops the ghost session)
     if (capturing && sender.tab && sender.tab.id === capturedTabId) {
       chrome.runtime.sendMessage({ target: "offscreen", type: "stop" }).catch(() => {});
-      capturing = false; capturedTabId = null;
+      capturing = false;
+      capturedTabId = null;
       console.log("[NeoAmp sw] captured tab reloaded — reset to idle");
     }
-  }
-  else if (msg.type === "relay-eq") {
+  } else if (msg.type === "relay-eq") {
     // EQ window faders → offscreen graph (live)
-    chrome.runtime.sendMessage({ target: "offscreen", type: "setEq", bands: msg.eq.bands, preamp: msg.eq.preamp, balance: msg.eq.balance, enabled: msg.eq.enabled }).catch(() => {});
-  }
-  else if (msg.type === "relay-volume") {
+    chrome.runtime
+      .sendMessage({
+        target: "offscreen",
+        type: "setEq",
+        bands: msg.eq.bands,
+        preamp: msg.eq.preamp,
+        balance: msg.eq.balance,
+        enabled: msg.eq.enabled,
+      })
+      .catch(() => {});
+  } else if (msg.type === "relay-volume") {
     // volume slider → offscreen master gain (live)
-    chrome.runtime.sendMessage({ target: "offscreen", type: "setVolume", volume: msg.volume }).catch(() => {});
-  }
-  else if (msg.type === "fft") {
+    chrome.runtime
+      .sendMessage({ target: "offscreen", type: "setVolume", volume: msg.volume })
+      .catch(() => {});
+  } else if (msg.type === "fft") {
     // offscreen analyser → content script (drives the visualizer + spectrum)
-    if (capturedTabId != null) chrome.tabs.sendMessage(capturedTabId, { target: "content", type: "fft", b64: msg.b64 }).catch(() => {});
-  }
-  else if (msg.type === "audioInfo") {
+    if (capturedTabId != null)
+      chrome.tabs
+        .sendMessage(capturedTabId, { target: "content", type: "fft", b64: msg.b64 })
+        .catch(() => {});
+  } else if (msg.type === "audioInfo") {
     // offscreen → content: the captured AudioContext's real sample rate (kHz readout)
-    if (capturedTabId != null) chrome.tabs.sendMessage(capturedTabId, { target: "content", type: "audioInfo", sampleRate: msg.sampleRate }).catch(() => {});
-  }
-  else if (msg.type === "error") {
+    if (capturedTabId != null)
+      chrome.tabs
+        .sendMessage(capturedTabId, {
+          target: "content",
+          type: "audioInfo",
+          sampleRate: msg.sampleRate,
+        })
+        .catch(() => {});
+  } else if (msg.type === "error") {
     console.error("[NeoAmp offscreen]", msg.error);
     notify(capturedTabId, "NeoAmp error: " + msg.error);
   }

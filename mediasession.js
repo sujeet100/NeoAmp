@@ -21,23 +21,29 @@
   // Pick the largest artwork by declared pixel area (falls back to the first entry).
   function bestArt(artwork) {
     if (!artwork || !artwork.length) return "";
-    var best = artwork[0], bestArea = -1;
+    var best = artwork[0],
+      bestArea = -1;
     for (var i = 0; i < artwork.length; i++) {
-      var a = artwork[i], wh = String(a.sizes || "").split("x");
+      var a = artwork[i],
+        wh = String(a.sizes || "").split("x");
       var area = (parseInt(wh[0], 10) || 0) * (parseInt(wh[1], 10) || 0);
-      if (area >= bestArea) { bestArea = area; best = a; }
+      if (area >= bestArea) {
+        bestArea = area;
+        best = a;
+      }
     }
     return (best && best.src) || "";
   }
 
   function snapshot() {
-    var ms = navigator.mediaSession, m = ms && ms.metadata;
+    var ms = navigator.mediaSession,
+      m = ms && ms.metadata;
     return {
-      title: m ? (m.title || "") : "",
-      artist: m ? (m.artist || "") : "",
-      album: m ? (m.album || "") : "",
+      title: m ? m.title || "" : "",
+      artist: m ? m.artist || "" : "",
+      album: m ? m.album || "" : "",
       art: m ? bestArt(m.artwork) : "",
-      playbackState: ms ? (ms.playbackState || "none") : "none",
+      playbackState: ms ? ms.playbackState || "none" : "none",
     };
   }
 

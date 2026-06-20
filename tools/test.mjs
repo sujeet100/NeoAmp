@@ -21,7 +21,10 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
-const fail = (msg) => { console.error("  ✗ " + msg); failed++; };
+const fail = (msg) => {
+  console.error("  ✗ " + msg);
+  failed++;
+};
 
 // ---- 1. syntax check -------------------------------------------------------
 function jsFilesIn(dir, { recurse = false } = {}) {
@@ -34,11 +37,9 @@ function jsFilesIn(dir, { recurse = false } = {}) {
 }
 
 // everything we author, minus the vendored minified bundles
-const sources = [
-  ...jsFilesIn("."),
-  ...jsFilesIn("presets"),
-  ...jsFilesIn("tools"),
-].filter((f) => !f.includes("vendor/"));
+const sources = [...jsFilesIn("."), ...jsFilesIn("presets"), ...jsFilesIn("tools")].filter(
+  (f) => !f.includes("vendor/")
+);
 
 console.log(`\nSyntax-checking ${sources.length} files…`);
 for (const f of sources) {
@@ -60,20 +61,35 @@ try {
   sandbox.window = sandbox;
   sandbox.console = console;
   const ctx = createContext(sandbox);
-  const src = PRESET_ORDER.map((n) => readFileSync(join(ROOT, "presets", n + ".js"), "utf8")).join("\n;\n");
+  const src = PRESET_ORDER.map((n) => readFileSync(join(ROOT, "presets", n + ".js"), "utf8")).join(
+    "\n;\n"
+  );
   runInContext(src, ctx, { filename: "presets-concat.js" });
 
   const presets = sandbox.WMP_PRESETS || {};
   const names = Object.keys(presets);
   if (!names.length) fail("WMP_PRESETS is empty after building presets");
 
-  const frame = { time: 2, frame: 120, bass: 1.3, bass_att: 1.1, mid: 1, mid_att: 1, treb: 1, treb_att: 1 };
+  const frame = {
+    time: 2,
+    frame: 120,
+    bass: 1.3,
+    bass_att: 1.1,
+    mid: 1,
+    mid_att: 1,
+    treb: 1,
+    treb_att: 1,
+  };
   let ran = 0;
   for (const name of names) {
     const p = presets[name];
     if (typeof p.frame_eqs === "function") {
-      try { p.frame_eqs({ ...frame }); ran++; }
-      catch (e) { fail(`frame_eqs threw for "${name}": ${e.message}`); }
+      try {
+        p.frame_eqs({ ...frame });
+        ran++;
+      } catch (e) {
+        fail(`frame_eqs threw for "${name}": ${e.message}`);
+      }
     }
   }
   if (!failed) console.log(`  ✓ built ${names.length} presets, ran ${ran} frame_eqs`);

@@ -41,8 +41,8 @@
 
   --wa-win-bg: linear-gradient(180deg, #3b3b4d 0%, #2a2a38 5%, #23232f 100%);
   --wa-win-border: #0c0c12;
-  --wa-bevel-light: rgba(255, 255, 255, 0.30);
-  --wa-bevel-dark: rgba(0, 0, 0, 0.80);
+  --wa-bevel-light: rgba(255, 255, 255, 0.3);
+  --wa-bevel-dark: rgba(0, 0, 0, 0.8);
   --wa-win-shadow: 0 8px 26px rgba(0, 0, 0, 0.6);
 
   --wa-title-bg: linear-gradient(180deg, #4a5fb0 0%, #2c3a82 45%, #1d2864 55%, #243070 100%);
@@ -76,8 +76,8 @@
   /* ---- layer setup -------------------------------------------------- */
   position: fixed;
   inset: 0;
-  z-index: 2147483600;          /* above YTM's own chrome */
-  pointer-events: none;          /* page underneath stays usable */
+  z-index: 2147483600; /* above YTM's own chrome */
+  pointer-events: none; /* page underneath stays usable */
   font-family: var(--wa-font);
   -webkit-font-smoothing: none;
 }
@@ -98,12 +98,20 @@
   color: var(--wa-fg);
   user-select: none;
 }
-.wa-win.dragging { opacity: 0.97; }
+.wa-win.dragging {
+  opacity: 0.97;
+}
 /* windowshade: collapsed to just the titlebar (body is display:none). !important beats
    the per-window id height/min-height rules (e.g. #wa-pl{height:220px}); the grabber is
    meaningless on a collapsed window. */
-.wa-win.wa-shaded { height: auto !important; min-height: 0 !important; padding-bottom: 0; }
-.wa-win.wa-shaded .wa-resize { display: none; }
+.wa-win.wa-shaded {
+  height: auto !important;
+  min-height: 0 !important;
+  padding-bottom: 0;
+}
+.wa-win.wa-shaded .wa-resize {
+  display: none;
+}
 
 .wa-titlebar {
   height: 17px;
@@ -113,45 +121,69 @@
   cursor: move;
   /* classic horizontal ridges layered over the skin's title gradient */
   background:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, rgba(0,0,0,0.13) 1px 2px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 1px, rgba(0, 0, 0, 0.13) 1px 2px),
     var(--wa-title-bg);
   border-bottom: 1px solid var(--wa-win-border);
   box-shadow: inset 0 1px 0 var(--wa-bevel-light);
 }
 .wa-win.inactive .wa-titlebar {
   background:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, rgba(0,0,0,0.10) 1px 2px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, rgba(0, 0, 0, 0.1) 1px 2px),
     var(--wa-title-bg-off);
 }
 .wa-title {
   flex: 1 1 auto;
-  font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   color: var(--wa-title-fg);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.wa-title .wa-logo { color: var(--wa-logo-fg); margin-right: 5px; letter-spacing: 0; }
+.wa-title .wa-logo {
+  color: var(--wa-logo-fg);
+  margin-right: 5px;
+  letter-spacing: 0;
+}
 
-.wa-tbtns { display: flex; gap: 2px; flex: 0 0 auto; }
+.wa-tbtns {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
 .wa-tbtn {
-  width: 13px; height: 12px;
-  display: grid; place-items: center;
+  width: 13px;
+  height: 12px;
+  display: grid;
+  place-items: center;
   font: 700 9px/1 var(--wa-font);
   color: var(--wa-title-fg);
   background: var(--wa-title-bg);
-  border: 1px solid var(--wa-win-border); border-radius: 1px;
+  border: 1px solid var(--wa-win-border);
+  border-radius: 1px;
   cursor: pointer;
 }
-.wa-tbtn:hover { filter: brightness(1.2); }
-.wa-tbtn:active { filter: brightness(0.8); }
+.wa-tbtn:hover {
+  filter: brightness(1.2);
+}
+.wa-tbtn:active {
+  filter: brightness(0.8);
+}
 
-.wa-body { padding: 6px; }
+.wa-body {
+  padding: 6px;
+}
 
 /* recessed inset "screen" */
 .wa-inset {
   background: var(--wa-inset-bg);
   border: 1px solid #000;
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9), inset -1px -1px 0 var(--wa-bevel-light);
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.9),
+    inset -1px -1px 0 var(--wa-bevel-light);
   border-radius: 1px;
 }
 
@@ -159,177 +191,380 @@
 .wa-lcd {
   font-family: var(--wa-lcd-font);
   color: var(--wa-lcd);
-  text-shadow: 0 0 5px var(--wa-lcd-glow), 0 0 1px var(--wa-lcd-glow);
+  text-shadow:
+    0 0 5px var(--wa-lcd-glow),
+    0 0 1px var(--wa-lcd-glow);
   font-variant-numeric: tabular-nums;
 }
 
 /* =======================================================================
    MAIN WINDOW
    ======================================================================= */
-#wa-main { width: var(--wa-stack-w); }
-#wa-main .wa-main-grid { display: grid; grid-template-columns: 78px 1fr; gap: 6px; }
+#wa-main {
+  width: var(--wa-stack-w);
+}
+#wa-main .wa-main-grid {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 6px;
+}
 
 .wa-clock {
-  font-size: 23px; line-height: 1; letter-spacing: 1px;
-  display: flex; align-items: center; justify-content: center;
-  min-height: 36px; padding: 2px; white-space: nowrap;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 2px;
+  white-space: nowrap;
 }
 .wa-art {
-  margin: 6px auto 0; width: 64px; height: 64px;
-  position: relative; overflow: hidden; background: #050507;
+  margin: 6px auto 0;
+  width: 64px;
+  height: 64px;
+  position: relative;
+  overflow: hidden;
+  background: #050507;
   border: 1px solid #000;
 }
 .wa-art img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-  image-rendering: pixelated; filter: saturate(1.05) contrast(1.02);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+  filter: saturate(1.05) contrast(1.02);
 }
-.wa-art::after {                  /* faint CRT scanlines */
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 1px, rgba(0,0,0,0.28) 1px 2px);
+.wa-art::after {
+  /* faint CRT scanlines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 0 1px,
+    rgba(0, 0, 0, 0.28) 1px 2px
+  );
 }
-.wa-art.empty img { display: none; }
+.wa-art.empty img {
+  display: none;
+}
 
-.wa-rcol { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.wa-rcol {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
 
-.wa-marquee { height: 20px; overflow: hidden; padding: 0 5px; display: flex; align-items: center; }
+.wa-marquee {
+  height: 20px;
+  overflow: hidden;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+}
 .wa-marquee-track {
-  white-space: nowrap; font-family: var(--wa-lcd-font);
-  font-size: 15px; line-height: 1; letter-spacing: 1px; color: var(--wa-lcd);
-  text-shadow: 0 0 4px var(--wa-lcd-glow); will-change: transform;
+  white-space: nowrap;
+  font-family: var(--wa-lcd-font);
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: var(--wa-lcd);
+  text-shadow: 0 0 4px var(--wa-lcd-glow);
+  will-change: transform;
 }
 
-.wa-midrow { display: flex; gap: 6px; align-items: stretch; }
-.wa-analyzer { width: 130px; height: 36px; display: block; background: var(--wa-analyzer-bg); }
+.wa-midrow {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.wa-analyzer {
+  width: 130px;
+  height: 36px;
+  display: block;
+  background: var(--wa-analyzer-bg);
+}
 .wa-bitbox {
-  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px;
-  padding: 2px 6px; font-family: var(--wa-lcd-font); font-size: 13px; letter-spacing: 1px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-family: var(--wa-lcd-font);
+  font-size: 13px;
+  letter-spacing: 1px;
 }
-.wa-bitline { display: flex; gap: 10px; color: var(--wa-lcd); text-shadow: 0 0 4px var(--wa-lcd-glow); }
-.wa-stereo { display: flex; gap: 8px; margin-left: auto; color: var(--wa-lcd); }
-.wa-stereo span { opacity: 0.22; }
-.wa-stereo span.on { opacity: 1; text-shadow: 0 0 4px var(--wa-lcd-glow); }
+.wa-bitline {
+  display: flex;
+  gap: 10px;
+  color: var(--wa-lcd);
+  text-shadow: 0 0 4px var(--wa-lcd-glow);
+}
+.wa-stereo {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--wa-lcd);
+}
+.wa-stereo span {
+  opacity: 0.22;
+}
+.wa-stereo span.on {
+  opacity: 1;
+  text-shadow: 0 0 4px var(--wa-lcd-glow);
+}
 
-.wa-posbar { padding: 3px 5px 0; }
+.wa-posbar {
+  padding: 3px 5px 0;
+}
 
 /* native range sliders, themed */
 .wa-range {
-  -webkit-appearance: none; appearance: none;
-  width: 100%; height: 9px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 9px;
   background: var(--wa-track-bg);
-  border: 1px solid #000; box-shadow: inset 0 1px 2px rgba(0,0,0,0.85);
-  border-radius: 1px; outline: none; cursor: pointer;
+  border: 1px solid #000;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.85);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
 }
 /* grooved/grippy thumb: horizontal dark grip lines over the metal gradient */
 .wa-range::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 13px; height: 16px;
-  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0 1px, transparent 1px 3px), var(--wa-thumb-bg);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 16px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px),
+    var(--wa-thumb-bg);
   border: 1px solid var(--wa-thumb-border);
-  box-shadow: inset 1px 0 0 rgba(255,255,255,0.45), inset -1px 0 0 rgba(0,0,0,0.4);
-  border-radius: 1px; cursor: pointer;
-}
-.wa-range::-moz-range-thumb {
-  width: 13px; height: 16px;
-  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.42) 0 1px, transparent 1px 3px), var(--wa-thumb-bg);
-  border: 1px solid var(--wa-thumb-border); border-radius: 1px; cursor: pointer;
-}
-
-.wa-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 5px 2px; }
-.wa-transport { display: flex; gap: 2px; }
-/* raised plastic: bright top/left edges, dark bottom/right edges (outset bevel) */
-.wa-btn {
-  min-width: 30px; height: 26px; padding: 0 5px;
-  display: grid; place-items: center;
-  color: var(--wa-btn-fg); background: var(--wa-btn-bg);
-  border: 2px solid;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 1px 1px 2px rgba(0,0,0,0.5);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4);
+  border-radius: 1px;
   cursor: pointer;
 }
-.wa-btn svg { width: 13px; height: 13px; fill: currentColor; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.5)); pointer-events: none; }
-.wa-btn:hover { filter: brightness(1.1); }
-.wa-btn:active, .wa-btn.active {
+.wa-range::-moz-range-thumb {
+  width: 13px;
+  height: 16px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px),
+    var(--wa-thumb-bg);
+  border: 1px solid var(--wa-thumb-border);
+  border-radius: 1px;
+  cursor: pointer;
+}
+
+.wa-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0 5px 2px;
+}
+.wa-transport {
+  display: flex;
+  gap: 2px;
+}
+/* raised plastic: bright top/left edges, dark bottom/right edges (outset bevel) */
+.wa-btn {
+  min-width: 30px;
+  height: 26px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  color: var(--wa-btn-fg);
+  background: var(--wa-btn-bg);
+  border: 2px solid;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark)
+    var(--wa-bevel-light);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+    1px 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.wa-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+.wa-btn:hover {
+  filter: brightness(1.1);
+}
+.wa-btn:active,
+.wa-btn.active {
   /* press = invert the bevel so it sinks in */
-  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light)
+    var(--wa-bevel-dark);
   background: var(--wa-btn-active-bg);
-  box-shadow: inset 2px 2px 3px rgba(0,0,0,0.6);
+  box-shadow: inset 2px 2px 3px rgba(0, 0, 0, 0.6);
   color: var(--wa-accent);
 }
-.wa-btn.active svg { filter: drop-shadow(0 0 4px var(--wa-accent-glow)); }
+.wa-btn.active svg {
+  filter: drop-shadow(0 0 4px var(--wa-accent-glow));
+}
 
-.wa-vols { display: flex; gap: 8px; align-items: center; flex: 1 1 auto; }
-.wa-vol { flex: 2 1 0; }
-.wa-bal { flex: 1 1 0; }
+.wa-vols {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 auto;
+}
+.wa-vol {
+  flex: 2 1 0;
+}
+.wa-bal {
+  flex: 1 1 0;
+}
 
-.wa-toggles { display: flex; gap: 4px; }
+.wa-toggles {
+  display: flex;
+  gap: 4px;
+}
 /* secondary controls: small + dark grey so they recede vs. the silver
    transport buttons (intentionally not skin-tinted; the active state is) */
 .wa-tog {
-  height: 18px; padding: 0 5px;
-  font: 700 7px/1 var(--wa-font); letter-spacing: 0.5px; text-transform: uppercase;
-  display: grid; place-items: center; color: #cfcfcf; opacity: 0.85; cursor: pointer;
+  height: 18px;
+  padding: 0 5px;
+  font: 700 7px/1 var(--wa-font);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: grid;
+  place-items: center;
+  color: #cfcfcf;
+  opacity: 0.85;
+  cursor: pointer;
   background: linear-gradient(180deg, #565660, #393942);
   border: 1px solid;
-  border-color: rgba(255,255,255,0.18) #15151c #15151c rgba(255,255,255,0.18);
+  border-color: rgba(255, 255, 255, 0.18) #15151c #15151c rgba(255, 255, 255, 0.18);
   border-radius: 2px;
 }
 .wa-tog.on {
-  opacity: 1; color: var(--wa-accent); text-shadow: 0 0 5px var(--wa-accent-glow);
+  opacity: 1;
+  color: var(--wa-accent);
+  text-shadow: 0 0 5px var(--wa-accent-glow);
   background: linear-gradient(180deg, #2c2c34, #45454f);
-  border-color: #15151c rgba(255,255,255,0.18) rgba(255,255,255,0.18) #15151c;
-  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.7);
+  border-color: #15151c rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.18) #15151c;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 /* numeric volume readout — small LCD digits riding the volume slider */
-.wa-vol-readout { flex: 0 0 auto; min-width: 24px; text-align: right; font-size: 11px; letter-spacing: 0.5px; }
+.wa-vol-readout {
+  flex: 0 0 auto;
+  min-width: 24px;
+  text-align: right;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
 /* seek-position tooltip — lives on <body> (escapes #neoamp-root's transform/clip), so it
    uses explicit values + the globally-injected LCD font rather than root-scoped vars. */
 .wa-seek-tip {
-  position: fixed; z-index: 2147483600; transform: translate(-50%, -100%); margin-top: -2px;
-  padding: 2px 7px; border-radius: 3px; pointer-events: none; white-space: nowrap;
-  font: 14px/1.2 "NeoAmp LCD", "Lucida Console", monospace; letter-spacing: 1px;
-  color: #38ff7a; background: rgba(6,14,9,0.96); border: 1px solid rgba(56,255,122,0.45);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5); text-shadow: 0 0 5px rgba(56,255,122,0.6);
-  opacity: 0; visibility: hidden;
+  position: fixed;
+  z-index: 2147483600;
+  transform: translate(-50%, -100%);
+  margin-top: -2px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+  font:
+    14px/1.2 "NeoAmp LCD",
+    "Lucida Console",
+    monospace;
+  letter-spacing: 1px;
+  color: #38ff7a;
+  background: rgba(6, 14, 9, 0.96);
+  border: 1px solid rgba(56, 255, 122, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 5px rgba(56, 255, 122, 0.6);
+  opacity: 0;
+  visibility: hidden;
 }
-.wa-seek-tip.on { opacity: 1; visibility: visible; }
+.wa-seek-tip.on {
+  opacity: 1;
+  visibility: visible;
+}
 
 /* =======================================================================
    CLASSIC SKIN HOST (.wsz canvas) — no procedural chrome; the skin's own
    bitmap titlebar/bezel is painted into the canvas, so strip our window styling
    ======================================================================= */
 .wa-skinwin {
-  background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
-  width: auto; line-height: 0;       /* kill inline-canvas descender gap */
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  width: auto;
+  line-height: 0; /* kill inline-canvas descender gap */
 }
 .wa-skin-drag {
-  position: absolute; top: 0; left: 0; cursor: move; z-index: 2;
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: move;
+  z-index: 2;
   /* sized in JS to the rendered titlebar; transparent grab strip */
 }
 /* top-left LOGO → settings hotspot, over the skin's own logo (the Winamp "system menu"
    spot). Above the drag strip; a 1px hover outline gives modern users the affordance. */
-.wa-skin-logo-hot { position: absolute; top: 0; left: 0; width: 46px; height: 22px; z-index: 4; cursor: pointer; }
-.wa-skin-logo-hot:hover { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4); }
+.wa-skin-logo-hot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 46px;
+  height: 22px;
+  z-index: 4;
+  cursor: pointer;
+}
+.wa-skin-logo-hot:hover {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
 /* procedural ◢◤ logo doubles as the settings opener */
-.wa-logo-hot { cursor: pointer; }
-.wa-logo-hot:hover { color: #fff; text-shadow: 0 0 3px rgba(255,255,255,0.55); }
+.wa-logo-hot {
+  cursor: pointer;
+}
+.wa-logo-hot:hover {
+  color: #fff;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+}
 
 /* "Now Playing" panel docked between Main and EQ in classic (.wsz) mode.
    Skin-width (550px = 275 * 2x) so it lines up flush with the skinned windows. */
 .wa-np {
-  width: 550px; min-height: 96px; cursor: move; box-sizing: border-box;
-  display: flex; align-items: center; gap: 12px; padding: 9px 13px;
+  width: 550px;
+  min-height: 96px;
+  cursor: move;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 13px;
   background: var(--pl-normalbg, var(--wa-win-bg));
   border: 2px solid var(--wa-win-border);
   box-shadow:
-    inset 1px 1px 0 var(--wa-bevel-light), inset -1px -1px 0 var(--wa-bevel-dark),
+    inset 1px 1px 0 var(--wa-bevel-light),
+    inset -1px -1px 0 var(--wa-bevel-dark),
     var(--wa-win-shadow);
 }
 /* In classic mode the NP panel is framed with the SKIN's own GEN/PLEDIT sprites
    (like the Playlist/Library windows) so it matches AND changes with the skin —
    no titlebar, so the top/bottom are plain ridge strips and the sides are rails. */
 .wa-np.wa-genskin {
-  border: 0; padding: 11px 22px 13px 26px; min-height: 96px;
+  border: 0;
+  padding: 11px 22px 13px 26px;
+  min-height: 96px;
   background:
     var(--gen-gold) left top / 50px 11px repeat-x,
     var(--gen-bfill) left bottom / 50px 13px repeat-x,
@@ -339,7 +574,9 @@
   box-shadow: var(--wa-win-shadow);
 }
 .wa-np.wa-plskin {
-  border: 0; padding: 11px 34px 14px 24px; min-height: 96px;
+  border: 0;
+  padding: 11px 34px 14px 24px;
+  min-height: 96px;
   background:
     var(--plf-tfill) left top / 50px 12px repeat-x,
     var(--plf-bfill) left bottom / 50px 16px repeat-x,
@@ -349,31 +586,90 @@
   box-shadow: var(--wa-win-shadow);
 }
 .wa-np-art {
-  flex: 0 0 auto; width: 72px; height: 72px; object-fit: cover; display: block;
-  image-rendering: pixelated; background: #050507;
-  border: 1px solid #000; box-shadow: inset 0 0 0 1px var(--wa-bevel-dark);
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+  background: #050507;
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px var(--wa-bevel-dark);
 }
-.wa-np.empty .wa-np-art { visibility: hidden; }
-.wa-np-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.wa-np.empty .wa-np-art {
+  visibility: hidden;
+}
+.wa-np-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
 /* title/artist use the skin's PLEDIT text palette so they change per skin */
 /* title is a MARQUEE: the box clips, the inner track scrolls when it overflows (Winamp). */
-.wa-np-title { font-family: var(--wa-lcd-font); font-size: 17px; line-height: 1;
-  color: var(--pl-current, var(--wa-lcd)); white-space: nowrap; overflow: hidden; }
-.wa-np-title-t { display: inline-block; white-space: nowrap; will-change: transform; }
-.wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-np-title {
+  font-family: var(--wa-lcd-font);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--pl-current, var(--wa-lcd));
+  white-space: nowrap;
+  overflow: hidden;
+}
+.wa-np-title-t {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+}
+.wa-np-artist {
+  font: 13px/1.1 var(--wa-lcd-font);
+  letter-spacing: 0.5px;
+  color: var(--pl-normal, var(--wa-fg));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-np-album {
+  font: 12px/1.1 var(--wa-lcd-font);
+  color: var(--pl-normal, var(--wa-fg-dim));
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* ONE clean control row (settings moved to right-click; long titles scroll, so the row
    no longer fights the title): [♥ 👎] · [🔊] · ❲VIS|LIB|LYR❳, groups spaced, keys tight. */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 10px; }
-.wa-np-rate { display: flex; flex-direction: row; gap: 2px; }       /* like + dislike, tight pair */
+.wa-np-btns {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.wa-np-rate {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+} /* like + dislike, tight pair */
 /* window-toggle RACK: the three view toggles read as one cohesive expansion module — a
    recessed tray holding flush keys (1px gaps), Winamp-stereo style. */
 .wa-np-toggles {
-  display: flex; gap: 1px; padding: 2px; border-radius: 3px;
-  background: rgba(0,0,0,0.16);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.45), inset 0 -1px 0 rgba(255,255,255,0.12);
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12);
 }
-.wa-np-toggles .wa-np-tog { border-radius: 1px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3); }
+.wa-np-toggles .wa-np-tog {
+  border-radius: 1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
 /* VIS/LIB/LYR/mute/like/gear: small metal keys THEMED from the skin's palette. We tried
    sampling the skin's real CBUTTONS sprite, but round-knob skins (Nucleo) sample their dark
    corners → grey, reintroducing the dullness. So the key metal is derived from the skin's
@@ -385,55 +681,90 @@
      skins → warm keys, light skins → light keys) and tint 22% with the selection accent so
      it carries the theme hue instead of washing out to grey. */
   --wa-panel: var(--pl-normalbg, #2b2b34);
-  --wa-acc:   var(--pl-selectedbg, var(--wa-btn-face, var(--wa-panel)));
-  --wa-key-base: color-mix(in srgb, color-mix(in srgb, var(--wa-panel) 50%, #ffffff 50%) 78%, var(--wa-acc) 22%);
+  --wa-acc: var(--pl-selectedbg, var(--wa-btn-face, var(--wa-panel)));
+  --wa-key-base: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--wa-panel) 50%, #ffffff 50%) 78%,
+    var(--wa-acc) 22%
+  );
   --wa-key-face: color-mix(in srgb, var(--wa-key-base) 86%, #ffffff 14%);
-  --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 84%, #000000 16%);
-  position: relative;   /* anchors the corner LED */
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 19px; padding: 0 8px; cursor: pointer;
+  --wa-key-lo: color-mix(in srgb, var(--wa-key-base) 84%, #000000 16%);
+  position: relative; /* anchors the corner LED */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 19px;
+  padding: 0 8px;
+  cursor: pointer;
   /* crisp PIXEL font (Silkscreen Bold) for the key labels — VT323's rounded LCD read too
      smooth/thin at this small size; Silkscreen is a hard bitmap face. The Bold .ttf IS the
      face (so weight 400), and font-smoothing off keeps the pixel edges sharp. Kept SMALL
      (8px) so the labels sit quietly beside the skin's own embossed keys instead of shouting. */
-  font: 400 8px/1 var(--wa-pixel-font); letter-spacing: 1px; text-transform: uppercase;
-  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  font: 400 8px/1 var(--wa-pixel-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
   /* contrast-derived from the key face (near-black on light keys, near-white on dark) so
      labels stay readable on every skin — but softened ~22% toward the key metal so they
      read as engraved-into-the-key, not a stark black sticker (the old pure #15171d was the
      "too dark" complaint). Polarity is preserved on dark skins (near-white softened too). */
-  color: color-mix(in srgb, var(--wa-key-fg, var(--pl-normal, #cdd2e6)) 78%, var(--wa-key-base) 22%);
+  color: color-mix(
+    in srgb,
+    var(--wa-key-fg, var(--pl-normal, #cdd2e6)) 78%,
+    var(--wa-key-base) 22%
+  );
   /* Winamp-metal lighting on the theme-tinted key: a bright specular at the very top, a
      sheen band, the mid face, then a darker base — the lighting profile real Winamp button
      sprites use, but built from the skin's own colour so it stays vibrant + theme-matched
      on every skin (raw-sampling the sprite reintroduced grey on round-knob skins). */
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     color-mix(in srgb, var(--wa-key-face) 52%, #fff 48%) 0%,
     color-mix(in srgb, var(--wa-key-face) 84%, #fff 16%) 16%,
     var(--wa-key-face) 50%,
-    color-mix(in srgb, var(--wa-key-lo) 88%, #000 12%) 100%);
+    color-mix(in srgb, var(--wa-key-lo) 88%, #000 12%) 100%
+  );
   border: 1px solid;
-  border-color: rgba(255,255,255,0.62) rgba(0,0,0,0.46) rgba(0,0,0,0.56) rgba(255,255,255,0.44);
+  border-color: rgba(255, 255, 255, 0.62) rgba(0, 0, 0, 0.46) rgba(0, 0, 0, 0.56)
+    rgba(255, 255, 255, 0.44);
   border-radius: 2px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 1px 2px rgba(0, 0, 0, 0.45);
 }
-.wa-np-tog:hover { filter: brightness(1.08); }
+.wa-np-tog:hover {
+  filter: brightness(1.08);
+}
 /* PUSH button (like the skin's EQ/PL): the face only dips while held, then snaps
    back — the LED alone carries the on/off state, so .on does NOT keep it pressed. */
 .wa-np-tog:active {
   background: linear-gradient(180deg, var(--wa-key-lo), var(--wa-key-face));
-  border-color: rgba(0,0,0,0.5) rgba(255,255,255,0.32) rgba(255,255,255,0.45) rgba(0,0,0,0.42);
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
+  border-color: rgba(0, 0, 0, 0.5) rgba(255, 255, 255, 0.32) rgba(255, 255, 255, 0.45)
+    rgba(0, 0, 0, 0.42);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.4);
 }
 /* PIXEL-ART LED — drawn the way a 90s skin artist would: hard 1px edges, ZERO blur (no
    modern CSS bloom). Off: a punched hole — dark inset top-left, faint light rim bottom-
    right. On: a raised diode in the skin's OWN indicator colour (--wa-led-on) — bright 1px
    inner top-left corner (specular), darker 1px inner bottom-right, and a hard 1px drop. */
 .wa-np-tog::before {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 5px; height: 5px; border-radius: 0;
-  background: rgba(0,0,0,0.5);
-  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.12);
-  image-rendering: pixelated; pointer-events: none;
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 1px 1px 0 rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .wa-np-tog.on::before {
   --led: var(--wa-led-on, var(--pl-current, var(--wa-accent, #16e651)));
@@ -443,45 +774,101 @@
     0 0 0 1px color-mix(in srgb, var(--led) 45%, #000);
 }
 /* ⚙ gear key styling (still used as the menu host) */
-.wa-gear-btn { padding: 0 6px; opacity: 0.9; }
-.wa-gear-btn::before { display: none; }
-.wa-gear-btn svg { width: 13px; height: 13px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+.wa-gear-btn {
+  padding: 0 6px;
+  opacity: 0.9;
+}
+.wa-gear-btn::before {
+  display: none;
+}
+.wa-gear-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.3));
+}
 /* context-menu mode: the gear button is hidden (settings open via right-click / the skin
    logo); the wrap is a zero-size, absolutely-positioned host so its dropdown appears at the
    click point (openGearAt sets left/top). */
 /* pointer-events:auto — it's a direct child of #neoamp-root (which is none so the page
    stays clickable in the gaps); without this the open menu inherits none and ignores clicks. */
-.wa-gear-ctx { position: absolute; width: 0; height: 0; z-index: 30; pointer-events: auto; }
-.wa-gear-ctx .wa-gear-btn { display: none; }
+.wa-gear-ctx {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 30;
+  pointer-events: auto;
+}
+.wa-gear-ctx .wa-gear-btn {
+  display: none;
+}
 /* 🔊 mute key: icon only (no LED). One SVG; CSS swaps the sound-wave for an ✕ on .on,
    and recolours the whole glyph red while muted (a clear "silenced" warning). */
-.wa-np-mute { padding: 0 6px; }
-.wa-np-mute::before { display: none; }
-.wa-np-mute svg { width: 15px; height: 15px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); color: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
-.wa-np-mute .wa-spk-x { display: none; }
-.wa-np-mute.on .wa-spk-wave { display: none; }
-.wa-np-mute.on .wa-spk-x { display: inline; }
+.wa-np-mute {
+  padding: 0 6px;
+}
+.wa-np-mute::before {
+  display: none;
+}
+.wa-np-mute svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+  fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
+  color: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.3));
+}
+.wa-np-mute .wa-spk-x {
+  display: none;
+}
+.wa-np-mute.on .wa-spk-wave {
+  display: none;
+}
+.wa-np-mute.on .wa-spk-x {
+  display: inline;
+}
 /* muted = flat red ✕, pixel-lit: hard 1px top-highlight + bottom-shadow, ZERO blur. */
-.wa-np-mute.on svg { fill: #ff5a5a; color: #ff5a5a; filter: drop-shadow(0 -1px 0 #ffb0b0) drop-shadow(0 1px 0 rgba(0,0,0,0.45)); }
+.wa-np-mute.on svg {
+  fill: #ff5a5a;
+  color: #ff5a5a;
+  filter: drop-shadow(0 -1px 0 #ffb0b0) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45));
+}
 /* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
    behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
-.wa-rate-btn { padding: 0 7px; }
-.wa-rate-btn::before { display: none; }
+.wa-rate-btn {
+  padding: 0 7px;
+}
+.wa-rate-btn::before {
+  display: none;
+}
 /* the icon IS the lamp. Off = dim, unlit, seated with a 1px dark drop. On = lit via a
    FLAT saturated fill + a hard 1px top-highlight + bottom-shadow (pixel bevel) — ZERO
    blur, matching the pixel LEDs (no modern bloom). Like = red, dislike = blue. */
-.wa-rate-btn svg { width: 13px; height: 13px; display: block; fill: color-mix(in srgb, var(--wa-key-fg, #3a3a44) 50%, transparent); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
+.wa-rate-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  fill: color-mix(in srgb, var(--wa-key-fg, #3a3a44) 50%, transparent);
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
+}
 .wa-rate-btn.wa-like.on svg {
   fill: #ff415f;
-  filter: drop-shadow(0 -1px 0 #ffb0c0) drop-shadow(0 1px 0 rgba(0,0,0,0.5));
+  filter: drop-shadow(0 -1px 0 #ffb0c0) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 .wa-rate-btn.wa-dislike.on svg {
   fill: #4da6ff;
-  filter: drop-shadow(0 -1px 0 #b9ddff) drop-shadow(0 1px 0 rgba(0,0,0,0.5));
+  filter: drop-shadow(0 -1px 0 #b9ddff) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 /* the Now-Playing copy of the skin picker is a touch larger (primary control) */
-.wa-np-btns .wa-skinsel { margin-top: 2px; }
-.wa-np-btns .wa-skinsel-btn { height: 19px; padding: 0 11px; font-size: 12px; }
+.wa-np-btns .wa-skinsel {
+  margin-top: 2px;
+}
+.wa-np-btns .wa-skinsel-btn {
+  height: 19px;
+  padding: 0 11px;
+  font-size: 12px;
+}
 
 /* =======================================================================
    GEN.BMP generic-window frame (Playlist / Library / Viz in classic mode).
@@ -489,9 +876,13 @@
    every background layer is scaled via background-size with pixelated rendering.
    Data-URL backgrounds are injected as --gen-* custom props (see winamp.js).
    ======================================================================= */
-.wa-genskin, .wa-plskin {
-  border: 0; border-radius: 0; padding: 0;
-  background: #1c1c26; box-shadow: var(--wa-win-shadow);
+.wa-genskin,
+.wa-plskin {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: #1c1c26;
+  box-shadow: var(--wa-win-shadow);
   image-rendering: pixelated;
 }
 /* .wa-win.wa-genskin (3 classes) so it beats `.wa-win.inactive .wa-titlebar`
@@ -499,8 +890,15 @@
    Layout: gold corners + LR_FILL ridges fill the bar; the title sits centered
    on the plain CENTER_FILL plaque flanked by LEFT_END/RIGHT_END caps. */
 .wa-win.wa-genskin .wa-titlebar {
-  height: 40px; flex: 0 0 40px; padding: 0; border: 0; box-shadow: none;   /* never let the flex column shrink the gold bar (it collapsed in the shorter playlist) */
-  position: relative; display: flex; align-items: center; justify-content: flex-end;
+  height: 40px;
+  flex: 0 0 40px;
+  padding: 0;
+  border: 0;
+  box-shadow: none; /* never let the flex column shrink the gold bar (it collapsed in the shorter playlist) */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   background:
     var(--gen-tl) left top / 50px 40px no-repeat,
     var(--gen-tr) right top / 50px 40px no-repeat,
@@ -508,58 +906,125 @@
   image-rendering: pixelated;
 }
 .wa-win.wa-genskin .wa-title {
-  position: absolute; left: 50%; top: 0; transform: translateX(-50%);  /* top:0 — plaque was floating */
-  flex: none; height: 40px; display: flex; align-items: center; justify-content: center;
-  padding: 0 48px; min-width: 150px;   /* keep short titles' plaque substantial */
-  color: #d6deff; font-size: 11px; letter-spacing: 2px; pointer-events: none; white-space: nowrap;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%); /* top:0 — plaque was floating */
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 48px;
+  min-width: 150px; /* keep short titles' plaque substantial */
+  color: #d6deff;
+  font-size: 11px;
+  letter-spacing: 2px;
+  pointer-events: none;
+  white-space: nowrap;
   background:
     var(--gen-lend) left top / 50px 40px no-repeat,
     var(--gen-rend) right top / 50px 40px no-repeat,
     var(--gen-cfill) left top / 50px 40px repeat-x;
   image-rendering: pixelated;
 }
-.wa-genskin .wa-title .wa-logo { display: none; }
+.wa-genskin .wa-title .wa-logo {
+  display: none;
+}
 /* non-close framed buttons (the viz fullscreen toggle) clear the gold corner cap.
    .wa-tbtns is static so .wa-close anchors to the (relative) titlebar, not here. */
-.wa-win.wa-genskin .wa-tbtns { position: static; margin-right: 54px; }
+.wa-win.wa-genskin .wa-tbtns {
+  position: static;
+  margin-right: 54px;
+}
 /* framed titlebar buttons (the viz fullscreen toggle): an 18x18 gold-bordered
    control matching the close, sitting on the gold ridge clear of the corner cap.
    z-index:3 keeps it above the centered title plaque; .wa-close's z-index:4 wins. */
-.wa-genskin .wa-tbtn, .wa-plskin .wa-tbtn {
-  position: relative; z-index: 3;
-  width: 18px; height: 18px; padding: 0; font-size: 13px; line-height: 1;
-  display: grid; place-items: center;
+.wa-genskin .wa-tbtn,
+.wa-plskin .wa-tbtn {
+  position: relative;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
   /* themed to the skin's sampled transport-button metal (like the NP keys) instead
      of a fixed gold, so the viz fullscreen toggle matches cool skins too. */
   color: var(--pl-normal, #fce9a0);
   --wa-key-base: var(--wa-btn-face, color-mix(in srgb, var(--pl-normalbg, #2b2b34) 60%, #fff 40%));
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     color-mix(in srgb, var(--wa-key-base) 70%, #fff 30%),
-    color-mix(in srgb, var(--wa-key-base) 88%, #000 12%));
-  border: 1px solid; border-color: rgba(255,255,255,0.58) rgba(0,0,0,0.5) rgba(0,0,0,0.5) rgba(255,255,255,0.42);
+    color-mix(in srgb, var(--wa-key-base) 88%, #000 12%)
+  );
+  border: 1px solid;
+  border-color: rgba(255, 255, 255, 0.58) rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.5)
+    rgba(255, 255, 255, 0.42);
   border-radius: 2px;
 }
-.wa-genskin .wa-tbtn:hover, .wa-plskin .wa-tbtn:hover { filter: brightness(1.15); }
-.wa-genskin .wa-tbtn:active, .wa-plskin .wa-tbtn:active { filter: brightness(0.82); border-color: rgba(0,0,0,0.6) rgba(255,236,160,0.55) rgba(255,236,160,0.55) rgba(0,0,0,0.6); }
+.wa-genskin .wa-tbtn:hover,
+.wa-plskin .wa-tbtn:hover {
+  filter: brightness(1.15);
+}
+.wa-genskin .wa-tbtn:active,
+.wa-plskin .wa-tbtn:active {
+  filter: brightness(0.82);
+  border-color: rgba(0, 0, 0, 0.6) rgba(255, 236, 160, 0.55) rgba(255, 236, 160, 0.55)
+    rgba(0, 0, 0, 0.6);
+}
 /* crisp SVG fullscreen icon centered in the gold button (replaces the ⛶ glyph) */
-.wa-tbtn svg { width: 12px; height: 12px; fill: currentColor; display: block; pointer-events: none; }
+.wa-tbtn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  display: block;
+  pointer-events: none;
+}
 /* viz fullscreen toggle: align vertically with the baked close (top:6) and sit just
    left of it — it was centered (≈5px lower) and ~54px away in the flex flow. */
-.wa-genskin .wa-fsbtn, .wa-plskin .wa-fsbtn { position: absolute; top: 6px; right: 26px; }
+.wa-genskin .wa-fsbtn,
+.wa-plskin .wa-fsbtn {
+  position: absolute;
+  top: 6px;
+  right: 26px;
+}
 /* the close glyph is BAKED into the gold top-right corner sprite (--gen-tr); our
    drawn ✕ doubled it up and was mis-shoved 54px left. Replace it with a
    transparent hit-area pinned exactly over the baked icon (Webamp gen-window.css
    right:2 top:3 9x9 → 2x: right:4 top:6 18x18); only the pressed sprite draws. */
-.wa-genskin .wa-close, .wa-plskin .wa-close {
-  position: absolute; top: 6px; right: 4px; width: 18px; height: 18px;
-  margin: 0; padding: 0; background: none; border: 0; box-shadow: none;
-  color: transparent; font-size: 0; z-index: 4; cursor: pointer;
+.wa-genskin .wa-close,
+.wa-plskin .wa-close {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: transparent;
+  font-size: 0;
+  z-index: 4;
+  cursor: pointer;
 }
-.wa-genskin .wa-close:active { background: var(--gen-close) center / 18px 18px no-repeat; }
-.wa-plskin .wa-close:active { background: var(--plf-close) center / 18px 18px no-repeat; }
+.wa-genskin .wa-close:active {
+  background: var(--gen-close) center / 18px 18px no-repeat;
+}
+.wa-plskin .wa-close:active {
+  background: var(--plf-close) center / 18px 18px no-repeat;
+}
 /* id-boosted so it beats the per-window `#wa-pl .wa-body` padding rules */
-#wa-pl.wa-genskin .wa-body, #wa-lib.wa-genskin .wa-body, #wa-viz.wa-genskin .wa-body, #wa-lyrics.wa-genskin .wa-body {
-  margin: 0; padding: 10px 26px 34px 30px;   /* clears the frame borders + breathing room */
+#wa-pl.wa-genskin .wa-body,
+#wa-lib.wa-genskin .wa-body,
+#wa-viz.wa-genskin .wa-body,
+#wa-lyrics.wa-genskin .wa-body {
+  margin: 0;
+  padding: 10px 26px 34px 30px; /* clears the frame borders + breathing room */
   background:
     var(--gen-ml) left top / 22px 58px repeat-y,
     var(--gen-mr) right top / 16px 58px repeat-y,
@@ -569,13 +1034,26 @@
   image-rendering: pixelated;
 }
 /* playlist list colors come from PLEDIT.TXT (injected as --pl-* props) */
-.wa-genskin .wa-pl-list, .wa-genskin .wa-lib-list,
-.wa-plskin .wa-pl-list, .wa-plskin .wa-lib-list {
-  background: var(--pl-normalbg, var(--wa-inset-bg)); border-color: #000;
+.wa-genskin .wa-pl-list,
+.wa-genskin .wa-lib-list,
+.wa-plskin .wa-pl-list,
+.wa-plskin .wa-lib-list {
+  background: var(--pl-normalbg, var(--wa-inset-bg));
+  border-color: #000;
 }
-.wa-genskin .wa-pl-row, .wa-genskin .wa-pl-n, .wa-genskin .wa-pl-d,
-.wa-plskin .wa-pl-row, .wa-plskin .wa-pl-n, .wa-plskin .wa-pl-d { color: var(--pl-normal, var(--wa-lcd)); }
-.wa-genskin .wa-pl-row.playing, .wa-plskin .wa-pl-row.playing { background: var(--pl-selectedbg, #0a2a5e); color: var(--pl-current, #fff); }
+.wa-genskin .wa-pl-row,
+.wa-genskin .wa-pl-n,
+.wa-genskin .wa-pl-d,
+.wa-plskin .wa-pl-row,
+.wa-plskin .wa-pl-n,
+.wa-plskin .wa-pl-d {
+  color: var(--pl-normal, var(--wa-lcd));
+}
+.wa-genskin .wa-pl-row.playing,
+.wa-plskin .wa-pl-row.playing {
+  background: var(--pl-selectedbg, #0a2a5e);
+  color: var(--pl-current, #fff);
+}
 
 /* =======================================================================
    PLEDIT.BMP window frame — used for skins without GEN.BMP (Sony, Nucleo…)
@@ -584,8 +1062,15 @@
    + fill. All 1x sprites scaled 2x via background-size.
    ======================================================================= */
 .wa-win.wa-plskin .wa-titlebar {
-  height: 40px; flex: 0 0 40px; padding: 0; border: 0; box-shadow: none;   /* don't let the flex column shrink the title bar */
-  position: relative; display: flex; align-items: center; justify-content: flex-end;
+  height: 40px;
+  flex: 0 0 40px;
+  padding: 0;
+  border: 0;
+  box-shadow: none; /* don't let the flex column shrink the title bar */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   background:
     var(--plf-tl) left top / 50px 40px no-repeat,
     var(--plf-tr) right top / 50px 40px no-repeat,
@@ -595,19 +1080,40 @@
 /* title sits centered on the plain top tile (the PLEDIT title tile has its own
    baked "PLAYLIST" text, so we use the plain tile texture + our own label) */
 .wa-win.wa-plskin .wa-title {
-  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-  flex: none; height: 40px; display: flex; align-items: center; justify-content: center;
-  padding: 0 18px; min-width: 150px; white-space: nowrap;
-  color: #e7ecff; font-size: 11px; letter-spacing: 2px; pointer-events: none;   /* match the GEN-frame title spacing */
-  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  min-width: 150px;
+  white-space: nowrap;
+  color: #e7ecff;
+  font-size: 11px;
+  letter-spacing: 2px;
+  pointer-events: none; /* match the GEN-frame title spacing */
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
   background: var(--plf-tfill) left top / 50px 40px repeat-x;
   image-rendering: pixelated;
 }
-.wa-plskin .wa-title .wa-logo { display: none; }
-.wa-win.wa-plskin .wa-tbtns { position: static; margin-right: 54px; }
+.wa-plskin .wa-title .wa-logo {
+  display: none;
+}
+.wa-win.wa-plskin .wa-tbtns {
+  position: static;
+  margin-right: 54px;
+}
 /* (framed .wa-tbtn styling is shared with .wa-genskin above) */
-#wa-pl.wa-plskin .wa-body, #wa-lib.wa-plskin .wa-body, #wa-viz.wa-plskin .wa-body, #wa-lyrics.wa-plskin .wa-body {
-  margin: 0; padding: 10px 44px 42px 28px;   /* right tile is wider; bottom clears the frame */
+#wa-pl.wa-plskin .wa-body,
+#wa-lib.wa-plskin .wa-body,
+#wa-viz.wa-plskin .wa-body,
+#wa-lyrics.wa-plskin .wa-body {
+  margin: 0;
+  padding: 10px 44px 42px 28px; /* right tile is wider; bottom clears the frame */
   background:
     var(--plf-left) left top / 24px 58px repeat-y,
     var(--plf-right) right top / 40px 58px repeat-y,
@@ -622,326 +1128,887 @@
    ======================================================================= */
 /* same width as the main + playlist windows so the stack aligns (classic
    Winamp keeps Main/EQ/Playlist a uniform width) */
-#wa-eq { width: var(--wa-stack-w); }
-.wa-eq-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+#wa-eq {
+  width: var(--wa-stack-w);
+}
+.wa-eq-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 .wa-eq-curve {
-  flex: 1 1 auto; height: 28px; display: block;
+  flex: 1 1 auto;
+  height: 28px;
+  display: block;
   background-color: #000;
   background-image:
     linear-gradient(#2a2a2a 1px, transparent 1px),
     linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
   background-size: 10px 10px;
 }
-.wa-eq-bands { display: flex; gap: 6px; align-items: flex-end; justify-content: space-between; padding: 4px 8px; }
-.wa-eq-band { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wa-eq-bands {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 4px 8px;
+}
+.wa-eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
 .wa-vrange {
-  -webkit-appearance: none; appearance: none;
-  writing-mode: vertical-lr; direction: rtl;
-  width: 10px; height: 66px;
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 10px;
+  height: 66px;
   /* recessed physical slot */
   background: linear-gradient(90deg, #050505, #161616 50%, #050505);
   border: 1px solid #000;
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85), inset -1px -1px 0 var(--wa-bevel-light);
-  outline: none; cursor: pointer;
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.85),
+    inset -1px -1px 0 var(--wa-bevel-light);
+  outline: none;
+  cursor: pointer;
 }
 /* metallic grey fader cap with one dark groove line across the center */
 .wa-vrange::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none; width: 18px; height: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 12px;
   background:
-    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.55) calc(50% - 1px),
-      rgba(0,0,0,0.55) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(
+      180deg,
+      transparent calc(50% - 1px),
+      rgba(0, 0, 0, 0.55) calc(50% - 1px),
+      rgba(0, 0, 0, 0.55) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
     linear-gradient(180deg, #dcdcdc, #888);
   border: 1px solid #333;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
 .wa-vrange::-moz-range-thumb {
-  width: 18px; height: 12px;
+  width: 18px;
+  height: 12px;
   background:
-    linear-gradient(180deg, transparent calc(50% - 1px), rgba(0,0,0,0.55) calc(50% - 1px),
-      rgba(0,0,0,0.55) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(
+      180deg,
+      transparent calc(50% - 1px),
+      rgba(0, 0, 0, 0.55) calc(50% - 1px),
+      rgba(0, 0, 0, 0.55) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
     linear-gradient(180deg, #dcdcdc, #888);
   border: 1px solid #333;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.5); cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
-.wa-eq-label { font-size: 8px; color: var(--wa-fg-dim); }
+.wa-eq-label {
+  font-size: 8px;
+  color: var(--wa-fg-dim);
+}
 
 /* =======================================================================
    VISUALIZATION WINDOW (Butterchurn iframe lives in the body)
    ======================================================================= */
-#wa-viz { width: 360px; height: 280px; display: flex; flex-direction: column; min-width: 200px; min-height: 150px; }
-#wa-viz .wa-body { flex: 1 1 auto; padding: 5px; display: flex; min-height: 0; }
+#wa-viz {
+  width: 360px;
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  min-height: 150px;
+}
+#wa-viz .wa-body {
+  flex: 1 1 auto;
+  padding: 5px;
+  display: flex;
+  min-height: 0;
+}
 .wa-viz-frame {
-  flex: 1 1 auto; width: 100%; height: 100%;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
   /* recessed inner bevel (dark top-left / light bottom-right) so the canvas
      reads as a sunken screen, matching the LCD boxes + the module double-bevel */
   border: 2px solid;
-  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark);
-  background: #000; display: block;
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light)
+    var(--wa-bevel-dark);
+  background: #000;
+  display: block;
 }
 .wa-resize {
-  position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 45%, var(--wa-bevel-light) 45% 55%, transparent 55%,
-    transparent 65%, var(--wa-bevel-light) 65% 75%, transparent 75%);
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 15px;
+  height: 15px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 45%,
+    var(--wa-bevel-light) 45% 55%,
+    transparent 55%,
+    transparent 65%,
+    var(--wa-bevel-light) 65% 75%,
+    transparent 75%
+  );
 }
 /* playlist resizes in height only → full-width bottom-edge grabber, ns cursor */
 .wa-resize-v {
-  left: 0; right: 0; width: auto; height: 6px; cursor: ns-resize;
-  background: repeating-linear-gradient(90deg,
-    var(--wa-bevel-light) 0 2px, transparent 2px 6px);
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 6px;
+  cursor: ns-resize;
+  background: repeating-linear-gradient(90deg, var(--wa-bevel-light) 0 2px, transparent 2px 6px);
   opacity: 0.5;
 }
 
 /* fullscreen: viz window fills the screen, chrome hidden, canvas edge-to-edge */
-#wa-viz:fullscreen, #wa-viz:-webkit-full-screen {
-  width: 100vw !important; height: 100vh !important;
-  border: 0; border-radius: 0;
+#wa-viz:fullscreen,
+#wa-viz:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  border: 0;
+  border-radius: 0;
 }
-#wa-viz:fullscreen .wa-titlebar, #wa-viz:-webkit-full-screen .wa-titlebar { display: none; }
-#wa-viz:fullscreen .wa-body, #wa-viz:-webkit-full-screen .wa-body { padding: 0; }
-#wa-viz:fullscreen .wa-resize, #wa-viz:-webkit-full-screen .wa-resize { display: none; }
+#wa-viz:fullscreen .wa-titlebar,
+#wa-viz:-webkit-full-screen .wa-titlebar {
+  display: none;
+}
+#wa-viz:fullscreen .wa-body,
+#wa-viz:-webkit-full-screen .wa-body {
+  padding: 0;
+}
+#wa-viz:fullscreen .wa-resize,
+#wa-viz:-webkit-full-screen .wa-resize {
+  display: none;
+}
 
 /* =======================================================================
    PLAYLIST WINDOW (YTM "Up Next" queue)
    ======================================================================= */
 /* width locked to the stack (var, not resizable); only the height grows */
-#wa-pl { width: var(--wa-stack-w); height: 220px; display: flex; flex-direction: column; min-height: 140px; }
-#wa-pl .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
-.wa-pl-list {
-  flex: 1 1 auto; overflow-y: auto; min-height: 0;
-  background: var(--wa-inset-bg); border: 1px solid #000;
-  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
-  font-family: var(--wa-lcd-font); font-size: 14px; line-height: 1.2;
+#wa-pl {
+  width: var(--wa-stack-w);
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
 }
-.wa-pl-row { display: flex; align-items: center; gap: 7px; padding: 2px 6px; color: var(--wa-lcd); cursor: pointer; white-space: nowrap; }
-.wa-pl-row:hover { background: rgba(255,255,255,0.07); }
-.wa-pl-row.playing { background: #0a2a5e; color: #fff; text-shadow: 0 0 4px var(--wa-lcd-glow); }
+#wa-pl .wa-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 5px;
+}
+.wa-pl-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--wa-inset-bg);
+  border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9);
+  font-family: var(--wa-lcd-font);
+  font-size: 14px;
+  line-height: 1.2;
+}
+.wa-pl-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 6px;
+  color: var(--wa-lcd);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wa-pl-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.wa-pl-row.playing {
+  background: #0a2a5e;
+  color: #fff;
+  text-shadow: 0 0 4px var(--wa-lcd-glow);
+}
 
 /* =======================================================================
    LYRICS WINDOW — scrolling, centered lyrics in the LCD font
    ======================================================================= */
-#wa-lyrics { width: 320px; height: 360px; display: flex; flex-direction: column; min-height: 140px; }
-#wa-lyrics .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
+#wa-lyrics {
+  width: 320px;
+  height: 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+#wa-lyrics .wa-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 5px;
+}
 .wa-lyrics-list {
-  flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 12px 14px;
-  background: var(--pl-normalbg, var(--wa-inset-bg)); border: 1px solid #000;
-  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
-  font-family: var(--wa-lcd-font); font-size: 16px; line-height: 1.5;
-  color: var(--pl-normal, var(--wa-lcd)); text-align: center;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 12px 14px;
+  background: var(--pl-normalbg, var(--wa-inset-bg));
+  border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9);
+  font-family: var(--wa-lcd-font);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--pl-normal, var(--wa-lcd));
+  text-align: center;
 }
-.wa-lyrics-list.empty { display: flex; align-items: center; justify-content: center; text-align: center; }
-.wa-lyrics-empty { opacity: 0.55; font-size: 14px; padding: 0 16px; }
-.wa-lyrics-line { padding: 1px 0; text-shadow: 0 0 4px var(--wa-lcd-glow); opacity: 0.8; }
-.wa-lyrics-line.active { opacity: 1; color: var(--pl-current, #fff); text-shadow: 0 0 7px var(--wa-lcd-glow); }
-.wa-lyrics-status { flex: 0 0 auto; min-height: 13px; text-align: center; opacity: 0.55;
-  font: 11px/1.3 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); }
-.wa-pl-n { min-width: 22px; text-align: right; opacity: 0.7; }
-.wa-pl-thumb { width: 26px; height: 26px; flex: 0 0 auto; object-fit: cover; image-rendering: pixelated; border: 1px solid #000; background: #000; }
-.wa-pl-thumb.empty { background: #111; }
-.wa-pl-t { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
-.wa-pl-plays { flex: 0 0 auto; font: 9px/1 var(--wa-font); color: var(--wa-fg-dim); opacity: 0.85; }
-.wa-pl-d { opacity: 0.85; }
-.wa-pl-empty { padding: 10px; color: var(--wa-fg-dim); font: 11px/1.4 var(--wa-font); white-space: normal; }
-.wa-pl-foot { display: flex; align-items: center; gap: 6px; }
-.wa-pl-btns { display: flex; gap: 3px; }
+.wa-lyrics-list.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.wa-lyrics-empty {
+  opacity: 0.55;
+  font-size: 14px;
+  padding: 0 16px;
+}
+.wa-lyrics-line {
+  padding: 1px 0;
+  text-shadow: 0 0 4px var(--wa-lcd-glow);
+  opacity: 0.8;
+}
+.wa-lyrics-line.active {
+  opacity: 1;
+  color: var(--pl-current, #fff);
+  text-shadow: 0 0 7px var(--wa-lcd-glow);
+}
+.wa-lyrics-status {
+  flex: 0 0 auto;
+  min-height: 13px;
+  text-align: center;
+  opacity: 0.55;
+  font: 11px/1.3 var(--wa-lcd-font);
+  color: var(--pl-normal, var(--wa-fg-dim));
+}
+.wa-pl-n {
+  min-width: 22px;
+  text-align: right;
+  opacity: 0.7;
+}
+.wa-pl-thumb {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  image-rendering: pixelated;
+  border: 1px solid #000;
+  background: #000;
+}
+.wa-pl-thumb.empty {
+  background: #111;
+}
+.wa-pl-t {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-pl-plays {
+  flex: 0 0 auto;
+  font: 9px/1 var(--wa-font);
+  color: var(--wa-fg-dim);
+  opacity: 0.85;
+}
+.wa-pl-d {
+  opacity: 0.85;
+}
+.wa-pl-empty {
+  padding: 10px;
+  color: var(--wa-fg-dim);
+  font: 11px/1.4 var(--wa-font);
+  white-space: normal;
+}
+.wa-pl-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wa-pl-btns {
+  display: flex;
+  gap: 3px;
+}
 .wa-pl-btn {
-  font: 700 8px/1 var(--wa-font); letter-spacing: 0.5px; color: var(--wa-btn-fg);
-  background: var(--wa-btn-bg); border: 2px solid; border-radius: 2px;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
-  padding: 5px 7px; cursor: pointer;
+  font: 700 8px/1 var(--wa-font);
+  letter-spacing: 0.5px;
+  color: var(--wa-btn-fg);
+  background: var(--wa-btn-bg);
+  border: 2px solid;
+  border-radius: 2px;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark)
+    var(--wa-bevel-light);
+  padding: 5px 7px;
+  cursor: pointer;
 }
-.wa-pl-btn:active { border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark); }
-.wa-pl-count { margin-left: auto; font: 700 9px/1 var(--wa-font); color: var(--wa-fg-dim); }
+.wa-pl-btn:active {
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light)
+    var(--wa-bevel-dark);
+}
+.wa-pl-count {
+  margin-left: auto;
+  font: 700 9px/1 var(--wa-font);
+  color: var(--wa-fg-dim);
+}
 .wa-pl-time {
   /* skin's playlist text colour (matches the rows + keeps Classic's green LCD),
      not the hardcoded LCD green that ignored the theme */
-  font-size: 14px; padding: 3px 6px; color: var(--pl-normal, var(--wa-lcd));
-  border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85);
+  font-size: 14px;
+  padding: 3px 6px;
+  color: var(--pl-normal, var(--wa-lcd));
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.85);
 }
 
 /* =======================================================================
    MEDIA LIBRARY WINDOW (search + results)
    ======================================================================= */
-#wa-lib { width: 380px; height: 300px; display: flex; flex-direction: column; min-width: 260px; min-height: 180px; }
-#wa-lib .wa-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; gap: 5px; }
-.wa-lib-bar { display: flex; gap: 5px; }
+#wa-lib {
+  width: 380px;
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  min-height: 180px;
+}
+#wa-lib .wa-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 5px;
+}
+.wa-lib-bar {
+  display: flex;
+  gap: 5px;
+}
 .wa-lib-input {
-  flex: 1 1 auto; min-width: 0;
-  font: 13px/1 var(--wa-lcd-font); color: var(--wa-lcd); letter-spacing: 0.5px;
-  background: var(--wa-inset-bg); border: 1px solid #000;
-  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.85); border-radius: 1px;
-  padding: 5px 7px; outline: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 13px/1 var(--wa-lcd-font);
+  color: var(--wa-lcd);
+  letter-spacing: 0.5px;
+  background: var(--wa-inset-bg);
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.85);
+  border-radius: 1px;
+  padding: 5px 7px;
+  outline: none;
 }
-.wa-lib-input::placeholder { color: var(--wa-fg-dim); }
+.wa-lib-input::placeholder {
+  color: var(--wa-fg-dim);
+}
 .wa-lib-go {
-  flex: 0 0 auto; font: 700 9px/1 var(--wa-font); color: var(--wa-btn-fg); cursor: pointer;
-  background: var(--wa-btn-bg); border: 2px solid; border-radius: 2px; padding: 0 10px;
-  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark) var(--wa-bevel-light);
+  flex: 0 0 auto;
+  font: 700 9px/1 var(--wa-font);
+  color: var(--wa-btn-fg);
+  cursor: pointer;
+  background: var(--wa-btn-bg);
+  border: 2px solid;
+  border-radius: 2px;
+  padding: 0 10px;
+  border-color: var(--wa-bevel-light) var(--wa-bevel-dark) var(--wa-bevel-dark)
+    var(--wa-bevel-light);
 }
-.wa-lib-go:active { border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light) var(--wa-bevel-dark); }
+.wa-lib-go:active {
+  border-color: var(--wa-bevel-dark) var(--wa-bevel-light) var(--wa-bevel-light)
+    var(--wa-bevel-dark);
+}
 .wa-lib-list {
-  flex: 1 1 auto; overflow-y: auto; min-height: 0;
-  background: var(--wa-inset-bg); border: 1px solid #000;
-  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--wa-inset-bg);
+  border: 1px solid #000;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9);
 }
 .wa-lib-sec {
-  position: sticky; top: 0;
-  font: 700 9px/1 var(--wa-font); letter-spacing: 1px; text-transform: uppercase;
-  color: var(--wa-title-fg); background: var(--wa-title-bg);
-  padding: 4px 7px; border-bottom: 1px solid #000;
+  position: sticky;
+  top: 0;
+  font: 700 9px/1 var(--wa-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--wa-title-fg);
+  background: var(--wa-title-bg);
+  padding: 4px 7px;
+  border-bottom: 1px solid #000;
 }
-.wa-lib-row { display: flex; align-items: center; gap: 7px; padding: 3px 6px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.25); }
-.wa-lib-row:hover { background: rgba(255,255,255,0.07); }
-.wa-lib-row.top { background: rgba(255,255,255,0.04); }
-.wa-lib-thumb { width: 30px; height: 30px; flex: 0 0 auto; object-fit: cover; image-rendering: pixelated; background: #000; border: 1px solid #000; }
-.wa-lib-thumb.empty { background: #111; }
-.wa-lib-meta { min-width: 0; flex: 1 1 auto; }
-.wa-lib-t { font-family: var(--wa-lcd-font); font-size: 14px; color: var(--wa-lcd); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-lib-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+}
+.wa-lib-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.wa-lib-row.top {
+  background: rgba(255, 255, 255, 0.04);
+}
+.wa-lib-thumb {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  image-rendering: pixelated;
+  background: #000;
+  border: 1px solid #000;
+}
+.wa-lib-thumb.empty {
+  background: #111;
+}
+.wa-lib-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.wa-lib-t {
+  font-family: var(--wa-lcd-font);
+  font-size: 14px;
+  color: var(--wa-lcd);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* PL/ALB badge marking a playlist/album result (single-click opens it) */
 .wa-lib-badge {
-  display: inline-block; font: 700 7px/1 var(--wa-font); letter-spacing: 0.5px;
-  color: var(--wa-title-fg); background: var(--wa-title-bg);
-  padding: 1px 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle;
+  display: inline-block;
+  font: 700 7px/1 var(--wa-font);
+  letter-spacing: 0.5px;
+  color: var(--wa-title-fg);
+  background: var(--wa-title-bg);
+  padding: 1px 3px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
 }
-.wa-lib-row.is-collection { cursor: pointer; }
-.wa-lib-s { font: 9px/1.3 var(--wa-font); color: var(--wa-fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-lib-status { font: 9px/1.2 var(--wa-font); color: var(--wa-fg-dim); padding: 1px 2px; }
+.wa-lib-row.is-collection {
+  cursor: pointer;
+}
+.wa-lib-s {
+  font: 9px/1.3 var(--wa-font);
+  color: var(--wa-fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-lib-status {
+  font: 9px/1.2 var(--wa-font);
+  color: var(--wa-fg-dim);
+  padding: 1px 2px;
+}
 
 /* classic skin picker: a RETRO GOLD beveled button (matching the NeoAmp
    nameplate) + a styled popup list — no native <select> (its OS dropdown breaks
    the skin illusion). Readable bold sans, dark engraved text on the gold plate. */
-.wa-skinsel { position: relative; display: inline-block; margin-right: 4px; }
+.wa-skinsel {
+  position: relative;
+  display: inline-block;
+  margin-right: 4px;
+}
 .wa-skinsel-btn {
-  display: flex; align-items: center; gap: 5px; height: 17px; padding: 0 9px;
-  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.2px; white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 17px;
+  padding: 0 9px;
+  font:
+    700 12px/1 "Helvetica Neue",
+    Arial,
+    sans-serif;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
   /* engraved gold lettering like the NeoAmp nameplate: bright cream text on a
      deeper bronze plate with a dark incised shadow (readable + matching) */
-  color: #fdf2cc; text-shadow: 0 1px 1px rgba(28,16,2,0.95), 0 -1px 0 rgba(28,16,2,0.35);
+  color: #fdf2cc;
+  text-shadow:
+    0 1px 1px rgba(28, 16, 2, 0.95),
+    0 -1px 0 rgba(28, 16, 2, 0.35);
   background: linear-gradient(180deg, #c9a44a 0%, #9a7a2e 48%, #7c5e1f 52%, #5a4216 100%);
-  border: 1px solid; border-color: #f0d98a #4a3810 #3a2c0c #d9b25a;
-  border-radius: 2px; box-shadow: inset 0 1px 0 rgba(255,240,190,0.5), 0 1px 2px rgba(0,0,0,0.45);
+  border: 1px solid;
+  border-color: #f0d98a #4a3810 #3a2c0c #d9b25a;
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 190, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
-.wa-skinsel-btn:hover { filter: brightness(1.07); }
-.wa-skinsel-btn:active { border-color: #3a2c0c #d9b25a #f0d98a #4a3810; box-shadow: inset 1px 1px 3px rgba(40,26,4,0.6); }
-.wa-skinsel-arrow { font-size: 8px; opacity: 0.85; }
-.wa-skinsel-menu {
-  display: none; position: absolute; right: 0; top: 100%; margin-top: 2px;
-  z-index: 50; min-width: 140px;
-  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif;   /* clear, not condensed */
-  background: linear-gradient(180deg, #322a1c, #221b10);
-  border: 1px solid; border-color: #e0bc66 #4a3810 #4a3810 #e0bc66;
-  box-shadow: 2px 3px 7px rgba(0,0,0,0.65);
+.wa-skinsel-btn:hover {
+  filter: brightness(1.07);
 }
-.wa-skinsel-menu.open { display: block; }
+.wa-skinsel-btn:active {
+  border-color: #3a2c0c #d9b25a #f0d98a #4a3810;
+  box-shadow: inset 1px 1px 3px rgba(40, 26, 4, 0.6);
+}
+.wa-skinsel-arrow {
+  font-size: 8px;
+  opacity: 0.85;
+}
+.wa-skinsel-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 2px;
+  z-index: 50;
+  min-width: 140px;
+  font:
+    700 12px/1 "Helvetica Neue",
+    Arial,
+    sans-serif; /* clear, not condensed */
+  background: linear-gradient(180deg, #322a1c, #221b10);
+  border: 1px solid;
+  border-color: #e0bc66 #4a3810 #4a3810 #e0bc66;
+  box-shadow: 2px 3px 7px rgba(0, 0, 0, 0.65);
+}
+.wa-skinsel-menu.open {
+  display: block;
+}
 /* bright cream text on dark so each skin name is clearly readable */
-.wa-skinsel-item { padding: 6px 11px; color: #f6edcf; cursor: pointer; white-space: nowrap; text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
-.wa-skinsel-item + .wa-skinsel-item { border-top: 1px solid rgba(255,235,170,0.08); }
+.wa-skinsel-item {
+  padding: 6px 11px;
+  color: #f6edcf;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+}
+.wa-skinsel-item + .wa-skinsel-item {
+  border-top: 1px solid rgba(255, 235, 170, 0.08);
+}
 /* gold selection highlight (was a harsh bright-green accent) */
-.wa-skinsel-item:hover { background: linear-gradient(180deg, #efd185, #c79a3e); color: #241803; text-shadow: 0 1px 0 rgba(255,250,225,0.5); }
-.wa-skinsel-item.load { border-top: 1px solid #4a3810; color: #c9a44a; }
+.wa-skinsel-item:hover {
+  background: linear-gradient(180deg, #efd185, #c79a3e);
+  color: #241803;
+  text-shadow: 0 1px 0 rgba(255, 250, 225, 0.5);
+}
+.wa-skinsel-item.load {
+  border-top: 1px solid #4a3810;
+  color: #c9a44a;
+}
 
 /* ===== ⚙ gear menu: a neutral dark dropdown (NOT gold) so it doesn't fight cool
    skins; the active skin is marked with the skin's own accent (--pl-current). It
    carries the Background + Zoom rows above the skin list. ================= */
 .wa-gear-menu {
-  right: 0; min-width: 178px; padding: 4px 0;
-  font: 700 12px/1 "Helvetica Neue", Arial, sans-serif;
+  right: 0;
+  min-width: 178px;
+  padding: 4px 0;
+  font:
+    700 12px/1 "Helvetica Neue",
+    Arial,
+    sans-serif;
   background: linear-gradient(180deg, #25262e, #191a20);
-  border: 1px solid; border-color: #4a4c58 #0c0d11 #0c0d11 #4a4c58;
-  box-shadow: 2px 4px 10px rgba(0,0,0,0.7);
+  border: 1px solid;
+  border-color: #4a4c58 #0c0d11 #0c0d11 #4a4c58;
+  box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.7);
 }
-.wa-gear-menu .wa-skinsel-item { color: #d6dae6; padding: 6px 12px; }
-.wa-gear-menu .wa-skinsel-item + .wa-skinsel-item { border-top: 1px solid rgba(255,255,255,0.05); }
-.wa-gear-menu .wa-skinsel-item:hover { background: rgba(255,255,255,0.10); color: #fff; text-shadow: none; }
-.wa-gear-menu .wa-skinsel-item.active { color: var(--pl-current, #16e651); }
-.wa-gear-menu .wa-skinsel-item.active::after { content: " ✓"; opacity: 0.9; }
-.wa-gear-menu .wa-skinsel-item.load { border-top: 1px solid rgba(255,255,255,0.12); color: #9fb0c8; }
+.wa-gear-menu .wa-skinsel-item {
+  color: #d6dae6;
+  padding: 6px 12px;
+}
+.wa-gear-menu .wa-skinsel-item + .wa-skinsel-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.wa-gear-menu .wa-skinsel-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-shadow: none;
+}
+.wa-gear-menu .wa-skinsel-item.active {
+  color: var(--pl-current, #16e651);
+}
+.wa-gear-menu .wa-skinsel-item.active::after {
+  content: " ✓";
+  opacity: 0.9;
+}
+.wa-gear-menu .wa-skinsel-item.load {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #9fb0c8;
+}
 /* section header above the skin list */
 .wa-gear-head {
-  padding: 7px 12px 3px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,0.1);
-  font: 700 10px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 7px 12px 3px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font:
+    700 10px/1 "Helvetica Neue",
+    Arial,
+    sans-serif;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   color: #8b90a2;
 }
 /* Background + Zoom control rows */
-.wa-gear-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 6px 12px; color: #d6dae6; }
-.wa-gear-click { cursor: pointer; }
-.wa-gear-click:hover { background: rgba(255,255,255,0.08); }
-.wa-gear-k { color: #aeb3c2; letter-spacing: 0.3px; }
-.wa-gear-val { color: var(--pl-current, #cdd2e6); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
-.wa-gear-zoom { display: inline-flex; align-items: center; gap: 8px; }
-.wa-gear-zval { min-width: 38px; text-align: center; color: #e7eaf2; }
-.wa-gear-step {
-  display: inline-grid; place-items: center; width: 18px; height: 18px; cursor: pointer;
-  color: #e7eaf2; font-weight: 700; border-radius: 2px;
-  background: linear-gradient(180deg, #44464f, #2c2e36);
-  border: 1px solid; border-color: rgba(255,255,255,0.28) rgba(0,0,0,0.5) rgba(0,0,0,0.5) rgba(255,255,255,0.2);
+.wa-gear-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 6px 12px;
+  color: #d6dae6;
 }
-.wa-gear-step:hover { filter: brightness(1.15); }
-.wa-gear-step:active { filter: brightness(0.85); box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5); }
+.wa-gear-click {
+  cursor: pointer;
+}
+.wa-gear-click:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.wa-gear-k {
+  color: #aeb3c2;
+  letter-spacing: 0.3px;
+}
+.wa-gear-val {
+  color: var(--pl-current, #cdd2e6);
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  text-align: right;
+}
+.wa-gear-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.wa-gear-zval {
+  min-width: 38px;
+  text-align: center;
+  color: #e7eaf2;
+}
+.wa-gear-step {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  color: #e7eaf2;
+  font-weight: 700;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #44464f, #2c2e36);
+  border: 1px solid;
+  border-color: rgba(255, 255, 255, 0.28) rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.5)
+    rgba(255, 255, 255, 0.2);
+}
+.wa-gear-step:hover {
+  filter: brightness(1.15);
+}
+.wa-gear-step:active {
+  filter: brightness(0.85);
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
 
 /* =======================================================================
    LAUNCHER
    ======================================================================= */
 /* retro GOLD launcher, matching the NeoAmp nameplate + skin picker (was blue) */
 #neoamp-launch {
-  position: fixed; right: 18px; bottom: 18px; z-index: 2147483601; pointer-events: auto;
-  font: 700 12px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif; letter-spacing: 1px;
-  color: #3a2a06; text-shadow: 0 1px 0 rgba(255,246,214,0.6);
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483601;
+  pointer-events: auto;
+  font:
+    700 12px/1 "Arial Narrow",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  letter-spacing: 1px;
+  color: #3a2a06;
+  text-shadow: 0 1px 0 rgba(255, 246, 214, 0.6);
   padding: 9px 15px;
   background: linear-gradient(180deg, #f1d98c 0%, #cda64a 48%, #ad8631 52%, #7c5e1f 100%);
-  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+  border: 1px solid;
+  border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
   border-radius: 3px;
-  box-shadow: inset 0 1px 0 rgba(255,250,228,0.6), 0 4px 14px rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 228, 0.6),
+    0 4px 14px rgba(0, 0, 0, 0.5);
   cursor: pointer;
 }
-#neoamp-launch:hover { filter: brightness(1.06); }
-#neoamp-launch:active { border-color: #4a3810 #efdfa6 #fbefcb #5a4514; box-shadow: inset 1px 1px 3px rgba(60,40,8,0.6); }
+#neoamp-launch:hover {
+  filter: brightness(1.06);
+}
+#neoamp-launch:active {
+  border-color: #4a3810 #efdfa6 #fbefcb #5a4514;
+  box-shadow: inset 1px 1px 3px rgba(60, 40, 8, 0.6);
+}
 
 /* one-time first-run onboarding card (sits just above the launcher pill) */
 #neoamp-onboard {
-  position: fixed; right: 18px; bottom: 64px; z-index: 2147483602; width: 322px; max-width: 78vw;
-  background: linear-gradient(180deg, #2b2f3a, #1b1e26); color: #e8ecf6;
-  border: 1px solid; border-color: #f1d98c #6a5320 #4a3810 #cda64a; border-radius: 5px;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
-  font: 12px/1.45 "Arial Narrow", "Helvetica Neue", Arial, sans-serif; padding: 12px 14px;
+  position: fixed;
+  right: 18px;
+  bottom: 64px;
+  z-index: 2147483602;
+  width: 322px;
+  max-width: 78vw;
+  background: linear-gradient(180deg, #2b2f3a, #1b1e26);
+  color: #e8ecf6;
+  border: 1px solid;
+  border-color: #f1d98c #6a5320 #4a3810 #cda64a;
+  border-radius: 5px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  font:
+    12px/1.45 "Arial Narrow",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  padding: 12px 14px;
 }
-#neoamp-onboard .neoamp-onboard-h { font-weight: 700; letter-spacing: 0.6px; color: #f1d98c; margin-bottom: 6px; }
-#neoamp-onboard .neoamp-onboard-b { opacity: 0.92; }
-#neoamp-onboard .neoamp-onboard-b b { color: #fff; font-weight: 700; }
+#neoamp-onboard .neoamp-onboard-h {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #f1d98c;
+  margin-bottom: 6px;
+}
+#neoamp-onboard .neoamp-onboard-b {
+  opacity: 0.92;
+}
+#neoamp-onboard .neoamp-onboard-b b {
+  color: #fff;
+  font-weight: 700;
+}
 #neoamp-onboard .neoamp-onboard-ok {
-  margin-top: 11px; float: right; cursor: pointer;
-  font: 700 11px/1 "Arial Narrow", Arial, sans-serif; letter-spacing: 0.5px; color: #3a2a06; padding: 6px 15px; border-radius: 3px;
+  margin-top: 11px;
+  float: right;
+  cursor: pointer;
+  font:
+    700 11px/1 "Arial Narrow",
+    Arial,
+    sans-serif;
+  letter-spacing: 0.5px;
+  color: #3a2a06;
+  padding: 6px 15px;
+  border-radius: 3px;
   background: linear-gradient(180deg, #f1d98c 0%, #cda64a 52%, #ad8631 56%, #7c5e1f 100%);
-  border: 1px solid; border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
+  border: 1px solid;
+  border-color: #fbefcb #5a4514 #4a3810 #efdfa6;
 }
-#neoamp-onboard::after { content: ""; display: block; clear: both; }
+#neoamp-onboard::after {
+  content: "";
+  display: block;
+  clear: both;
+}
 
 /* keyboard-shortcut reference overlay (opened from the gear menu) */
-.neoamp-sc-back { position: fixed; inset: 0; z-index: 2147483640; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); }
+.neoamp-sc-back {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
 .neoamp-sc {
-  width: 384px; max-width: 88vw; max-height: 84vh; overflow: auto;
-  background: linear-gradient(180deg, #2b2f3a, #1b1e26); color: #e8ecf6;
-  border: 1px solid; border-color: #f1d98c #6a5320 #4a3810 #cda64a; border-radius: 6px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6); font: 13px/1.4 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  width: 384px;
+  max-width: 88vw;
+  max-height: 84vh;
+  overflow: auto;
+  background: linear-gradient(180deg, #2b2f3a, #1b1e26);
+  color: #e8ecf6;
+  border: 1px solid;
+  border-color: #f1d98c #6a5320 #4a3810 #cda64a;
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  font:
+    13px/1.4 "Arial Narrow",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
 }
-.neoamp-sc-h { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid rgba(241,217,140,0.25); font-weight: 700; letter-spacing: 0.6px; color: #f1d98c; }
-.neoamp-sc-x { cursor: pointer; background: none; border: 0; color: #cfd5e6; font-size: 15px; line-height: 1; padding: 2px 7px; border-radius: 3px; }
-.neoamp-sc-x:hover { background: rgba(255,255,255,0.12); color: #fff; }
-.neoamp-sc-list { padding: 8px 14px 14px; }
-.neoamp-sc-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.neoamp-sc-row:last-child { border-bottom: 0; }
+.neoamp-sc-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(241, 217, 140, 0.25);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #f1d98c;
+}
+.neoamp-sc-x {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  color: #cfd5e6;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.neoamp-sc-x:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.neoamp-sc-list {
+  padding: 8px 14px 14px;
+}
+.neoamp-sc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.neoamp-sc-row:last-child {
+  border-bottom: 0;
+}
 .neoamp-sc-key {
-  flex: 0 0 104px; text-align: center; font: 700 11px/1 "Arial Narrow", Arial, sans-serif; letter-spacing: 0.5px; color: #1b1e26;
-  background: linear-gradient(180deg, #f6f8fd, #c7cede); border: 1px solid #8a93a8; border-bottom-width: 2px; border-radius: 4px; padding: 5px 6px;
+  flex: 0 0 104px;
+  text-align: center;
+  font:
+    700 11px/1 "Arial Narrow",
+    Arial,
+    sans-serif;
+  letter-spacing: 0.5px;
+  color: #1b1e26;
+  background: linear-gradient(180deg, #f6f8fd, #c7cede);
+  border: 1px solid #8a93a8;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 5px 6px;
 }
-.neoamp-sc-desc { flex: 1 1 auto; opacity: 0.92; }
+.neoamp-sc-desc {
+  flex: 1 1 auto;
+  opacity: 0.92;
+}
 
 /* keyboard-focus visibility for every operable control (div-based + native). Only
    :focus-visible so a mouse click doesn't leave a ring, but Tab navigation does. */
-.wa-tog:focus-visible, .wa-np-tog:focus-visible, .wa-tbtn:focus-visible,
-.wa-pl-btn:focus-visible, .wa-skinsel-btn:focus-visible, .wa-skinsel-item:focus-visible,
-.wa-gear-click:focus-visible, .wa-gear-step:focus-visible, .wa-lib-row:focus-visible,
-.wa-pl-row:focus-visible, .wa-lib-go:focus-visible, .wa-lib-input:focus-visible,
-.wa-range:focus-visible, .wa-vrange:focus-visible, .neoamp-sc-x:focus-visible, .neoamp-onboard-ok:focus-visible {
-  outline: 2px solid #7fc7ff; outline-offset: 1px; border-radius: 2px;
+.wa-tog:focus-visible,
+.wa-np-tog:focus-visible,
+.wa-tbtn:focus-visible,
+.wa-pl-btn:focus-visible,
+.wa-skinsel-btn:focus-visible,
+.wa-skinsel-item:focus-visible,
+.wa-gear-click:focus-visible,
+.wa-gear-step:focus-visible,
+.wa-lib-row:focus-visible,
+.wa-pl-row:focus-visible,
+.wa-lib-go:focus-visible,
+.wa-lib-input:focus-visible,
+.wa-range:focus-visible,
+.wa-vrange:focus-visible,
+.neoamp-sc-x:focus-visible,
+.neoamp-onboard-ok:focus-visible {
+  outline: 2px solid #7fc7ff;
+  outline-offset: 1px;
+  border-radius: 2px;
 }

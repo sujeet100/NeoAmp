@@ -13,19 +13,32 @@
   // [WMP-viz shader]) — our only window into GLSL errors (can't check in Node).
   function installShaderDebug() {
     var numbered = function (src) {
-      return String(src || "").split("\n").map(function (l, i) { return String(i + 1).padStart(3) + "| " + l; }).join("\n");
+      return String(src || "")
+        .split("\n")
+        .map(function (l, i) {
+          return String(i + 1).padStart(3) + "| " + l;
+        })
+        .join("\n");
     };
     [self.WebGLRenderingContext, self.WebGL2RenderingContext].forEach(function (Ctx) {
       if (!Ctx || Ctx.prototype.__wmpShaderDebug) return;
       Ctx.prototype.__wmpShaderDebug = true;
       var srcOf = new WeakMap();
       var _shaderSource = Ctx.prototype.shaderSource;
-      Ctx.prototype.shaderSource = function (shader, source) { srcOf.set(shader, source); return _shaderSource.call(this, shader, source); };
+      Ctx.prototype.shaderSource = function (shader, source) {
+        srcOf.set(shader, source);
+        return _shaderSource.call(this, shader, source);
+      };
       var _compile = Ctx.prototype.compileShader;
       Ctx.prototype.compileShader = function (shader) {
         var r = _compile.call(this, shader);
         if (!this.getShaderParameter(shader, this.COMPILE_STATUS))
-          console.error("[WMP-viz shader] compile FAILED\n" + this.getShaderInfoLog(shader) + "\n--- source ---\n" + numbered(srcOf.get(shader)));
+          console.error(
+            "[WMP-viz shader] compile FAILED\n" +
+              this.getShaderInfoLog(shader) +
+              "\n--- source ---\n" +
+              numbered(srcOf.get(shader))
+          );
         return r;
       };
       var _link = Ctx.prototype.linkProgram;
@@ -40,26 +53,43 @@
   installShaderDebug();
 
   var FFT_SIZE = 1024; // matches the content script's analyser
-  var post = function (m) { try { parent.postMessage(Object.assign({ __wmp: true }, m), "*"); } catch (_) {} };
-  var fail = function (msg) { console.error("[WMP-viz]", msg); post({ type: "error", message: String(msg) }); };
+  var post = function (m) {
+    try {
+      parent.postMessage(Object.assign({ __wmp: true }, m), "*");
+    } catch (_) {}
+  };
+  var fail = function (msg) {
+    console.error("[WMP-viz]", msg);
+    post({ type: "error", message: String(msg) });
+  };
 
   var BC = (window.butterchurn && (window.butterchurn.default || window.butterchurn)) || null;
 
   function packPresets(g) {
     if (!g) return {};
     var mod = g.default || g;
-    try { if (typeof mod.getPresets === "function") return mod.getPresets() || {}; } catch (_) {}
+    try {
+      if (typeof mod.getPresets === "function") return mod.getPresets() || {};
+    } catch (_) {}
     return typeof mod === "object" ? mod : {};
   }
   function collectPresets() {
-    return Object.assign({}, packPresets(window.butterchurnPresets), packPresets(window.butterchurnPresetsExtra), packPresets(window.butterchurnPresetsExtra2));
+    return Object.assign(
+      {},
+      packPresets(window.butterchurnPresets),
+      packPresets(window.butterchurnPresetsExtra),
+      packPresets(window.butterchurnPresetsExtra2)
+    );
   }
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" },   // ONE seamless self-sequencing preset
+    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // ONE seamless self-sequencing preset
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
-    { label: "Dance of the Freaky Circles (Nebula Spectrum)", wmp: "Dance of the Freaky Circles (Nebula Spectrum)" },
+    {
+      label: "Dance of the Freaky Circles (Nebula Spectrum)",
+      wmp: "Dance of the Freaky Circles (Nebula Spectrum)",
+    },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Alchemy v2: Random", wmp: "Alchemy v2: Random" },
     { label: "Alchemy Random", wmp: "Alchemy Random" },
@@ -128,13 +158,19 @@
   ];
 
   var DIRECTOR_KEY = "__director__"; // sentinel picker value that engages the auto-sequencer
-  var viz = null, presets = {}, names = [], idx = 0, rafId = 0;
+  var viz = null,
+    presets = {},
+    names = [],
+    idx = 0,
+    rafId = 0;
   var presetSel = null;
   var userFavs = new Set();
   var latest = new Uint8Array(FFT_SIZE);
   var audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
 
-  var nowMs = function () { return (window.performance && performance.now) ? performance.now() : Date.now(); };
+  var nowMs = function () {
+    return window.performance && performance.now ? performance.now() : Date.now();
+  };
 
   // --- The Director — Tier-2 era sequencer (the composition "when-to-change" brain)
   //
@@ -155,36 +191,49 @@
   var Director = (function () {
     var cfg = {
       enabled: false,
-      dwellCalmMs: 11000,    // dwell between cuts when the track is calm
-      dwellLoudMs: 6000,     // dwell when energetic (shorter → more frequent cuts)
-      maxBeatWaitMs: 2500,   // once dwell elapses, wait this long for a beat, else cut anyway
-      blendCalmS: 3.0,       // crossfade length when calm (morphier)
-      blendLoudS: 1.6,       // crossfade length when energetic (snappier)
-      beatSens: 1.45,        // onset ratio (energy / local-average) to call a beat
-      beatFloor: 0.015,      // ignore "beats" below this RMS (treat as silence)
+      dwellCalmMs: 11000, // dwell between cuts when the track is calm
+      dwellLoudMs: 6000, // dwell when energetic (shorter → more frequent cuts)
+      maxBeatWaitMs: 2500, // once dwell elapses, wait this long for a beat, else cut anyway
+      blendCalmS: 3.0, // crossfade length when calm (morphier)
+      blendLoudS: 1.6, // crossfade length when energetic (snappier)
+      beatSens: 1.45, // onset ratio (energy / local-average) to call a beat
+      beatFloor: 0.015, // ignore "beats" below this RMS (treat as silence)
       beatRefractoryMs: 220, // minimum gap between beats
-      energyTauMs: 6000,     // "vibe" EMA time-constant (macro pacing)
+      energyTauMs: 6000, // "vibe" EMA time-constant (macro pacing)
     };
 
     // audio-derived state
-    var energy = 0;          // instantaneous RMS of the centered waveform
-    var energyNorm = 0;      // AGC-normalized energy, 0..1
-    var vibe = 0;            // slow EMA of energyNorm, 0..1 — the macro pacing signal
-    var runningMax = 1e-2;   // adaptive gain reference (decays slowly)
-    var beat = false;        // a transient fired THIS frame
+    var energy = 0; // instantaneous RMS of the centered waveform
+    var energyNorm = 0; // AGC-normalized energy, 0..1
+    var vibe = 0; // slow EMA of energyNorm, 0..1 — the macro pacing signal
+    var runningMax = 1e-2; // adaptive gain reference (decays slowly)
+    var beat = false; // a transient fired THIS frame
     var beatStrength = 0;
     var lastBeatAt = -1e9;
-    var hist = new Float32Array(32), histN = 0, histI = 0, histSum = 0; // ~0.5s onset window
+    var hist = new Float32Array(32),
+      histN = 0,
+      histI = 0,
+      histSum = 0; // ~0.5s onset window
 
     // sequencer state
-    var eras = [];           // preset names this Director cycles among
-    var bag = [];            // shuffle bag of era indices: every era plays once before any repeat
-    var lastTickAt = 0, dwellElapsed = 0, pending = false, pendingSince = 0;
-    var onSwitch = null, curName = null;
+    var eras = []; // preset names this Director cycles among
+    var bag = []; // shuffle bag of era indices: every era plays once before any repeat
+    var lastTickAt = 0,
+      dwellElapsed = 0,
+      pending = false,
+      pendingSince = 0;
+    var onSwitch = null,
+      curName = null;
 
     function feed(bytes, now) {
-      var n = bytes.length, sum = 0, i, x;
-      for (i = 0; i < n; i++) { x = (bytes[i] - 128) / 128; sum += x * x; }
+      var n = bytes.length,
+        sum = 0,
+        i,
+        x;
+      for (i = 0; i < n; i++) {
+        x = (bytes[i] - 128) / 128;
+        sum += x * x;
+      }
       energy = Math.sqrt(sum / n);
 
       // adaptive normalization so quiet and loud tracks pace the same way
@@ -192,19 +241,31 @@
       energyNorm = Math.min(1, energy / runningMax);
 
       // short-window local average for transient/onset detection
-      histSum -= hist[histI]; hist[histI] = energy; histSum += energy;
-      histI = (histI + 1) % hist.length; if (histN < hist.length) histN++;
+      histSum -= hist[histI];
+      hist[histI] = energy;
+      histSum += energy;
+      histI = (histI + 1) % hist.length;
+      if (histN < hist.length) histN++;
       var localAvg = histN ? histSum / histN : 0;
 
       beat = false;
       beatStrength = localAvg > 1e-6 ? energy / localAvg : 0;
-      if (energy > cfg.beatFloor && beatStrength > cfg.beatSens && (now - lastBeatAt) > cfg.beatRefractoryMs) {
-        beat = true; lastBeatAt = now;
+      if (
+        energy > cfg.beatFloor &&
+        beatStrength > cfg.beatSens &&
+        now - lastBeatAt > cfg.beatRefractoryMs
+      ) {
+        beat = true;
+        lastBeatAt = now;
       }
     }
 
-    function dwellMs() { return cfg.dwellCalmMs + (cfg.dwellLoudMs - cfg.dwellCalmMs) * vibe; }
-    function blendS() { return cfg.blendCalmS + (cfg.blendLoudS - cfg.blendCalmS) * vibe; }
+    function dwellMs() {
+      return cfg.dwellCalmMs + (cfg.dwellLoudMs - cfg.dwellCalmMs) * vibe;
+    }
+    function blendS() {
+      return cfg.blendCalmS + (cfg.blendLoudS - cfg.blendCalmS) * vibe;
+    }
 
     // SHUFFLE BAG: draw eras without replacement so every look plays once before any repeats
     // (no "same thing again and again"). Refill+reshuffle when empty; avoid an immediate repeat
@@ -214,15 +275,24 @@
       if (eras.length === 1) return eras[0];
       if (!bag.length) {
         for (var i = 0; i < eras.length; i++) bag.push(i);
-        for (var j = bag.length - 1; j > 0; j--) { var r = Math.floor(Math.random() * (j + 1)); var x = bag[j]; bag[j] = bag[r]; bag[r] = x; }
+        for (var j = bag.length - 1; j > 0; j--) {
+          var r = Math.floor(Math.random() * (j + 1));
+          var x = bag[j];
+          bag[j] = bag[r];
+          bag[r] = x;
+        }
       }
       var idx = bag.shift();
-      if (eras[idx] === curName && bag.length) { var idx2 = bag.shift(); bag.push(idx); idx = idx2; }
+      if (eras[idx] === curName && bag.length) {
+        var idx2 = bag.shift();
+        bag.push(idx);
+        idx = idx2;
+      }
       return eras[idx];
     }
 
     function tick(now) {
-      var dt = lastTickAt ? (now - lastTickAt) : 0;
+      var dt = lastTickAt ? now - lastTickAt : 0;
       lastTickAt = now;
       // advance the "vibe" envelope every frame (even while disabled, so it's warm when engaged)
       var a = dt > 0 ? Math.min(1, dt / cfg.energyTauMs) : 0;
@@ -230,26 +300,65 @@
       if (!cfg.enabled || eras.length < 2 || !onSwitch) return;
 
       dwellElapsed += dt;
-      if (!pending && dwellElapsed >= dwellMs()) { pending = true; pendingSince = now; }
-      if (pending && (beat || (now - pendingSince) > cfg.maxBeatWaitMs)) {
+      if (!pending && dwellElapsed >= dwellMs()) {
+        pending = true;
+        pendingSince = now;
+      }
+      if (pending && (beat || now - pendingSince > cfg.maxBeatWaitMs)) {
         var name = pickNext();
         if (name) onSwitch(name, blendS()); // onSwitch → loadByName → noteLoaded resets the clock
       }
     }
 
     return {
-      feed: feed, tick: tick, cfg: cfg,
-      setEras: function (list) { eras = (list || []).slice(); bag = []; },
-      setOnSwitch: function (fn) { onSwitch = fn; },
+      feed: feed,
+      tick: tick,
+      cfg: cfg,
+      setEras: function (list) {
+        eras = (list || []).slice();
+        bag = [];
+      },
+      setOnSwitch: function (fn) {
+        onSwitch = fn;
+      },
       // every preset load (manual OR director) resets the dwell clock so a manual
       // pick gets its full dwell before the Director cuts away from it.
-      noteLoaded: function (name, now) { curName = name; dwellElapsed = 0; pending = false; lastTickAt = now; },
-      setEnabled: function (on, now) { cfg.enabled = !!on; dwellElapsed = 0; pending = false; lastTickAt = now; },
+      noteLoaded: function (name, now) {
+        curName = name;
+        dwellElapsed = 0;
+        pending = false;
+        lastTickAt = now;
+      },
+      setEnabled: function (on, now) {
+        cfg.enabled = !!on;
+        dwellElapsed = 0;
+        pending = false;
+        lastTickAt = now;
+      },
       // jump to a fresh era immediately (so engaging the Director gives instant feedback).
-      kick: function () { if (cfg.enabled && eras.length >= 2 && onSwitch) { var n = pickNext(); if (n) onSwitch(n, blendS()); } },
-      isEnabled: function () { return cfg.enabled; },
-      eraCount: function () { return eras.length; },
-      status: function () { return { enabled: cfg.enabled, energy: energy, vibe: vibe, beat: beat, dwellMs: dwellMs(), eras: eras.length, current: curName }; },
+      kick: function () {
+        if (cfg.enabled && eras.length >= 2 && onSwitch) {
+          var n = pickNext();
+          if (n) onSwitch(n, blendS());
+        }
+      },
+      isEnabled: function () {
+        return cfg.enabled;
+      },
+      eraCount: function () {
+        return eras.length;
+      },
+      status: function () {
+        return {
+          enabled: cfg.enabled,
+          energy: energy,
+          vibe: vibe,
+          beat: beat,
+          dwellMs: dwellMs(),
+          eras: eras.length,
+          current: curName,
+        };
+      },
     };
   })();
   window.Director = Director; // exposed for debugging / a future UI toggle
@@ -258,7 +367,13 @@
   var starEl = document.getElementById("star");
   var bar = document.getElementById("bar");
   var hideTimer;
-  function showBar() { bar.classList.remove("hidden"); clearTimeout(hideTimer); hideTimer = setTimeout(function () { bar.classList.add("hidden"); }, 3500); }
+  function showBar() {
+    bar.classList.remove("hidden");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      bar.classList.add("hidden");
+    }, 3500);
+  }
 
   function setSize() {
     // This Butterchurn build does NOT resize the canvas we pass it (buffer stays
@@ -282,31 +397,52 @@
     if (!names.length) return;
     idx = ((i % names.length) + names.length) % names.length;
     var key = names[idx];
-    try { viz.loadPreset(presets[key], blend == null ? 2.0 : blend); } catch (e) { fail("loadPreset: " + e.message); return; }
+    try {
+      viz.loadPreset(presets[key], blend == null ? 2.0 : blend);
+    } catch (e) {
+      fail("loadPreset: " + e.message);
+      return;
+    }
     syncSelect(key);
     updateStar();
     showBar();
     Director.noteLoaded(key, nowMs());
     post({ type: "preset:changed", name: key });
   }
-  function loadByName(name, blend) { var i = names.indexOf(name); if (i >= 0) loadByIndex(i, blend); else console.warn("[WMP-viz] preset not found:", name); }
+  function loadByName(name, blend) {
+    var i = names.indexOf(name);
+    if (i >= 0) loadByIndex(i, blend);
+    else console.warn("[WMP-viz] preset not found:", name);
+  }
   // A user picking from the dropdown: the Director sentinel engages auto-sequencing;
   // any real preset takes manual control (and disengages the Director if it was running).
   function userPick(name) {
-    if (name === DIRECTOR_KEY) { setDirector(true); return; }
+    if (name === DIRECTOR_KEY) {
+      setDirector(true);
+      return;
+    }
     if (Director.isEnabled()) setDirector(false);
-    loadByName(name); showBar();
+    loadByName(name);
+    showBar();
   }
   // manual nav always disengages the Director (the user is taking over)
-  var step = function (d) { if (Director.isEnabled()) setDirector(false); loadByIndex(idx + d); };
-  var randomPreset = function () { if (Director.isEnabled()) setDirector(false); loadByIndex(Math.floor(Math.random() * names.length)); };
+  var step = function (d) {
+    if (Director.isEnabled()) setDirector(false);
+    loadByIndex(idx + d);
+  };
+  var randomPreset = function () {
+    if (Director.isEnabled()) setDirector(false);
+    loadByIndex(Math.floor(Math.random() * names.length));
+  };
 
   function renderOptions() {
     if (!presetSel) return;
     var sel = presetSel;
     sel.innerHTML = "";
     var ph = document.createElement("option");
-    ph.value = ""; ph.textContent = "♪ pick a preset…"; ph.disabled = true;
+    ph.value = "";
+    ph.textContent = "♪ pick a preset…";
+    ph.disabled = true;
     sel.appendChild(ph);
 
     // The Director (Tier-2 era sequencer) was RETIRED in favour of "Alchemy v2: Random",
@@ -321,29 +457,51 @@
       entries.forEach(function (e) {
         if (!presets[e[0]]) return;
         var o = document.createElement("option");
-        o.value = e[0]; o.textContent = e[1];
+        o.value = e[0];
+        o.textContent = e[1];
         og.appendChild(o);
       });
       if (og.children.length) sel.appendChild(og);
     };
 
-    var favEntries = Array.from(userFavs).filter(function (n) { return presets[n]; }).sort().map(function (n) { return [n, "★ " + n]; });
+    var favEntries = Array.from(userFavs)
+      .filter(function (n) {
+        return presets[n];
+      })
+      .sort()
+      .map(function (n) {
+        return [n, "★ " + n];
+      });
     if (favEntries.length) addGroup("★ Favorites", favEntries);
 
     var wmpSet = window.WMP_PRESETS ? Object.keys(window.WMP_PRESETS) : [];
-    var wmpNames = {}; wmpSet.forEach(function (n) { wmpNames[n] = true; });
+    var wmpNames = {};
+    wmpSet.forEach(function (n) {
+      wmpNames[n] = true;
+    });
     var groups = { Featured: [], Ambience: [], Battery: [] };
     FAVORITES.forEach(function (f) {
-      var g = /^Ambience/.test(f.label) ? "Ambience" : /^Battery/.test(f.label) ? "Battery" : "Featured";
+      var g = /^Ambience/.test(f.label)
+        ? "Ambience"
+        : /^Battery/.test(f.label)
+          ? "Battery"
+          : "Featured";
       groups[g].push([f.wmp, f.label]);
     });
     addGroup("◢◤ WMP — Featured", groups.Featured);
     addGroup("◢◤ WMP — Ambience", groups.Ambience);
     addGroup("◢◤ WMP — Battery", groups.Battery);
 
-    var milkdrop = names.filter(function (n) { return !wmpNames[n]; })
-      .sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); })
-      .map(function (n) { return [n, n]; });
+    var milkdrop = names
+      .filter(function (n) {
+        return !wmpNames[n];
+      })
+      .sort(function (a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+      })
+      .map(function (n) {
+        return [n, n];
+      });
     addGroup("MilkDrop presets (A–Z)", milkdrop);
 
     var cur = names[idx];
@@ -353,24 +511,36 @@
   function buildBar() {
     presetSel = document.getElementById("presetSel");
     renderOptions();
-    presetSel.addEventListener("change", function () { if (presetSel.value) userPick(presetSel.value); });
+    presetSel.addEventListener("change", function () {
+      if (presetSel.value) userPick(presetSel.value);
+    });
     starEl.addEventListener("click", toggleFav);
-    document.getElementById("prev").addEventListener("click", function () { step(-1); });
-    document.getElementById("next").addEventListener("click", function () { step(1); });
+    document.getElementById("prev").addEventListener("click", function () {
+      step(-1);
+    });
+    document.getElementById("next").addEventListener("click", function () {
+      step(1);
+    });
     document.getElementById("rand").addEventListener("click", randomPreset);
     document.addEventListener("mousemove", showBar);
   }
 
-  function syncSelect(name) { if (presetSel) presetSel.value = name && presets[name] ? name : ""; }
+  function syncSelect(name) {
+    if (presetSel) presetSel.value = name && presets[name] ? name : "";
+  }
   function updateStar() {
     var on = userFavs.has(names[idx]);
     starEl.textContent = on ? "★" : "☆";
     starEl.classList.toggle("on", on);
   }
   function toggleFav() {
-    var cur = names[idx]; if (!cur) return;
-    if (userFavs.has(cur)) userFavs.delete(cur); else userFavs.add(cur);
-    updateStar(); renderOptions(); syncSelect(cur);
+    var cur = names[idx];
+    if (!cur) return;
+    if (userFavs.has(cur)) userFavs.delete(cur);
+    else userFavs.add(cur);
+    updateStar();
+    renderOptions();
+    syncSelect(cur);
     post({ type: "favorites:set", names: Array.from(userFavs) });
     showBar();
   }
@@ -379,25 +549,48 @@
     rafId = requestAnimationFrame(renderLoop);
     var now = nowMs();
     Director.feed(latest, now); // read the live audio energy/beat…
-    Director.tick(now);         // …and (if engaged) advance the era sequencer
-    try { viz.render({ audioLevels: audioLevels }); }
-    catch (e) { cancelAnimationFrame(rafId); fail("render: " + e.message); }
+    Director.tick(now); // …and (if engaged) advance the era sequencer
+    try {
+      viz.render({ audioLevels: audioLevels });
+    } catch (e) {
+      cancelAnimationFrame(rafId);
+      fail("render: " + e.message);
+    }
   }
 
   function init() {
-    if (!BC || typeof BC.createVisualizer !== "function") { fail("Butterchurn not loaded (createVisualizer missing)"); return; }
+    if (!BC || typeof BC.createVisualizer !== "function") {
+      fail("Butterchurn not loaded (createVisualizer missing)");
+      return;
+    }
     presets = collectPresets();
     Object.assign(presets, window.WMP_PRESETS || {}); // WMP presets win on collisions
     names = Object.keys(presets);
-    if (!names.length) { fail("No presets found in bundle"); return; }
+    if (!names.length) {
+      fail("No presets found in bundle");
+      return;
+    }
 
     var ctx;
-    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    catch (e) { fail("AudioContext: " + e.message); return; }
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      fail("AudioContext: " + e.message);
+      return;
+    }
 
     var d0 = setSize();
-    try { viz = BC.createVisualizer(ctx, canvas, { width: d0.bw, height: d0.bh, pixelRatio: 1, textureRatio: 1 }); }
-    catch (e) { fail("createVisualizer: " + e.message); return; }
+    try {
+      viz = BC.createVisualizer(ctx, canvas, {
+        width: d0.bw,
+        height: d0.bh,
+        pixelRatio: 1,
+        textureRatio: 1,
+      });
+    } catch (e) {
+      fail("createVisualizer: " + e.message);
+      return;
+    }
 
     buildBar();
 
@@ -415,11 +608,23 @@
     ];
     // V4 = the 8 kit-factory scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst),
     // shuffle-cycled by the Director. Fall back to the v2 era playlist if V4 isn't present.
-    var v4Scenes = (window.WMP_V4_SCENES || []).filter(function (n) { return presets[n]; });
-    var eraList = v4Scenes.length >= 2 ? v4Scenes : ERA_PLAYLIST.filter(function (n) { return presets[n]; });
-    if (eraList.length < 2) eraList = names.filter(function (n) { return /^Alchemy v[24]:/.test(n); });
+    var v4Scenes = (window.WMP_V4_SCENES || []).filter(function (n) {
+      return presets[n];
+    });
+    var eraList =
+      v4Scenes.length >= 2
+        ? v4Scenes
+        : ERA_PLAYLIST.filter(function (n) {
+            return presets[n];
+          });
+    if (eraList.length < 2)
+      eraList = names.filter(function (n) {
+        return /^Alchemy v[24]:/.test(n);
+      });
     Director.setEras(eraList);
-    Director.setOnSwitch(function (name, blend) { loadByName(name, blend); });
+    Director.setOnSwitch(function (name, blend) {
+      loadByName(name, blend);
+    });
 
     window.addEventListener("resize", sizeCanvas);
     requestAnimationFrame(sizeCanvas);
@@ -427,9 +632,13 @@
     // Boot straight into the single seamless "Alchemy V4: Random" preset (it self-sequences in
     // frame_eqs — no cross-preset Director crossfade, which read foggy/like-a-new-preset). The
     // Director (viz.js) stays dormant; reachable only via the postMessage debug toggle.
-    var bootName = presets["Alchemy V4: Random"] ? "Alchemy V4: Random"
-                 : (presets["Alchemy Random"] ? "Alchemy Random" : names[0]);
-    loadByName(bootName); renderLoop();
+    var bootName = presets["Alchemy V4: Random"]
+      ? "Alchemy V4: Random"
+      : presets["Alchemy Random"]
+        ? "Alchemy Random"
+        : names[0];
+    loadByName(bootName);
+    renderLoop();
     post({ type: "ready", presets: names.length });
   }
 
@@ -439,8 +648,12 @@
     if (m.type === "audio" && m.data) latest.set(m.data);
     else if (m.type === "favorites:init") {
       userFavs.clear();
-      (m.names || []).forEach(function (n) { userFavs.add(n); });
-      renderOptions(); syncSelect(names[idx]); updateStar();
+      (m.names || []).forEach(function (n) {
+        userFavs.add(n);
+      });
+      renderOptions();
+      syncSelect(names[idx]);
+      updateStar();
     } else if (m.type === "resize") sizeCanvas();
     else if (m.type === "preset:load" && m.name) loadByName(m.name);
     else if (m.type === "preset:step") step(m.dir || 1);
@@ -451,8 +664,10 @@
 
   function setDirector(on) {
     Director.setEnabled(on, nowMs());
-    if (on) Director.kick();   // jump to a fresh era immediately so engaging gives instant feedback
-    console.log("[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras");
+    if (on) Director.kick(); // jump to a fresh era immediately so engaging gives instant feedback
+    console.log(
+      "[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras"
+    );
     post({ type: "director", enabled: Director.isEnabled(), eras: Director.eraCount() });
     showBar();
   }
@@ -466,5 +681,9 @@
     // self-sequences. (Director still reachable via postMessage for debugging.)
   });
 
-  try { init(); } catch (e) { fail("init: " + (e && e.message ? e.message : e)); }
+  try {
+    init();
+  } catch (e) {
+    fail("init: " + (e && e.message ? e.message : e));
+  }
 })();

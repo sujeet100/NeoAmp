@@ -54,11 +54,7 @@ if (missing.length) {
 }
 
 // -x excludes junk that can hide inside included dirs.
-const args = [
-  "-r", "-q", zipPath,
-  ...INCLUDE,
-  "-x", "*.DS_Store", "-x", "__MACOSX/*",
-];
+const args = ["-r", "-q", zipPath, ...INCLUDE, "-x", "*.DS_Store", "-x", "__MACOSX/*"];
 execFileSync("zip", args, { cwd: ROOT, stdio: "inherit" });
 
 const sizeMB = (readFileSync(zipPath).length / 1024 / 1024).toFixed(2);

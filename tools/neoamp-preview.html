@@ -1,121 +1,345 @@
 <!doctype html>
 <html>
-<head>
-<meta charset="utf-8">
-<title>NeoAmp preview</title>
-<link rel="stylesheet" href="/overlay.css">
-<link rel="stylesheet" href="/winamp.css">
-<style>
-  html,body{margin:0;height:100%;background:#0b0b10;}
-  /* a faint YTM-ish backdrop so the windows read against something */
-  body{background:
-    radial-gradient(900px 600px at 80% 10%, #1b1430 0%, transparent 60%),
-    radial-gradient(700px 500px at 10% 90%, #102030 0%, transparent 60%),
-    #0b0b10;}
-</style>
-</head>
-<body>
-<script>
-// ---- shim the extension APIs winamp.js / wsz.js expect ----
-window.chrome = window.chrome || {};
-chrome.runtime = chrome.runtime || {};
-chrome.runtime.getURL = function (p) {
-  if (p === "viz.html") return "about:blank";   // skip Butterchurn in the preview
-  return "/" + p.replace(/^\/+/, "");
-};
-var _store = {};
-chrome.storage = { local: {
-  get: function (key, cb) { var o = {}; o[key] = _store[key]; cb(o); },
-  set: function (obj) { Object.assign(_store, obj); },
-} };
-
-// ---- mock the content.js backend (window.NeoAmp) with sample data ----
-(function () {
-  var listeners = {};
-  function on(ev, cb) { (listeners[ev] = listeners[ev] || []).push(cb); }
-  function emit(ev, a) { (listeners[ev] || []).forEach(function (cb) { try { cb(a); } catch (e) { console.error(e); } }); }
-  var track = {
-    title: "Pneuma", artist: "Tool", album: "Fear Inoculum", year: "2019",
-    plays: "12M plays", likeStatus: "LIKE",
-    art: "", currentTime: 184, duration: 723, paused: false, volume: 0.82,
-    shuffle: true, repeat: false,
-    // PLACEHOLDER lyric lines only — never real/copyrighted lyrics (real lyrics come from
-    // the provider's own pane at runtime; hardcoding them gets blocked).
-    lyrics: { source: "preview-mock", isTimeSynced: true, activeLine: 3, lines: [
-      "[ sample lyric line one ]", "[ sample lyric line two ]", "[ sample lyric line three ]",
-      "[ current line — highlighted ]", "[ sample lyric line five ]", "[ sample lyric line six ]",
-      "[ la la la ]", "[ placeholder verse ]", "[ another placeholder line ]", "[ end of sample ]",
-    ] },
-  };
-  // mock EQ state so the real getEqState()/setEq*/setBalance wiring is exercised
-  var eqState = { enabled: true, preamp: 0, bands: [4, 2, 0, -2, -3, 0, 2, 4, 5, 3], balance: 0 };
-  var queue = [
-    { index:0, title:"Pneuma", artist:"Tool", duration:"11:53", plays:"12M plays", art:"", playing:true },
-    { index:1, title:"Invincible", artist:"Tool", duration:"12:44", plays:"8.1M plays", art:"", playing:false },
-    { index:2, title:"Descending", artist:"Tool", duration:"13:37", plays:"6.5M plays", art:"", playing:false },
-    { index:3, title:"7empest", artist:"Tool", duration:"15:43", plays:"9.0M plays", art:"", playing:false },
-    { index:4, title:"Fear Inoculum", artist:"Tool", duration:"10:21", plays:"15M plays", art:"", playing:false },
-  ];
-  var noop = function () {};
-  window.NeoAmp = {
-    start: function () { running = true; emit("start"); kick(); },
-    stop: function () { running = false; emit("stop"); },
-    isRunning: function () { return running; },
-    on: on, off: noop,
-    getTrack: function () { return track; },
-    getQueue: function () { return queue; },
-    search: function (q, cb) { cb({ query: q, results: [
-      { section:"Top result", title:q+" (Top)", subtitle:"Song • Tool", art:"", rowIndex:-1, plays:"12M plays", kind:"song" },
-      { section:"Songs", title:"Pneuma", subtitle:"Tool • Fear Inoculum", art:"", rowIndex:0, plays:"12M plays", kind:"song" },
-      { section:"Albums", title:"Fear Inoculum", subtitle:"Album • Tool • 2019", art:"", rowIndex:1, plays:"", kind:"album" },
-      { section:"Playlists", title:"Best of Tool", subtitle:"Playlist • YouTube Music", art:"", rowIndex:2, plays:"", kind:"playlist" },
-    ] }); },
-    getHomeShelves: function (cb) { cb({ home:true, results: [
-      { section:"Quick Picks", title:"Schism", subtitle:"Tool", art:"", homeIndex:0 },
-      { section:"Quick Picks", title:"Lateralus", subtitle:"Tool", art:"", homeIndex:1 },
-      { section:"Listen Again", title:"Vicarious", subtitle:"Tool", art:"", homeIndex:2 },
-    ] }); },
-    control: {
-      playPause:noop, play:noop, pause:noop, prev:noop, next:noop, stop:noop, seek:noop, seekBy:noop,
-      setVolume:noop, nudgeVolume:noop, getVolume:function(){return track.volume;},
-      setMute:function(b){track.__muted=(b===undefined)?!track.__muted:!!b;return track.__muted;}, isMuted:function(){return !!track.__muted;},
-      toggleShuffle:noop, toggleRepeat:noop, playQueueItem:noop,
-      playLibraryItem:noop, openLibraryItem:noop, like:noop, dislike:noop, playHomeItem:noop,
-      getEqState:function(){return {enabled:eqState.enabled,preamp:eqState.preamp,bands:eqState.bands.slice(),balance:eqState.balance};},
-      setEqEnabled:function(v){eqState.enabled=v;}, setPreamp:function(v){eqState.preamp=v;},
-      setEqBand:function(i,v){eqState.bands[i]=v;}, setBalance:function(v){eqState.balance=v;},
-      setEq:function(b,pre,en){if(b)eqState.bands=b.slice(); if(typeof pre==="number")eqState.preamp=pre; if(typeof en==="boolean")eqState.enabled=en;},
-    },
-    storage: { get: function (k, cb) { chrome.storage.local.get(k, function (o) { cb(o[k]); }); }, set: chrome.storage.local.set },
-    toast: function (m) { console.log("[toast]", m); },
-    FFT_SIZE: 1024,
-  };
-  var running = false;
-  function kick() {
-    var t0 = performance.now();
-    emit("track", track);
-    // fake spectrum so the analyzers draw
-    var freq = new Uint8Array(512);
-    function frame() {
-      if (!running) return;
-      var t = (performance.now() - t0) / 1000;
-      for (var i = 0; i < freq.length; i++) {
-        var x = i / freq.length;
-        freq[i] = Math.max(0, Math.min(255, 200 * Math.exp(-x*3) * (0.5 + 0.5*Math.sin(t*4 + x*20))));
+  <head>
+    <meta charset="utf-8" />
+    <title>NeoAmp preview</title>
+    <link rel="stylesheet" href="/overlay.css" />
+    <link rel="stylesheet" href="/winamp.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0b10;
       }
-      emit("audio", { time: new Uint8Array(1024).fill(128), freq: freq });
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  }
-})();
-</script>
-<script src="/skins.js"></script>
-<script src="/wsz.js"></script>
-<script src="/winamp.js"></script>
-<script>
-  // launch + populate; the harness flips windows open and screenshots
-  window.addEventListener("load", function () { setTimeout(function () { window.NeoAmp.start(); }, 50); });
-</script>
-</body>
+      /* a faint YTM-ish backdrop so the windows read against something */
+      body {
+        background:
+          radial-gradient(900px 600px at 80% 10%, #1b1430 0%, transparent 60%),
+          radial-gradient(700px 500px at 10% 90%, #102030 0%, transparent 60%), #0b0b10;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      // ---- shim the extension APIs winamp.js / wsz.js expect ----
+      window.chrome = window.chrome || {};
+      chrome.runtime = chrome.runtime || {};
+      chrome.runtime.getURL = function (p) {
+        if (p === "viz.html") return "about:blank"; // skip Butterchurn in the preview
+        return "/" + p.replace(/^\/+/, "");
+      };
+      var _store = {};
+      chrome.storage = {
+        local: {
+          get: function (key, cb) {
+            var o = {};
+            o[key] = _store[key];
+            cb(o);
+          },
+          set: function (obj) {
+            Object.assign(_store, obj);
+          },
+        },
+      };
+
+      // ---- mock the content.js backend (window.NeoAmp) with sample data ----
+      (function () {
+        var listeners = {};
+        function on(ev, cb) {
+          (listeners[ev] = listeners[ev] || []).push(cb);
+        }
+        function emit(ev, a) {
+          (listeners[ev] || []).forEach(function (cb) {
+            try {
+              cb(a);
+            } catch (e) {
+              console.error(e);
+            }
+          });
+        }
+        var track = {
+          title: "Pneuma",
+          artist: "Tool",
+          album: "Fear Inoculum",
+          year: "2019",
+          plays: "12M plays",
+          likeStatus: "LIKE",
+          art: "",
+          currentTime: 184,
+          duration: 723,
+          paused: false,
+          volume: 0.82,
+          shuffle: true,
+          repeat: false,
+          // PLACEHOLDER lyric lines only — never real/copyrighted lyrics (real lyrics come from
+          // the provider's own pane at runtime; hardcoding them gets blocked).
+          lyrics: {
+            source: "preview-mock",
+            isTimeSynced: true,
+            activeLine: 3,
+            lines: [
+              "[ sample lyric line one ]",
+              "[ sample lyric line two ]",
+              "[ sample lyric line three ]",
+              "[ current line — highlighted ]",
+              "[ sample lyric line five ]",
+              "[ sample lyric line six ]",
+              "[ la la la ]",
+              "[ placeholder verse ]",
+              "[ another placeholder line ]",
+              "[ end of sample ]",
+            ],
+          },
+        };
+        // mock EQ state so the real getEqState()/setEq*/setBalance wiring is exercised
+        var eqState = {
+          enabled: true,
+          preamp: 0,
+          bands: [4, 2, 0, -2, -3, 0, 2, 4, 5, 3],
+          balance: 0,
+        };
+        var queue = [
+          {
+            index: 0,
+            title: "Pneuma",
+            artist: "Tool",
+            duration: "11:53",
+            plays: "12M plays",
+            art: "",
+            playing: true,
+          },
+          {
+            index: 1,
+            title: "Invincible",
+            artist: "Tool",
+            duration: "12:44",
+            plays: "8.1M plays",
+            art: "",
+            playing: false,
+          },
+          {
+            index: 2,
+            title: "Descending",
+            artist: "Tool",
+            duration: "13:37",
+            plays: "6.5M plays",
+            art: "",
+            playing: false,
+          },
+          {
+            index: 3,
+            title: "7empest",
+            artist: "Tool",
+            duration: "15:43",
+            plays: "9.0M plays",
+            art: "",
+            playing: false,
+          },
+          {
+            index: 4,
+            title: "Fear Inoculum",
+            artist: "Tool",
+            duration: "10:21",
+            plays: "15M plays",
+            art: "",
+            playing: false,
+          },
+        ];
+        var noop = function () {};
+        window.NeoAmp = {
+          start: function () {
+            running = true;
+            emit("start");
+            kick();
+          },
+          stop: function () {
+            running = false;
+            emit("stop");
+          },
+          isRunning: function () {
+            return running;
+          },
+          on: on,
+          off: noop,
+          getTrack: function () {
+            return track;
+          },
+          getQueue: function () {
+            return queue;
+          },
+          search: function (q, cb) {
+            cb({
+              query: q,
+              results: [
+                {
+                  section: "Top result",
+                  title: q + " (Top)",
+                  subtitle: "Song • Tool",
+                  art: "",
+                  rowIndex: -1,
+                  plays: "12M plays",
+                  kind: "song",
+                },
+                {
+                  section: "Songs",
+                  title: "Pneuma",
+                  subtitle: "Tool • Fear Inoculum",
+                  art: "",
+                  rowIndex: 0,
+                  plays: "12M plays",
+                  kind: "song",
+                },
+                {
+                  section: "Albums",
+                  title: "Fear Inoculum",
+                  subtitle: "Album • Tool • 2019",
+                  art: "",
+                  rowIndex: 1,
+                  plays: "",
+                  kind: "album",
+                },
+                {
+                  section: "Playlists",
+                  title: "Best of Tool",
+                  subtitle: "Playlist • YouTube Music",
+                  art: "",
+                  rowIndex: 2,
+                  plays: "",
+                  kind: "playlist",
+                },
+              ],
+            });
+          },
+          getHomeShelves: function (cb) {
+            cb({
+              home: true,
+              results: [
+                {
+                  section: "Quick Picks",
+                  title: "Schism",
+                  subtitle: "Tool",
+                  art: "",
+                  homeIndex: 0,
+                },
+                {
+                  section: "Quick Picks",
+                  title: "Lateralus",
+                  subtitle: "Tool",
+                  art: "",
+                  homeIndex: 1,
+                },
+                {
+                  section: "Listen Again",
+                  title: "Vicarious",
+                  subtitle: "Tool",
+                  art: "",
+                  homeIndex: 2,
+                },
+              ],
+            });
+          },
+          control: {
+            playPause: noop,
+            play: noop,
+            pause: noop,
+            prev: noop,
+            next: noop,
+            stop: noop,
+            seek: noop,
+            seekBy: noop,
+            setVolume: noop,
+            nudgeVolume: noop,
+            getVolume: function () {
+              return track.volume;
+            },
+            setMute: function (b) {
+              track.__muted = b === undefined ? !track.__muted : !!b;
+              return track.__muted;
+            },
+            isMuted: function () {
+              return !!track.__muted;
+            },
+            toggleShuffle: noop,
+            toggleRepeat: noop,
+            playQueueItem: noop,
+            playLibraryItem: noop,
+            openLibraryItem: noop,
+            like: noop,
+            dislike: noop,
+            playHomeItem: noop,
+            getEqState: function () {
+              return {
+                enabled: eqState.enabled,
+                preamp: eqState.preamp,
+                bands: eqState.bands.slice(),
+                balance: eqState.balance,
+              };
+            },
+            setEqEnabled: function (v) {
+              eqState.enabled = v;
+            },
+            setPreamp: function (v) {
+              eqState.preamp = v;
+            },
+            setEqBand: function (i, v) {
+              eqState.bands[i] = v;
+            },
+            setBalance: function (v) {
+              eqState.balance = v;
+            },
+            setEq: function (b, pre, en) {
+              if (b) eqState.bands = b.slice();
+              if (typeof pre === "number") eqState.preamp = pre;
+              if (typeof en === "boolean") eqState.enabled = en;
+            },
+          },
+          storage: {
+            get: function (k, cb) {
+              chrome.storage.local.get(k, function (o) {
+                cb(o[k]);
+              });
+            },
+            set: chrome.storage.local.set,
+          },
+          toast: function (m) {
+            console.log("[toast]", m);
+          },
+          FFT_SIZE: 1024,
+        };
+        var running = false;
+        function kick() {
+          var t0 = performance.now();
+          emit("track", track);
+          // fake spectrum so the analyzers draw
+          var freq = new Uint8Array(512);
+          function frame() {
+            if (!running) return;
+            var t = (performance.now() - t0) / 1000;
+            for (var i = 0; i < freq.length; i++) {
+              var x = i / freq.length;
+              freq[i] = Math.max(
+                0,
+                Math.min(255, 200 * Math.exp(-x * 3) * (0.5 + 0.5 * Math.sin(t * 4 + x * 20)))
+              );
+            }
+            emit("audio", { time: new Uint8Array(1024).fill(128), freq: freq });
+            requestAnimationFrame(frame);
+          }
+          requestAnimationFrame(frame);
+        }
+      })();
+    </script>
+    <script src="/skins.js"></script>
+    <script src="/wsz.js"></script>
+    <script src="/winamp.js"></script>
+    <script>
+      // launch + populate; the harness flips windows open and screenshots
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          window.NeoAmp.start();
+        }, 50);
+      });
+    </script>
+  </body>
 </html>

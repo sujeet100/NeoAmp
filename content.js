@@ -18,8 +18,11 @@
 
   var FFT_SIZE = 1024; // must equal Butterchurn's fftSize (2 * numSamps=512)
 
-  var timeBytes = null, freqBytes = null, running = false;
-  var trackTimer = 0, lastTrack = null;
+  var timeBytes = null,
+    freqBytes = null,
+    running = false;
+  var trackTimer = 0,
+    lastTrack = null;
 
   // EQ state — the UI's source of truth. The actual audio graph lives in the OFFSCREEN
   // document (it owns the gesture-gated tabCapture); the content script relays changes
@@ -29,31 +32,54 @@
 
   // --- tiny event bus -------------------------------------------------------
   var listeners = { start: [], stop: [], audio: [], track: [] };
-  function on(ev, cb) { (listeners[ev] || (listeners[ev] = [])).push(cb); }
+  function on(ev, cb) {
+    (listeners[ev] || (listeners[ev] = [])).push(cb);
+  }
   function off(ev, cb) {
-    var a = listeners[ev]; if (!a) return;
-    var i = a.indexOf(cb); if (i >= 0) a.splice(i, 1);
+    var a = listeners[ev];
+    if (!a) return;
+    var i = a.indexOf(cb);
+    if (i >= 0) a.splice(i, 1);
   }
   function emit(ev, arg) {
-    var a = listeners[ev]; if (!a) return;
-    for (var i = 0; i < a.length; i++) { try { a[i](arg); } catch (e) { console.error("[NeoAmp]", ev, e); } }
+    var a = listeners[ev];
+    if (!a) return;
+    for (var i = 0; i < a.length; i++) {
+      try {
+        a[i](arg);
+      } catch (e) {
+        console.error("[NeoAmp]", ev, e);
+      }
+    }
   }
 
   // --- EQ helpers -----------------------------------------------------------
-  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function clamp(x, lo, hi) {
+    return Math.max(lo, Math.min(hi, x));
+  }
   // relay the live EQ to the offscreen engine (via the service worker) so a fader
   // drag shapes the audio immediately. Harmless if capture isn't running.
   function relayEq() {
     try {
       chrome.runtime.sendMessage({
-        target: "sw", type: "relay-eq",
-        eq: { bands: eqState.bands.slice(), preamp: eqState.preamp, balance: eqState.balance, enabled: eqState.enabled },
+        target: "sw",
+        type: "relay-eq",
+        eq: {
+          bands: eqState.bands.slice(),
+          preamp: eqState.preamp,
+          balance: eqState.balance,
+          enabled: eqState.enabled,
+        },
       });
     } catch (_) {}
   }
   function persistEq() {
     clearTimeout(eqSaveTimer);
-    eqSaveTimer = setTimeout(function () { try { chrome.storage.local.set({ neoampEq: eqState }); } catch (_) {} }, 400);
+    eqSaveTimer = setTimeout(function () {
+      try {
+        chrome.storage.local.set({ neoampEq: eqState });
+      } catch (_) {}
+    }, 400);
   }
 
   // --- audio lifecycle (driven by the service worker + offscreen engine) ----
@@ -79,14 +105,15 @@
     timeBytes = new Uint8Array(FFT_SIZE);
     freqBytes = new Uint8Array(FFT_SIZE / 2);
     trackTimer = setInterval(sendTrack, 400);
-    relayEq();               // hand the engine the persisted curve
+    relayEq(); // hand the engine the persisted curve
     emit("start");
     sendTrack();
   }
   function onEqStopped() {
     if (!running) return;
     running = false;
-    clearInterval(trackTimer); trackTimer = 0;
+    clearInterval(trackTimer);
+    trackTimer = 0;
     timeBytes = freqBytes = null;
     emit("stop");
   }
@@ -95,25 +122,46 @@
   // same "audio" subscribers as before (the viz iframe bridge + the spectrum analyzer).
   function onFft(b64) {
     if (!running || !timeBytes) return;
-    var bin; try { bin = atob(b64); } catch (_) { return; }
+    var bin;
+    try {
+      bin = atob(b64);
+    } catch (_) {
+      return;
+    }
     if (bin.length !== timeBytes.length + freqBytes.length) return;
     for (var i = 0; i < timeBytes.length; i++) timeBytes[i] = bin.charCodeAt(i) & 255;
-    for (var j = 0; j < freqBytes.length; j++) freqBytes[j] = bin.charCodeAt(timeBytes.length + j) & 255;
-    frame.time = timeBytes; frame.freq = freqBytes;
+    for (var j = 0; j < freqBytes.length; j++)
+      freqBytes[j] = bin.charCodeAt(timeBytes.length + j) & 255;
+    frame.time = timeBytes;
+    frame.freq = freqBytes;
     emit("audio", frame);
   }
   // ask the SW to stop capture (stopping needs no gesture, unlike starting)
-  function requestStop() { try { chrome.runtime.sendMessage({ target: "sw", type: "stop-capture" }); } catch (_) {} }
+  function requestStop() {
+    try {
+      chrome.runtime.sendMessage({ target: "sw", type: "stop-capture" });
+    } catch (_) {}
+  }
   // a page button can't START capture — guide the user to the right-click menu
-  function startHint() { toast("To open NeoAmp: click the gold “N” toolbar icon, or press ⌘⇧E (Ctrl+Shift+E)."); }
+  function startHint() {
+    toast("To open NeoAmp: click the gold “N” toolbar icon, or press ⌘⇧E (Ctrl+Shift+E).");
+  }
 
   // --- now-playing + transport ---------------------------------------------
-  function q(sel) { return document.querySelector(sel); }
-  function qa(sels) { // first matching element across a list of selectors
-    for (var i = 0; i < sels.length; i++) { var el = document.querySelector(sels[i]); if (el) return el; }
+  function q(sel) {
+    return document.querySelector(sel);
+  }
+  function qa(sels) {
+    // first matching element across a list of selectors
+    for (var i = 0; i < sels.length; i++) {
+      var el = document.querySelector(sels[i]);
+      if (el) return el;
+    }
     return null;
   }
-  function clean(s) { return (s || "").replace(/\s+/g, " ").trim(); }
+  function clean(s) {
+    return (s || "").replace(/\s+/g, " ").trim();
+  }
 
   // A play/view-count string like "1.2M plays" if present in `text`, else "".
   function matchPlays(text) {
@@ -123,7 +171,12 @@
   // byline is "Artist • Album • Year • plays" — segments vary (often just the
   // artist). Split on • and classify each part rather than assuming order.
   function parseByline(text) {
-    var parts = (text || "").split("•").map(function (s) { return clean(s); }).filter(Boolean);
+    var parts = (text || "")
+      .split("•")
+      .map(function (s) {
+        return clean(s);
+      })
+      .filter(Boolean);
     var out = { artist: parts[0] || "", album: "", year: "", plays: "" };
     // Order matters: the FIRST non-plays segment is the album, so a 4-digit
     // album title ("1989", "1984") isn't stolen by the year test; a later
@@ -139,7 +192,10 @@
   // 3-state status via the `like-status` attribute (th-ch/youtube-music), with
   // an aria-pressed fallback. Anchor on the unambiguous #button-shape-* ids.
   function likeRenderer() {
-    return q("ytmusic-player-bar #like-button-renderer") || q("ytmusic-player-bar ytmusic-like-button-renderer");
+    return (
+      q("ytmusic-player-bar #like-button-renderer") ||
+      q("ytmusic-player-bar ytmusic-like-button-renderer")
+    );
   }
   function readLikeStatus() {
     if (typeof PROVIDER !== "undefined" && PROVIDER && PROVIDER.like) {
@@ -147,15 +203,21 @@
       var sb = qa(PROVIDER.like);
       if (sb) {
         var al = (sb.getAttribute("aria-label") || "").toLowerCase();
-        if (sb.getAttribute("aria-checked") === "true" || sb.getAttribute("aria-pressed") === "true" || /\bremove\b/.test(al)) return "LIKE";
+        if (
+          sb.getAttribute("aria-checked") === "true" ||
+          sb.getAttribute("aria-pressed") === "true" ||
+          /\bremove\b/.test(al)
+        )
+          return "LIKE";
       }
       return "INDIFFERENT";
     }
     var r = likeRenderer();
     if (!r) return "INDIFFERENT";
     var attr = r.getAttribute("like-status");
-    if (attr) return attr;                            // "LIKE" | "DISLIKE" | "INDIFFERENT"
-    var lb = r.querySelector("#button-shape-like button"), db = r.querySelector("#button-shape-dislike button");
+    if (attr) return attr; // "LIKE" | "DISLIKE" | "INDIFFERENT"
+    var lb = r.querySelector("#button-shape-like button"),
+      db = r.querySelector("#button-shape-dislike button");
     if (lb && lb.getAttribute("aria-pressed") === "true") return "LIKE";
     if (db && db.getAttribute("aria-pressed") === "true") return "DISLIKE";
     return "INDIFFERENT";
@@ -177,16 +239,18 @@
   // YTM's exact repeat DOM varies by build, so this is best-effort with a null
   // fallback; confirm selectors live if repeat sync looks wrong.
   function readShuffle() {
-    return readPressed(qa(["ytmusic-player-bar [aria-label*='Shuffle' i]", "ytmusic-player-bar .shuffle"]));
+    return readPressed(
+      qa(["ytmusic-player-bar [aria-label*='Shuffle' i]", "ytmusic-player-bar .shuffle"])
+    );
   }
   function readRepeat() {
     var bar = q("ytmusic-player-bar");
     var mode = bar && (bar.getAttribute("repeat-mode") || bar.getAttribute("repeat_mode") || "");
-    if (mode) return !/none|off/i.test(mode);   // NONE / ALL_OFF = off; ALL / ONE = on
+    if (mode) return !/none|off/i.test(mode); // NONE / ALL_OFF = off; ALL / ONE = on
     var b = qa(["ytmusic-player-bar [aria-label*='Repeat' i]", "ytmusic-player-bar .repeat"]);
     var p = readPressed(b);
     if (p != null) return p;
-    var al = (b && (b.getAttribute("aria-label") || b.getAttribute("title")) || "").toLowerCase();
+    var al = ((b && (b.getAttribute("aria-label") || b.getAttribute("title"))) || "").toLowerCase();
     if (/off/.test(al)) return false;
     if (/repeat (all|one)|one|all/.test(al)) return true;
     return null;
@@ -199,20 +263,30 @@
   var lyricsCache = { key: "", lyrics: null };
   function readLyrics(key) {
     var lines = [];
-    if (PROVIDER.lyricsLine) {                         // per-line elements (Spotify: [data-testid=lyrics-line])
+    if (PROVIDER.lyricsLine) {
+      // per-line elements (Spotify: [data-testid=lyrics-line])
       var nodes = qaAll(PROVIDER.lyricsLine);
-      for (var i = 0; i < nodes.length; i++) { var t = clean(nodes[i].textContent); if (t) lines.push(t); }
-    } else if (PROVIDER.lyricsText) {                  // one block with \n line breaks (YTM description shelf)
+      for (var i = 0; i < nodes.length; i++) {
+        var t = clean(nodes[i].textContent);
+        if (t) lines.push(t);
+      }
+    } else if (PROVIDER.lyricsText) {
+      // one block with \n line breaks (YTM description shelf)
       var el = qa(PROVIDER.lyricsText);
       if (el) {
-        lines = (el.textContent || "").split("\n").map(function (s) { return s.replace(/\s+$/, ""); });
-        while (lines.length && !lines[0].trim()) lines.shift();              // trim leading blanks
+        lines = (el.textContent || "").split("\n").map(function (s) {
+          return s.replace(/\s+$/, "");
+        });
+        while (lines.length && !lines[0].trim()) lines.shift(); // trim leading blanks
         while (lines.length && !lines[lines.length - 1].trim()) lines.pop(); // trim trailing blanks
       }
-    } else return null;                               // provider has no lyrics wiring
-    if (lines.length) { lyricsCache = { key: key, lyrics: { lines: lines, source: PROVIDER.id } }; return lyricsCache.lyrics; }
-    if (key && lyricsCache.key === key) return lyricsCache.lyrics;   // pane closed → keep same-track lyrics
-    return null;                                       // different track / never loaded → empty-state
+    } else return null; // provider has no lyrics wiring
+    if (lines.length) {
+      lyricsCache = { key: key, lyrics: { lines: lines, source: PROVIDER.id } };
+      return lyricsCache.lyrics;
+    }
+    if (key && lyricsCache.key === key) return lyricsCache.lyrics; // pane closed → keep same-track lyrics
+    return null; // different track / never loaded → empty-state
   }
   function readTrack() {
     var v = q("video") || q("audio");
@@ -227,9 +301,15 @@
     var ms = mediaMeta || {};
     // position: the media element when it exposes a real duration, else the provider's DOM
     // position text (e.g. Spotify has no media element we can read) so the seek bar moves.
-    var cur = 0, dur = 0;
-    if (v && isFinite(v.duration) && v.duration > 0) { cur = v.currentTime || 0; dur = v.duration; }
-    else if (PROVIDER.posElapsed || PROVIDER.posDuration) { dur = parseTime(textOf(PROVIDER.posDuration)); cur = parseTime(textOf(PROVIDER.posElapsed)); }
+    var cur = 0,
+      dur = 0;
+    if (v && isFinite(v.duration) && v.duration > 0) {
+      cur = v.currentTime || 0;
+      dur = v.duration;
+    } else if (PROVIDER.posElapsed || PROVIDER.posDuration) {
+      dur = parseTime(textOf(PROVIDER.posDuration));
+      cur = parseTime(textOf(PROVIDER.posElapsed));
+    }
     var title = ms.title || clean(titleEl && titleEl.textContent);
     var artist = ms.artist || by.artist;
     return {
@@ -237,25 +317,31 @@
       artist: artist,
       album: ms.album || by.album,
       year: by.year,
-      plays: by.plays,                                 // best-effort; often ""
+      plays: by.plays, // best-effort; often ""
       likeStatus: readLikeStatus(),
       art: ms.art || (artEl ? artEl.src : ""),
       currentTime: cur,
       duration: dur,
-      paused: isPaused(),                              // provider-aware (button on EME sites, else media element)
-      volume: playerVolume,                            // our master-gain volume (provider-agnostic)
-      shuffle: readShuffle(),                          // true | false | null (unknown)
-      repeat: readRepeat(),                            // true | false | null (unknown)
-      lyrics: readLyrics(title + "|" + artist),        // provider's lyrics pane, per-track cached
+      paused: isPaused(), // provider-aware (button on EME sites, else media element)
+      volume: playerVolume, // our master-gain volume (provider-agnostic)
+      shuffle: readShuffle(), // true | false | null (unknown)
+      repeat: readRepeat(), // true | false | null (unknown)
+      lyrics: readLyrics(title + "|" + artist), // provider's lyrics pane, per-track cached
     };
   }
-  function getTrack() { return lastTrack || readTrack(); }
-  function sendTrack() { lastTrack = readTrack(); lastTrack.sampleRate = audioSampleRate; emit("track", lastTrack); }
+  function getTrack() {
+    return lastTrack || readTrack();
+  }
+  function sendTrack() {
+    lastTrack = readTrack();
+    lastTrack.sampleRate = audioSampleRate;
+    emit("track", lastTrack);
+  }
 
   // The "Up Next" queue, read straight from YTM's DOM. Each row is a
   // <ytmusic-player-queue-item>; the currently-playing one carries [selected].
   function readQueue() {
-    if (PROVIDER.queueRow) return readQueueGeneric();   // provider-configured queue (e.g. Spotify)
+    if (PROVIDER.queueRow) return readQueueGeneric(); // provider-configured queue (e.g. Spotify)
     var items = document.querySelectorAll("ytmusic-player-queue-item");
     var out = [];
     for (var i = 0; i < items.length; i++) {
@@ -270,7 +356,7 @@
         title: title,
         artist: byline.split("•")[0].trim(),
         duration: clean((it.querySelector(".duration") || {}).textContent),
-        plays: matchPlays(byline),               // from the byline only (usually absent)
+        plays: matchPlays(byline), // from the byline only (usually absent)
         art: img && /^https?:/.test(img.src) ? img.src : "",
         playing: it.hasAttribute("selected") || pbs === "playing" || pbs === "paused",
       });
@@ -283,22 +369,28 @@
   // site's queue panel is closed (the rows only exist in the DOM while it's open).
   var lastProviderQueue = [];
   function readQueueGeneric() {
-    var rows = qaAll(PROVIDER.queueRow), out = [];
+    var rows = qaAll(PROVIDER.queueRow),
+      out = [];
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var title = clean(firstTextIn(r, PROVIDER.queueTitle));
       if (!title) continue;
       var img = r.querySelector("img");
       out.push({
-        index: i, title: title,
+        index: i,
+        title: title,
         artist: clean(firstTextIn(r, PROVIDER.queueArtist)),
-        duration: "", plays: "",
+        duration: "",
+        plays: "",
         art: img && /^https?:/.test(img.src) ? img.src : "",
         playing: false,
       });
     }
-    if (out.length) { lastProviderQueue = out; return out; }
-    return lastProviderQueue;   // panel closed → keep showing the last-known queue
+    if (out.length) {
+      lastProviderQueue = out;
+      return out;
+    }
+    return lastProviderQueue; // panel closed → keep showing the last-known queue
   }
 
   // --- search (drives YTM's own search box) --------------------------------
@@ -313,7 +405,9 @@
     try {
       var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set;
       setter.call(input, query);
-    } catch (_) { input.value = query; }
+    } catch (_) {
+      input.value = query;
+    }
     input.dispatchEvent(new Event("input", { bubbles: true }));
     return input;
   }
@@ -322,14 +416,19 @@
   function rowPlays(r) {
     // scan only the metadata flex columns — not the whole row (a title containing
     // "views"/"plays" would otherwise yield a bogus count)
-    var cols = r.querySelectorAll(".flex-column, yt-formatted-string.flex-column, .secondary-flex-columns yt-formatted-string");
-    for (var i = 0; i < cols.length; i++) { var m = matchPlays(cols[i].textContent); if (m) return m; }
+    var cols = r.querySelectorAll(
+      ".flex-column, yt-formatted-string.flex-column, .secondary-flex-columns yt-formatted-string"
+    );
+    for (var i = 0; i < cols.length; i++) {
+      var m = matchPlays(cols[i].textContent);
+      if (m) return m;
+    }
     return "";
   }
   // song vs playlist/album, by the title link's navigation endpoint (not the tag)
   function classifyRow(r) {
     var a = r.querySelector("a.yt-simple-endpoint[href]") || r.querySelector("a[href]");
-    var href = a ? (a.getAttribute("href") || "") : "";
+    var href = a ? a.getAttribute("href") || "" : "";
     if (/\bwatch\b|[?&]v=/.test(href)) return "song";
     if (/\/playlist\?list=|[?&]list=/.test(href)) return "playlist";
     if (/\/browse\/MPRE/.test(href)) return "album";
@@ -341,16 +440,25 @@
     var out = [];
     var card = document.querySelector("ytmusic-card-shelf-renderer");
     if (card) {
-      var ctitle = clean((card.querySelector(".title, yt-formatted-string.title, a.yt-simple-endpoint") || {}).textContent);
+      var ctitle = clean(
+        (card.querySelector(".title, yt-formatted-string.title, a.yt-simple-endpoint") || {})
+          .textContent
+      );
       // some card layouts have no .title — derive it from the leading text
       // ("Arijit Singh Artist • …" → "Arijit Singh")
-      if (!ctitle) ctitle = clean(clean(card.textContent).split(/\s+(?:Artist|Song|Album|Single|EP|Video|Playlist)\b/)[0]).slice(0, 40);
+      if (!ctitle)
+        ctitle = clean(
+          clean(card.textContent).split(/\s+(?:Artist|Song|Album|Single|EP|Video|Playlist)\b/)[0]
+        ).slice(0, 40);
       out.push({
-        section: "Top result", title: ctitle,
+        section: "Top result",
+        title: ctitle,
         subtitle: clean(clean(card.textContent).replace(ctitle, "")).slice(0, 80),
-        art: (card.querySelector("img") || {}).src || "", rowIndex: -1,
+        art: (card.querySelector("img") || {}).src || "",
+        rowIndex: -1,
         play: !!card.querySelector("ytmusic-play-button-renderer"),
-        plays: matchPlays(card.textContent), kind: classifyRow(card),
+        plays: matchPlays(card.textContent),
+        kind: classifyRow(card),
       });
     }
     var rows = document.querySelectorAll("ytmusic-responsive-list-item-renderer");
@@ -362,14 +470,22 @@
       // .title is the reliable title across row types (song/album/artist);
       // links[0]/.flex-column[0] are unreliable (often the subtitle).
       var titleEl = r.querySelector("yt-formatted-string.title, .title");
-      var title = clean(titleEl && titleEl.textContent) || clean((r.querySelectorAll("a.yt-simple-endpoint")[0] || {}).textContent);
+      var title =
+        clean(titleEl && titleEl.textContent) ||
+        clean((r.querySelectorAll("a.yt-simple-endpoint")[0] || {}).textContent);
       if (!title) continue;
-      var subtitle = clean(clean(r.textContent).replace(title, "")).replace(/^[•\-\s]+/, "").slice(0, 90);
+      var subtitle = clean(clean(r.textContent).replace(title, ""))
+        .replace(/^[•\-\s]+/, "")
+        .slice(0, 90);
       out.push({
-        section: section || "Results", title: title, subtitle: subtitle,
-        art: (r.querySelector("img") || {}).src || "", rowIndex: i,
+        section: section || "Results",
+        title: title,
+        subtitle: subtitle,
+        art: (r.querySelector("img") || {}).src || "",
+        rowIndex: i,
         play: !!r.querySelector("ytmusic-play-button-renderer"),
-        plays: rowPlays(r), kind: classifyRow(r),
+        plays: rowPlays(r),
+        kind: classifyRow(r),
       });
     }
     return out;
@@ -380,10 +496,13 @@
   // and keep the live element refs (homeItems) so playHomeItem can click them.
   var homeItems = [];
   function findShelf(name) {
-    var shelves = document.querySelectorAll("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer");
+    var shelves = document.querySelectorAll(
+      "ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer"
+    );
     for (var i = 0; i < shelves.length; i++) {
       var hh = shelves[i].querySelector(
-        ".title.ytmusic-carousel-shelf-basic-header-renderer, ytmusic-carousel-shelf-basic-header-renderer .title, h2 .title, h2, .title");
+        ".title.ytmusic-carousel-shelf-basic-header-renderer, ytmusic-carousel-shelf-basic-header-renderer .title, h2 .title, h2, .title"
+      );
       var t = hh ? clean(hh.textContent) : "";
       if (t.toLowerCase().indexOf(name.toLowerCase()) === 0) return shelves[i];
     }
@@ -391,7 +510,9 @@
   }
   function scrapeShelf(shelf, section) {
     if (!shelf) return [];
-    var items = shelf.querySelectorAll("ytmusic-two-row-item-renderer, ytmusic-responsive-list-item-renderer");
+    var items = shelf.querySelectorAll(
+      "ytmusic-two-row-item-renderer, ytmusic-responsive-list-item-renderer"
+    );
     var out = [];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
@@ -400,21 +521,36 @@
       if (!title) continue;
       var subEl = it.querySelector("yt-formatted-string.subtitle, .subtitle, .flex-column");
       var img = it.querySelector("img");
-      out.push({ section: section, title: title, subtitle: clean(subEl && subEl.textContent),
-        art: img && /^https?:/.test(img.src) ? img.src : "", _el: it });
+      out.push({
+        section: section,
+        title: title,
+        subtitle: clean(subEl && subEl.textContent),
+        art: img && /^https?:/.test(img.src) ? img.src : "",
+        _el: it,
+      });
     }
     return out;
   }
   // SPA-navigate to home (never location.href — that reloads + kills capture)
   function goHome() {
-    var items = document.querySelectorAll("ytmusic-pivot-bar-item-renderer, ytmusic-pivot-bar-renderer a");
+    var items = document.querySelectorAll(
+      "ytmusic-pivot-bar-item-renderer, ytmusic-pivot-bar-renderer a"
+    );
     for (var i = 0; i < items.length; i++) {
-      var t = clean((items[i].querySelector(".tab-title, yt-formatted-string") || items[i]).textContent);
+      var t = clean(
+        (items[i].querySelector(".tab-title, yt-formatted-string") || items[i]).textContent
+      );
       var al = items[i].getAttribute("aria-label") || "";
-      if (/^home$/i.test(t) || /home/i.test(al)) { items[i].click(); return true; }
+      if (/^home$/i.test(t) || /home/i.test(al)) {
+        items[i].click();
+        return true;
+      }
     }
     var logo = document.querySelector("ytmusic-nav-bar a#left-content, a[title='YouTube Music']");
-    if (logo) { logo.click(); return true; }
+    if (logo) {
+      logo.click();
+      return true;
+    }
     return false;
   }
   // allowNavigate=true permits clicking the Home pivot (SPA-navigating YTM there)
@@ -423,20 +559,42 @@
   // merely opening the Library never yanks the user off their current page.
   function getHomeShelves(cb, allowNavigate) {
     var collect = function () {
-      var list = scrapeShelf(findShelf("Quick picks"), "Quick Picks")
-        .concat(scrapeShelf(findShelf("Listen again"), "Listen Again"));
+      var list = scrapeShelf(findShelf("Quick picks"), "Quick Picks").concat(
+        scrapeShelf(findShelf("Listen again"), "Listen Again")
+      );
       homeItems = list;
       // strip the live el before handing back (winamp.js plays via homeIndex)
-      cb({ results: list.map(function (x, i) {
-        return { section: x.section, title: x.title, subtitle: x.subtitle, art: x.art, homeIndex: i };
-      }), home: true });
+      cb({
+        results: list.map(function (x, i) {
+          return {
+            section: x.section,
+            title: x.title,
+            subtitle: x.subtitle,
+            art: x.art,
+            homeIndex: i,
+          };
+        }),
+        home: true,
+      });
     };
-    if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) { collect(); return; }
-    if (!allowNavigate || !goHome()) { cb({ results: [], home: true }); return; }
+    if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) {
+      collect();
+      return;
+    }
+    if (!allowNavigate || !goHome()) {
+      cb({ results: [], home: true });
+      return;
+    }
     var tries = 0;
     (function wait() {
-      if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) { setTimeout(collect, 400); return; }
-      if (++tries > 30) { cb({ results: [], home: true }); return; }
+      if (document.querySelector("ytmusic-carousel-shelf-renderer, ytmusic-shelf-renderer")) {
+        setTimeout(collect, 400);
+        return;
+      }
+      if (++tries > 30) {
+        cb({ results: [], home: true });
+        return;
+      }
       setTimeout(wait, 250);
     })();
   }
@@ -446,7 +604,8 @@
   // scrape the rows. Row element refs are cached so playLibraryItem can click play-by-index.
   var spotifyRows = [];
   function scrapeSpotifyResults() {
-    var rows = qaAll(PROVIDER.searchResultRow), out = [];
+    var rows = qaAll(PROVIDER.searchResultRow),
+      out = [];
     spotifyRows = [];
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
@@ -455,22 +614,43 @@
       var img = r.querySelector("img");
       spotifyRows.push(r);
       out.push({
-        section: "Songs", title: title, subtitle: clean(firstTextIn(r, PROVIDER.searchResultArtist)),
+        section: "Songs",
+        title: title,
+        subtitle: clean(firstTextIn(r, PROVIDER.searchResultArtist)),
         art: img && /^https?:/.test(img.src) ? img.src : "",
-        rowIndex: spotifyRows.length - 1, play: true, plays: "", kind: "song",
+        rowIndex: spotifyRows.length - 1,
+        play: true,
+        plays: "",
+        kind: "song",
       });
     }
     return out;
   }
   function searchSpotify(query, cb) {
     var input = qa(PROVIDER.searchBox);
-    if (!input) { cb({ error: "search box not found" }); return; }
+    if (!input) {
+      cb({ error: "search box not found" });
+      return;
+    }
     input.focus();
-    try { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set.call(input, query); }
-    catch (_) { input.value = query; }
+    try {
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set.call(input, query);
+    } catch (_) {
+      input.value = query;
+    }
     input.dispatchEvent(new Event("input", { bubbles: true }));
     setTimeout(function () {
-      ["keydown", "keyup"].forEach(function (t) { input.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); });
+      ["keydown", "keyup"].forEach(function (t) {
+        input.dispatchEvent(
+          new KeyboardEvent(t, {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+          })
+        );
+      });
       var tries = 0;
       (function waitSearch() {
         if (location.pathname.indexOf("/search/") === 0) {
@@ -481,33 +661,70 @@
           }
           var t2 = 0;
           (function waitRows() {
-            if (qaAll(PROVIDER.searchResultRow).length) { setTimeout(function () { cb({ results: scrapeSpotifyResults(), query: query }); }, 450); return; }
-            if (++t2 > 28) { cb({ results: scrapeSpotifyResults(), query: query }); return; }
+            if (qaAll(PROVIDER.searchResultRow).length) {
+              setTimeout(function () {
+                cb({ results: scrapeSpotifyResults(), query: query });
+              }, 450);
+              return;
+            }
+            if (++t2 > 28) {
+              cb({ results: scrapeSpotifyResults(), query: query });
+              return;
+            }
             setTimeout(waitRows, 250);
           })();
           return;
         }
-        if (++tries > 28) { cb({ error: "search timed out", query: query }); return; }
+        if (++tries > 28) {
+          cb({ error: "search timed out", query: query });
+          return;
+        }
         setTimeout(waitSearch, 250);
       })();
     }, 350);
   }
 
   function search(query, cb) {
-    if (PROVIDER.searchResultRow) { searchSpotify(query, cb); return; }   // provider with in-app results (Spotify)
-    if (!triggerSearch(query)) { cb({ error: "search box not found" }); return; }
+    if (PROVIDER.searchResultRow) {
+      searchSpotify(query, cb);
+      return;
+    } // provider with in-app results (Spotify)
+    if (!triggerSearch(query)) {
+      cb({ error: "search box not found" });
+      return;
+    }
     // submit after a tick so autocomplete doesn't swallow the Enter
     setTimeout(function () {
       var input = q("ytmusic-search-box input#input") || q("ytmusic-search-box input");
-      if (input) ["keydown", "keypress", "keyup"].forEach(function (t) {
-        input.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      });
+      if (input)
+        ["keydown", "keypress", "keyup"].forEach(function (t) {
+          input.dispatchEvent(
+            new KeyboardEvent(t, {
+              key: "Enter",
+              code: "Enter",
+              keyCode: 13,
+              which: 13,
+              bubbles: true,
+            })
+          );
+        });
       var tries = 0;
       (function waitForResults() {
-        var ready = location.href.indexOf("/search") !== -1 &&
-          document.querySelectorAll("ytmusic-responsive-list-item-renderer, ytmusic-card-shelf-renderer").length;
-        if (ready) { setTimeout(function () { cb({ results: scrapeResults(), query: query }); }, 650); return; }
-        if (++tries > 30) { cb({ error: "search timed out", query: query }); return; }
+        var ready =
+          location.href.indexOf("/search") !== -1 &&
+          document.querySelectorAll(
+            "ytmusic-responsive-list-item-renderer, ytmusic-card-shelf-renderer"
+          ).length;
+        if (ready) {
+          setTimeout(function () {
+            cb({ results: scrapeResults(), query: query });
+          }, 650);
+          return;
+        }
+        if (++tries > 30) {
+          cb({ error: "search timed out", query: query });
+          return;
+        }
         setTimeout(waitForResults, 300);
       })();
     }, 350);
@@ -525,15 +742,34 @@
     "music.youtube.com": {
       id: "youtube-music",
       // play/pause uses the media element here (works + instant) — no button needed
-      next: ["ytmusic-player-bar .next-button", "tp-yt-paper-icon-button.next-button", ".next-button"],
-      prev: ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
-      shuffle: ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
-      repeat: ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
+      next: [
+        "ytmusic-player-bar .next-button",
+        "tp-yt-paper-icon-button.next-button",
+        ".next-button",
+      ],
+      prev: [
+        "ytmusic-player-bar .previous-button",
+        "tp-yt-paper-icon-button.previous-button",
+        ".previous-button",
+      ],
+      shuffle: [
+        "ytmusic-player-bar .shuffle",
+        "tp-yt-paper-icon-button.shuffle",
+        "[aria-label*='Shuffle' i]",
+      ],
+      repeat: [
+        "ytmusic-player-bar .repeat",
+        "tp-yt-paper-icon-button.repeat",
+        "[aria-label*='Repeat' i]",
+      ],
       searchBox: ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"],
       // lyrics: the Lyrics tab fills a description shelf — ONE element, \n-separated lines
       // (live-verified: 57 newlines, no <br>). Present only while the Lyrics tab is open.
       lyricsTab: ["tp-yt-paper-tab"],
-      lyricsText: ["ytmusic-description-shelf-renderer yt-formatted-string.description", "ytmusic-description-shelf-renderer .description"],
+      lyricsText: [
+        "ytmusic-description-shelf-renderer yt-formatted-string.description",
+        "ytmusic-description-shelf-renderer .description",
+      ],
     },
     "open.spotify.com": {
       id: "spotify",
@@ -541,7 +777,11 @@
       capabilities: { library: true, dislike: false },
       // Spotify is an EME player — drive its own DOM buttons (data-testids are stable;
       // aria-label fallbacks add resilience). Direct media-element control is unreliable.
-      playPause: ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
+      playPause: [
+        "[data-testid='control-button-playpause']",
+        "button[aria-label='Play']",
+        "button[aria-label='Pause']",
+      ],
       next: ["[data-testid='control-button-skip-forward']", "button[aria-label='Next']"],
       prev: ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
       // shuffle has NO data-testid (live DOM); its aria-label is dynamic ("Enable/Disable Shuffle …")
@@ -552,7 +792,10 @@
       // playlist" when saved), so we match the STABLE aria-checked state attribute (present
       // in both states, only on this button within the now-playing widget). readLikeStatus
       // reads aria-checked="true" ⇒ saved ⇒ heart lit.
-      like: ["[data-testid='now-playing-widget'] button[aria-checked]", "[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]"],
+      like: [
+        "[data-testid='now-playing-widget'] button[aria-checked]",
+        "[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]",
+      ],
       searchBox: ["[data-testid='search-input']", "input[data-testid='search-input']"],
       // Spotify has no readable media element for us, so read position from its DOM text
       // (lets the seek bar show progress); times are "m:ss" → parsed to seconds. Flat array
@@ -588,7 +831,10 @@
   };
   function activeProvider() {
     var host = location.hostname;
-    for (var k in PROVIDERS) { if (PROVIDERS.hasOwnProperty(k) && (host === k || host.endsWith("." + k))) return PROVIDERS[k]; }
+    for (var k in PROVIDERS) {
+      if (PROVIDERS.hasOwnProperty(k) && (host === k || host.endsWith("." + k)))
+        return PROVIDERS[k];
+    }
     return null;
   }
   var PROVIDER = activeProvider() || { id: "unknown" };
@@ -601,58 +847,130 @@
   // See docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md.
   var DEFAULT_PROVIDERS = JSON.parse(JSON.stringify(PROVIDERS));
   function applySelectorOverrides(cfg) {
-    for (var h in DEFAULT_PROVIDERS) PROVIDERS[h] = JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[h]));
+    for (var h in DEFAULT_PROVIDERS)
+      PROVIDERS[h] = JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[h]));
     if (cfg && cfg.providers && typeof cfg.providers === "object") {
       Object.keys(cfg.providers).forEach(function (host) {
-        var ov = cfg.providers[host]; if (!ov || typeof ov !== "object") return;
+        var ov = cfg.providers[host];
+        if (!ov || typeof ov !== "object") return;
         if (!PROVIDERS[host]) PROVIDERS[host] = { id: host };
         Object.keys(ov).forEach(function (key) {
           var arr = ov[key];
-          if (Array.isArray(arr) && arr.length && arr.every(function (s) { return typeof s === "string"; })) {
+          if (
+            Array.isArray(arr) &&
+            arr.length &&
+            arr.every(function (s) {
+              return typeof s === "string";
+            })
+          ) {
             var defs = PROVIDERS[host][key] || [];
-            PROVIDERS[host][key] = arr.concat(defs.filter(function (s) { return arr.indexOf(s) === -1; }));
+            PROVIDERS[host][key] = arr.concat(
+              defs.filter(function (s) {
+                return arr.indexOf(s) === -1;
+              })
+            );
           }
         });
       });
     }
-    PROVIDER = activeProvider() || PROVIDER;   // re-point at the rebuilt active entry
+    PROVIDER = activeProvider() || PROVIDER; // re-point at the rebuilt active entry
   }
   try {
-    chrome.storage.local.get("neoampSelectors", function (r) { applySelectorOverrides(r && r.neoampSelectors); });
-    chrome.storage.onChanged.addListener(function (ch, area) { if (area === "local" && ch.neoampSelectors) applySelectorOverrides(ch.neoampSelectors.newValue); });
+    chrome.storage.local.get("neoampSelectors", function (r) {
+      applySelectorOverrides(r && r.neoampSelectors);
+    });
+    chrome.storage.onChanged.addListener(function (ch, area) {
+      if (area === "local" && ch.neoampSelectors)
+        applySelectorOverrides(ch.neoampSelectors.newValue);
+    });
   } catch (_) {}
 
-  function mediaEl() { return q("video") || q("audio"); }
-  function clickSel(list) { var b = list && qa(list); if (b) { b.click(); return true; } return false; }
-  function textOf(list) { var el = list && qa(list); return el ? clean(el.textContent) : ""; }
-  function qaAll(list) { if (!list) return []; for (var i = 0; i < list.length; i++) { try { var n = document.querySelectorAll(list[i]); if (n.length) return n; } catch (_) {} } return []; }
-  function firstTextIn(root, list) { if (!list) return ""; for (var i = 0; i < list.length; i++) { var el = root.querySelector(list[i]); if (el) return el.textContent; } return ""; }
-  function firstIn(root, list) { if (!list) return null; for (var i = 0; i < list.length; i++) { var el = root.querySelector(list[i]); if (el) return el; } return null; }
+  function mediaEl() {
+    return q("video") || q("audio");
+  }
+  function clickSel(list) {
+    var b = list && qa(list);
+    if (b) {
+      b.click();
+      return true;
+    }
+    return false;
+  }
+  function textOf(list) {
+    var el = list && qa(list);
+    return el ? clean(el.textContent) : "";
+  }
+  function qaAll(list) {
+    if (!list) return [];
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var n = document.querySelectorAll(list[i]);
+        if (n.length) return n;
+      } catch (_) {}
+    }
+    return [];
+  }
+  function firstTextIn(root, list) {
+    if (!list) return "";
+    for (var i = 0; i < list.length; i++) {
+      var el = root.querySelector(list[i]);
+      if (el) return el.textContent;
+    }
+    return "";
+  }
+  function firstIn(root, list) {
+    if (!list) return null;
+    for (var i = 0; i < list.length; i++) {
+      var el = root.querySelector(list[i]);
+      if (el) return el;
+    }
+    return null;
+  }
   // Set a React-controlled <input> value so the framework's onChange fires (a plain
   // .value assignment is swallowed by React's value tracker). Used for provider seek bars.
   function setRangeValue(input, val) {
     try {
       var d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
-      (d && d.set ? d.set : function (x) { input.value = x; }).call(input, String(val));
+      (d && d.set
+        ? d.set
+        : function (x) {
+            input.value = x;
+          }
+      ).call(input, String(val));
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
       return true;
-    } catch (_) { try { input.value = String(val); return true; } catch (e) { return false; } }
+    } catch (_) {
+      try {
+        input.value = String(val);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
   }
   // Seek on sites with no controllable media element: drive the provider's range slider,
   // scaling the target seconds to the slider's own max (Spotify's is milliseconds).
   function seekProvider(t) {
     if (!PROVIDER.seekBar) return;
-    var inp = qa(PROVIDER.seekBar), durSec = parseTime(textOf(PROVIDER.posDuration));
+    var inp = qa(PROVIDER.seekBar),
+      durSec = parseTime(textOf(PROVIDER.posDuration));
     if (!inp || !(durSec > 0) || !isFinite(t)) return;
-    var max = parseFloat(inp.max) || (durSec * 1000);
+    var max = parseFloat(inp.max) || durSec * 1000;
     if (setRangeValue(inp, Math.round(Math.max(0, Math.min(1, t / durSec)) * max))) sendTrack();
   }
-  function parseTime(s) {  // "m:ss" / "h:mm:ss" → seconds
+  function parseTime(s) {
+    // "m:ss" / "h:mm:ss" → seconds
     if (!s) return 0;
-    var p = String(s).split(":").map(function (n) { return parseInt(n, 10); });
+    var p = String(s)
+      .split(":")
+      .map(function (n) {
+        return parseInt(n, 10);
+      });
     if (p.some(isNaN)) return 0;
-    return p.reduce(function (a, n) { return a * 60 + n; }, 0);
+    return p.reduce(function (a, n) {
+      return a * 60 + n;
+    }, 0);
   }
   // Player volume runs on the offscreen master gain (provider-agnostic — works even when a
   // site exposes no controllable media element, e.g. Spotify). Persisted + relayed live.
@@ -660,15 +978,32 @@
   var playerMuted = false;
   // Mute is NOT a separate offscreen state — it folds into the SAME master-gain relay:
   // we send 0 when muted, the real volume otherwise. One gain authority, no new message.
-  function relayVolume() { try { chrome.runtime.sendMessage({ target: "sw", type: "relay-volume", volume: playerMuted ? 0 : playerVolume }); } catch (_) {} }
-  function persistVolume() { try { chrome.storage.local.set({ neoampVolume: playerVolume }); } catch (_) {} }
-  function persistMute() { try { chrome.storage.local.set({ neoampMute: playerMuted }); } catch (_) {} }
+  function relayVolume() {
+    try {
+      chrome.runtime.sendMessage({
+        target: "sw",
+        type: "relay-volume",
+        volume: playerMuted ? 0 : playerVolume,
+      });
+    } catch (_) {}
+  }
+  function persistVolume() {
+    try {
+      chrome.storage.local.set({ neoampVolume: playerVolume });
+    } catch (_) {}
+  }
+  function persistMute() {
+    try {
+      chrome.storage.local.set({ neoampMute: playerMuted });
+    } catch (_) {}
+  }
   function isPaused() {
-    if (PROVIDER.playPause) {                       // EME providers (Spotify): <video>.paused is unreliable
+    if (PROVIDER.playPause) {
+      // EME providers (Spotify): <video>.paused is unreliable
       var b = qa(PROVIDER.playPause);
-      var al = (b && b.getAttribute("aria-label") || "").toLowerCase();
-      if (/pause/.test(al)) return false;           // button labeled "Pause" ⇒ currently playing
-      if (/play/.test(al)) return true;             // button labeled "Play"  ⇒ currently paused
+      var al = ((b && b.getAttribute("aria-label")) || "").toLowerCase();
+      if (/pause/.test(al)) return false; // button labeled "Pause" ⇒ currently playing
+      if (/play/.test(al)) return true; // button labeled "Play"  ⇒ currently paused
       return mediaMeta.playbackState ? mediaMeta.playbackState !== "playing" : true;
     }
     var v = mediaEl();
@@ -678,44 +1013,106 @@
   // Prefer the provider's own play/pause toggle button (reliable on EME players like
   // Spotify); fall back to the media element (YTM, and any site without a button sel).
   function doPlayPause() {
-    if (PROVIDER.playPause && clickSel(PROVIDER.playPause)) { setTimeout(sendTrack, 200); return; }
+    if (PROVIDER.playPause && clickSel(PROVIDER.playPause)) {
+      setTimeout(sendTrack, 200);
+      return;
+    }
     var v = mediaEl();
-    if (v) { v.paused ? v.play() : v.pause(); sendTrack(); }
+    if (v) {
+      v.paused ? v.play() : v.pause();
+      sendTrack();
+    }
   }
 
   var control = {
-    playPause: function () { doPlayPause(); },
-    play: function () { if (isPaused()) doPlayPause(); },
-    pause: function () { if (!isPaused()) doPlayPause(); },
-    next: function () { clickSel(PROVIDER.next); },
-    prev: function () { clickSel(PROVIDER.prev); },
-    stop: function () { if (!isPaused()) doPlayPause(); var v = mediaEl(); if (v) { try { v.currentTime = 0; } catch (_) {} } sendTrack(); },
+    playPause: function () {
+      doPlayPause();
+    },
+    play: function () {
+      if (isPaused()) doPlayPause();
+    },
+    pause: function () {
+      if (!isPaused()) doPlayPause();
+    },
+    next: function () {
+      clickSel(PROVIDER.next);
+    },
+    prev: function () {
+      clickSel(PROVIDER.prev);
+    },
+    stop: function () {
+      if (!isPaused()) doPlayPause();
+      var v = mediaEl();
+      if (v) {
+        try {
+          v.currentTime = 0;
+        } catch (_) {}
+      }
+      sendTrack();
+    },
     // seek to absolute seconds: media element when it has a real timeline, else the
     // provider's own seek slider (Spotify — its <video> can't be seeked by us).
     seek: function (t) {
       var v = mediaEl();
-      if (v && isFinite(v.duration) && v.duration > 0) { if (isFinite(t)) { v.currentTime = t; sendTrack(); } return; }
+      if (v && isFinite(v.duration) && v.duration > 0) {
+        if (isFinite(t)) {
+          v.currentTime = t;
+          sendTrack();
+        }
+        return;
+      }
       seekProvider(t);
     },
     // relative seek (keyboard ←/→) — reads the live time so it isn't stale-by-a-tick
     seekBy: function (d) {
       var v = mediaEl();
       if (v && isFinite(v.currentTime) && isFinite(v.duration) && v.duration > 0) {
-        v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + d)); sendTrack(); return;
+        v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + d));
+        sendTrack();
+        return;
       }
       seekProvider(parseTime(textOf(PROVIDER.posElapsed)) + d);
     },
     // volume = the offscreen master gain (provider-agnostic; works on sites with no
     // controllable media element, e.g. Spotify). Relayed live + persisted.
-    setVolume: function (x) { playerVolume = clamp(+x || 0, 0, 1); if (playerVolume > 0) playerMuted = false; relayVolume(); persistVolume(); persistMute(); },
-    nudgeVolume: function (d) { playerVolume = clamp(playerVolume + d, 0, 1); if (playerVolume > 0) playerMuted = false; relayVolume(); persistVolume(); persistMute(); sendTrack(); },
-    getVolume: function () { return playerVolume; },   // the REAL volume, so the slider doesn't snap to 0 while muted
-    setMute: function (b) { playerMuted = b === undefined ? !playerMuted : !!b; relayVolume(); persistMute(); return playerMuted; },
-    isMuted: function () { return playerMuted; },
-    getCapabilities: function () { return (PROVIDER && PROVIDER.capabilities) || {}; },
-    focusSearch: function () {   // focus the active site's own search box (provider-aware)
+    setVolume: function (x) {
+      playerVolume = clamp(+x || 0, 0, 1);
+      if (playerVolume > 0) playerMuted = false;
+      relayVolume();
+      persistVolume();
+      persistMute();
+    },
+    nudgeVolume: function (d) {
+      playerVolume = clamp(playerVolume + d, 0, 1);
+      if (playerVolume > 0) playerMuted = false;
+      relayVolume();
+      persistVolume();
+      persistMute();
+      sendTrack();
+    },
+    getVolume: function () {
+      return playerVolume;
+    }, // the REAL volume, so the slider doesn't snap to 0 while muted
+    setMute: function (b) {
+      playerMuted = b === undefined ? !playerMuted : !!b;
+      relayVolume();
+      persistMute();
+      return playerMuted;
+    },
+    isMuted: function () {
+      return playerMuted;
+    },
+    getCapabilities: function () {
+      return (PROVIDER && PROVIDER.capabilities) || {};
+    },
+    focusSearch: function () {
+      // focus the active site's own search box (provider-aware)
       var s = PROVIDER.searchBox && qa(PROVIDER.searchBox);
-      if (s && s.focus) { s.focus(); if (s.scrollIntoView) s.scrollIntoView({ block: "center" }); return true; }
+      if (s && s.focus) {
+        s.focus();
+        if (s.scrollIntoView) s.scrollIntoView({ block: "center" });
+        return true;
+      }
       return false;
     },
     // open the site's own queue panel if the queue DOM isn't rendered yet (e.g. Spotify
@@ -731,12 +1128,13 @@
     // lyrics are already present. Called when NeoAmp's Lyrics window opens. On YTM the queue
     // items stay in the DOM under the inactive Up-Next tab (verified), so the mirror is safe.
     ensureLyrics: function () {
-      if (PROVIDER.lyricsText) {                       // YTM: activate the Lyrics tab
-        if (qa(PROVIDER.lyricsText)) return;           // already loaded
+      if (PROVIDER.lyricsText) {
+        // YTM: activate the Lyrics tab
+        if (qa(PROVIDER.lyricsText)) return; // already loaded
         var tabs = qaAll(PROVIDER.lyricsTab);
         for (var i = 0; i < tabs.length; i++) {
           if (!/lyric/i.test(tabs[i].textContent || "")) continue;
-          if (tabs[i].getAttribute("aria-selected") === "true") return;   // already on Lyrics
+          if (tabs[i].getAttribute("aria-selected") === "true") return; // already on Lyrics
           // YTM's tabs are Polymer paper-tabs: a synthetic .click() does NOT switch them.
           // Setting the parent tp-yt-paper-tabs `.selected` index DOES (switches + lazy-loads).
           var parent = tabs[i].parentElement;
@@ -744,45 +1142,83 @@
           if (parent && "selected" in parent) {
             var sibs = parent.querySelectorAll("tp-yt-paper-tab");
             parent.selected = [].indexOf.call(sibs, tabs[i]);
-          } else { tabs[i].click(); }                  // fallback
-          setTimeout(sendTrack, 1200);                 // let the lazy lyrics render, then push
+          } else {
+            tabs[i].click();
+          } // fallback
+          setTimeout(sendTrack, 1200); // let the lazy lyrics render, then push
           return;
         }
         return;
       }
-      if (PROVIDER.lyricsLine && PROVIDER.lyricsBtn) {  // Spotify: open the lyrics view
-        if (qaAll(PROVIDER.lyricsLine).length) return;  // already open
+      if (PROVIDER.lyricsLine && PROVIDER.lyricsBtn) {
+        // Spotify: open the lyrics view
+        if (qaAll(PROVIDER.lyricsLine).length) return; // already open
         if (clickSel(PROVIDER.lyricsBtn)) setTimeout(sendTrack, 800);
       }
     },
     // click the provider's shuffle/repeat button, then re-read shortly after so the UI
     // reflects the ACTUAL resulting state (sites flip it async; like the like/dislike path).
-    toggleShuffle: function () { if (clickSel(PROVIDER.shuffle)) setTimeout(sendTrack, 250); },
-    toggleRepeat: function () { if (clickSel(PROVIDER.repeat)) setTimeout(sendTrack, 250); },
+    toggleShuffle: function () {
+      if (clickSel(PROVIDER.shuffle)) setTimeout(sendTrack, 250);
+    },
+    toggleRepeat: function () {
+      if (clickSel(PROVIDER.repeat)) setTimeout(sendTrack, 250);
+    },
     // --- equalizer + balance (relayed live to the offscreen audio engine) ---
-    getEqState: function () { return { enabled: eqState.enabled, preamp: eqState.preamp, bands: eqState.bands.slice(), balance: eqState.balance }; },
-    setEqEnabled: function (on) { eqState.enabled = !!on; relayEq(); persistEq(); },
-    setPreamp: function (db) { eqState.preamp = +db || 0; relayEq(); persistEq(); },
-    setEqBand: function (i, db) { if (i >= 0 && i < eqState.bands.length) { eqState.bands[i] = +db || 0; relayEq(); persistEq(); } },
-    setBalance: function (x) { eqState.balance = clamp(+x || 0, -1, 1); relayEq(); persistEq(); },
+    getEqState: function () {
+      return {
+        enabled: eqState.enabled,
+        preamp: eqState.preamp,
+        bands: eqState.bands.slice(),
+        balance: eqState.balance,
+      };
+    },
+    setEqEnabled: function (on) {
+      eqState.enabled = !!on;
+      relayEq();
+      persistEq();
+    },
+    setPreamp: function (db) {
+      eqState.preamp = +db || 0;
+      relayEq();
+      persistEq();
+    },
+    setEqBand: function (i, db) {
+      if (i >= 0 && i < eqState.bands.length) {
+        eqState.bands[i] = +db || 0;
+        relayEq();
+        persistEq();
+      }
+    },
+    setBalance: function (x) {
+      eqState.balance = clamp(+x || 0, -1, 1);
+      relayEq();
+      persistEq();
+    },
     // bulk-apply a preset (all 10 bands + optional preamp/enabled) in one relay
     setEq: function (bands, preamp, enabled) {
       if (bands && bands.length === eqState.bands.length) eqState.bands = bands.map(Number);
       if (typeof preamp === "number") eqState.preamp = preamp;
       if (typeof enabled === "boolean") eqState.enabled = enabled;
-      relayEq(); persistEq();
+      relayEq();
+      persistEq();
     },
     playQueueItem: function (i) {
-      if (PROVIDER.queueRow) {   // provider-configured queue (Spotify): click the row's own play button
+      if (PROVIDER.queueRow) {
+        // provider-configured queue (Spotify): click the row's own play button
         var play = function () {
-          var rows = qaAll(PROVIDER.queueRow), r = rows[i];
+          var rows = qaAll(PROVIDER.queueRow),
+            r = rows[i];
           if (!r) return false;
           var pb = firstIn(r, PROVIDER.queuePlay);
-          if (pb) { pb.click(); return true; }
+          if (pb) {
+            pb.click();
+            return true;
+          }
           return false;
         };
         if (play()) return;
-        if (control.ensureQueueOpen()) setTimeout(play, 700);   // panel closed → open it, then retry
+        if (control.ensureQueueOpen()) setTimeout(play, 700); // panel closed → open it, then retry
         return;
       }
       var items = document.querySelectorAll("ytmusic-player-queue-item");
@@ -790,13 +1226,17 @@
       if (!it) return;
       // Verified live: only the thumbnail play-button overlay actually starts
       // the row — clicking .song-info / the row / dblclick do nothing.
-      var target = it.querySelector("ytmusic-play-button-renderer") ||
-        it.querySelector(".thumbnail yt-icon, yt-icon.icon") || it;
+      var target =
+        it.querySelector("ytmusic-play-button-renderer") ||
+        it.querySelector(".thumbnail yt-icon, yt-icon.icon") ||
+        it;
       target.click();
     },
     playLibraryItem: function (rowIndex) {
-      if (PROVIDER.searchResultRow) {   // provider with cached result rows (Spotify)
-        var sr = spotifyRows[rowIndex]; if (!sr) return;
+      if (PROVIDER.searchResultRow) {
+        // provider with cached result rows (Spotify)
+        var sr = spotifyRows[rowIndex];
+        if (!sr) return;
         var pb = firstIn(sr, PROVIDER.searchResultPlay);
         if (pb) pb.click();
         return;
@@ -810,57 +1250,99 @@
       var rows = document.querySelectorAll("ytmusic-responsive-list-item-renderer");
       var r = rows[rowIndex];
       if (!r) return;
-      var b = r.querySelector("ytmusic-play-button-renderer") || r.querySelector(".thumbnail yt-icon, yt-icon.icon");
+      var b =
+        r.querySelector("ytmusic-play-button-renderer") ||
+        r.querySelector(".thumbnail yt-icon, yt-icon.icon");
       if (b) b.click();
     },
     // OPEN a playlist/album result as an SPA route (click its title link — never
     // location.href). Use for collection rows; playLibraryItem still PLAYS them.
     openLibraryItem: function (rowIndex) {
-      var r = rowIndex < 0
-        ? document.querySelector("ytmusic-card-shelf-renderer")
-        : document.querySelectorAll("ytmusic-responsive-list-item-renderer")[rowIndex];
+      var r =
+        rowIndex < 0
+          ? document.querySelector("ytmusic-card-shelf-renderer")
+          : document.querySelectorAll("ytmusic-responsive-list-item-renderer")[rowIndex];
       if (!r) return;
-      var link = r.querySelector("a.yt-simple-endpoint.yt-formatted-string")
-              || r.querySelector("yt-formatted-string.title a")
-              || r.querySelector("a.yt-simple-endpoint[href*='list='], a.yt-simple-endpoint[href*='browse/']");
+      var link =
+        r.querySelector("a.yt-simple-endpoint.yt-formatted-string") ||
+        r.querySelector("yt-formatted-string.title a") ||
+        r.querySelector(
+          "a.yt-simple-endpoint[href*='list='], a.yt-simple-endpoint[href*='browse/']"
+        );
       if (link) link.click();
     },
     // like/dislike toggle the current track (3-state — clicking when already
     // set returns to neutral). Anchor on the unambiguous #button-shape-* ids.
     like: function () {
       // binary-save providers (Spotify "Add to Liked Songs") click their own button
-      if (PROVIDER.like) { if (clickSel(PROVIDER.like)) setTimeout(sendTrack, 300); return; }
-      var r = likeRenderer(); if (!r) return;
-      var b = r.querySelector("#button-shape-like > button") || r.querySelector("#button-shape-like button") || r.querySelector("button[aria-label='Like']");
+      if (PROVIDER.like) {
+        if (clickSel(PROVIDER.like)) setTimeout(sendTrack, 300);
+        return;
+      }
+      var r = likeRenderer();
+      if (!r) return;
+      var b =
+        r.querySelector("#button-shape-like > button") ||
+        r.querySelector("#button-shape-like button") ||
+        r.querySelector("button[aria-label='Like']");
       // YTM flips like-status asynchronously — re-read after a tick so the LED
       // reflects the toggle promptly instead of waiting for the 400ms poll.
-      if (b) { b.click(); setTimeout(sendTrack, 250); }
+      if (b) {
+        b.click();
+        setTimeout(sendTrack, 250);
+      }
     },
     dislike: function () {
-      if (PROVIDER.capabilities && PROVIDER.capabilities.dislike === false) return;  // no dislike (Spotify)
-      var r = likeRenderer(); if (!r) return;
-      var b = r.querySelector("#button-shape-dislike > button") || r.querySelector("#button-shape-dislike button") || r.querySelector("button[aria-label='Dislike']");
-      if (b) { b.click(); setTimeout(sendTrack, 250); }
+      if (PROVIDER.capabilities && PROVIDER.capabilities.dislike === false) return; // no dislike (Spotify)
+      var r = likeRenderer();
+      if (!r) return;
+      var b =
+        r.querySelector("#button-shape-dislike > button") ||
+        r.querySelector("#button-shape-dislike button") ||
+        r.querySelector("button[aria-label='Dislike']");
+      if (b) {
+        b.click();
+        setTimeout(sendTrack, 250);
+      }
     },
     // play a scraped home-shelf item by its index (refs held in homeItems)
     playHomeItem: function (idx) {
-      var it = homeItems[idx]; if (!it || !it._el) return;
+      var it = homeItems[idx];
+      if (!it || !it._el) return;
       // the cached node goes stale after any SPA navigation (e.g. a search) tore
       // down the home DOM — detect it (a detached node is still truthy) and bail.
-      if (!document.contains(it._el)) { toast("Home list changed — press HOME to refresh"); return; }
-      var b = it._el.querySelector("ytmusic-play-button-renderer") || it._el.querySelector(".thumbnail yt-icon, yt-icon.icon");
-      if (b) { b.click(); return; }
-      var a = it._el.querySelector("a.yt-simple-endpoint[href]"); if (a) a.click();
+      if (!document.contains(it._el)) {
+        toast("Home list changed — press HOME to refresh");
+        return;
+      }
+      var b =
+        it._el.querySelector("ytmusic-play-button-renderer") ||
+        it._el.querySelector(".thumbnail yt-icon, yt-icon.icon");
+      if (b) {
+        b.click();
+        return;
+      }
+      var a = it._el.querySelector("a.yt-simple-endpoint[href]");
+      if (a) a.click();
     },
   };
 
   // --- storage (chrome.storage, async; the iframe can't use it directly) ----
   var storage = {
     get: function (key, cb) {
-      try { chrome.storage.local.get(key, function (r) { cb(r ? r[key] : undefined); }); }
-      catch (_) { cb(undefined); }
+      try {
+        chrome.storage.local.get(key, function (r) {
+          cb(r ? r[key] : undefined);
+        });
+      } catch (_) {
+        cb(undefined);
+      }
     },
-    set: function (obj) { try { chrome.storage.local.set(obj); } catch (_) {} },
+    set: function (obj) {
+      try {
+        chrome.storage.local.set(obj);
+      } catch (_) {}
+    },
   };
 
   // restore the saved EQ (Winamp remembers it). Loaded eagerly so start() sees it
@@ -871,13 +1353,19 @@
     eqState.preamp = +e.preamp || 0;
     eqState.bands = e.bands.map(Number);
     eqState.balance = clamp(+e.balance || 0, -1, 1);
-    relayEq();   // if capture is already live, push the restored curve to the engine
+    relayEq(); // if capture is already live, push the restored curve to the engine
   });
   storage.get("neoampVolume", function (v) {
-    if (typeof v === "number") { playerVolume = clamp(v, 0, 1); relayVolume(); }
+    if (typeof v === "number") {
+      playerVolume = clamp(v, 0, 1);
+      relayVolume();
+    }
   });
   storage.get("neoampMute", function (m) {
-    if (typeof m === "boolean") { playerMuted = m; relayVolume(); }
+    if (typeof m === "boolean") {
+      playerMuted = m;
+      relayVolume();
+    }
   });
 
   function toast(msg) {
@@ -885,7 +1373,9 @@
     t.className = "ytm-wmp-toast";
     t.textContent = msg;
     document.documentElement.appendChild(t);
-    setTimeout(function () { t.parentNode && t.parentNode.removeChild(t); }, 4500);
+    setTimeout(function () {
+      t.parentNode && t.parentNode.removeChild(t);
+    }, 4500);
   }
 
   // messages from the service worker: lifecycle (raise/hide the player when capture
@@ -893,8 +1383,9 @@
   try {
     chrome.runtime.onMessage.addListener(function (msg) {
       if (!msg || msg.target !== "content") return;
-      if (msg.type === "lifecycle") { msg.state === "started" ? onEqStarted() : onEqStopped(); }
-      else if (msg.type === "fft") onFft(msg.b64);
+      if (msg.type === "lifecycle") {
+        msg.state === "started" ? onEqStarted() : onEqStopped();
+      } else if (msg.type === "fft") onFft(msg.b64);
       else if (msg.type === "audioInfo") audioSampleRate = +msg.sampleRate || 0;
       else if (msg.type === "toast") toast(msg.text);
     });
@@ -905,8 +1396,11 @@
     // Shift+V can only guide to it. STOP works anytime (no gesture needed).
     start: startHint,
     stop: requestStop,
-    isRunning: function () { return running; },
-    on: on, off: off,
+    isRunning: function () {
+      return running;
+    },
+    on: on,
+    off: off,
     getTrack: getTrack,
     getQueue: readQueue,
     search: search,
@@ -920,5 +1414,7 @@
   // Tell the SW a fresh page loaded so it clears any stale capture state for this tab.
   // After a refresh the old capture is dead, but the SW may still think it's live — which
   // made starting take TWO clicks (first click stopped the ghost session).
-  try { chrome.runtime.sendMessage({ target: "sw", type: "content-loaded" }); } catch (_) {}
+  try {
+    chrome.runtime.sendMessage({ target: "sw", type: "content-loaded" });
+  } catch (_) {}
 })();

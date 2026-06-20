@@ -6,7 +6,6 @@
   "use strict";
   var P = (window.WMP_PRESETS = window.WMP_PRESETS || {});
 
-
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
   //   • Exactly TWO jagged WHITE lightning lines crossing through dead center
@@ -23,29 +22,36 @@
   P["Ambience Thingus"] = (function () {
     var preset = build(
       {
-        wave_a: 0,                 // primary waveform off; the two custom lines draw the cross
-        decay: 0.94,               // trails smear into soft arms, but short enough to stay clean
+        wave_a: 0, // primary waveform off; the two custom lines draw the cross
+        decay: 0.94, // trails smear into soft arms, but short enough to stay clean
         gammaadj: 1.4,
-        zoom: 1.0, rot: 0.01, warp: 0.02, warpscale: 1.2, warpanimspeed: 0.4,
+        zoom: 1.0,
+        rot: 0.01,
+        warp: 0.02,
+        warpscale: 1.2,
+        warpanimspeed: 0.4,
         // wrap:0 — wrapping was smearing off-edge pixels back as blocky edge
         // artifacts; clamp instead so the spiral dissipates cleanly into the void.
-        cx: 0.5, cy: 0.5, darken_center: 0, wrap: 0
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1;
           var mid = t.mid_att || t.mid || 1;
           var treb = t.treb_att || t.treb || 1;
-          t.q1 = t.time * 0.28;                            // the CROSS visibly rotates CCW
-          t.q5 = 0.72;                                     // half-length (reaches the edges)
-          t.q6 = 0.10 + 0.30 * Math.min(0.6 * treb + 0.4 * mid, 2.4); // waveform amplitude (the jaggedness)
-          t.q7 = 0.06 + 0.04 * bass;                       // gentle S-bend depth
-          t.q10 = Math.min(0.6 + 0.7 * bass, 1.5);         // bolt brightness PULSES with bass
+          t.q1 = t.time * 0.28; // the CROSS visibly rotates CCW
+          t.q5 = 0.72; // half-length (reaches the edges)
+          t.q6 = 0.1 + 0.3 * Math.min(0.6 * treb + 0.4 * mid, 2.4); // waveform amplitude (the jaggedness)
+          t.q7 = 0.06 + 0.04 * bass; // gentle S-bend depth
+          t.q10 = Math.min(0.6 + 0.7 * bass, 1.5); // bolt brightness PULSES with bass
           // The LINES rotate (q1); the feedback/background is NOT rotated (rot=0)
           // so it doesn't spin under them — matches the original.
           t.rot = 0.0;
-          t.zoom = 1.0 + 0.035 * (bass - 1.0);             // beat zoom breathe (back by request)
-          t.decay = 0.90;                                  // faster fade -> deeper void, less fuzzy mesh
+          t.zoom = 1.0 + 0.035 * (bass - 1.0); // beat zoom breathe (back by request)
+          t.decay = 0.9; // faster fade -> deeper void, less fuzzy mesh
           return t;
         },
         // Just a gentle feedback fade (rotation handles the smear). No angular
@@ -67,7 +73,7 @@
           PAL_GLSL +
           "shader_body {\n" +
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float R = 9.0 + 20.0 * bass;\n" +                       // line thickness (px), pulses hard w/ bass
+          "float R = 9.0 + 20.0 * bass;\n" + // line thickness (px), pulses hard w/ bass
           "vec2 ips = vec2(1.0 / resolution.x, 1.0 / resolution.y);\n" +
           "float lum = lc(src);\n" +
           // Two rings (R and 0.5R) x 8 directions -> a SOLID fat band, not sparse.
@@ -85,20 +91,20 @@
           "  lum = max(lum, lc(texture2D(sampler_main, uv + vec2(ed.x, -ed.y)).rgb));\n" +
           "  lum = max(lum, lc(texture2D(sampler_main, uv - vec2(ed.x, -ed.y)).rgb));\n" +
           "}\n" +
-          "float seg = time / 6.0;\n" +                            // new random hue every ~6s
+          "float seg = time / 6.0;\n" + // new random hue every ~6s
           "float i0 = floor(seg);\n" +
           "float f = smoothstep(0.0, 1.0, fract(seg));\n" +
-          "float h = mix(h1d(i0), h1d(i0 + 1.0), f);\n" +          // random hue, crossfaded
+          "float h = mix(h1d(i0), h1d(i0 + 1.0), f);\n" + // random hue, crossfaded
           "vec3 base = pal(h);\n" +
-          "base = pow(base, vec3(1.5));\n" +                       // deepen (rich, not pastel)
+          "base = pow(base, vec3(1.5));\n" + // deepen (rich, not pastel)
           "float bl = dot(base, vec3(0.333));\n" +
-          "base = clamp(bl + (base - bl) * 1.7, 0.0, 1.0);\n" +    // boost saturation (kill muddy grays)
-          "float fill = (0.12 + 0.20 * bass) + 0.5 * lum;\n" +     // DEEP saturated hue field
+          "base = clamp(bl + (base - bl) * 1.7, 0.0, 1.0);\n" + // boost saturation (kill muddy grays)
+          "float fill = (0.12 + 0.20 * bass) + 0.5 * lum;\n" + // DEEP saturated hue field
           "vec3 col = base * fill;\n" +
           "col += vec3(1.0) * smoothstep(0.45, 0.95, lum) * 0.9;\n" + // the fat bolt pops stark WHITE
-          "col = col / (col + 0.8);\n" +                           // gentler tonemap (less washout)
+          "col = col / (col + 0.8);\n" + // gentler tonemap (less washout)
           "ret = col;\n" +
-          "}\n"
+          "}\n",
       }
     );
 
@@ -109,17 +115,27 @@
     function crossLine(offset, useV2) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
-          enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1,
-          smoothing: 0.0, a: 1.0, thick: 1, r: 1.0, g: 1.0, b: 1.0
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.0,
+          a: 1.0,
+          thick: 1,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
         }),
         init_eqs: passthrough,
         frame_eqs: passthrough,
         point_eqs: function (a) {
           var th = (a.q1 || 0) + offset;
-          var ct = Math.cos(th), st = Math.sin(th);
-          var s = a.sample * 2.0 - 1.0;                      // -1 .. +1 through centre
-          var len = (a.q5 || 0.7);
-          var amp = (a.q6 || 0.12);
+          var ct = Math.cos(th),
+            st = Math.sin(th);
+          var s = a.sample * 2.0 - 1.0; // -1 .. +1 through centre
+          var len = a.q5 || 0.7;
+          var amp = a.q6 || 0.12;
           var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
           // Overall S-shape: sin(s*PI) is 0 at the centre and bends one way on each
           // half -> a smooth S. The live waveform jaggedness rides on top (also 0
@@ -128,10 +144,12 @@
           var disp = bend + samp * amp * Math.abs(s);
           a.x = 0.5 + s * len * ct - disp * st;
           a.y = 0.5 + s * len * st + disp * ct;
-          var w = (a.q10 !== undefined ? a.q10 : 1);
-          a.r = w; a.g = w; a.b = w;
+          var w = a.q10 !== undefined ? a.q10 : 1;
+          a.r = w;
+          a.g = w;
+          a.b = w;
           return a;
-        }
+        },
       };
     }
     preset.waves[0] = crossLine(0, false);
@@ -139,22 +157,34 @@
     return preset;
   })();
 
-
   // ── Ambience Water ────────────────────────────────────────────────────────
   // Soft yellow pool caustics: layered sine ripples, no rotation, luminous.
   P["Ambience Water"] = build(
     {
-      wave_mode: 0, wave_smoothing: 0.95, wave_scale: 0.35, additivewave: 1,
-      wave_r: 1.0, wave_g: 0.9, wave_b: 0.35, wave_a: 0.22,
-      decay: 0.95, gammaadj: 1.6,
-      zoom: 1.0, rot: 0.0, warp: 0.12, warpscale: 2.2, warpanimspeed: 0.5,
-      cx: 0.5, cy: 0.5, wrap: 1
+      wave_mode: 0,
+      wave_smoothing: 0.95,
+      wave_scale: 0.35,
+      additivewave: 1,
+      wave_r: 1.0,
+      wave_g: 0.9,
+      wave_b: 0.35,
+      wave_a: 0.22,
+      decay: 0.95,
+      gammaadj: 1.6,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.12,
+      warpscale: 2.2,
+      warpanimspeed: 0.5,
+      cx: 0.5,
+      cy: 0.5,
+      wrap: 1,
     },
     {
       frame: function (t) {
         var bass = t.bass_att || t.bass || 1;
         var treb = t.treb_att || t.treb || 1;
-        t.warp = 0.10 + 0.05 * bass;
+        t.warp = 0.1 + 0.05 * bass;
         t.warpanimspeed = 0.4 + 0.3 * treb;
         t.zoom = 1.0 + 0.005 * Math.sin(t.time * 0.4);
         t.decay = 0.95;
@@ -179,26 +209,38 @@
         "v += 0.06 * sin(uv.x*10.0 + time*0.8) * sin(uv.y*10.0 - time*0.6);\n" +
         "v *= (1.0 + 0.25*bass);\n" +
         "ret = amber_ramp(v);\n" +
-        "}\n"
+        "}\n",
     }
   );
-
 
   // ── Ambience Down the Drain ────────────────────────────────────────────────
   // Yellow caustics spiralling into a dark central hole: zoom-in + rotate.
   P["Ambience Down the Drain"] = build(
     {
-      wave_mode: 0, wave_smoothing: 0.9, wave_scale: 0.5, additivewave: 1,
-      wave_r: 1.0, wave_g: 0.82, wave_b: 0.25, wave_a: 0.8,
-      decay: 0.965, gammaadj: 1.9,
-      zoom: 0.99, rot: 0.10, warp: 0.06, warpscale: 1.2,
-      cx: 0.55, cy: 0.5, darken_center: 0, wrap: 0
+      wave_mode: 0,
+      wave_smoothing: 0.9,
+      wave_scale: 0.5,
+      additivewave: 1,
+      wave_r: 1.0,
+      wave_g: 0.82,
+      wave_b: 0.25,
+      wave_a: 0.8,
+      decay: 0.965,
+      gammaadj: 1.9,
+      zoom: 0.99,
+      rot: 0.1,
+      warp: 0.06,
+      warpscale: 1.2,
+      cx: 0.55,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 0,
     },
     {
       frame: function (t) {
         var bass = t.bass_att || t.bass || 1;
         var treb = t.treb || 1;
-        t.zoom = 0.99 - 0.008 * bass;   // gentle inward pull (was collapsing)
+        t.zoom = 0.99 - 0.008 * bass; // gentle inward pull (was collapsing)
         t.rot = 0.08 + 0.06 * Math.sin(t.time * 0.2) + 0.02 * bass;
         t.cx = 0.55 + 0.01 * Math.sin(t.time * 0.3);
         t.decay = 0.965;
@@ -220,14 +262,13 @@
         "shader_body {\n" +
         "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
         "float v = dot(src, vec3(0.33)) * (1.0 + 0.3*bass);\n" +
-        "v = 0.18 + 0.9 * v;\n" +                       // base so the field stays visible
+        "v = 0.18 + 0.9 * v;\n" + // base so the field stays visible
         "float r = length(uv - vec2(0.55, 0.5));\n" +
-        "v *= smoothstep(0.02, 0.11, r);\n" +           // smaller drain hole
+        "v *= smoothstep(0.02, 0.11, r);\n" + // smaller drain hole
         "ret = amber_ramp(v);\n" +
-        "}\n"
+        "}\n",
     }
   );
-
 
   // ════════════════════════════════════════════════════════════════════════
   // AMBIENCE family (amber/yellow fluid light; Niagara cycles yellow<->teal).
@@ -242,23 +283,37 @@
   P["Ambience Snell"] = (function () {
     var preset = build(
       {
-        wave_mode: 0, wave_smoothing: 0.9, wave_scale: 0.5, additivewave: 1,
-        wave_r: 1.0, wave_g: 0.85, wave_b: 0.3, wave_a: 0.45,
-        decay: 0.96, gammaadj: 1.8,
-        zoom: 1.0, rot: 0.0, warp: 0.12, warpscale: 1.8, warpanimspeed: 0.6,
-        cx: 0.5, cy: 0.5, darken_center: 0, wrap: 1
+        wave_mode: 0,
+        wave_smoothing: 0.9,
+        wave_scale: 0.5,
+        additivewave: 1,
+        wave_r: 1.0,
+        wave_g: 0.85,
+        wave_b: 0.3,
+        wave_a: 0.45,
+        decay: 0.96,
+        gammaadj: 1.8,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.12,
+        warpscale: 1.8,
+        warpanimspeed: 0.6,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 1,
       },
       {
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1;
           var treb = t.treb_att || t.treb || 1;
-          t.warp = 0.10 + 0.06 * bass;
+          t.warp = 0.1 + 0.06 * bass;
           t.warpanimspeed = 0.5 + 0.4 * treb;
           t.zoom = 1.0 + 0.004 * Math.sin(t.time * 0.3);
           t.rot = 0.01 * Math.sin(t.time * 0.2);
           t.decay = 0.96;
-          t.wave_a = 0.30 + 0.30 * bass;
-          t.wave_g = 0.82 + 0.10 * bass;
+          t.wave_a = 0.3 + 0.3 * bass;
+          t.wave_g = 0.82 + 0.1 * bass;
           return t;
         },
         warp:
@@ -280,12 +335,11 @@
           "v += 0.07 * sin(uv.y * 12.0 + time * 0.8);\n" +
           "v *= (1.0 + 0.30 * bass);\n" +
           "ret = amber_ramp(v);\n" +
-          "}\n"
+          "}\n",
       }
     );
     return preset;
   })();
-
 
   // ── Ambience Warp ───────────────────────────────────────────────────────────
   // A warping amber tunnel: feedback zoomed outward each frame so trails of the
@@ -293,11 +347,25 @@
   P["Ambience Warp"] = (function () {
     var preset = build(
       {
-        wave_mode: 0, wave_smoothing: 0.88, wave_scale: 0.55, additivewave: 1,
-        wave_r: 1.0, wave_g: 0.82, wave_b: 0.28, wave_a: 0.4,
-        decay: 0.95, gammaadj: 1.9,
-        zoom: 1.04, rot: 0.02, warp: 0.05, warpscale: 1.2, warpanimspeed: 0.6,
-        cx: 0.5, cy: 0.5, darken_center: 0, wrap: 0
+        wave_mode: 0,
+        wave_smoothing: 0.88,
+        wave_scale: 0.55,
+        additivewave: 1,
+        wave_r: 1.0,
+        wave_g: 0.82,
+        wave_b: 0.28,
+        wave_a: 0.4,
+        decay: 0.95,
+        gammaadj: 1.9,
+        zoom: 1.04,
+        rot: 0.02,
+        warp: 0.05,
+        warpscale: 1.2,
+        warpanimspeed: 0.6,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
@@ -334,23 +402,36 @@
           "vec3 warm = amber_ramp(v);\n" +
           "vec3 cool = vec3(0.15, 0.45, 0.95) * v * 1.4;\n" +
           "ret = mix(cool, warm, 0.5 + 0.5*sin(time*0.05));\n" +
-          "}\n"
+          "}\n",
       }
     );
     return preset;
   })();
-
 
   // ── Ambience Anon ───────────────────────────────────────────────────────────
   // Anonymous slow-morphing amber cloud: a soft fbm mass that breathes, with a
   // faint waveform heartbeat fed in. Deliberately minimal, very smooth.
   P["Ambience Anon"] = build(
     {
-      wave_mode: 0, wave_smoothing: 0.95, wave_scale: 0.3, additivewave: 1,
-      wave_r: 1.0, wave_g: 0.86, wave_b: 0.32, wave_a: 0.18,
-      decay: 0.97, gammaadj: 1.7,
-      zoom: 1.0, rot: 0.0, warp: 0.05, warpscale: 1.6, warpanimspeed: 0.2,
-      cx: 0.5, cy: 0.5, darken_center: 0, wrap: 1
+      wave_mode: 0,
+      wave_smoothing: 0.95,
+      wave_scale: 0.3,
+      additivewave: 1,
+      wave_r: 1.0,
+      wave_g: 0.86,
+      wave_b: 0.32,
+      wave_a: 0.18,
+      decay: 0.97,
+      gammaadj: 1.7,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.05,
+      warpscale: 1.6,
+      warpanimspeed: 0.2,
+      cx: 0.5,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 1,
     },
     {
       frame: function (t) {
@@ -382,33 +463,48 @@
         "v *= smoothstep(0.85, 0.15, d);\n" +
         "v *= (1.0 + 0.25 * bass);\n" +
         "ret = amber_ramp(v);\n" +
-        "}\n"
+        "}\n",
     }
   );
-
 
   // ── Ambience Falloff ────────────────────────────────────────────────────────
   // Light cascading downward: feedback drifts down each frame so the live waveform
   // leaves amber streaks raining toward the bottom, with a faint sideways sway.
   P["Ambience Falloff"] = build(
     {
-      wave_mode: 0, wave_smoothing: 0.9, wave_scale: 0.5, additivewave: 1,
-      wave_r: 1.0, wave_g: 0.84, wave_b: 0.3, wave_a: 0.4,
-      decay: 0.955, gammaadj: 1.85,
-      zoom: 1.0, rot: 0.0, warp: 0.04, warpscale: 1.6, warpanimspeed: 0.5,
-      cx: 0.5, cy: 0.3, dx: 0.0, dy: 0.012, darken_center: 0, wrap: 1
+      wave_mode: 0,
+      wave_smoothing: 0.9,
+      wave_scale: 0.5,
+      additivewave: 1,
+      wave_r: 1.0,
+      wave_g: 0.84,
+      wave_b: 0.3,
+      wave_a: 0.4,
+      decay: 0.955,
+      gammaadj: 1.85,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.04,
+      warpscale: 1.6,
+      warpanimspeed: 0.5,
+      cx: 0.5,
+      cy: 0.3,
+      dx: 0.0,
+      dy: 0.012,
+      darken_center: 0,
+      wrap: 1,
     },
     {
       frame: function (t) {
         var bass = t.bass_att || t.bass || 1;
         var treb = t.treb_att || t.treb || 1;
-        t.dy = 0.010 + 0.006 * bass;
+        t.dy = 0.01 + 0.006 * bass;
         t.dx = 0.002 * Math.sin(t.time * 0.4);
         t.warp = 0.04 + 0.03 * treb;
         t.zoom = 1.0;
         t.decay = 0.955;
-        t.wave_a = 0.25 + 0.30 * bass;
-        t.cy = 0.30 + 0.04 * Math.sin(t.time * 0.2);
+        t.wave_a = 0.25 + 0.3 * bass;
+        t.cy = 0.3 + 0.04 * Math.sin(t.time * 0.2);
         return t;
       },
       warp:
@@ -428,10 +524,9 @@
         "v += 0.05 * sin(uv.x * 30.0 + time * 1.5) * smoothstep(0.0, 0.5, uv.y);\n" +
         "v *= smoothstep(0.0, 0.18, 1.0 - uv.y) + 0.4;\n" +
         "ret = amber_ramp(v);\n" +
-        "}\n"
+        "}\n",
     }
   );
-
 
   // ── Ambience Bubble ─────────────────────────────────────────────────────────
   // Round amber bubbles floating up: four soft glowing metaball circles drift and
@@ -440,10 +535,22 @@
     var preset = build(
       {
         wave_a: 0,
-        wave_mode: 0, wave_smoothing: 0.9, additivewave: 1,
-        decay: 0.95, gammaadj: 1.9,
-        zoom: 1.0, rot: 0.0, warp: 0.05, warpscale: 1.4, warpanimspeed: 0.4,
-        cx: 0.5, cy: 0.5, dx: 0.0, dy: -0.004, darken_center: 0, wrap: 1
+        wave_mode: 0,
+        wave_smoothing: 0.9,
+        additivewave: 1,
+        decay: 0.95,
+        gammaadj: 1.9,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.05,
+        warpscale: 1.4,
+        warpanimspeed: 0.4,
+        cx: 0.5,
+        cy: 0.5,
+        dx: 0.0,
+        dy: -0.004,
+        darken_center: 0,
+        wrap: 1,
       },
       {
         frame: function (t) {
@@ -452,13 +559,13 @@
           t.warp = 0.04 + 0.02 * bass;
           t.zoom = 1.0 + 0.003 * Math.sin(t.time * 0.3);
           t.decay = 0.95;
-          t.q1 = 0.30 + 0.10 * Math.sin(t.time * 0.50);
-          t.q2 = 0.40 + 0.15 * Math.sin(t.time * 0.27 + 1.0);
-          t.q3 = 0.70 + 0.10 * Math.sin(t.time * 0.40 + 2.0);
+          t.q1 = 0.3 + 0.1 * Math.sin(t.time * 0.5);
+          t.q2 = 0.4 + 0.15 * Math.sin(t.time * 0.27 + 1.0);
+          t.q3 = 0.7 + 0.1 * Math.sin(t.time * 0.4 + 2.0);
           t.q4 = 0.55 + 0.18 * Math.sin(t.time * 0.31 + 3.0);
-          t.q6 = 0.50 + 0.12 * Math.sin(t.time * 0.43 + 4.0);
+          t.q6 = 0.5 + 0.12 * Math.sin(t.time * 0.43 + 4.0);
           t.q7 = 0.35 + 0.16 * Math.sin(t.time * 0.22 + 5.0);
-          t.q8 = 0.60 + 0.10 * Math.sin(t.time * 0.37 + 6.0);
+          t.q8 = 0.6 + 0.1 * Math.sin(t.time * 0.37 + 6.0);
           t.q9 = 0.65 + 0.15 * Math.sin(t.time * 0.29 + 7.0);
           t.q5 = 0.09 + 0.05 * bass;
           return t;
@@ -477,7 +584,7 @@
           "v = 0.04 + 1.05 * v;\n" +
           "vec3 tint = mix(vec3(0.95,0.25,0.85), vec3(0.15,0.85,0.80), 0.5+0.5*sin(time*0.05));\n" +
           "ret = tint * v;\n" +
-          "}\n"
+          "}\n",
       }
     );
     preset.waves[0] = circleWave("q1", "q2");
@@ -485,12 +592,14 @@
     preset.waves[2] = circleWave("q6", "q7");
     preset.waves[3] = circleWave("q8", "q9");
     preset.waves.forEach(function (w) {
-      w.baseVals.r = 1.0; w.baseVals.g = 1.0; w.baseVals.b = 1.0;
-      w.baseVals.a = 0.7; w.baseVals.smoothing = 0.5;
+      w.baseVals.r = 1.0;
+      w.baseVals.g = 1.0;
+      w.baseVals.b = 1.0;
+      w.baseVals.a = 0.7;
+      w.baseVals.smoothing = 0.5;
     });
     return preset;
   })();
-
 
   // ── Ambience Dizzy ──────────────────────────────────────────────────────────
   // Dizzying spiral: fast rotation plus a center-pulling swirl warp; amber glow on
@@ -498,15 +607,22 @@
   P["Ambience Dizzy"] = (function () {
     var preset = build(
       {
-        wave_a: 0, decay: 0.96, gammaadj: 1.8, zoom: 1.02,
-        rot: 0.06, warp: 0.10, warpscale: 1.4, warpanimspeed: 1.2,
-        darken_center: 0, wrap: 0
+        wave_a: 0,
+        decay: 0.96,
+        gammaadj: 1.8,
+        zoom: 1.02,
+        rot: 0.06,
+        warp: 0.1,
+        warpscale: 1.4,
+        warpanimspeed: 1.2,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           var tr = t.treb_att || t.treb || 1;
-          t.rot = 0.05 + 0.10 * b;
+          t.rot = 0.05 + 0.1 * b;
           t.zoom = 1.01 + 0.02 * b;
           t.q1 = 0.5;
           t.q2 = 0.5;
@@ -530,14 +646,15 @@
           "ret = vec3(0.10, 0.82, 0.85) * v * 1.7;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
           "ret += vec3(0.20, 0.95, 0.90) * exp(-dd * dd * 7.0) * (0.06 + 0.25 * bass);\n" +
-          "}\n"
+          "}\n",
       }
     );
     preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.4; preset.waves[0].baseVals.g = 0.95; preset.waves[0].baseVals.b = 1.0;
+    preset.waves[0].baseVals.r = 0.4;
+    preset.waves[0].baseVals.g = 0.95;
+    preset.waves[0].baseVals.b = 1.0;
     return preset;
   })();
-
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
   // Four real-audio spokes (an 8-armed blade set) rotating about the center over a
@@ -545,14 +662,20 @@
   P["Ambience Windmill"] = (function () {
     var preset = build(
       {
-        wave_a: 0, decay: 0.94, gammaadj: 1.8, zoom: 1.0,
-        rot: 0.0, warp: 0.02, darken_center: 0, wrap: 0
+        wave_a: 0,
+        decay: 0.94,
+        gammaadj: 1.8,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.02,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           t.q1 = t.time * (0.4 + 0.4 * b);
-          t.q6 = 0.16 + 0.10 * b;
+          t.q6 = 0.16 + 0.1 * b;
           return t;
         },
         comp:
@@ -563,7 +686,7 @@
           "ret = vec3(0.12, 0.80, 0.82) * v * 1.7;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
           "ret += vec3(0.20, 0.92, 0.88) * exp(-dd * dd * 5.0) * (0.10 + 0.30 * bass);\n" +
-          "}\n"
+          "}\n",
       }
     );
     var offs = [0.0, 0.785, 1.571, 2.356];
@@ -574,7 +697,8 @@
           var th = (a.q1 || 0) + off;
           var s = a.sample * 2.0 - 1.0;
           var amp = a.q6 || 0.18;
-          var ct = Math.cos(th), st = Math.sin(th);
+          var ct = Math.cos(th),
+            st = Math.sin(th);
           a.x = 0.5 + s * 0.5 * ct - a.value1 * amp * st;
           a.y = 0.5 + s * 0.5 * st + a.value1 * amp * ct;
           return a;
@@ -584,21 +708,26 @@
     return preset;
   })();
 
-
   // ── Ambience Niagara ──────────────────────────────────────────────────────
   // A waterfall: shader streams of light falling downward, color CYCLING
   // yellow<->teal via tintComp; a real circular waveform rides on top for the beat.
   P["Ambience Niagara"] = (function () {
     var preset = build(
       {
-        wave_a: 0, decay: 0.97, gammaadj: 1.7, zoom: 1.0,
-        dy: 0.012, warp: 0.03, darken_center: 0, wrap: 1
+        wave_a: 0,
+        decay: 0.97,
+        gammaadj: 1.7,
+        zoom: 1.0,
+        dy: 0.012,
+        warp: 0.03,
+        darken_center: 0,
+        wrap: 1,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           var tr = t.treb_att || t.treb || 1;
-          t.dy = 0.010 + 0.012 * b;
+          t.dy = 0.01 + 0.012 * b;
           t.q1 = 0.5;
           t.q2 = 0.5;
           t.q5 = 0.13 + 0.06 * b + 0.02 * tr;
@@ -616,16 +745,15 @@
           "ret = c - 0.004;\n" +
           "}\n",
         // WMP Niagara cycles teal/cyan <-> blue (a waterfall, not amber).
-        comp: tintComp("vec3(0.10,0.80,0.80)", "vec3(0.10,0.35,0.95)", "0.06", "1.6")
+        comp: tintComp("vec3(0.10,0.80,0.80)", "vec3(0.10,0.35,0.95)", "0.06", "1.6"),
       }
     );
     preset.waves[0] = circleWave("q1", "q2");
     preset.waves[0].baseVals.r = 0.95;
     preset.waves[0].baseVals.g = 0.95;
-    preset.waves[0].baseVals.b = 0.80;
+    preset.waves[0].baseVals.b = 0.8;
     return preset;
   })();
-
 
   // ── Ambience Blender ────────────────────────────────────────────────────────
   // A blender vortex: like Dizzy but more churning — the swirl is perturbed by fbm
@@ -633,9 +761,16 @@
   P["Ambience Blender"] = (function () {
     var preset = build(
       {
-        wave_a: 0, decay: 0.95, gammaadj: 1.8, zoom: 1.03,
-        rot: 0.04, warp: 0.12, warpscale: 1.6, warpanimspeed: 1.5,
-        darken_center: 0, wrap: 0
+        wave_a: 0,
+        decay: 0.95,
+        gammaadj: 1.8,
+        zoom: 1.03,
+        rot: 0.04,
+        warp: 0.12,
+        warpscale: 1.6,
+        warpanimspeed: 1.5,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
@@ -668,14 +803,15 @@
           "ret = tint * v * 1.7;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
           "ret += tint * exp(-dd * dd * 9.0) * (0.08 + 0.30 * bass);\n" +
-          "}\n"
+          "}\n",
       }
     );
     preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.6; preset.waves[0].baseVals.g = 0.6; preset.waves[0].baseVals.b = 1.0;
+    preset.waves[0].baseVals.r = 0.6;
+    preset.waves[0].baseVals.g = 0.6;
+    preset.waves[0].baseVals.b = 1.0;
     return preset;
   })();
-
 
   // ── Ambience X Marks the Spot ───────────────────────────────────────────────
   // A glowing amber X: two crossed real-audio spokes at +/-45 deg that pulse with
@@ -683,14 +819,20 @@
   P["Ambience X Marks the Spot"] = (function () {
     var preset = build(
       {
-        wave_a: 0, decay: 0.95, gammaadj: 1.8, zoom: 1.0,
-        rot: 0.0, warp: 0.02, darken_center: 0, wrap: 0
+        wave_a: 0,
+        decay: 0.95,
+        gammaadj: 1.8,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.02,
+        darken_center: 0,
+        wrap: 0,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           t.q1 = t.time * 0.15;
-          t.q6 = 0.14 + 0.10 * b;
+          t.q6 = 0.14 + 0.1 * b;
           return t;
         },
         comp:
@@ -701,7 +843,7 @@
           "ret = vec3(0.95, 0.25, 0.70) * v * 1.7;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
           "ret += vec3(1.0, 0.45, 0.85) * exp(-dd * dd * 6.0) * (0.12 + 0.35 * bass);\n" +
-          "}\n"
+          "}\n",
       }
     );
     var offs = [0.785, -0.785];
@@ -712,7 +854,8 @@
           var th = (a.q1 || 0) + off;
           var s = a.sample * 2.0 - 1.0;
           var amp = a.q6 || 0.16;
-          var ct = Math.cos(th), st = Math.sin(th);
+          var ct = Math.cos(th),
+            st = Math.sin(th);
           a.x = 0.5 + s * 0.55 * ct - a.value1 * amp * st;
           a.y = 0.5 + s * 0.55 * st + a.value1 * amp * ct;
           return a;

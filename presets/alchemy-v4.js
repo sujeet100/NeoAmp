@@ -65,7 +65,9 @@
   // ── shared COMP: vibrant multi-colour-fusion background (q29 variant) UNDER the kit-coloured
   //    motif, + bloom + Reinhard tone-map. fg + bg share the q8 hue clock -> harmonious. ──
   var COMP_V4 =
-    NOISE_GLSL + PAL_GLSL + ALC_MOIRE_GLSL +
+    NOISE_GLSL +
+    PAL_GLSL +
+    ALC_MOIRE_GLSL +
     "vec3 dusty(vec3 c, float s){ float l = dot(c, vec3(0.333)); return mix(vec3(l), c, s); }\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
@@ -107,11 +109,11 @@
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
     "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
-    "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" +                // moiré (threshold <0.5 so only ONE picker index maps here — was <1.5 → showed ~2x too often)
-    "  else if (q29 < 1.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" +  // marble (1)
-    "  else if (q29 < 2.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" +              // horizon bands (2)
-    "  else if (q29 < 3.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" +  // ribbon stripes (3)
-    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" +        // aurora swirl (4)
+    "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré (threshold <0.5 so only ONE picker index maps here — was <1.5 → showed ~2x too often)
+    "  else if (q29 < 1.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (1)
+    "  else if (q29 < 2.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" + // horizon bands (2)
+    "  else if (q29 < 3.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" + // ribbon stripes (3)
+    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" + // aurora swirl (4)
     // BOLD kaleidoscope wedges — when a fold is active, split the (already-mirrored) field into two
     // distinct LUMINOUS colour panes along the fold axes so it reads as bold colour wedges (orig
     // sweep_08 = a green/mauve bowtie-X), NOT the uniform symmetric blob a low-contrast fbm fold gives.
@@ -119,12 +121,12 @@
     // each pane (luminous, not flat). A soft seam glow marks the visible diagonal X where panes meet.
     "  float foldOn = clamp(q13, 0.0, 1.0); if (q12 > 7.5) foldOn = 1.0;\n" +
     "  if (foldOn > 0.01) {\n" +
-    "    float bowtie = smoothstep(-0.04, 0.04, abs(pdc.x) - abs(pdc.y));\n" +                          // 1 = along-axis wedge, 0 = cross wedge (crisp pane edge)
+    "    float bowtie = smoothstep(-0.04, 0.04, abs(pdc.x) - abs(pdc.y));\n" + // 1 = along-axis wedge, 0 = cross wedge (crisp pane edge)
     "    vec3 paneA = dusty(pal(hb + 0.12), 1.05) * 1.15;\n" +
-    "    vec3 paneB = dusty(pal(hb + 0.62), 0.98) * 0.90;\n" +                                          // ~half-turn apart → always COMPLEMENTARY (bold at every hue moment)
+    "    vec3 paneB = dusty(pal(hb + 0.62), 0.98) * 0.90;\n" + // ~half-turn apart → always COMPLEMENTARY (bold at every hue moment)
     "    vec3 wedge = mix(paneB, paneA, bowtie);\n" +
     "    float seam = smoothstep(0.06, 0.0, abs(abs(pdc.x) - abs(pdc.y)));\n" +
-    "    wedge += dusty(pal(hb + 0.37), 0.9) * seam * 0.45;\n" +                                        // luminous seam-X glow
+    "    wedge += dusty(pal(hb + 0.37), 0.9) * seam * 0.45;\n" + // luminous seam-X glow
     "    ground = mix(ground, wedge, 0.68 * foldOn);\n" +
     "  }\n" +
     // ASYMMETRIC corner bleed — the original is NEVER flat: a drifting OFF-CENTER colour pool + a
@@ -133,9 +135,8 @@
     "  float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
     "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
-    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" +   // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
-
-    "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" +                                               // kit-coloured motif over the vibrant ground
+    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" + // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
+    "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
@@ -145,74 +146,134 @@
     // POP against more near-black, matching the vibrant 1080p reference. Still luminous, not neon/blown-white.
     "  vec3 toned = col / (col + vec3(0.6));\n" +
     "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
-    "  toned = mix(vec3(tl), toned, 1.22);\n" +                                     // resaturate toward the original's SATMAX (gentler → not neon)
-    "  toned = mix(toned * toned, toned, 0.72);\n" +                               // deepen darks/mids ONLY (x*x ≤ x) → contrast without lifting highlights to blowout
+    "  toned = mix(vec3(tl), toned, 1.22);\n" + // resaturate toward the original's SATMAX (gentler → not neon)
+    "  toned = mix(toned * toned, toned, 0.72);\n" + // deepen darks/mids ONLY (x*x ≤ x) → contrast without lifting highlights to blowout
     "  ret = clamp(toned, 0.0, 1.0);\n" +
     "}\n";
 
-  var BASE = { wave_a: 0, additivewave: 1, decay: 0.95, zoom: 1, rot: 0, warp: 0, dx: 0, dy: 0,
-               cx: 0.5, cy: 0.5, gammaadj: 1.5, darken_center: 0, wrap: 0, echo_alpha: 0 };
+  var BASE = {
+    wave_a: 0,
+    additivewave: 1,
+    decay: 0.95,
+    zoom: 1,
+    rot: 0,
+    warp: 0,
+    dx: 0,
+    dy: 0,
+    cx: 0.5,
+    cy: 0.5,
+    gammaadj: 1.5,
+    darken_center: 0,
+    wrap: 0,
+    echo_alpha: 0,
+  };
 
   // Clean orb as a custom SHAPE: COLOURED translucent fill (hue q8+hueOff, brightens on the beat)
   // with a CONTRAST-hue border (fill hue + 0.5). Bright-ish core -> colour fill -> soft edge.
   // Positioned at (qx,qy); radius q7; visibility from `visVar` (staging: comes & goes).
-  function orbCol(h, off) { var x = 6.2832 * (h + off); return 0.5 + 0.5 * Math.cos(x); }
+  function orbCol(h, off) {
+    var x = 6.2832 * (h + off);
+    return 0.5 + 0.5 * Math.cos(x);
+  }
   function orbShape(qx, qy, hueOff, visVar) {
     return {
-      baseVals: Object.assign({}, SHAPE_BASE, { enabled: 1, sides: 40, additive: 0, thickoutline: 1 }),
+      baseVals: Object.assign({}, SHAPE_BASE, {
+        enabled: 1,
+        sides: 40,
+        additive: 0,
+        thickoutline: 1,
+      }),
       init_eqs: passthrough,
       frame_eqs: function (s) {
         var vis = visVar ? (s[visVar] !== undefined ? s[visVar] : 1) : 1;
-        var cx = s[qx] !== undefined ? s[qx] : 0.5, cy = s[qy] !== undefined ? s[qy] : 0.5;
-        var be = Math.max(0, (s.bass_att || 1) - 1);                 // beat energy
-        var hf = (s.q8 || 0) + (hueOff || 0), hb = hf + 0.5;         // fill hue, complementary border hue
-        var fr = orbCol(hf, 0), fg = orbCol(hf, 0.33), fb = orbCol(hf, 0.67);
-        var br = orbCol(hb, 0), bg = orbCol(hb, 0.33), bb = orbCol(hb, 0.67);
-        var bri = 0.85 + 0.55 * be;                                  // FILL brightness pulses with bass
-        s.x = cx; s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1 + 0.40 * be);                    // size pulses with bass
-        s.r = Math.min(1, fr * bri); s.g = Math.min(1, fg * bri); s.b = Math.min(1, fb * bri);   // COLOURED core (not washed white)
+        var cx = s[qx] !== undefined ? s[qx] : 0.5,
+          cy = s[qy] !== undefined ? s[qy] : 0.5;
+        var be = Math.max(0, (s.bass_att || 1) - 1); // beat energy
+        var hf = (s.q8 || 0) + (hueOff || 0),
+          hb = hf + 0.5; // fill hue, complementary border hue
+        var fr = orbCol(hf, 0),
+          fg = orbCol(hf, 0.33),
+          fb = orbCol(hf, 0.67);
+        var br = orbCol(hb, 0),
+          bg = orbCol(hb, 0.33),
+          bb = orbCol(hb, 0.67);
+        var bri = 0.85 + 0.55 * be; // FILL brightness pulses with bass
+        s.x = cx;
+        s.y = cy;
+        s.rad = (s.q7 || 0.06) * (1 + 0.4 * be); // size pulses with bass
+        s.r = Math.min(1, fr * bri);
+        s.g = Math.min(1, fg * bri);
+        s.b = Math.min(1, fb * bri); // COLOURED core (not washed white)
         s.a = 0.96 * vis;
-        s.r2 = fr * 0.85; s.g2 = fg * 0.85; s.b2 = fb * 0.85; s.a2 = 0.30 * vis;               // prominent coloured body (was transparent)
-        s.border_r = br * 0.32; s.border_g = bg * 0.32; s.border_b = bb * 0.32; s.border_a = 0.95 * vis;  // DARK contrast-hue rim (thickened by the comp dilation)
+        s.r2 = fr * 0.85;
+        s.g2 = fg * 0.85;
+        s.b2 = fb * 0.85;
+        s.a2 = 0.3 * vis; // prominent coloured body (was transparent)
+        s.border_r = br * 0.32;
+        s.border_g = bg * 0.32;
+        s.border_b = bb * 0.32;
+        s.border_a = 0.95 * vis; // DARK contrast-hue rim (thickened by the comp dilation)
         return s;
-      }
+      },
     };
   }
 
   // ── in-preset director helpers (ported from v2:Random) ──────────────────────────────────────
   // smooth come-and-go envelope (0..1) from a sine input, with a hold band.
-  function comeGo(s) { var x = (0.5 + 0.5 * s - 0.30) / 0.30; x = x < 0 ? 0 : (x > 1 ? 1 : x); return x * x * (3 - 2 * x); }
+  function comeGo(s) {
+    var x = (0.5 + 0.5 * s - 0.3) / 0.3;
+    x = x < 0 ? 0 : x > 1 ? 1 : x;
+    return x * x * (3 - 2 * x);
+  }
   // stochastic discrete index cross-fader: dwells minS..maxS, then (on a beat gate, or +5s hard cap)
   // ramps a smoothstep crossfade to a NEW index over `fade` seconds. Returns {a, b, mix}. LONG fade
   // ⇒ morph, not cut. (Math.random is fine here — this is browser preset code, not a workflow.)
   function makePicker(n, minS, maxS, fade) {
-    var a = Math.floor(Math.random() * n), b = a, mix = 0, transing = false;
-    var start = 0, roll = minS + Math.random() * (maxS - minS), tstart = 0, out = { a: a, b: a, mix: 0 };
+    var a = Math.floor(Math.random() * n),
+      b = a,
+      mix = 0,
+      transing = false;
+    var start = 0,
+      roll = minS + Math.random() * (maxS - minS),
+      tstart = 0,
+      out = { a: a, b: a, mix: 0 };
     return function (time, dt, gate) {
       if (!transing) {
         var el = time - start;
         if (el >= roll && (gate === undefined || gate || el >= roll + 5)) {
-          b = n > 1 ? Math.floor(Math.random() * (n - 1)) : a; if (b >= a) b++;
-          tstart = time; transing = true;
+          b = n > 1 ? Math.floor(Math.random() * (n - 1)) : a;
+          if (b >= a) b++;
+          tstart = time;
+          transing = true;
         }
       } else {
-        var fr = (time - tstart) / fade; mix = fr < 0 ? 0 : (fr > 1 ? 1 : fr); mix = mix * mix * (3 - 2 * mix);
-        if (fr >= 1) { a = b; transing = false; mix = 0; start = time; roll = minS + Math.random() * (maxS - minS); }
+        var fr = (time - tstart) / fade;
+        mix = fr < 0 ? 0 : fr > 1 ? 1 : fr;
+        mix = mix * mix * (3 - 2 * mix);
+        if (fr >= 1) {
+          a = b;
+          transing = false;
+          mix = 0;
+          start = time;
+          roll = minS + Math.random() * (maxS - minS);
+        }
       }
-      out.a = a; out.b = b; out.mix = mix; return out;
+      out.a = a;
+      out.b = b;
+      out.mix = mix;
+      return out;
     };
   }
 
   // ── central-motif modes: each = a kit-factory point fn (one wave). Dispatched per-frame by q30. ──
-  var fAnem = alcAnemone(10, ALC_PAL.roseGreen).point_eqs;   // 10 arms (was 24) → a cleaner, softer flower, not a dense spirograph lattice (#21)
+  var fAnem = alcAnemone(10, ALC_PAL.roseGreen).point_eqs; // 10 arms (was 24) → a cleaner, softer flower, not a dense spirograph lattice (#21)
   var fSpin = alcSpindle(ALC_PAL.redCyan).point_eqs;
   // NOTE: no nested-polygon "mandala" mode. In the original (frames w_sweep f_14/20/26) the mandala
   // is a SMALL central waveform MIRRORED by the kaleidoscope fold into big soft wedges — NOT a thin
   // nested-star-polygon tangle (which is what alcNgonPacked produced). So the fold (look 3/6) builds
   // the mandala from whatever flower motif is active; we shrink the motif under a fold (see frame).
   var fNgon = alcNgon({ sides: 6, aspectX: 1.0, hueOff: 0.0 }).point_eqs;
-  var fTri  = alcTriangle(0, 0).point_eqs;
+  var fTri = alcTriangle(0, 0).point_eqs;
   // BOLT — V1's central "flow" motif (alchemy.js wave[3] shape 8): the live audio waveform drawn as
   // a vertical oscilloscope column; the camera tilt/roll turns it into the flowing diagonal trace.
   function fBolt(a) {
@@ -221,45 +282,68 @@
     a.x = cx + (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.3;
     a.y = 0.12 + a.sample * 0.76;
     var h = a.q8 || 0;
-    a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+    a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+    a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+    a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
     return a;
   }
   // URCHIN — V1's central "flower" motif (alchemy.js wave[3] shape 3): all 512 live-waveform samples
   // form a spiky rosette whose spike LENGTH is the waveform amplitude → a flower that flares with the
   // audio. (This is the flower-like central flow the user remembered, distinct from anemone's fixed spikes.)
   function fUrchin(a) {
-    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var sc = (a.q5 || 0.4);
-    var rad = sc * (0.20 + 0.65 * Math.abs(a.value1 || 0));
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var sc = a.q5 || 0.4;
+    var rad = sc * (0.2 + 0.65 * Math.abs(a.value1 || 0));
     var ang = (a.sample || 0) * 6.2832 + (a.q9 || 0);
-    a.x = cx + rad * Math.cos(ang); a.y = cy + rad * Math.sin(ang);
+    a.x = cx + rad * Math.cos(ang);
+    a.y = cy + rad * Math.sin(ang);
     var h = a.q8 || 0;
-    a.r = 0.5 + 0.5 * Math.cos(6.2832 * h); a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33)); a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
+    a.r = 0.5 + 0.5 * Math.cos(6.2832 * h);
+    a.g = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.33));
+    a.b = 0.5 + 0.5 * Math.cos(6.2832 * (h + 0.67));
     return a;
   }
   // ROTLINE — the original "rotating lines" + line-sweep (frames w_rot ~2:40, w_sweep ~0:40): N live-
   // waveform diameter lines sharing one rotation (q9, sped up), smeared by feedback into a swept fan.
   function fRotLine(a) {
-    var N = 3, fk = (a.sample || 0) * N, seg = Math.floor(fk), u = fk - seg, s = u * 2 - 1;
+    var N = 3,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg,
+      s = u * 2 - 1;
     var th = (a.q9 || 0) * 4.0 + seg * (3.14159 / N);
-    var len = (a.q5 || 0.4) * 1.45, disp = (a.value1 || 0) * (a.q6 || 0.05) * 1.8;
-    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var len = (a.q5 || 0.4) * 1.45,
+      disp = (a.value1 || 0) * (a.q6 || 0.05) * 1.8;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + s * len * Math.cos(th) - disp * Math.sin(th);
     a.y = cy + s * len * Math.sin(th) + disp * Math.cos(th);
-    var h = a.q8 || 0; a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+    var h = a.q8 || 0;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
     if (u < 0.02) a.a = 0;
     return a;
   }
   // FOUNTAIN — the v2 radial-burst "fountain": ~48 waveform spokes spraying OUTWARD from the centre
   // (vs the urchin's amplitude-radius ring). Spins (q9) + blooms; pairs with the vortex/burst looks.
   function fFountain(a) {
-    var N = 48, fk = (a.sample || 0) * N, seg = Math.floor(fk), u = fk - seg;
+    var N = 48,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg;
     var ang = (seg / N) * 6.2832 + (a.q9 || 0);
-    var rad = (a.q5 || 0.4) * (0.10 + 0.90 * u) + (a.value1 || 0) * 0.06 * u;   // spoke centre→out, waveform-tipped
-    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + rad * Math.cos(ang); a.y = cy + rad * Math.sin(ang);
-    var h = a.q8 || 0; a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
-    if (u < 0.03) a.a = 0;   // hide spoke-to-spoke jump
+    var rad = (a.q5 || 0.4) * (0.1 + 0.9 * u) + (a.value1 || 0) * 0.06 * u; // spoke centre→out, waveform-tipped
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + rad * Math.cos(ang);
+    a.y = cy + rad * Math.sin(ang);
+    var h = a.q8 || 0;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.03) a.a = 0; // hide spoke-to-spoke jump
     return a;
   }
   // WAVEFAN — the big bold horizontal oscilloscope waveform of the 2:40-2:50 scene (orig rot_06..10):
@@ -267,24 +351,31 @@
   // gradient along it. Under the #24 look's downward drift + high decay the trail smears into the fine
   // descending comb-fan; the two big orbs ride near it. Real-waveform (primary-motif rule).
   function fWaveFan(a) {
-    var cx = a.q2 !== undefined ? a.q2 : 0.5, cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var width = (a.q5 || 0.4) * 2.1;                                    // wide horizontal span
-    var amp = (a.q6 || 0.05) * 4.8;                                     // tall waveform peaks
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var width = (a.q5 || 0.4) * 2.1; // wide horizontal span
+    var amp = (a.q6 || 0.05) * 4.8; // tall waveform peaks
     a.x = cx + (a.sample - 0.5) * width;
     a.y = cy + (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25;
-    var h = (a.q8 || 0) + a.sample * 0.34;                             // green→yellow→magenta gradient along the wave
-    a.r = orbCol(h, 0); a.g = orbCol(h, 0.33); a.b = orbCol(h, 0.67);
+    var h = (a.q8 || 0) + a.sample * 0.34; // green→yellow→magenta gradient along the wave
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
     return a;
   }
   var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.50, 0.80];   // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan (anemone lowered → softer, less dense)
-  function scaleFor(m) { return m === 0 ? 0.46 : (m === 1 ? 0.40 : 0.5); }
+  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8]; // anemone·spindle·ngon·triangle·bolt·urchin·rotline·fountain·wavefan (anemone lowered → softer, less dense)
+  function scaleFor(m) {
+    return m === 0 ? 0.46 : m === 1 ? 0.4 : 0.5;
+  }
   function centralDraw(a) {
-    var m = Math.floor((a.q30 || 0) + 0.5); if (m < 0) m = 0; if (m >= MODES.length) m = MODES.length - 1;
+    var m = Math.floor((a.q30 || 0) + 0.5);
+    if (m < 0) m = 0;
+    if (m >= MODES.length) m = MODES.length - 1;
     MODES[m](a);
-    a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m];   // q4 = visibility dip-swap
+    a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m]; // q4 = visibility dip-swap
     return a;
   }
   var fTether = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm).point_eqs;
@@ -295,49 +386,175 @@
   // decay tuned to 0.84–0.92: high enough to keep a continuity trail, low enough that additive
   // bristles DON'T accumulate into a milky white-out. exp kept ~0.8–0.95 (Reinhard does the rest).
   var LOOKS = [
-    { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.000, swirl: 0.00, dx: 0, dy: -0.0010, tilt: 0.10, tiltOsc: 0.05, pan: 0.04, px: 0.50, py: 0.50, exp: 0.90 },  // free-space, gentle rise
-    { decay: 0.86, fold: 1, zoom: 0.018, rot: 0.004, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.30, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // corridor: forward fly + steep tilt
-    { decay: 0.93, fold: 1, zoom: -0.006, rot: 0.022, swirl: 0.14, dx: 0, dy: 0.0000, tilt: 0.05, tiltOsc: 0.04, pan: 0.06, px: 0.46, py: 0.43, exp: 0.88 },  // vortex DRAIN (inward swirl spiral)
-    { decay: 0.93, fold: 4, zoom: 0.004, rot: 0.010, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.00, tiltOsc: 0.03, pan: 0.02, px: 0.50, py: 0.50, exp: 0.92 },  // QUAD kaleidoscope (high decay → swept X-fan)
-    { decay: 0.88, fold: 1, zoom: 0.000, rot: 0.003, swirl: 0.00, dx: 0, dy: -0.0008, tilt: 0.08, tiltOsc: 0.05, pan: 0.05, px: 0.50, py: 0.50, exp: 0.90 },  // anemone free-space
-    { decay: 0.87, fold: 1, zoom: 0.008, rot: 0.000, swirl: 0.02, dx: 0, dy:  0.0000, tilt: 0.12, tiltOsc: 0.04, pan: 0.06, px: 0.52, py: 0.48, exp: 0.90 },  // side-angle drift
-    { decay: 0.93, fold: 8, zoom: 0.000, rot: 0.008, swirl: 0.00, dx: 0, dy:  0.0000, tilt: 0.04, tiltOsc: 0.03, pan: 0.0, px: 0.50, py: 0.50, exp: 0.92 },  // NEW full DIAGONAL-X kaleidoscope (centred; orig 0:29 f_18). Look 3 keeps the quad fold.
-    { decay: 0.90, fold: 1, zoom: -0.012, rot: 0.000, swirl: 0.03, dx: 0, dy: -0.0010, tilt: 0.05, tiltOsc: 0.05, pan: 0.03, px: 0.50, py: 0.50, exp: 0.92 }  // burst bloom outward
+    {
+      decay: 0.88,
+      fold: 1,
+      zoom: 0.0,
+      rot: 0.0,
+      swirl: 0.0,
+      dx: 0,
+      dy: -0.001,
+      tilt: 0.1,
+      tiltOsc: 0.05,
+      pan: 0.04,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.9,
+    }, // free-space, gentle rise
+    {
+      decay: 0.86,
+      fold: 1,
+      zoom: 0.018,
+      rot: 0.004,
+      swirl: 0.0,
+      dx: 0,
+      dy: 0.0,
+      tilt: 0.3,
+      tiltOsc: 0.03,
+      pan: 0.02,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.92,
+    }, // corridor: forward fly + steep tilt
+    {
+      decay: 0.93,
+      fold: 1,
+      zoom: -0.006,
+      rot: 0.022,
+      swirl: 0.14,
+      dx: 0,
+      dy: 0.0,
+      tilt: 0.05,
+      tiltOsc: 0.04,
+      pan: 0.06,
+      px: 0.46,
+      py: 0.43,
+      exp: 0.88,
+    }, // vortex DRAIN (inward swirl spiral)
+    {
+      decay: 0.93,
+      fold: 4,
+      zoom: 0.004,
+      rot: 0.01,
+      swirl: 0.0,
+      dx: 0,
+      dy: 0.0,
+      tilt: 0.0,
+      tiltOsc: 0.03,
+      pan: 0.02,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.92,
+    }, // QUAD kaleidoscope (high decay → swept X-fan)
+    {
+      decay: 0.88,
+      fold: 1,
+      zoom: 0.0,
+      rot: 0.003,
+      swirl: 0.0,
+      dx: 0,
+      dy: -0.0008,
+      tilt: 0.08,
+      tiltOsc: 0.05,
+      pan: 0.05,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.9,
+    }, // anemone free-space
+    {
+      decay: 0.87,
+      fold: 1,
+      zoom: 0.008,
+      rot: 0.0,
+      swirl: 0.02,
+      dx: 0,
+      dy: 0.0,
+      tilt: 0.12,
+      tiltOsc: 0.04,
+      pan: 0.06,
+      px: 0.52,
+      py: 0.48,
+      exp: 0.9,
+    }, // side-angle drift
+    {
+      decay: 0.93,
+      fold: 8,
+      zoom: 0.0,
+      rot: 0.008,
+      swirl: 0.0,
+      dx: 0,
+      dy: 0.0,
+      tilt: 0.04,
+      tiltOsc: 0.03,
+      pan: 0.0,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.92,
+    }, // NEW full DIAGONAL-X kaleidoscope (centred; orig 0:29 f_18). Look 3 keeps the quad fold.
+    {
+      decay: 0.9,
+      fold: 1,
+      zoom: -0.012,
+      rot: 0.0,
+      swirl: 0.03,
+      dx: 0,
+      dy: -0.001,
+      tilt: 0.05,
+      tiltOsc: 0.05,
+      pan: 0.03,
+      px: 0.5,
+      py: 0.5,
+      exp: 0.92,
+    }, // burst bloom outward
   ];
 
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
-  var lastT = 0, huePhase = 0, waveAmt = 0;
+  var lastT = 0,
+    huePhase = 0,
+    waveAmt = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
-  var lookPick  = makePicker(LOOKS.length, 9, 16, 4.0);   // camera/look — slow, long morph
-  var bgPick    = makePicker(5, 14, 26, 5.0);             // 5 DISTINCT bg variants (moiré/marble/horizon/ribbon/aurora), one per index — own slow clock
-  var motifPick = makePicker(MODES.length, 6, 12, 2.0);   // central motif — own clock, dip-swap
+  var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
+  var bgPick = makePicker(5, 14, 26, 5.0); // 5 DISTINCT bg variants (moiré/marble/horizon/ribbon/aurora), one per index — own slow clock
+  var motifPick = makePicker(MODES.length, 6, 12, 2.0); // central motif — own clock, dip-swap
 
   function frame(t) {
     var time = t.time || 0;
-    var bass = t.bass || 1, bassA = t.bass_att !== undefined ? t.bass_att : bass;
-    var dt = Math.min(0.05, Math.max(0.001, time - lastT)); lastT = time;
-    var energy = (typeof alcEnergy === "function") ? alcEnergy(t) : bassA;
-    var f = beat(t.bass || 1, dt);   // per-beat flash (fast decay)
+    var bass = t.bass || 1,
+      bassA = t.bass_att !== undefined ? t.bass_att : bass;
+    var dt = Math.min(0.05, Math.max(0.001, time - lastT));
+    lastT = time;
+    var energy = typeof alcEnergy === "function" ? alcEnergy(t) : bassA;
+    var f = beat(t.bass || 1, dt); // per-beat flash (fast decay)
 
     // shared HUE clock (fg + bg) — mostly clock-driven, faster when loud, tiny per-beat warm nudge
     huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.05);
     t.q8 = huePhase + 0.04 * f;
 
     // LOOK — camera + exposure + fold eased between two looks on a slow clock
-    var lk = lookPick(time, dt, f > 0.6), A = LOOKS[lk.a], B = LOOKS[lk.b], k = lk.mix;
-    function L(key) { return A[key] + (B[key] - A[key]) * k; }
+    var lk = lookPick(time, dt, f > 0.6),
+      A = LOOKS[lk.a],
+      B = LOOKS[lk.b],
+      k = lk.mix;
+    function L(key) {
+      return A[key] + (B[key] - A[key]) * k;
+    }
     t.q1 = L("decay");
-    var fold = (k < 0.5 ? A.fold : B.fold);                              // fold is discrete (snap at midpoint, hidden by morph)
-    t.q12 = fold; t.q13 = (fold > 1.5 && fold < 7.5) ? (0.6 + 0.4 * Math.min(1, (bassA - 1) + 0.5 * Math.sin(time * 0.07))) : 0;  // fold>=8 = the COMP diagonal full-mirror (WARP itself doesn't fold it)
-    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13);          // per-look zoom (no global recede — it smeared bristles into a net)
-    t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045);                                // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
+    var fold = k < 0.5 ? A.fold : B.fold; // fold is discrete (snap at midpoint, hidden by morph)
+    t.q12 = fold;
+    t.q13 =
+      fold > 1.5 && fold < 7.5
+        ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07))
+        : 0; // fold>=8 = the COMP diagonal full-mirror (WARP itself doesn't fold it)
+    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (no global recede — it smeared bristles into a net)
+    t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
-    t.q18 = L("dx"); t.q19 = L("dy");
+    t.q18 = L("dx");
+    t.q19 = L("dy");
     var pan = L("pan");
-    t.q20 = L("px") + pan * Math.cos(time * 0.11);                                    // VP orbits → parallax
+    t.q20 = L("px") + pan * Math.cos(time * 0.11); // VP orbits → parallax
     t.q27 = L("py") + pan * Math.sin(time * 0.11);
-    t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.10);                   // stronger 3D plane tilt (side-angle)
-    t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f);   // gentle beat lift (Reinhard compresses the rest)
+    t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // stronger 3D plane tilt (side-angle)
+    t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
     t.q32 = bass;
 
     // BACKGROUND — its OWN slow clock, decoupled from the motif (the same motif now appears over
@@ -350,18 +567,19 @@
     var mCur = mo.mix < 0.5 ? mo.a : mo.b;
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
-    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd));                       // dips to ~0.21 at the swap instant
+    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips to ~0.21 at the swap instant
     // #24 SCENE amount — eased toward 1 while the WAVEFAN motif (mode 8) is active, so the 2:40-2:50 look
     // (big clustered orbs + downward comb-fan) BLEEDS in/out rather than cutting.
     waveAmt += ((mCur === 8 ? 1 : 0) - waveAmt) * Math.min(1, dt * 0.8);
 
     // MOTIF contract (read by the kit factories)
-    t.q2 = 0.5; t.q3 = 0.5;
-    t.q5 = scaleFor(mCur) * (0.82 + 0.40 * (bassA - 1) + 0.22 * f);      // breathing + per-beat pop
-    if (fold > 1.5 && mCur !== 6) t.q5 *= 0.52;                          // small mirrored flower under a fold (orig f_26); but keep the rotline SWEEP (mode 6) LONG → radiating X-fan (orig sweep_08)
+    t.q2 = 0.5;
+    t.q3 = 0.5;
+    t.q5 = scaleFor(mCur) * (0.82 + 0.4 * (bassA - 1) + 0.22 * f); // breathing + per-beat pop
+    if (fold > 1.5 && mCur !== 6) t.q5 *= 0.52; // small mirrored flower under a fold (orig f_26); but keep the rotline SWEEP (mode 6) LONG → radiating X-fan (orig sweep_08)
     t.q6 = 0.05;
-    t.q9 = time * 0.06;                                                  // slow spin
-    t.q10 = 0.4 * Math.max(0, bassA - 1);                               // twist scales with bass
+    t.q9 = time * 0.06; // slow spin
+    t.q10 = 0.4 * Math.max(0, bassA - 1); // twist scales with bass
 
     // ORBS + TETHER — wide opposite-corner diagonal (separation ~0.6w, never crossing center).
     // STAGING: orb A is a near-persistent anchor; orb B comes & goes on its own phase → single↔pair;
@@ -369,35 +587,38 @@
     // visibility — non-periodic come-and-go (summed incommensurate sines). BOTH orbs fully disappear
     // now and then (the original has orb-absent moments — w_ripple f_30). Orb A is biased to be
     // present most of the time but DROPS TO 0 periodically; orb B varies more, out of phase with A.
-    t.q25 = comeGo(0.30 + 0.60 * Math.sin(time * 0.060 + 0.3) + 0.38 * Math.sin(time * 0.027 + 2.2));
+    t.q25 = comeGo(0.3 + 0.6 * Math.sin(time * 0.06 + 0.3) + 0.38 * Math.sin(time * 0.027 + 2.2));
     t.q14 = comeGo(0.6 * Math.sin(time * 0.055 + 1.7) + 0.4 * Math.sin(time * 0.026 + 0.4));
     // PATH — the pair axis rotates through ALL directions (non-uniformly) with breathing separation +
     // independent per-orb wander, so the orbs stop retracing the same fixed diagonal (user note, #19).
-    var axis = time * 0.050 + 0.6 * Math.sin(time * 0.017);
-    var sep = 0.30 + 0.06 * Math.sin(time * 0.037), wob = 0.35 * Math.sin(time * 0.043);
-    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.090);
+    var axis = time * 0.05 + 0.6 * Math.sin(time * 0.017);
+    var sep = 0.3 + 0.06 * Math.sin(time * 0.037),
+      wob = 0.35 * Math.sin(time * 0.043);
+    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.09);
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.060 + 0.020 * Math.max(0, bass - 1)) * (1 + 0.40 * f);     // orb radius (pops on beat)
-    t.q26 = 0.06 * (0.5 + 0.7 * bassA);                                 // tether jag amplitude (audio-coupled)
+    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat)
+    t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
-      var wa = waveAmt, ca = time * 0.03;
-      t.q19 -= 0.004 * wa;                                              // downward drift → descending comb
-      t.q1 += (0.945 - t.q1) * 0.6 * wa;                               // a touch more decay for the comb trail
-      t.q7 *= (1 + 1.3 * wa);                                          // BIG orbs
-      t.q21 += (0.40 + 0.05 * Math.cos(ca) - t.q21) * wa;
+      var wa = waveAmt,
+        ca = time * 0.03;
+      t.q19 -= 0.004 * wa; // downward drift → descending comb
+      t.q1 += (0.945 - t.q1) * 0.6 * wa; // a touch more decay for the comb trail
+      t.q7 *= 1 + 1.3 * wa; // BIG orbs
+      t.q21 += (0.4 + 0.05 * Math.cos(ca) - t.q21) * wa;
       t.q22 += (0.44 + 0.05 * Math.sin(ca) - t.q22) * wa;
       t.q23 += (0.58 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa;
       t.q24 += (0.56 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
-      t.q25 = Math.max(t.q25, wa); t.q14 = Math.max(t.q14, wa);         // both orbs present
-      t.q13 *= (1 - wa);                                               // #24 is NOT folded — fade out any kaleidoscope fold strength
-      if (wa > 0.5) t.q12 = 1;                                        // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
-      t.q29 += (4.9 - t.q29) * wa;                                    // calm aurora ground (the orig #24 is plain/dark, not the busy moiré dot-grid)
+      t.q25 = Math.max(t.q25, wa);
+      t.q14 = Math.max(t.q14, wa); // both orbs present
+      t.q13 *= 1 - wa; // #24 is NOT folded — fade out any kaleidoscope fold strength
+      if (wa > 0.5) t.q12 = 1; // and kill the diagonal-X fold (not q13-gated) once mostly in-scene
+      t.q29 += (4.9 - t.q29) * wa; // calm aurora ground (the orig #24 is plain/dark, not the busy moiré dot-grid)
     }
-    t.q11 = 0;   // orb ripples removed — the original's orb rings are a 3D feedback trace, not a drawn ring
+    t.q11 = 0; // orb ripples removed — the original's orb rings are a 3D feedback trace, not a drawn ring
     return t;
   }
 
@@ -405,28 +626,54 @@
   //    WAVE2 tether · two filled-orb SHAPES. (WAVE3 + SHAPE2/3 left free for later layers.) ──
   var preset = build(BASE, { frame: frame, warp: WARP_V4, comp: COMP_V4 });
   preset.waves[0] = {
-    baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 1, usedots: 0, scaling: 1, smoothing: 0.05, thick: 1, a: 0.62 }),
-    init_eqs: passthrough, frame_eqs: passthrough, point_eqs: function (a) { return centralDraw(a); }
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 512,
+      additive: 1,
+      usedots: 0,
+      scaling: 1,
+      smoothing: 0.05,
+      thick: 1,
+      a: 0.62,
+    }),
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
+    point_eqs: function (a) {
+      return centralDraw(a);
+    },
   };
   // waves[1] free. (Orb ripples were removed: the original's orb rings are a 3D feedback trace/tube-stack,
   // not a drawn ring — the flat procedural version read as fake. q11 is now unused.)
   preset.waves[1] = {
     baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
-    init_eqs: passthrough, frame_eqs: passthrough, point_eqs: ""
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
+    point_eqs: "",
   };
-  preset.waves[2] = {   // jagged REAL-waveform tether spanning the two orbs (gated: both present)
-    baseVals: Object.assign({}, WAVE_BASE, { enabled: 1, samples: 512, additive: 0, usedots: 0, scaling: 1, smoothing: 0.0, thick: 1, a: 0.9 }),
-    init_eqs: passthrough, frame_eqs: passthrough,
+  preset.waves[2] = {
+    // jagged REAL-waveform tether spanning the two orbs (gated: both present)
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 512,
+      additive: 0,
+      usedots: 0,
+      scaling: 1,
+      smoothing: 0.0,
+      thick: 1,
+      a: 0.9,
+    }),
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
     point_eqs: function (a) {
       fTether(a);
-      var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55);             // both orbs present
-      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.40));                // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
+      var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
+      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
       a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
       return a;
-    }
+    },
   };
-  preset.shapes[0] = orbShape("q21", "q22", 0.00, "q25");   // orb A (near-persistent anchor)
-  preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14");   // orb B (comes & goes; different hue)
+  preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25"); // orb A (near-persistent anchor)
+  preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14"); // orb B (comes & goes; different hue)
 
   P["Alchemy V4: Random"] = preset;
 })();

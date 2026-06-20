@@ -13,10 +13,9 @@ import path from "node:path";
 const REPO = "/Users/sujitk/projects/personal/ytmusic-wmp-visualizer";
 // Full Chrome with new-headless has solid software-WebGL (SwiftShader via ANGLE); the standalone
 // chrome-headless-shell's WebGL is flaky (returns a null GL context). Default to full Chrome.
-const CHROME = process.env.CHROME ||
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const HEADLESS = (process.env.HEADLESS || "new"); // "new" for full Chrome; "shell" = headless-shell (omit flag)
-const PRESET = process.argv[2] || "";                       // "" = use viz.js boot default
+const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const HEADLESS = process.env.HEADLESS || "new"; // "new" for full Chrome; "shell" = headless-shell (omit flag)
+const PRESET = process.argv[2] || ""; // "" = use viz.js boot default
 const SHOTS = (process.argv[3] || "3.0,7.0,11.0").split(",").map(Number);
 const OUTDIR = "/tmp/alc-render";
 const PORT = 9344;
@@ -26,16 +25,29 @@ fs.mkdirSync(OUTDIR, { recursive: true });
 const udd = fs.mkdtempSync(path.join(os.tmpdir(), "cr-"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const chrome = spawn(CHROME, [
-  ...(HEADLESS === "new" ? ["--headless=new"] : []),
-  "--remote-debugging-port=" + PORT, "--user-data-dir=" + udd,
-  "--window-size=1280,800", "--hide-scrollbars", "--mute-audio",
-  "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
-  "--autoplay-policy=no-user-gesture-required", "--no-first-run", "--no-default-browser-check",
-  "about:blank",
-], { stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn(
+  CHROME,
+  [
+    ...(HEADLESS === "new" ? ["--headless=new"] : []),
+    "--remote-debugging-port=" + PORT,
+    "--user-data-dir=" + udd,
+    "--window-size=1280,800",
+    "--hide-scrollbars",
+    "--mute-audio",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    "--ignore-gpu-blocklist",
+    "--autoplay-policy=no-user-gesture-required",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "about:blank",
+  ],
+  { stdio: ["ignore", "ignore", "pipe"] }
+);
 let chromeErr = "";
-chrome.stderr.on("data", (d) => { chromeErr += d.toString(); });
+chrome.stderr.on("data", (d) => {
+  chromeErr += d.toString();
+});
 
 async function wsTargetUrl() {
   for (let i = 0; i < 50; i++) {
@@ -44,40 +56,68 @@ async function wsTargetUrl() {
       const list = await r.json();
       const page = list.find((t) => t.type === "page");
       if (page && page.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
-    } catch (e) { /* not up yet */ }
+    } catch (e) {
+      /* not up yet */
+    }
     await sleep(200);
   }
   throw new Error("Chrome CDP did not come up. stderr:\n" + chromeErr.slice(-1500));
 }
 
 function cdpClient(ws) {
-  let id = 0; const pending = new Map(); const logs = [];
+  let id = 0;
+  const pending = new Map();
+  const logs = [];
   ws.addEventListener("message", (ev) => {
     const m = JSON.parse(ev.data);
-    if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return; }
+    if (m.id && pending.has(m.id)) {
+      pending.get(m.id)(m);
+      pending.delete(m.id);
+      return;
+    }
     if (m.method === "Runtime.consoleAPICalled") {
-      logs.push("[" + m.params.type + "] " + m.params.args.map((a) => a.value !== undefined ? a.value : (a.description || a.type)).join(" "));
+      logs.push(
+        "[" +
+          m.params.type +
+          "] " +
+          m.params.args
+            .map((a) => (a.value !== undefined ? a.value : a.description || a.type))
+            .join(" ")
+      );
     } else if (m.method === "Log.entryAdded") {
       logs.push("[log:" + m.params.entry.level + "] " + m.params.entry.text);
     } else if (m.method === "Runtime.exceptionThrown") {
       const ex = m.params.exceptionDetails;
-      logs.push("[EXCEPTION] " + (ex.exception ? (ex.exception.description || ex.text) : ex.text));
+      logs.push("[EXCEPTION] " + (ex.exception ? ex.exception.description || ex.text : ex.text));
     }
   });
-  const send = (method, params = {}) => new Promise((res) => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
+  const send = (method, params = {}) =>
+    new Promise((res) => {
+      const i = ++id;
+      pending.set(i, res);
+      ws.send(JSON.stringify({ id: i, method, params }));
+    });
   return { send, logs };
 }
 
 (async () => {
   const wsUrl = await wsTargetUrl();
   const ws = new WebSocket(wsUrl);
-  await new Promise((res, rej) => { ws.addEventListener("open", res); ws.addEventListener("error", rej); });
+  await new Promise((res, rej) => {
+    ws.addEventListener("open", res);
+    ws.addEventListener("error", rej);
+  });
   const { send, logs } = cdpClient(ws);
 
   await send("Runtime.enable");
   await send("Log.enable");
   await send("Page.enable");
-  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
   await send("Page.navigate", { url: URL });
   await sleep(2500); // let scripts load + init() + first frames
 
@@ -101,7 +141,9 @@ function cdpClient(ws) {
   console.log("presets loaded in page:", pumpRes.result && pumpRes.result.value);
 
   if (PRESET) {
-    await send("Runtime.evaluate", { expression: `window.postMessage({__wmp:true,type:'preset:load',name:${JSON.stringify(PRESET)}},'*')` });
+    await send("Runtime.evaluate", {
+      expression: `window.postMessage({__wmp:true,type:'preset:load',name:${JSON.stringify(PRESET)}},'*')`,
+    });
   }
   // probe: is the WebGL canvas actually non-black? sample a few pixels after a moment.
   await sleep(800);
@@ -109,13 +151,16 @@ function cdpClient(ws) {
   const tag = (PRESET || "boot").replace(/[^a-z0-9]+/gi, "_");
   let last = 2.5 + 0.8;
   for (const s of SHOTS) {
-    await sleep(Math.max(0, (s - last) * 1000)); last = s;
+    await sleep(Math.max(0, (s - last) * 1000));
+    last = s;
     const shot = await send("Page.captureScreenshot", { format: "png" });
     if (shot.result && shot.result.data) {
       const fp = `${OUTDIR}/${tag}_${s}s.png`;
       fs.writeFileSync(fp, Buffer.from(shot.result.data, "base64"));
       console.log("wrote", fp);
-    } else { console.log("screenshot failed at", s, "s:", JSON.stringify(shot).slice(0, 300)); }
+    } else {
+      console.log("screenshot failed at", s, "s:", JSON.stringify(shot).slice(0, 300));
+    }
   }
 
   // non-black check via getImageData on the canvas
@@ -131,8 +176,15 @@ function cdpClient(ws) {
   console.log("\n=== PAGE CONSOLE (last 40) ===");
   console.log(logs.slice(-40).join("\n") || "(empty)");
 
-  ws.close(); chrome.kill("SIGKILL");
-  try { fs.rmSync(udd, { recursive: true, force: true }); } catch (e) {}
+  ws.close();
+  chrome.kill("SIGKILL");
+  try {
+    fs.rmSync(udd, { recursive: true, force: true });
+  } catch (e) {}
   await sleep(200);
   process.exit(0);
-})().catch((e) => { console.error("HARNESS ERROR:", e.message); chrome.kill("SIGKILL"); process.exit(1); });
+})().catch((e) => {
+  console.error("HARNESS ERROR:", e.message);
+  chrome.kill("SIGKILL");
+  process.exit(1);
+});
