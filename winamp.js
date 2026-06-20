@@ -508,6 +508,16 @@
   // in skinSelectors so the active-skin highlight + populate() stay in sync with the
   // rest of the app. Reuses the .wa-skinsel-menu open/close plumbing.
   var GEAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.6 7.6 0 0 0 0-1.88l2-1.56-1.92-3.32-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54h-3.84l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96L2.27 9.5l2 1.56a7.6 7.6 0 0 0 0 1.88l-2 1.56 1.92 3.32 2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54h3.84l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96 1.92-3.32-2-1.56ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>';
+  // Position the (context-mode) gear wrap at a viewport point — converting to its host's
+  // local coords through the UI zoom — then open the menu. Used by right-click + the logo.
+  function openGearAt(gear, clientX, clientY) {
+    if (!gear || !gear.openMenu) return;
+    var host = gear.offsetParent || gear.parentNode; if (!host) return;
+    var r = host.getBoundingClientRect(), s = uiScale || 1;
+    gear.style.left = Math.max(2, (clientX - r.left) / s) + "px";
+    gear.style.top = Math.max(2, (clientY - r.top) / s) + "px";
+    gear.openMenu();
+  }
   function buildGearMenu() {
     var btn = h("div", { class: "wa-np-tog wa-gear-btn", title: "Appearance — background, zoom, skin", html: GEAR_SVG });
     var menu = h("div", { class: "wa-skinsel-menu wa-gear-menu" });
@@ -559,12 +569,16 @@
       menu.appendChild(keys);
       markActive();
     };
+    // open/close the menu programmatically (used by the right-click + logo triggers)
+    wrap.openMenu = function () {
+      skinSelectors.forEach(function (w) { var m = w.querySelector(".wa-skinsel-menu"); if (m) m.classList.remove("open"); });
+      updateBg(); updateZoom(); menu.classList.add("open");
+    };
+    wrap.closeMenu = function () { menu.classList.remove("open"); };
     btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a window drag
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
-      var willOpen = !menu.classList.contains("open");
-      skinSelectors.forEach(function (w) { var m = w.querySelector(".wa-skinsel-menu"); if (m) m.classList.remove("open"); });
-      if (willOpen) { updateBg(); updateZoom(); menu.classList.add("open"); }
+      if (menu.classList.contains("open")) wrap.closeMenu(); else wrap.openMenu();
     });
     wrap.populate();
     skinSelectors.push(wrap);
@@ -588,6 +602,7 @@
     ["L", "Library / search"],
     ["−  =  \\", "Zoom out / in / reset"],
     ["⌘ ⇧ E", "Start / stop EQ capture"],
+    ["Right-click", "Skins, background, zoom & settings"],
   ];
   function scEsc(e) { if (e.key === "Escape") { e.stopPropagation(); closeShortcuts(); } }
   function closeShortcuts() {
@@ -1076,8 +1091,12 @@
   function ensureNowPlaying() {
     if (wins["wa-np"]) return;
     var img = h("img", { class: "wa-np-art", alt: "" });
+    // Title is a marquee: a clipping box (.wa-np-title) with an inner track (span) that
+    // scrolls when the name overflows — the Winamp way (long titles scroll, never clip).
+    els.npTitleTrack = h("span", { class: "wa-np-title-t", text: "—" });
+    els.npTitle = h("div", { class: "wa-np-title" }, [els.npTitleTrack]);
     var info = h("div", { class: "wa-np-info" }, [
-      (els.npTitle = h("div", { class: "wa-np-title", text: "—" })),
+      els.npTitle,
       (els.npArtist = h("div", { class: "wa-np-artist", text: "" })),
       (els.npAlbum = h("div", { class: "wa-np-album", text: "" })),
     ]);
@@ -1130,15 +1149,23 @@
       npBtn("LIB", "Show/hide the library / search window", "wa-lib", function () { if (isShown("wa-lib")) libBecameVisible(); }),
       npBtn("LYR", "Show/hide the lyrics window", "wa-lyrics", maybeLoadLyrics),
     ]);
+    // Settings menu (Background/Zoom/Skin/Shortcuts) is no longer a gear button cluttering
+    // the strip — it opens on RIGHT-CLICK of the now-playing bar (and via the skin's logo,
+    // wired in the main window), the authentic Winamp pattern. The gear wrap is kept as the
+    // menu host (its button hidden via .wa-gear-ctx) so all its populate/positioning works.
     var gear = buildGearMenu();
+    gear.classList.add("wa-gear-ctx");
+    els.gearWrap = gear;   // so the skin's top-left logo can open the same menu
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
-    // TWO-ROW control deck (frees horizontal room for the title): row A = track/audio
-    // quick-actions [♥ 👎 🔊]; row B = system/view toggles ❲VIS|LIB|LYR❳ + ⚙. A 1px groove
-    // separates them like two snapped-together hardware modules.
-    var rowA = h("div", { class: "wa-np-row wa-np-row-a" }, [rate, els.mute]);
-    var rowB = h("div", { class: "wa-np-row wa-np-row-b" }, [toggles, gear]);
-    var btns = h("div", { class: "wa-np-btns" }, [rowA, rowB]);
-    var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
+    // ONE clean row now that the title scrolls + settings moved to right-click:
+    // [♥ 👎]  [🔊]  ❲VIS|LIB|LYR❳
+    var btns = h("div", { class: "wa-np-btns" }, [rate, els.mute, toggles]);
+    var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns, gear]);
+    // right-click anywhere on the strip → open the settings menu at the cursor
+    el.addEventListener("contextmenu", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      openGearAt(gear, e.clientX, e.clientY);
+    });
     // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
     // async after the .wsz parses. Showing it before that flashes the dark, unframed
     // fallback background (the "shaded on first load" look). enableClassic() reveals it
@@ -1182,7 +1209,7 @@
     if (hasArt) { if (w.img.src !== t.art) w.img.src = t.art; }
     else w.img.removeAttribute("src");
     w.el.classList.toggle("empty", !hasArt);
-    if (els.npTitle) els.npTitle.textContent = t.title || "—";
+    if (els.npTitleTrack) runMarquee(els.npTitleTrack, t.title || "—");   // scroll long titles, Winamp-style
     if (els.npArtist) els.npArtist.textContent = t.artist || "";
     // album + year on one line (filtered so it's never a stray " • " when absent)
     if (els.npAlbum) els.npAlbum.textContent = [t.album, t.year].filter(Boolean).join("  •  ");
@@ -1660,31 +1687,34 @@
   }
   var lastLyricsTrack = "";
 
-  var marqueeAnim = null, lastMarquee = "";
-  function setMarquee(text) {
-    if (text === lastMarquee) return;
-    lastMarquee = text;
-    if (marqueeAnim) { marqueeAnim.cancel(); marqueeAnim = null; }
+  function setMarquee(text) { runMarquee(els.marquee, text); }
+  // Generic Winamp-style ticker: scroll an inline track inside its clipping parent, but
+  // ONLY when the text overflows (else it sits static). Per-element state on the node.
+  function runMarquee(el, text) {
+    if (!el) return;
+    text = text || "";
+    if (el.__mqText === text) return;
+    el.__mqText = text;
+    if (el.__mqAnim) { el.__mqAnim.cancel(); el.__mqAnim = null; }
     var sep = "      ◆      ";
-    els.marquee.textContent = text;
-    els.marquee.style.transform = "translateX(0)";
-    // animate only if it overflows; scroll one full text+sep width then loop
+    el.textContent = text;
+    el.style.transform = "translateX(0)";
     requestAnimationFrame(function () {
-      var box = els.marquee.parentNode;
-      if (els.marquee.scrollWidth <= box.clientWidth) return;
-      els.marquee.textContent = text + sep + text;
-      var dist = (els.marquee.scrollWidth - els.marquee.clientWidth) / 2 + measure(sep);
+      var box = el.parentNode;
+      if (!box || el.scrollWidth <= box.clientWidth) return;   // fits → no scroll
+      el.textContent = text + sep + text;
+      var dist = (el.scrollWidth - el.clientWidth) / 2 + measureIn(el, sep);
       var dur = Math.max(6000, dist * 45);
-      marqueeAnim = els.marquee.animate(
+      el.__mqAnim = el.animate(
         [{ transform: "translateX(0)" }, { transform: "translateX(" + -dist + "px)" }],
         { duration: dur, iterations: Infinity, easing: "linear" }
       );
     });
   }
-  function measure(s) {
+  function measureIn(el, s) {
     var span = h("span", { text: s });
     span.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:inherit";
-    els.marquee.appendChild(span); var w = span.offsetWidth; span.remove(); return w;
+    el.appendChild(span); var w = span.offsetWidth; span.remove(); return w;
   }
 
   function onAudio(frame) {

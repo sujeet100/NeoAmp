@@ -349,21 +349,15 @@
 .wa-np.empty .wa-np-art { visibility: hidden; }
 .wa-np-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
 /* title/artist use the skin's PLEDIT text palette so they change per skin */
-.wa-np-title {
-  font-family: var(--wa-lcd-font); font-size: 17px; line-height: 1;
-  color: var(--pl-current, var(--wa-lcd));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+/* title is a MARQUEE: the box clips, the inner track scrolls when it overflows (Winamp). */
+.wa-np-title { font-family: var(--wa-lcd-font); font-size: 17px; line-height: 1;
+  color: var(--pl-current, var(--wa-lcd)); white-space: nowrap; overflow: hidden; }
+.wa-np-title-t { display: inline-block; white-space: nowrap; will-change: transform; }
 .wa-np-artist { font: 13px/1.1 var(--wa-lcd-font); letter-spacing: 0.5px; color: var(--pl-normal, var(--wa-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-np-album { font: 12px/1.1 var(--wa-lcd-font); color: var(--pl-normal, var(--wa-fg-dim)); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* TWO-ROW control deck — stacks the keys so the title/album gets the horizontal room.
-   Row A: [♥ 👎 🔊] track/audio actions.  Row B: ❲VIS|LIB|LYR❳ + ⚙ system/views.
-   Both rows right-aligned; a 1px groove (dark line + light line) joins them like two
-   snapped-together hardware modules. */
-.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
-.wa-np-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.wa-np-row-a { padding-bottom: 4px; }
-.wa-np-row-b { padding-top: 4px; gap: 8px; border-top: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 0 rgba(255,255,255,0.09); }
+/* ONE clean control row (settings moved to right-click; long titles scroll, so the row
+   no longer fights the title): [♥ 👎] · [🔊] · ❲VIS|LIB|LYR❳, groups spaced, keys tight. */
+.wa-np-btns { flex: 0 0 auto; display: flex; flex-direction: row; align-items: center; gap: 10px; }
 .wa-np-rate { display: flex; flex-direction: row; gap: 2px; }       /* like + dislike, tight pair */
 /* window-toggle RACK: the three view toggles read as one cohesive expansion module — a
    recessed tray holding flush keys (1px gaps), Winamp-stereo style. */
@@ -441,12 +435,15 @@
     inset 1px 1px 0 color-mix(in srgb, var(--led) 45%, #fff),
     0 0 0 1px color-mix(in srgb, var(--led) 45%, #000);
 }
-/* ⚙ gear key: secondary settings — sits at the far right of row B, same KEY HEIGHT as the
-   rest of the row (so it aligns, not the off-looking shrunk version) but with a smaller,
-   slightly dimmed glyph so it reads as secondary. */
+/* ⚙ gear key styling (still used as the menu host) */
 .wa-gear-btn { padding: 0 6px; opacity: 0.9; }
 .wa-gear-btn::before { display: none; }
 .wa-gear-btn svg { width: 13px; height: 13px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+/* context-menu mode: the gear button is hidden (settings open via right-click / the skin
+   logo); the wrap is a zero-size, absolutely-positioned host so its dropdown appears at the
+   click point (openGearAt sets left/top). */
+.wa-gear-ctx { position: absolute; width: 0; height: 0; z-index: 30; }
+.wa-gear-ctx .wa-gear-btn { display: none; }
 /* 🔊 mute key: icon only (no LED). One SVG; CSS swaps the sound-wave for an ✕ on .on,
    and recolours the whole glyph red while muted (a clear "silenced" warning). */
 .wa-np-mute { padding: 0 6px; }
