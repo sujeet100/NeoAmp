@@ -275,6 +275,19 @@
   border-color: #15151c rgba(255,255,255,0.18) rgba(255,255,255,0.18) #15151c;
   box-shadow: inset 1px 1px 2px rgba(0,0,0,0.7);
 }
+/* numeric volume readout — small LCD digits riding the volume slider */
+.wa-vol-readout { flex: 0 0 auto; min-width: 24px; text-align: right; font-size: 11px; letter-spacing: 0.5px; }
+/* seek-position tooltip — lives on <body> (escapes #neoamp-root's transform/clip), so it
+   uses explicit values + the globally-injected LCD font rather than root-scoped vars. */
+.wa-seek-tip {
+  position: fixed; z-index: 2147483600; transform: translate(-50%, -100%); margin-top: -2px;
+  padding: 2px 7px; border-radius: 3px; pointer-events: none; white-space: nowrap;
+  font: 14px/1.2 "NeoAmp LCD", "Lucida Console", monospace; letter-spacing: 1px;
+  color: #38ff7a; background: rgba(6,14,9,0.96); border: 1px solid rgba(56,255,122,0.45);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5); text-shadow: 0 0 5px rgba(56,255,122,0.6);
+  opacity: 0; visibility: hidden;
+}
+.wa-seek-tip.on { opacity: 1; visibility: visible; }
 
 /* =======================================================================
    CLASSIC SKIN HOST (.wsz canvas) — no procedural chrome; the skin's own
@@ -409,6 +422,15 @@
 .wa-gear-btn { padding: 0 6px; }
 .wa-gear-btn::before { display: none; }
 .wa-gear-btn svg { width: 15px; height: 15px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+/* 🔊 mute key: icon only (no LED). One SVG; CSS swaps the sound-wave for an ✕ on .on,
+   and recolours the whole glyph red while muted (a clear "silenced" warning). */
+.wa-np-mute { padding: 0 6px; }
+.wa-np-mute::before { display: none; }
+.wa-np-mute svg { width: 15px; height: 15px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); color: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+.wa-np-mute .wa-spk-x { display: none; }
+.wa-np-mute.on .wa-spk-wave { display: none; }
+.wa-np-mute.on .wa-spk-x { display: inline; }
+.wa-np-mute.on svg { fill: #ff5a5a; color: #ff5a5a; filter: drop-shadow(0 0 3px rgba(255,90,90,0.6)); }
 /* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
    behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
 .wa-rate-btn { padding: 0 7px; }

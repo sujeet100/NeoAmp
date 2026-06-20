@@ -251,7 +251,7 @@
       elapsed: 0, duration: 0, title: "NeoAmp", kbps: "", khz: "", stereo: true,
       playing: false, paused: false, shuffle: false, repeat: false, volume: 1,
       balance: (hooks && typeof hooks.balance === "number") ? hooks.balance : 0,
-      pressed: null, eqOn: false, plOn: false, freq: null, marqueeX: 0, scrub: null,
+      pressed: null, eqOn: false, plOn: false, freq: null, marqueeX: 0, scrub: null, flash: null,
     };
 
     function sheet(name) { return skin.sheets[name]; }
@@ -290,6 +290,8 @@
     var MARQUEE_SEP = "  ***  ";
     function drawMarquee() {
       var R = LAYOUT.marquee;
+      // transient readout (volume/balance drag) takes over the title line, Winamp-style
+      if (st.flash) { drawText(st.flash, R.x, R.y, R.w); return; }
       var textW = String(st.title).length * CHAR_W;
       if (textW <= R.w) { drawText(st.title, R.x, R.y, R.w); return; }
       var full = st.title + MARQUEE_SEP;
@@ -400,7 +402,8 @@
       // play/pause/stop indicator
       var indKey = st.stopped ? "STOPPED" : (st.paused ? "PAUSED" : "PLAYING");
       blit("PLAYPAUS", indKey, LAYOUT.playIndicator.x, LAYOUT.playIndicator.y);
-      drawTime(st.elapsed);
+      // while scrubbing show the TARGET time (authentic Winamp) — a numeric seek readout
+      drawTime((st.pressed === "position" && st.scrub != null) ? st.scrub * st.duration : st.elapsed);
       drawMarquee();
       drawText(st.kbps, LAYOUT.kbps.x, LAYOUT.kbps.y, 15);
       drawText(st.khz, LAYOUT.khz.x, LAYOUT.khz.y, 15);
@@ -453,7 +456,17 @@
     // which slider is being dragged: "volume" | "balance" | "position" | null.
     // Drag uses WINDOW listeners (not canvas) so it survives the cursor leaving
     // the canvas — exactly why mountEq listens on window for its band faders.
-    var slider = null;
+    var slider = null, flashTimer = null;
+    // Winamp-style transient readout in the title line while a slider drags.
+    function flashVol() { st.flash = "VOLUME: " + Math.round(st.volume * 100) + "%"; }
+    function flashBal() {
+      var b = Math.round(Math.abs(st.balance) * 100);
+      st.flash = b === 0 ? "BALANCE: CENTER" : ("BALANCE: " + b + "% " + (st.balance < 0 ? "LEFT" : "RIGHT"));
+    }
+    function clearFlashSoon() {
+      if (flashTimer) clearTimeout(flashTimer);
+      flashTimer = setTimeout(function () { st.flash = null; scheduleRender(); }, 800);
+    }
     var BUTTONS = ["prev", "play", "pause", "stop", "next", "eject"];
     canvas.addEventListener("mousedown", function (e) {
       // transport press feedback
@@ -467,24 +480,25 @@
       }
       if (hit(e, LAYOUT.volume)) {
         slider = "volume"; st.pressed = "volume"; st.volume = valAt(e, LAYOUT.volume, 14);
-        if (hooks.onVolume) hooks.onVolume(st.volume); scheduleRender(); return;
+        flashVol(); if (hooks.onVolume) hooks.onVolume(st.volume); scheduleRender(); return;
       }
       if (hit(e, LAYOUT.balance)) {
         slider = "balance"; st.pressed = "balance"; st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1;
-        if (hooks.onBalance) hooks.onBalance(st.balance);
+        flashBal(); if (hooks.onBalance) hooks.onBalance(st.balance);
         scheduleRender(); return;
       }
     });
     var onSlide = function (e) {
       if (!slider) return;
-      if (slider === "volume") { st.volume = valAt(e, LAYOUT.volume, 14); if (hooks.onVolume) hooks.onVolume(st.volume); }
-      else if (slider === "balance") { st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1; if (hooks.onBalance) hooks.onBalance(st.balance); }
+      if (slider === "volume") { st.volume = valAt(e, LAYOUT.volume, 14); flashVol(); if (hooks.onVolume) hooks.onVolume(st.volume); }
+      else if (slider === "balance") { st.balance = valAt(e, LAYOUT.balance, 14) * 2 - 1; flashBal(); if (hooks.onBalance) hooks.onBalance(st.balance); }
       else if (slider === "position") { st.scrub = valAt(e, LAYOUT.position, 29); }
       scheduleRender();
     };
     var onSlideEnd = function () {
       if (!slider) return;
       if (slider === "position" && hooks.onSeek && st.scrub != null) hooks.onSeek(st.scrub * st.duration);
+      if (slider === "volume" || slider === "balance") clearFlashSoon();
       slider = null; st.pressed = null; st.scrub = null; scheduleRender();
     };
     window.addEventListener("mousemove", onSlide);
@@ -538,7 +552,7 @@
       // every skin switch — otherwise stale handlers stack up and fire against a
       // detached canvas).
       destroy: function () {
-        clearInterval(tick); if (raf) cancelAnimationFrame(raf);
+        clearInterval(tick); if (raf) cancelAnimationFrame(raf); if (flashTimer) clearTimeout(flashTimer);
         window.removeEventListener("mousemove", onSlide); window.removeEventListener("mouseup", onSlideEnd);
         canvas.remove();
       },

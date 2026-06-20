@@ -561,8 +561,12 @@
   // Player volume runs on the offscreen master gain (provider-agnostic — works even when a
   // site exposes no controllable media element, e.g. Spotify). Persisted + relayed live.
   var playerVolume = 1;
-  function relayVolume() { try { chrome.runtime.sendMessage({ target: "sw", type: "relay-volume", volume: playerVolume }); } catch (_) {} }
+  var playerMuted = false;
+  // Mute is NOT a separate offscreen state — it folds into the SAME master-gain relay:
+  // we send 0 when muted, the real volume otherwise. One gain authority, no new message.
+  function relayVolume() { try { chrome.runtime.sendMessage({ target: "sw", type: "relay-volume", volume: playerMuted ? 0 : playerVolume }); } catch (_) {} }
   function persistVolume() { try { chrome.storage.local.set({ neoampVolume: playerVolume }); } catch (_) {} }
+  function persistMute() { try { chrome.storage.local.set({ neoampMute: playerMuted }); } catch (_) {} }
   function isPaused() {
     if (PROVIDER.playPause) {                       // EME providers (Spotify): <video>.paused is unreliable
       var b = qa(PROVIDER.playPause);
@@ -607,9 +611,11 @@
     },
     // volume = the offscreen master gain (provider-agnostic; works on sites with no
     // controllable media element, e.g. Spotify). Relayed live + persisted.
-    setVolume: function (x) { playerVolume = clamp(+x || 0, 0, 1); relayVolume(); persistVolume(); },
-    nudgeVolume: function (d) { playerVolume = clamp(playerVolume + d, 0, 1); relayVolume(); persistVolume(); sendTrack(); },
-    getVolume: function () { return playerVolume; },
+    setVolume: function (x) { playerVolume = clamp(+x || 0, 0, 1); if (playerVolume > 0) playerMuted = false; relayVolume(); persistVolume(); persistMute(); },
+    nudgeVolume: function (d) { playerVolume = clamp(playerVolume + d, 0, 1); if (playerVolume > 0) playerMuted = false; relayVolume(); persistVolume(); persistMute(); sendTrack(); },
+    getVolume: function () { return playerVolume; },   // the REAL volume, so the slider doesn't snap to 0 while muted
+    setMute: function (b) { playerMuted = b === undefined ? !playerMuted : !!b; relayVolume(); persistMute(); return playerMuted; },
+    isMuted: function () { return playerMuted; },
     getCapabilities: function () { return (PROVIDER && PROVIDER.capabilities) || {}; },
     focusSearch: function () {   // focus the active site's own search box (provider-aware)
       var s = PROVIDER.searchBox && qa(PROVIDER.searchBox);
@@ -737,6 +743,9 @@
   });
   storage.get("neoampVolume", function (v) {
     if (typeof v === "number") { playerVolume = clamp(v, 0, 1); relayVolume(); }
+  });
+  storage.get("neoampMute", function (m) {
+    if (typeof m === "boolean") { playerMuted = m; relayVolume(); }
   });
 
   function toast(msg) {

@@ -707,9 +707,12 @@
 
     els.vol = h("input", { class: "wa-range wa-vol", type: "range", min: "0", max: "100", value: "100", title: "Volume" });
     els.bal = h("input", { class: "wa-range wa-bal", type: "range", min: "-100", max: "100", value: "0", title: "Balance" });
-    els.vol.addEventListener("input", function () { NA.control.setVolume(+els.vol.value / 100); paintRange(els.vol); });
+    // numeric volume readout (the MUTE button itself lives in the universal NP strip so
+    // it's visible on .wsz skins too, where this procedural main window is hidden).
+    els.volNum = h("span", { class: "wa-vol-readout wa-lcd", text: "100", title: "Volume" });
+    els.vol.addEventListener("input", function () { NA.control.setVolume(+els.vol.value / 100); paintRange(els.vol); syncVolUi(); });
     els.bal.addEventListener("input", function () { NA.control.setBalance(+els.bal.value / 100); paintRange(els.bal); });
-    var vols = h("div", { class: "wa-vols" }, [els.vol, els.bal]);
+    var vols = h("div", { class: "wa-vols" }, [els.vol, els.volNum, els.bal]);
 
     function tog(label, title, fn) {
       var t = h("div", { class: "wa-tog", title: title, text: label });
@@ -729,22 +732,45 @@
     win.body.appendChild(grid);
     win.body.appendChild(controls);
 
+    // floating seek-position tooltip (appended to <body>, not #neoamp-root, so the
+    // root's CSS transform/clip can't cut it off). Shows the target time while scrubbing.
+    els.seekTip = h("div", { class: "wa-seek-tip" });
+    document.body.appendChild(els.seekTip);
+    function showSeekTip() {
+      var t = trackDur * (+els.seek.value / 1000);
+      els.seekTip.textContent = fmt(t);
+      var r = els.seek.getBoundingClientRect();
+      var pct = (+els.seek.value - +els.seek.min) / ((+els.seek.max - +els.seek.min) || 1);
+      els.seekTip.style.left = Math.round(r.left + pct * r.width) + "px";
+      els.seekTip.style.top = Math.round(r.top - 6) + "px";
+      els.seekTip.classList.add("on");
+    }
     // seek interactions
     els.seek.addEventListener("input", function () {
       seeking = true;
       var t = trackDur * (+els.seek.value / 1000);
       els.clock.textContent = fmt(t);
       paintRange(els.seek);
+      showSeekTip();
     });
     els.seek.addEventListener("change", function () {
       NA.control.seek(trackDur * (+els.seek.value / 1000));
       seeking = false;
+      els.seekTip.classList.remove("on");
     });
 
     // init volume + balance + slider fills
     els.vol.value = String(Math.round(NA.control.getVolume() * 100));
     if (NA.control.getEqState) els.bal.value = String(Math.round(NA.control.getEqState().balance * 100));
     [els.seek, els.vol, els.bal].forEach(paintRange);
+    syncVolUi();
+  }
+
+  // keep the volume readout + mute lamp in sync with the live control state (the slider
+  // auto-unmutes on raise, the keyboard can mute, etc. — one place reflects all of it).
+  function syncVolUi() {
+    if (els.volNum) els.volNum.textContent = String(Math.round((NA.control.getVolume ? NA.control.getVolume() : +els.vol.value / 100) * 100));
+    if (els.mute && NA.control.isMuted) els.mute.classList.toggle("on", NA.control.isMuted());
   }
 
   // paint the filled portion of a native range track (it doesn't fill itself)
@@ -1053,6 +1079,16 @@
       rateBtn(HEART_SVG, "Like this track", "like"),
       rateBtn(THUMBDOWN_SVG, "Dislike this track", "dislike"),
     ]);
+    // MUTE — universal (the procedural main window is hidden on .wsz skins, so the
+    // canonical mute lives here). One SVG carries both states; CSS swaps wave↔✕ via .on.
+    var SPEAKER_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
+      '<path class="wa-spk-wave" d="M15.5 8.6a5 5 0 010 6.8" fill="none" stroke="currentColor" stroke-width="2"/>' +
+      '<path class="wa-spk-x" d="M16 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+    els.mute = h("div", { class: "wa-np-tog wa-np-mute", title: "Mute (M)", html: SPEAKER_SVG });
+    els.mute.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    els.mute.addEventListener("click", function (e) { e.stopPropagation(); els.mute.classList.toggle("on", NA.control.setMute()); });
+    if (NA.control.isMuted && NA.control.isMuted()) els.mute.classList.add("on");
     // Decluttered: the strip keeps only the often-used controls (like/dislike + the
     // VIS/LIB window toggles). The set-once appearance controls — Background, Zoom and
     // Skin — moved behind the ⚙ gear menu so the now-playing bar reads cleanly.
@@ -1062,8 +1098,8 @@
     ]);
     var gear = buildGearMenu();
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
-    // one tidy row, three groups: [like dislike] · [VIS LIB] · [⚙]
-    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, gear]);
+    // one tidy row: [like dislike] · [mute] · [VIS LIB] · [⚙]
+    var btns = h("div", { class: "wa-np-btns" }, [rate, els.mute, toggles, gear]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
     // async after the .wsz parses. Showing it before that flashes the dark, unframed
@@ -1116,7 +1152,7 @@
       onNext: function () { NA.control.next(); },
       onEject: function () { focusYtSearch(); },
       onSeek: function (t) { NA.control.seek(t); },
-      onVolume: function (v) { NA.control.setVolume(v); if (els.vol) { els.vol.value = String(Math.round(v * 100)); paintRange(els.vol); } },
+      onVolume: function (v) { NA.control.setVolume(v); if (els.vol) { els.vol.value = String(Math.round(v * 100)); paintRange(els.vol); } syncVolUi(); },
       balance: NA.control.getEqState ? NA.control.getEqState().balance : 0,
       onBalance: function (x) { NA.control.setBalance(x); if (els.bal) { els.bal.value = String(Math.round(x * 100)); paintRange(els.bal); } },
       onShuffle: function () { transportToggleAt = Date.now(); NA.control.toggleShuffle(); },
@@ -1492,6 +1528,7 @@
       var vv = String(Math.round(t.volume * 100));
       if (els.vol.value !== vv) { els.vol.value = vv; paintRange(els.vol); }
     }
+    syncVolUi();
   }
 
   function onTrack(t) {
@@ -1846,8 +1883,9 @@
       case " ": c.playPause(); break;
       case "ArrowRight": c.seekBy(5); break;
       case "ArrowLeft": c.seekBy(-5); break;
-      case "ArrowUp": c.nudgeVolume(0.05); break;
-      case "ArrowDown": c.nudgeVolume(-0.05); break;
+      case "ArrowUp": c.nudgeVolume(0.05); syncVolUi(); break;
+      case "ArrowDown": c.nudgeVolume(-0.05); syncVolUi(); break;
+      case "m": case "M": if (c.setMute) { c.setMute(); syncVolUi(); } break;
       case "l": case "L": focusLibrary(); break;
       case "-": case "_": setUiScale(uiScale - 0.05); break;   // zoom out (fit a short screen)
       case "=": case "+": setUiScale(uiScale + 0.05); break;   // zoom in
