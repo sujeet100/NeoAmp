@@ -42,7 +42,12 @@ principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
    obfuscated/hashed class names (e.g. Spotify's `q8mQFn7r8UYsKdHE`), which regenerate per
    build. **Verify selectors against the live DOM** before shipping: launch a headful
    Chrome with `--remote-debugging-port`, have the user log in, and read the real DOM over
-   CDP (see `tools/` / scratchpad probes) rather than guessing.
+   CDP via **`node tools/cdp-eval.mjs <probe.js>`** rather than guessing (this is exactly
+   how the Spotify selectors were nailed — guessed `control-button-shuffle` was wrong; the
+   real shuffle has no testid, and the like toggle's aria-label flips while only
+   `aria-checked` is stable). **Providers wired today:** YouTube Music (full) + Spotify
+   (transport / like / seek / queue / volume + focuses Spotify's own search box; in-app
+   search *results* still pending). Full status + roadmap: `MULTI-PROVIDER-DESIGN.md`.
 2. **Per-provider selectors are DATA, not code, and live in config.** The site-specific
    bits that remain (transport buttons, search box, like, position) are declared per
    provider in the `PROVIDERS` registry in `content.js`, **mirrored in `selectors.json`**.

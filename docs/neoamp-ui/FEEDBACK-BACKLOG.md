@@ -39,12 +39,38 @@ button row (REM/SEL **and** the redundant ADD/MISC) was removed, leaving just th
 + total time; double-click a row to play. Search lives in the Library window; queue
 management stays in YTM.
 
-**Still open (next session):** kbps stays dashed (not exposable); B2.6 silent DOM-scrape
-failures; B2.7 perf / AudioWorklet + multi-tab; B3 lyrics, real playlist management
-(drag/drop), mute, windowshade, clear "EQ active" indicator.
+**Session 3 (2026-06-20) — MULTI-PROVIDER + Spotify** (full detail: `MULTI-PROVIDER-DESIGN.md`).
+NeoAmp now runs on **Spotify** too, all selectors **live-verified via `tools/cdp-eval.mjs`**
+(headful Chrome + CDP, not guessed): provider-agnostic metadata (MediaSession `world:MAIN`),
+transport, volume (offscreen master gain), seek (Spotify's range input — verified 3:21→0:45),
+like (stable `aria-checked` → LED), queue mirror (double-click plays via the row's play-button),
+capability gating (dislike hidden; LIB focuses Spotify's own search box), GitHub-raw remote
+selector-config hot-fix channel (`selectors.json`).
 
-**Needs LIVE verification** (can't headless-test audio): the kHz readout *value*; the toast /
-context-menu / command copy (all require an extension reload to take effect).
+---
+
+## PENDING — prioritized (next sessions)
+
+**Multi-provider follow-ups:**
+- In-app **Spotify search RESULTS** — today LIB only focuses Spotify's own search box; showing
+  results in NeoAmp's library window needs scraping Spotify's search DOM.
+- **Silence / zero-FFT detector** — toast (not a frozen viz) if a provider's audio doesn't pass
+  capture (graceful degrade for future EME providers).
+- Provider adapter **file-split** (`content.js` `PROVIDERS` → `providers/*.js`); pure refactor.
+- More providers: **plain YouTube** (cheap, reuses code), **Bandcamp** (DRM-free).
+
+**Player-UI features still wanted (from section B below):**
+- **Lyrics window** (B3) — scrolling Winamp-style lyrics pane (both YTM + Spotify have lyrics).
+- **Mute button** + numeric volume / seek-position tooltip (B3).
+- **Windowshade** (double-click titlebar to collapse) on all windows (B3).
+- Clear **"EQ / capture active" indicator** (B3).
+- **B2.2** a "this is now your player" moment (NeoAmp's controls overlay the site's own bar).
+- **B2.6** silent DOM-scrape failures → a **self-test / health signal** on load.
+- **B2.7** perf (FFT relay → AudioWorklet) + multi-tab robustness.
+- Real in-app **playlist management** (drag / remove) — descoped; queue mgmt stays in the provider.
+
+**Notes:** kbps stays dashed (not exposed by YTM/Spotify). The remote-config channel needs the
+GitHub repo to be **PUBLIC** to fire (else it silently uses bundled defaults — harmless).
 
 ---
 

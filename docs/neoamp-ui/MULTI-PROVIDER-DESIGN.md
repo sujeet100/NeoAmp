@@ -144,18 +144,33 @@ Decouples "site changed its DOM" from "user must wait for a store update."
 
 ## Roadmap
 
-- [x] Audio capture works on a 2nd provider (Spotify) — DRM doesn't block. *(verified)*
-- [x] MediaSession metadata backbone (`mediasession.js` + `readTrack` prefers it). *(26ab36d)*
-- [x] Spotify injection (manifest matches / host_permissions / WAR / context menu). *(26ab36d)*
-- [ ] **Transport abstraction**: generic play/pause/seek via media element + per-provider
-      `next`/`prev` selector config. Spotify as the proof. *(next)*
-- [ ] **Provider adapter refactor**: extract the registry + base provider + a
-      `youtube-music` provider from `content.js`; add a `spotify` provider.
-- [ ] **Silence/zero-FFT detector** + capability-aware control disabling.
-- [x] **Remote selector config** — `selectors.json` in the repo, SW-fetched from GitHub
-      raw (~5-min propagation, edit+push), layered over bundled defaults; cached in storage.
-- [ ] Add **plain YouTube** (cheapest, reuses code) and evaluate **Bandcamp** (DRM-free).
-- [ ] Self-test on load → surface scrape breakage (backlog B2.6).
+**Shipped (Spotify is a fully working 2nd provider, all live-verified via `tools/cdp-eval.mjs`):**
+- [x] Audio capture on Spotify — DRM does NOT block tab audio (EQ + viz work).
+- [x] MediaSession metadata backbone (`mediasession.js`, `world:"MAIN"` → `readTrack` prefers it).
+- [x] Spotify injection (manifest matches / host_permissions / WAR / context menu).
+- [x] Transport: play/pause, next, prev, shuffle, repeat — per-provider `PROVIDERS` registry.
+- [x] **Volume** via the offscreen master gain (provider-agnostic; works w/o a media element).
+- [x] **Seek** on Spotify — drives its `playback-progressbar` `<input type=range>` (React-set,
+      ms-scaled); position read from `playback-position/duration` text. Verified 3:21→0:45.
+- [x] **Like** → matches the save toggle's stable `aria-checked` (its aria-label flips
+      "Add to Liked Songs" ⇄ "Add to playlist"); heart LED reflects saved state.
+- [x] **Queue mirror** — Spotify "Next in queue" `li[role=row]` rows; `ensureQueueOpen()`
+      opens its panel on demand; double-click plays via the row's `play-button`.
+- [x] **Capability gating** — `dislike` hidden on Spotify; **LIB focuses Spotify's own
+      search box** (in-app library is YTM-only); no YTM-specific copy leaks.
+- [x] **Remote selector config** — `selectors.json` (GitHub raw, ~5-min edit+push), layered
+      over bundled defaults; cached in storage. (Repo must be PUBLIC for the channel to fire.)
+
+**Pending (next sessions):**
+- [ ] **In-app Spotify search RESULTS** — today LIB only focuses Spotify's own search box;
+      showing results inside NeoAmp's library window needs scraping Spotify's search DOM.
+- [ ] **Silence / zero-FFT detector** — if a provider's audio ever doesn't pass capture,
+      toast instead of a frozen viz (graceful degrade for future EME providers).
+- [ ] **Provider adapter FILE-split** — the inline `content.js` `PROVIDERS` registry → a
+      `providers/*.js` base + per-provider modules. Pure refactor; low urgency.
+- [ ] **Self-test on load** → surface scrape breakage (backlog B2.6).
+- [ ] More providers: **plain YouTube** (cheapest, reuses code), **Bandcamp** (DRM-free,
+      cleanest). SoundCloud/Deezer/Tidal have weak MediaSession (more fragile).
 
 ## References (verification pass, 2026-06-20)
 
