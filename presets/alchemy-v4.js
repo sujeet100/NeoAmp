@@ -86,6 +86,16 @@
     "  sharp = max(sharp, texture2D(sampler_main, kuv - vec2(0.0, dpx.y)).rgb);\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv + dpx).rgb);\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv - dpx).rgb);\n" +
+    // PRISM / RGB chromatic split — offset the R and B channels of the motif along an axis so it reads
+    // as iridescent dispersion. Gated to ribbon (mode 9) + crossed-X (mode 11) via q30 (NOT the green
+    // wire-net). Only splits the EXISTING dusty motif colour → no neon, honours the muting rule.
+    "  float prismOn = step(8.5, q30) * (1.0 - step(9.5, q30)) + step(10.5, q30);\n" +
+    "  if (prismOn > 0.5) {\n" +
+    "    vec2 ddir = vec2(0.0032, 0.0024);\n" +
+    "    float rr = texture2D(sampler_main, kuv + ddir).r;\n" +
+    "    float bb2 = texture2D(sampler_main, kuv - ddir).b;\n" +
+    "    sharp = vec3(max(sharp.r, rr), sharp.g, max(sharp.b, bb2));\n" +
+    "  }\n" +
     "  vec2 px = 1.0 / resolution; vec3 bloom = vec3(0.0);\n" +
     "  for (int i = 0; i < 8; i++) {\n" +
     "    float ba = float(i) / 8.0 * 6.2832; vec2 bd = vec2(cos(ba), sin(ba));\n" +
@@ -114,7 +124,11 @@
     "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (2)
     "  else if (q29 < 3.5) { float band = pdc.y * 5.0 + time * 0.10; ground = mix(ground, mix(cB, cA, 0.5 + 0.5 * sin(band)), 0.4); }\n" + // horizon bands (3)
     "  else if (q29 < 4.5) { float rib = 0.5 + 0.5 * sin((pdc.x * 0.83 + pdc.y * 0.56) * 9.0 + time * 0.20); ground = mix(ground, mix(cC, cA, rib), 0.45); }\n" + // ribbon stripes (4)
-    "  else { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" + // aurora swirl (5)
+    "  else if (q29 < 5.5) { ground = mix(ground, mix(cB, cA, fbm(pdc * 2.5 + time * 0.05 + n1)), 0.5); }\n" + // aurora swirl (5)
+    // VOID (6) — the near-black finale STAGE. q29 is steered to 5.5..5.9 from frame() ONLY while a wire/
+    // X motif is active (modes 10/11), so the wires read as the only light on black (Era-D character).
+    // No textured variant; the crush below darkens the whole fbm ground + fold wedges + corner pool.
+    "  float voidAmt = smoothstep(5.5, 5.9, q29);\n" +
     // BOLD kaleidoscope wedges — when a fold is active, split the (already-mirrored) field into two
     // distinct LUMINOUS colour panes along the fold axes so it reads as bold colour wedges (orig
     // sweep_08 = a green/mauve bowtie-X), NOT the uniform symmetric blob a low-contrast fbm fold gives.
@@ -137,6 +151,7 @@
     "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
     "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" + // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
+    "  ground *= mix(1.0, 0.05, voidAmt);\n" + // VOID: crush to near-black so wire/X motifs read as the only light (faint corner-pool survives)
     "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
@@ -440,10 +455,71 @@
     a.b = orbCol(h, 0.67);
     return a;
   }
-  var MODES = [fAnem, fSpin, fNgon, fTri, fBolt, fUrchin, fRotLine, fFountain, fWaveFan, fRibbon];
+  // STAR-NET (mode 10) — the face-on straight-line WIRE / spirograph star-net mandala (orig Era-D spine,
+  // also A t11/t33, B t79): N long CRISP STRAIGHT diameter lines through center (FIXED length) with only a
+  // SMALL perpendicular live-waveform jag → a clean star, NOT a bristly rosette. Reads as a mandala when
+  // folded, as a corridor net when the orbiter-row (wave[3]) + a recede look are active. Steered onto the
+  // VOID bg from frame() so the wires glow on black. Mild green/teal bias (the original net is green).
+  function fStarNet(a) {
+    var N = 6,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg,
+      s = u * 2 - 1;
+    var th = seg * (3.14159 / N) + (a.q9 || 0) * 0.5; // 6 arms, slow rotation
+    var len = (a.q5 || 0.4) * 1.5;
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.2; // SMALL crisp jag (not a bristle)
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
+    a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
+    var h = (a.q8 || 0) + 0.2; // green/teal lean
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0; // hide arm-to-arm jump
+    return a;
+  }
+  // CROSSED-X (mode 11) — two iridescent live-waveform BEAMS crossing at ±45° (orig A t38, C t127, D t145/
+  // t150). The "Dance two-lines" idea as an X; pairs with the PRISM COMP split + the orbs as beam-tip
+  // end-caps, on the VOID bg. Real-waveform jag (primary-motif rule).
+  function fCrossX(a) {
+    var half = (a.sample || 0) < 0.5 ? 0 : 1,
+      u = ((a.sample || 0) - half * 0.5) * 2.0,
+      s = u * 2 - 1;
+    var ang = half ? 0.7854 : -0.7854; // +45° / -45°
+    var ct = Math.cos(ang),
+      st = Math.sin(ang);
+    var len = (a.q5 || 0.4) * 1.6;
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 2.2;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + s * len * ct - jag * st;
+    a.y = cy + s * len * st + jag * ct;
+    var h = (a.q8 || 0) + a.sample * 0.5; // iridescent gradient (PRISM COMP adds the channel split)
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0; // hide the half-to-half jump
+    return a;
+  }
+  var MODES = [
+    fAnem,
+    fSpin,
+    fNgon,
+    fTri,
+    fBolt,
+    fUrchin,
+    fRotLine,
+    fFountain,
+    fWaveFan,
+    fRibbon,
+    fStarNet,
+    fCrossX,
+  ];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8, 0.55]; // …·wavefan·ribbon (ribbon additive + long-trailed → low alpha vs milky-out)
+  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8, 0.55, 0.72, 0.7]; // …·ribbon·STARNET·CROSSX (crisp lines → moderate alpha)
   function scaleFor(m) {
     return m === 0 ? 0.46 : m === 1 ? 0.4 : 0.5;
   }
@@ -599,6 +675,7 @@
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
     ribAmt = 0, // mode 9 active → diagonal ribbon feedback streak
+    netVoid = 0, // modes 10/11 active → near-black VOID stage (wire/X read as the only light)
     lastStrobeT = 0,
     strobeOn = 1;
   var beat = alcBeatFlash({ rise: 1.22 });
@@ -664,12 +741,13 @@
     focusAmt +=
       ((mCur === 0 || mCur === 5 || mCur === 6 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6);
     ribAmt += ((mCur === 9 ? 1 : 0) - ribAmt) * Math.min(1, dt * 0.8);
+    netVoid += ((mCur === 10 || mCur === 11 ? 1 : 0) - netVoid) * Math.min(1, dt * 0.5);
 
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5;
     t.q3 = 0.5;
     t.q5 = scaleFor(mCur) * (0.82 + 0.4 * (bassA - 1) + 0.22 * f); // breathing + per-beat pop
-    if (fold > 1.5 && mCur !== 6 && mCur !== 9) t.q5 *= 0.52; // small mirrored flower under a fold; keep rotline (6) + ribbon (9) FULL-length
+    if (fold > 1.5 && mCur !== 6 && mCur !== 9 && mCur !== 10 && mCur !== 11) t.q5 *= 0.52; // small mirrored flower under a fold; keep line/ribbon/star-net/X (6/9/10/11) FULL-length
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow spin
     t.q10 = 0.4 * Math.max(0, bassA - 1); // twist scales with bass
@@ -745,6 +823,9 @@
       t.q13 *= 1 - ra; // no fold (a flowing band folds into a spirograph tangle — gotcha §8c)
       if (ra > 0.5) t.q12 = 1;
     }
+    // VOID stage (modes 10/11 — wire star-net / crossed-X): steer the bg toward near-black, eased so it
+    // fades in/out (q29 5.5..5.9 → COMP voidAmt crush) and the wires read as the only light.
+    if (netVoid > 0.01) t.q29 = 5.5 + 0.4 * netVoid;
     t.q11 = focusAmt; // COMP pupil amount + anemone-squash strength (high for modes 0/5/6)
     return t;
   }
@@ -769,13 +850,46 @@
       return centralDraw(a);
     },
   };
-  // waves[1] free. (Orb ripples were removed: the original's orb rings are a 3D feedback trace/tube-stack,
-  // not a drawn ring — the flat procedural version read as fake. q11 is now unused.)
+  // waves[1] = STAR-NET inner lattice — a 2nd straight-line star rotated a half-step + shorter, so the
+  // wire-net mode (10) reads as a denser 12-point spirograph lattice. Gated to ~0 alpha on every other
+  // mode (read q30) so it never bleeds through unrelated motifs (no-always-on, gotcha §8d).
   preset.waves[1] = {
-    baseVals: Object.assign({}, WAVE_BASE, { enabled: 0 }),
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 512,
+      additive: 1,
+      usedots: 0,
+      scaling: 1,
+      smoothing: 0.05,
+      thick: 1,
+      a: 0.5,
+    }),
     init_eqs: passthrough,
     frame_eqs: passthrough,
-    point_eqs: "",
+    point_eqs: function (a) {
+      if (Math.abs((a.q30 || 0) - 10) > 0.5) {
+        a.a = 0;
+        return a;
+      }
+      var N = 6,
+        fk = (a.sample || 0) * N,
+        seg = Math.floor(fk),
+        u = fk - seg,
+        s = u * 2 - 1;
+      var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5; // half-step offset
+      var len = (a.q5 || 0.4) * 0.85,
+        jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
+      var cx = a.q2 !== undefined ? a.q2 : 0.5,
+        cy = a.q3 !== undefined ? a.q3 : 0.5;
+      a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
+      a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
+      var h = (a.q8 || 0) + 0.2;
+      a.r = orbCol(h, 0);
+      a.g = orbCol(h, 0.33);
+      a.b = orbCol(h, 0.67);
+      a.a = u < 0.02 ? 0 : 0.5;
+      return a;
+    },
   };
   preset.waves[2] = {
     // jagged REAL-waveform tether spanning the two orbs (gated: both present)
@@ -796,6 +910,44 @@
       var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
       var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
       a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
+      return a;
+    },
+  };
+  // waves[3] = NET-CORRIDOR orbiter ROW — a row of ~8 dots receding from a near-left point toward the
+  // WARP vanishing point (q20,q27), fading with depth → the marching-orbiter corridor (orig Era-A intro).
+  // Gated to the wire-net mode (10) so a star-net under a recede look reads as the corridor (no new q-var:
+  // it shares mode 10 with the net + lattice). Dots-mode; the spare 4th wave slot, 0 shape budget.
+  preset.waves[3] = {
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 64,
+      additive: 1,
+      usedots: 1,
+      scaling: 1,
+      smoothing: 0.0,
+      thick: 1,
+      a: 0.8,
+    }),
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
+    point_eqs: function (a) {
+      if (Math.abs((a.q30 || 0) - 10) > 0.5) {
+        a.a = 0;
+        return a;
+      }
+      var K = 8,
+        depth = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near → 1 far (8 dots)
+      var vpx = a.q20 !== undefined ? a.q20 : 0.5,
+        vpy = a.q27 !== undefined ? a.q27 : 0.5;
+      var nearX = 0.15,
+        nearY = 0.5;
+      a.x = nearX + (vpx - nearX) * depth;
+      a.y = nearY + (vpy - nearY) * depth;
+      var h = a.q8 || 0;
+      a.r = orbCol(h, 0);
+      a.g = orbCol(h, 0.33);
+      a.b = orbCol(h, 0.67);
+      a.a = 0.85 * (1 - depth * 0.65); // fade with depth → corridor recede cue
       return a;
     },
   };
