@@ -1132,8 +1132,9 @@
     ]);
     var gear = buildGearMenu();
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
-    // one tidy row: [like dislike] · [mute] · [VIS LIB] · [⚙]
-    var btns = h("div", { class: "wa-np-btns" }, [rate, els.mute, toggles, gear]);
+    // function clusters: [♥ 👎 rate] · [VIS|LIB|LYR rack] · [🔊 mute + ⚙ gear utilities]
+    var utils = h("div", { class: "wa-np-utils" }, [els.mute, gear]);
+    var btns = h("div", { class: "wa-np-btns" }, [rate, toggles, utils]);
     var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
     // async after the .wsz parses. Showing it before that flashes the dark, unframed
