@@ -980,7 +980,7 @@
     point_eqs: function (a) {
       fTether(a);
       var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
-      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
+      var beatG = 0.4 + 0.6 * Math.max(0, Math.min(1, ((a.q32 || 1) - 1.0) / 0.5)); // present-ish always (so it leaves a continuous colour-shifting trail like the orbs), BRIGHTER on the kick
       a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
       return a;
     },
