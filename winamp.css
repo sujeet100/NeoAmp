@@ -306,6 +306,13 @@
   position: absolute; top: 0; left: 0; cursor: move; z-index: 2;
   /* sized in JS to the rendered titlebar; transparent grab strip */
 }
+/* top-left LOGO → settings hotspot, over the skin's own logo (the Winamp "system menu"
+   spot). Above the drag strip; a 1px hover outline gives modern users the affordance. */
+.wa-skin-logo-hot { position: absolute; top: 0; left: 0; width: 46px; height: 22px; z-index: 4; cursor: pointer; }
+.wa-skin-logo-hot:hover { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4); }
+/* procedural ◢◤ logo doubles as the settings opener */
+.wa-logo-hot { cursor: pointer; }
+.wa-logo-hot:hover { color: #fff; text-shadow: 0 0 3px rgba(255,255,255,0.55); }
 
 /* "Now Playing" panel docked between Main and EQ in classic (.wsz) mode.
    Skin-width (550px = 275 * 2x) so it lines up flush with the skinned windows. */

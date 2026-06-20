@@ -704,6 +704,13 @@
     skinSel.value = DEFAULT_WSZ;
 
     var win = makeWindow("wa-main", "NeoAmp", { gadget: skinSel, onClose: function () { NA.stop(); } });
+    // the ◢◤ logo doubles as the system-menu / settings opener (Winamp convention)
+    var mainLogo = win.titlebar.querySelector(".wa-logo");
+    if (mainLogo) {
+      mainLogo.classList.add("wa-logo-hot"); mainLogo.title = "Options — skins, background, zoom & settings";
+      mainLogo.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      mainLogo.addEventListener("click", function (e) { e.stopPropagation(); openGearAt(els.gearWrap, e.clientX, e.clientY); });
+    }
 
     // left column: clock + album art
     els.clock = h("div", { class: "wa-clock wa-lcd", text: "0:00" });
@@ -846,6 +853,12 @@
       var el = h("div", { class: "wa-win wa-skinwin inactive", id: "wa-skin" });
       var drag = h("div", { class: "wa-skin-drag" });   // invisible titlebar grab strip
       el.appendChild(drag);
+      // top-left LOGO hotspot → settings menu (the authentic Winamp "system menu" spot).
+      // Sits above the drag strip; a hover outline gives modern users the affordance.
+      var logoHot = h("div", { class: "wa-skin-logo-hot", title: "Options — skins, background, zoom & settings" });
+      logoHot.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // don't start a drag
+      logoHot.addEventListener("click", function (e) { e.stopPropagation(); openGearAt(els.gearWrap, e.clientX, e.clientY); });
+      el.appendChild(logoHot);
       el.addEventListener("mousedown", function () { raise(el); }, true);
       makeDraggable(el, drag);
       root.appendChild(el);
@@ -1155,17 +1168,13 @@
     // menu host (its button hidden via .wa-gear-ctx) so all its populate/positioning works.
     var gear = buildGearMenu();
     gear.classList.add("wa-gear-ctx");
-    els.gearWrap = gear;   // so the skin's top-left logo can open the same menu
+    els.gearWrap = gear;   // the skin logo + the global right-click both open this menu
+    root.appendChild(gear); // ROOT-level host so the menu can pop at the cursor over ANY window
     applyBackdrop(); // sync the gear's Background row to the current/persisted mode
     // ONE clean row now that the title scrolls + settings moved to right-click:
     // [♥ 👎]  [🔊]  ❲VIS|LIB|LYR❳
     var btns = h("div", { class: "wa-np-btns" }, [rate, els.mute, toggles]);
-    var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns, gear]);
-    // right-click anywhere on the strip → open the settings menu at the cursor
-    el.addEventListener("contextmenu", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      openGearAt(gear, e.clientX, e.clientY);
-    });
+    var el = h("div", { class: "wa-win wa-np inactive empty", id: "wa-np" }, [img, info, btns]);
     // Created hidden: the skin frame (--pl-* colors + GEN/PLEDIT sprites) is applied
     // async after the .wsz parses. Showing it before that flashes the dark, unframed
     // fallback background (the "shaded on first load" look). enableClassic() reveals it
@@ -1827,6 +1836,14 @@
     if (root) return;
     root = h("div", { id: "neoamp-root" });
     document.documentElement.appendChild(root);
+    // GLOBAL right-click → settings menu, over ANY NeoAmp window (events bubble up from the
+    // pointer-events:auto windows through the root). Text fields + the open menu keep their
+    // native behaviour. The menu is a root-level host so it pops at the cursor anywhere.
+    root.addEventListener("contextmenu", function (e) {
+      if (e.target.closest && e.target.closest("input, textarea, [contenteditable], .wa-skinsel-menu")) return;
+      e.preventDefault();
+      openGearAt(els.gearWrap, e.clientX, e.clientY);
+    });
     ensureBackdrop();
     NA.storage.get("neoampBg", function (m) { if (m && BG_MODES.indexOf(m) >= 0) bgMode = m; applyBackdrop(); });
     buildMain();
