@@ -245,10 +245,10 @@
         var br = orbCol(hb, 0),
           bg = orbCol(hb, 0.33),
           bb = orbCol(hb, 0.67);
-        var bri = 0.85 + 0.55 * be; // FILL brightness pulses with bass
+        var bri = 0.9 + 0.3 * be; // FILL brightness pulses GENTLY with bass
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1 + 0.4 * be); // size pulses with bass
+        s.rad = (s.q7 || 0.06) * (1 + 0.12 * be); // size pulses GENTLY with bass (was 0.4 → boomed on every bass hit)
         s.r = Math.min(1, fr * bri);
         s.g = Math.min(1, fg * bri);
         s.b = Math.min(1, fb * bri); // COLOURED core (not washed white)
@@ -290,7 +290,7 @@
           gb = orbCol(hf, 0.67);
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be); // WIDER than the core → a surrounding halo
+        s.rad = (s.q7 || 0.06) * (1.3 + 0.12 * be); // a bit WIDER than the core → soft halo (was 1.7+0.5 → boomed on bass)
         s.r = gr * 0.85;
         s.g = gg * 0.85;
         s.b = Math.min(1, gb * 1.5 + 0.15); // push the halo toward teal (orig glow)
@@ -791,7 +791,7 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat) — fine in normal scenes
+    t.q7 = (0.058 + 0.006 * Math.max(0, bass - 1)) * (1 + 0.12 * f); // orb radius — gentle bass/beat coupling (was 0.02+0.4f → boomed)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
     // REVERSE PARALLAX — on the beat the orbs slide OUTWARD from center + grow, while the feedback field
     // recedes INWARD: two layers in opposite radial senses = the "rushing past in 3D space" depth cue.
@@ -803,7 +803,7 @@
     t.q22 = clmp(0.5 + (t.q22 - 0.5) * po);
     t.q23 = clmp(0.5 + (t.q23 - 0.5) * po);
     t.q24 = clmp(0.5 + (t.q24 - 0.5) * po);
-    t.q7 *= po; // discs enlarge slightly as they "pass the camera" (fine in normal scenes)
+    // (radius is NOT inflated by po — keep the parallax POSITIONAL only; compounding it onto q7 boomed the orbs on bass)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
