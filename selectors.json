@@ -15,7 +15,7 @@
       "prev": ["[data-testid='control-button-skip-back']", "button[aria-label='Previous']"],
       "shuffle": ["button[aria-label*='shuffle' i]", "[data-testid='control-button-shuffle']"],
       "repeat": ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"],
-      "like": ["[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]", "[data-testid='now-playing-widget'] button[data-testid='add-button']"],
+      "like": ["[data-testid='now-playing-widget'] button[aria-checked]", "[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]"],
       "searchBox": ["[data-testid='search-input']", "input[data-testid='search-input']"],
       "posElapsed": ["[data-testid='playback-position']"],
       "posDuration": ["[data-testid='playback-duration']"],

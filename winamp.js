@@ -538,7 +538,7 @@
     ["Space", "Play / pause"],
     ["← / →", "Seek −5s / +5s"],
     ["↑ / ↓", "Volume up / down"],
-    ["L", "Open Media Library"],
+    ["L", "Library / search"],
     ["−  =  \\", "Zoom out / in / reset"],
     ["⌘ ⇧ E", "Start / stop EQ capture"],
   ];
@@ -550,9 +550,7 @@
   }
   function showShortcuts() {
     if (shortcutsEl) { closeShortcuts(); return; }   // toggle off if already open
-    var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
-    var rows = SHORTCUTS.filter(function (r) { return !(r[0] === "L" && caps.library === false); });
-    var list = h("div", { class: "neoamp-sc-list" }, rows.map(function (r) {
+    var list = h("div", { class: "neoamp-sc-list" }, SHORTCUTS.map(function (r) {
       return h("div", { class: "neoamp-sc-row" }, [
         h("kbd", { class: "neoamp-sc-key", text: r[0] }),
         h("span", { class: "neoamp-sc-desc", text: r[1] }),
@@ -709,7 +707,7 @@
     els.eqTog = tog("EQ", "Toggle equalizer", function (t) { toggleWin("wa-eq", t); });
     els.plTog = tog("PL", "Toggle playlist", function (t) { toggleWin("wa-pl", t); refreshQueue(true); });
     els.visTog = tog("VIS", "Toggle visualization", function (t) { toggleWin("wa-viz", t); });
-    els.libTog = tog("LIB", "Toggle media library / search", function (t) { toggleWin("wa-lib", t); if (isShown("wa-lib")) libBecameVisible(); });
+    els.libTog = tog("LIB", "Library / search", function (t) { toggleLibrary(t); });
     var toggles = h("div", { class: "wa-toggles" }, [els.shuffleTog, els.repeatTog, els.eqTog, els.plTog, els.visTog, els.libTog]);
 
     var controls = h("div", { class: "wa-controls" }, [transport, vols, toggles]);
@@ -1017,6 +1015,7 @@
       b.addEventListener("mousedown", function (e) { e.stopPropagation(); }); // don't start a drag
       b.addEventListener("click", function (e) {
         e.stopPropagation();
+        if (id === "wa-lib") { toggleLibrary(b); if (classicApi) dockClassicStack(); return; }   // library OR site-search
         toggleWin(id);
         b.classList.toggle("on", isShown(id));
         if (classicApi) dockClassicStack();   // re-dock LIB into the stack (no-op for VIS)
@@ -1621,6 +1620,18 @@
   }
 
   // keyboard "L": open the Library/search window (if hidden) and focus its box
+  // LIB action: open the in-app library window (YTM), or focus the site's OWN search box
+  // on providers without one (Spotify) — so "LIB" is a working search affordance everywhere.
+  function toggleLibrary(togBtn) {
+    var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
+    if (caps.library === false) {
+      if (!(NA.control.focusSearch && NA.control.focusSearch())) NA.toast("Search isn't available on this site.");
+      return;
+    }
+    toggleWin("wa-lib", togBtn);
+    if (togBtn) togBtn.classList.toggle("on", isShown("wa-lib"));
+    if (isShown("wa-lib")) libBecameVisible();
+  }
   function focusLibrary() {
     var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
     if (caps.library === false) { focusYtSearch(); return; }   // no in-app library → the site's own search
@@ -1686,10 +1697,10 @@
   // flags) so e.g. on Spotify the dislike + library/search buttons don't show as dead.
   function applyCapabilities() {
     var caps = (NA.control.getCapabilities && NA.control.getCapabilities()) || {};
-    var noLib = caps.library === false ? "none" : "";
+    // dislike has no Spotify equivalent → hide it. LIB stays visible everywhere: on
+    // providers with no in-app library it focuses the site's own search box (see
+    // toggleLibrary), so "LIB" is a working search affordance on every provider.
     if (els.npDislike) els.npDislike.style.display = caps.dislike === false ? "none" : "";
-    if (els.npLIB) els.npLIB.style.display = noLib;
-    if (els.libTog) els.libTog.style.display = noLib;   // main-window LIB toggle too
   }
   function showUI() {
     buildUI();

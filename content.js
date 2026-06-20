@@ -462,9 +462,11 @@
       shuffle: ["button[aria-label*='shuffle' i]", "[data-testid='control-button-shuffle']"],
       repeat: ["[data-testid='control-button-repeat']", "button[aria-label*='repeat' i]"],
       // single "Add to Liked Songs" (binary) — wired to like(); no dislike
-      // "Add to Liked Songs" / "Remove from Liked Songs" — scoped to the now-playing widget
-      // so we never hit a track ROW's add-button (which shares data-testid='add-button').
-      like: ["[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]", "[data-testid='now-playing-widget'] button[data-testid='add-button']"],
+      // Save toggle: its aria-label flips ("Add to Liked Songs" when unsaved ⇄ "Add to
+      // playlist" when saved), so we match the STABLE aria-checked state attribute (present
+      // in both states, only on this button within the now-playing widget). readLikeStatus
+      // reads aria-checked="true" ⇒ saved ⇒ heart lit.
+      like: ["[data-testid='now-playing-widget'] button[aria-checked]", "[data-testid='now-playing-widget'] button[aria-label*='Liked Songs' i]"],
       searchBox: ["[data-testid='search-input']", "input[data-testid='search-input']"],
       // Spotify has no readable media element for us, so read position from its DOM text
       // (lets the seek bar show progress); times are "m:ss" → parsed to seconds. Flat array
@@ -479,6 +481,9 @@
       queueRow: ["li[role='row']"],
       queueTitle: ["[id^='listrow-title']"],
       queueArtist: ["a[href*='/artist/']"],
+      queuePlay: ["[data-testid='play-button']", "button[aria-label*='play' i]"],
+      // seek bar = a React-controlled <input type=range>, value in MS (0..duration_ms)
+      seekBar: ["[data-testid='playback-progressbar'] input[type='range']"],
     },
   };
   function activeProvider() {
@@ -522,6 +527,27 @@
   function textOf(list) { var el = list && qa(list); return el ? clean(el.textContent) : ""; }
   function qaAll(list) { if (!list) return []; for (var i = 0; i < list.length; i++) { try { var n = document.querySelectorAll(list[i]); if (n.length) return n; } catch (_) {} } return []; }
   function firstTextIn(root, list) { if (!list) return ""; for (var i = 0; i < list.length; i++) { var el = root.querySelector(list[i]); if (el) return el.textContent; } return ""; }
+  function firstIn(root, list) { if (!list) return null; for (var i = 0; i < list.length; i++) { var el = root.querySelector(list[i]); if (el) return el; } return null; }
+  // Set a React-controlled <input> value so the framework's onChange fires (a plain
+  // .value assignment is swallowed by React's value tracker). Used for provider seek bars.
+  function setRangeValue(input, val) {
+    try {
+      var d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+      (d && d.set ? d.set : function (x) { input.value = x; }).call(input, String(val));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    } catch (_) { try { input.value = String(val); return true; } catch (e) { return false; } }
+  }
+  // Seek on sites with no controllable media element: drive the provider's range slider,
+  // scaling the target seconds to the slider's own max (Spotify's is milliseconds).
+  function seekProvider(t) {
+    if (!PROVIDER.seekBar) return;
+    var inp = qa(PROVIDER.seekBar), durSec = parseTime(textOf(PROVIDER.posDuration));
+    if (!inp || !(durSec > 0) || !isFinite(t)) return;
+    var max = parseFloat(inp.max) || (durSec * 1000);
+    if (setRangeValue(inp, Math.round(Math.max(0, Math.min(1, t / durSec)) * max))) sendTrack();
+  }
   function parseTime(s) {  // "m:ss" / "h:mm:ss" → seconds
     if (!s) return 0;
     var p = String(s).split(":").map(function (n) { return parseInt(n, 10); });
@@ -560,14 +586,20 @@
     next: function () { clickSel(PROVIDER.next); },
     prev: function () { clickSel(PROVIDER.prev); },
     stop: function () { if (!isPaused()) doPlayPause(); var v = mediaEl(); if (v) { try { v.currentTime = 0; } catch (_) {} } sendTrack(); },
-    seek: function (t) { var v = mediaEl(); if (v && isFinite(t)) { v.currentTime = t; sendTrack(); } },
+    // seek to absolute seconds: media element when it has a real timeline, else the
+    // provider's own seek slider (Spotify — its <video> can't be seeked by us).
+    seek: function (t) {
+      var v = mediaEl();
+      if (v && isFinite(v.duration) && v.duration > 0) { if (isFinite(t)) { v.currentTime = t; sendTrack(); } return; }
+      seekProvider(t);
+    },
     // relative seek (keyboard ←/→) — reads the live time so it isn't stale-by-a-tick
     seekBy: function (d) {
       var v = mediaEl();
-      if (v && isFinite(v.currentTime)) {
-        var dur = isFinite(v.duration) ? v.duration : Infinity;
-        v.currentTime = Math.max(0, Math.min(dur, v.currentTime + d)); sendTrack();
+      if (v && isFinite(v.currentTime) && isFinite(v.duration) && v.duration > 0) {
+        v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + d)); sendTrack(); return;
       }
+      seekProvider(parseTime(textOf(PROVIDER.posElapsed)) + d);
     },
     // volume = the offscreen master gain (provider-agnostic; works on sites with no
     // controllable media element, e.g. Spotify). Relayed live + persisted.
@@ -605,6 +637,13 @@
       relayEq(); persistEq();
     },
     playQueueItem: function (i) {
+      if (PROVIDER.queueRow) {   // provider-configured queue (Spotify): click the row's own play button
+        var rows = qaAll(PROVIDER.queueRow), r = rows[i];
+        if (!r) return;
+        var pb = firstIn(r, PROVIDER.queuePlay);
+        if (pb) pb.click();
+        return;
+      }
       var items = document.querySelectorAll("ytmusic-player-queue-item");
       var it = items[i];
       if (!it) return;
