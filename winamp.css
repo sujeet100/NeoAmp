@@ -21,11 +21,18 @@
   src: url("fonts/VT323-Regular.ttf") format("truetype");
   font-display: swap;
 }
+/* true pixel/bitmap font (crisp blocks, not VT323's rounded LCD) for the retro key labels */
+@font-face {
+  font-family: "NeoAmp Pixel";
+  src: url("fonts/Silkscreen-Regular.ttf") format("truetype");
+  font-display: swap;
+}
 
 #neoamp-root {
   /* ---- skin variables (classic green defaults) ---------------------- */
   --wa-font: "Lucida Console", "DejaVu Sans Mono", "Courier New", monospace;
   --wa-lcd-font: "NeoAmp LCD", "Lucida Console", monospace;
+  --wa-pixel-font: "NeoAmp Pixel", "Lucida Console", monospace;
 
   /* shared width of the docked column (Main / EQ / Playlist) — classic
      Winamp keeps these a single uniform width so the stack aligns flush */
@@ -351,10 +358,9 @@
   --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 90%, #000000 10%);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 19px; padding: 0 8px; cursor: pointer;
-  /* match the song-title font (the VT323 "NeoAmp LCD" face), not the plain mono --wa-font;
-     turn OFF font smoothing so VT323 renders as crisp pixels (like the skin's bitmap title)
-     instead of anti-aliased/smooth. */
-  font: 700 16px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
+  /* retro PIXEL font (Silkscreen) for the key labels — crisp blocks like the skin's bitmap
+     title. Silkscreen is already a bitmap-style face; no-smoothing keeps the edges hard. */
+  font: 400 12px/1 var(--wa-pixel-font); letter-spacing: 1px; text-transform: uppercase;
   -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
   /* contrast-derived from the key face (near-black on light keys, near-white on dark)
      so labels stay readable on every skin — NOT --pl-normal, which went invisible. */

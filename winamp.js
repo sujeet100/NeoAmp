@@ -18,6 +18,20 @@
   var NA = window.NeoAmp;
   if (!NA) { console.error("[NeoAmp] backend (content.js) not present"); return; }
 
+  // Load the bundled fonts with ABSOLUTE extension URLs. A relative url() in a
+  // content-script-injected stylesheet (winamp.css) does NOT resolve to the extension —
+  // it 404s and the text silently falls back to mono — so the @font-face there never
+  // worked live. chrome.runtime.getURL gives the real web-accessible path; this <style>
+  // (in the page document) is what actually registers + loads "NeoAmp LCD"/"NeoAmp Pixel".
+  (function injectFonts() {
+    try {
+      var f = function (fam, file) { return '@font-face{font-family:"' + fam + '";src:url("' + chrome.runtime.getURL("fonts/" + file) + '") format("truetype");font-display:swap}'; };
+      var st = document.createElement("style");
+      st.textContent = f("NeoAmp Pixel", "Silkscreen-Regular.ttf") + f("NeoAmp LCD", "VT323-Regular.ttf");
+      (document.head || document.documentElement).appendChild(st);
+    } catch (_) {}
+  })();
+
   // Load the bundled VT323 LCD font via the FontFace API. A CSS @font-face
   // url() inside a content-script-injected stylesheet gets blocked by YTM's
   // font-src CSP (which is why the LCD looked like plain monospace). Fetching
