@@ -192,6 +192,28 @@
     return null;
   }
 
+  // Lyrics, scraped from the provider's OWN lyrics pane (the user's licensed view).
+  // Per-track cached: the lines only exist in the DOM while the pane is open, so we keep
+  // the last-known lyrics for the SAME track when it closes (same fix as the queue mirror),
+  // and reset on track change. Returns { lines, source } | null. `key` = title|artist.
+  var lyricsCache = { key: "", lyrics: null };
+  function readLyrics(key) {
+    var lines = [];
+    if (PROVIDER.lyricsLine) {                         // per-line elements (Spotify: [data-testid=lyrics-line])
+      var nodes = qaAll(PROVIDER.lyricsLine);
+      for (var i = 0; i < nodes.length; i++) { var t = clean(nodes[i].textContent); if (t) lines.push(t); }
+    } else if (PROVIDER.lyricsText) {                  // one block with \n line breaks (YTM description shelf)
+      var el = qa(PROVIDER.lyricsText);
+      if (el) {
+        lines = (el.textContent || "").split("\n").map(function (s) { return s.replace(/\s+$/, ""); });
+        while (lines.length && !lines[0].trim()) lines.shift();              // trim leading blanks
+        while (lines.length && !lines[lines.length - 1].trim()) lines.pop(); // trim trailing blanks
+      }
+    } else return null;                               // provider has no lyrics wiring
+    if (lines.length) { lyricsCache = { key: key, lyrics: { lines: lines, source: PROVIDER.id } }; return lyricsCache.lyrics; }
+    if (key && lyricsCache.key === key) return lyricsCache.lyrics;   // pane closed → keep same-track lyrics
+    return null;                                       // different track / never loaded → empty-state
+  }
   function readTrack() {
     var v = q("video") || q("audio");
     var titleEl = q("ytmusic-player-bar .title");
@@ -208,9 +230,11 @@
     var cur = 0, dur = 0;
     if (v && isFinite(v.duration) && v.duration > 0) { cur = v.currentTime || 0; dur = v.duration; }
     else if (PROVIDER.posElapsed || PROVIDER.posDuration) { dur = parseTime(textOf(PROVIDER.posDuration)); cur = parseTime(textOf(PROVIDER.posElapsed)); }
+    var title = ms.title || clean(titleEl && titleEl.textContent);
+    var artist = ms.artist || by.artist;
     return {
-      title: ms.title || clean(titleEl && titleEl.textContent),
-      artist: ms.artist || by.artist,
+      title: title,
+      artist: artist,
       album: ms.album || by.album,
       year: by.year,
       plays: by.plays,                                 // best-effort; often ""
@@ -222,6 +246,7 @@
       volume: playerVolume,                            // our master-gain volume (provider-agnostic)
       shuffle: readShuffle(),                          // true | false | null (unknown)
       repeat: readRepeat(),                            // true | false | null (unknown)
+      lyrics: readLyrics(title + "|" + artist),        // provider's lyrics pane, per-track cached
     };
   }
   function getTrack() { return lastTrack || readTrack(); }
@@ -416,7 +441,60 @@
     })();
   }
 
+  // Spotify in-app search: type into Spotify's own box (SPA route — keeps capture alive,
+  // live-verified no reload), click the "Songs" filter chip for a clean track list, then
+  // scrape the rows. Row element refs are cached so playLibraryItem can click play-by-index.
+  var spotifyRows = [];
+  function scrapeSpotifyResults() {
+    var rows = qaAll(PROVIDER.searchResultRow), out = [];
+    spotifyRows = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var title = clean(firstTextIn(r, PROVIDER.searchResultTitle));
+      if (!title) continue;
+      var img = r.querySelector("img");
+      spotifyRows.push(r);
+      out.push({
+        section: "Songs", title: title, subtitle: clean(firstTextIn(r, PROVIDER.searchResultArtist)),
+        art: img && /^https?:/.test(img.src) ? img.src : "",
+        rowIndex: spotifyRows.length - 1, play: true, plays: "", kind: "song",
+      });
+    }
+    return out;
+  }
+  function searchSpotify(query, cb) {
+    var input = qa(PROVIDER.searchBox);
+    if (!input) { cb({ error: "search box not found" }); return; }
+    input.focus();
+    try { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value").set.call(input, query); }
+    catch (_) { input.value = query; }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setTimeout(function () {
+      ["keydown", "keyup"].forEach(function (t) { input.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); });
+      var tries = 0;
+      (function waitSearch() {
+        if (location.pathname.indexOf("/search/") === 0) {
+          // narrow to the Songs sub-view (an <a> chip → SPA, no reload) for a full track list
+          if (location.pathname.indexOf("/tracks") < 0) {
+            var songs = q("a[href*='/search/'][href$='/tracks']");
+            if (songs) songs.click();
+          }
+          var t2 = 0;
+          (function waitRows() {
+            if (qaAll(PROVIDER.searchResultRow).length) { setTimeout(function () { cb({ results: scrapeSpotifyResults(), query: query }); }, 450); return; }
+            if (++t2 > 28) { cb({ results: scrapeSpotifyResults(), query: query }); return; }
+            setTimeout(waitRows, 250);
+          })();
+          return;
+        }
+        if (++tries > 28) { cb({ error: "search timed out", query: query }); return; }
+        setTimeout(waitSearch, 250);
+      })();
+    }, 350);
+  }
+
   function search(query, cb) {
+    if (PROVIDER.searchResultRow) { searchSpotify(query, cb); return; }   // provider with in-app results (Spotify)
     if (!triggerSearch(query)) { cb({ error: "search box not found" }); return; }
     // submit after a tick so autocomplete doesn't swallow the Enter
     setTimeout(function () {
@@ -452,11 +530,15 @@
       shuffle: ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
       repeat: ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
       searchBox: ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"],
+      // lyrics: the Lyrics tab fills a description shelf — ONE element, \n-separated lines
+      // (live-verified: 57 newlines, no <br>). Present only while the Lyrics tab is open.
+      lyricsTab: ["tp-yt-paper-tab"],
+      lyricsText: ["ytmusic-description-shelf-renderer yt-formatted-string.description", "ytmusic-description-shelf-renderer .description"],
     },
     "open.spotify.com": {
       id: "spotify",
-      // No library-search or dislike for us → gated off in the UI. Queue IS mirrored.
-      capabilities: { library: false, dislike: false },
+      // In-app search results now work (live-verified selectors below); no dislike. Queue IS mirrored.
+      capabilities: { library: true, dislike: false },
       // Spotify is an EME player — drive its own DOM buttons (data-testids are stable;
       // aria-label fallbacks add resilience). Direct media-element control is unreliable.
       playPause: ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
@@ -482,12 +564,26 @@
       // aria-labelledby target (#listrow-title-…), artist via the artist link. Robust
       // role/aria/href anchors only — NEVER Spotify's hashed CSS classes (e.g. q8mQFn…).
       queueOpen: ["[data-testid='control-button-queue']"],
-      queueRow: ["li[role='row']"],
+      // Scope to the queue's own treegrids (Now playing + Next up) — a bare li[role='row']
+      // also matches a stray row on other pages, so when the panel CLOSED the mirror
+      // collapsed to that one wrong row. Live-verified: queue rows are ul[role='treegrid']
+      // > li[role='row']; closed → no treegrid → 0 rows → the cache keeps the mirror.
+      queueRow: ["ul[role='treegrid'] li[role='row']"],
       queueTitle: ["[id^='listrow-title']"],
       queueArtist: ["a[href*='/artist/']"],
       queuePlay: ["[data-testid='play-button']", "button[aria-label*='play' i]"],
       // seek bar = a React-controlled <input type=range>, value in MS (0..duration_ms)
       seekBar: ["[data-testid='playback-progressbar'] input[type='range']"],
+      // in-app search results (live-verified on /search/<q>/tracks): each track is a
+      // [data-testid='tracklist-row']; title = the /track/ link, artist = the /artist/
+      // link, play = the row's "Play …" button (no testid — aria-label starts "Play").
+      searchResultRow: ["[data-testid='tracklist-row']"],
+      searchResultTitle: ["a[href*='/track/']"],
+      searchResultArtist: ["a[href*='/artist/']"],
+      searchResultPlay: ["button[aria-label^='Play' i]", "[data-testid='play-button']"],
+      // lyrics pane (opened via the lyrics button): every line is [data-testid='lyrics-line']
+      lyricsBtn: ["[data-testid='lyrics-button']"],
+      lyricsLine: ["[data-testid='lyrics-line']"],
     },
   };
   function activeProvider() {
@@ -669,6 +765,12 @@
       target.click();
     },
     playLibraryItem: function (rowIndex) {
+      if (PROVIDER.searchResultRow) {   // provider with cached result rows (Spotify)
+        var sr = spotifyRows[rowIndex]; if (!sr) return;
+        var pb = firstIn(sr, PROVIDER.searchResultPlay);
+        if (pb) pb.click();
+        return;
+      }
       if (rowIndex < 0) {
         var card = document.querySelector("ytmusic-card-shelf-renderer");
         var cb = card && card.querySelector("ytmusic-play-button-renderer");

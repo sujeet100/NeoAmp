@@ -7,7 +7,9 @@
       "prev": ["ytmusic-player-bar .previous-button", "tp-yt-paper-icon-button.previous-button", ".previous-button"],
       "shuffle": ["ytmusic-player-bar .shuffle", "tp-yt-paper-icon-button.shuffle", "[aria-label*='Shuffle' i]"],
       "repeat": ["ytmusic-player-bar .repeat", "tp-yt-paper-icon-button.repeat", "[aria-label*='Repeat' i]"],
-      "searchBox": ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"]
+      "searchBox": ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"],
+      "lyricsTab": ["tp-yt-paper-tab"],
+      "lyricsText": ["ytmusic-description-shelf-renderer yt-formatted-string.description", "ytmusic-description-shelf-renderer .description"]
     },
     "open.spotify.com": {
       "playPause": ["[data-testid='control-button-playpause']", "button[aria-label='Play']", "button[aria-label='Pause']"],
@@ -20,9 +22,17 @@
       "posElapsed": ["[data-testid='playback-position']"],
       "posDuration": ["[data-testid='playback-duration']"],
       "queueOpen": ["[data-testid='control-button-queue']"],
-      "queueRow": ["li[role='row']"],
+      "queueRow": ["ul[role='treegrid'] li[role='row']"],
       "queueTitle": ["[id^='listrow-title']"],
-      "queueArtist": ["a[href*='/artist/']"]
+      "queueArtist": ["a[href*='/artist/']"],
+      "queuePlay": ["[data-testid='play-button']", "button[aria-label*='play' i]"],
+      "seekBar": ["[data-testid='playback-progressbar'] input[type='range']"],
+      "searchResultRow": ["[data-testid='tracklist-row']"],
+      "searchResultTitle": ["a[href*='/track/']"],
+      "searchResultArtist": ["a[href*='/artist/']"],
+      "searchResultPlay": ["button[aria-label^='Play' i]", "[data-testid='play-button']"],
+      "lyricsBtn": ["[data-testid='lyrics-button']"],
+      "lyricsLine": ["[data-testid='lyrics-line']"]
     }
   }
 }
