@@ -54,7 +54,16 @@ if (!failed) console.log("  ✓ all files parse");
 // ---- 2. build presets + run every frame_eqs -------------------------------
 // Same order as viz.html's <script> includes: kit first (defines the shared
 // factories), then each family.
-const PRESET_ORDER = ["kit", "dance", "alchemy", "ambience", "battery"];
+const PRESET_ORDER = [
+  "kit",
+  "dance",
+  "alchemy-random",
+  "alchemy-scenes",
+  "alchemy-eras",
+  "alchemy-motifs",
+  "ambience",
+  "battery",
+];
 console.log(`\nBuilding presets from ${PRESET_ORDER.join(" + ")}…`);
 try {
   const sandbox = {};

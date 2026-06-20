@@ -125,7 +125,7 @@ in `viz.js`. Symptom if wrong: content fills only a corner and/or is blurry.
 | `viz.html` | Sandboxed page: `<canvas>` + control bar + script includes (vendor, `presets/*.js` in order, `viz.js`). |
 | `viz.js` | Butterchurn init, canvas sizing, favorites menu, keyboard, message handling, render loop. `FAVORITES` array defines the buttons. |
 | `presets/kit.js` | **Shared kit**, loaded first: helpers, GLSL constants, the `build()` factory, and every reusable `alc*` element/motif/background/orb factory. Its top-level declarations are shared globals the family files build on. |
-| `presets/{dance,alchemy,ambience,battery}.js` | Per-family hand-authored presets; each registers into `window.WMP_PRESETS`. **Most preset work happens in these** — e.g. Alchemy work lives in `presets/alchemy.js`. (Split out of the former monolithic `wmp-presets.js`; load order in `viz.html` is kit → families → `viz.js`.) |
+| `presets/{dance,ambience,battery}.js` + `presets/alchemy-{random,scenes,eras,motifs}.js` | Per-family hand-authored presets; each registers into `window.WMP_PRESETS`. **Most preset work happens in these.** Alchemy was split from the former monolithic `presets/alchemy.js` (2.5k lines) into four themed files — `random` (the two flagship engines), `scenes`, `eras`, `motifs` — to stay navigable; they're independent IIFEs, so a preset's file is found by name. (Earlier split out of the former monolithic `wmp-presets.js`; load order in `viz.html` is kit → families → `viz.js`.) |
 | `overlay.css` | Launcher button, fullscreen iframe, toast styling. |
 | `vendor/*.min.js` | Butterchurn 2.6.7 core + 3 preset packs (2.4.7). Vendored locally — MV3 bans remote code. |
 
@@ -176,7 +176,7 @@ P["Name"] = build(baseValsOverrides, { frame: fn, pixel: fn, init: fn, warp: gls
 ### Validate before every reload
 
 ```bash
-for f in presets/kit.js presets/dance.js presets/alchemy.js presets/ambience.js presets/battery.js viz.js content.js; do node --check "$f" || break; done
+for f in presets/*.js viz.js content.js; do node --check "$f" || break; done   # or just: npm test
 # structural + runtime check: concat the split files into ONE global scope (mirrors the
 # browser's shared <script> scope — kit's top-level vars become globals the families use),
 # build every preset, run each frame_eqs (catches missing kit refs / throwing eqs):
