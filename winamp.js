@@ -516,6 +516,7 @@
     var r = host.getBoundingClientRect(), s = uiScale || 1;
     gear.style.left = Math.max(2, (clientX - r.left) / s) + "px";
     gear.style.top = Math.max(2, (clientY - r.top) / s) + "px";
+    gear.style.zIndex = String(++zTop);   // above the window just raised by the right-click
     gear.openMenu();
   }
   function buildGearMenu() {
