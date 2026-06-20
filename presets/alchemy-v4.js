@@ -125,7 +125,13 @@
     // NEW full DIAGONAL-X kaleidoscope (fold>=8): mirror the BACKGROUND across BOTH diagonals about
     // screen centre (rotate -45°, abs, rotate +45°) → 4 triangular wedges like the original (f_18).
     "  if (q12 > 7.5) { vec2 dr = vec2(pdc.x + pdc.y, pdc.y - pdc.x) * 0.70711; dr = abs(dr); pdc = vec2(dr.x - dr.y, dr.x + dr.y) * 0.70711; }\n" +
-    "  vec2 w = pdc * 1.3 + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
+    // 3D-SPACE FLOW — STREAM the colour-field domain radially OUTWARD over time (faster on bass) so the
+    // background itself flies past the viewer in 3D (it used to be screen-locked + static). This is what
+    // sells "moving through space"; the feedback echo alone was too subtle to override the fresh ground.
+    "  float flowT = time * (0.22 + 0.6 * bb);\n" +
+    "  vec2 flowD = pdc / (length(pdc) + 0.06);\n" +
+    "  vec2 wf = pdc * 1.3 - flowD * flowT * 0.5;\n" +
+    "  vec2 w = wf + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
     "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
     "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
@@ -157,8 +163,8 @@
     // BEAT COLOUR-SPLAT — a discrete on-pulse hue burst born at center and propagating outward (orig
     // flips green↔magenta from the vanishing point on the kick). Driven by bass (q32) since q33 isn't
     // exposed; routed through dusty() + bounded mix so it stays muted (Reinhard compresses the rest).
-    "  float beatE = clamp((q32 - 1.05) / 0.45, 0.0, 1.0);\n" +
-    "  ground = mix(ground, dusty(pal(hb + 0.5 + prad * 0.6), 0.95), beatE * exp(-prad * prad * 3.0) * 0.5);\n" +
+    "  float beatE = clamp((q32 - 1.0) / 0.3, 0.0, 1.0);\n" + // fires more readily (bass rarely spikes hard)
+    "  ground = mix(ground, dusty(pal(hb + 0.5 + prad * 0.9), 0.95), beatE * exp(-prad * prad * 1.6) * 0.7);\n" + // brighter + BROADER center-out burst (complementary hue ring)
     // ASYMMETRIC corner bleed — the original is NEVER flat: a drifting OFF-CENTER colour pool + a
     // warm plume rising from one edge, so colour always bleeds into a corner (not a centred vignette).
     "  vec2 poolC = 0.42 * vec2(cos(time * 0.05 + hb * 6.2832), sin(time * 0.037 + 1.3));\n" +
@@ -785,7 +791,7 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat)
+    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat) — fine in normal scenes
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
     // REVERSE PARALLAX — on the beat the orbs slide OUTWARD from center + grow, while the feedback field
     // recedes INWARD: two layers in opposite radial senses = the "rushing past in 3D space" depth cue.
@@ -797,7 +803,7 @@
     t.q22 = clmp(0.5 + (t.q22 - 0.5) * po);
     t.q23 = clmp(0.5 + (t.q23 - 0.5) * po);
     t.q24 = clmp(0.5 + (t.q24 - 0.5) * po);
-    t.q7 *= po; // discs enlarge as they "pass the camera"
+    t.q7 *= po; // discs enlarge slightly as they "pass the camera" (fine in normal scenes)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
@@ -805,11 +811,11 @@
         ca = time * 0.03;
       t.q19 -= 0.004 * wa; // downward drift → descending comb
       t.q1 += (0.945 - t.q1) * 0.6 * wa; // a touch more decay for the comb trail
-      t.q7 *= 1 + 1.3 * wa; // BIG orbs
-      t.q21 += (0.4 + 0.05 * Math.cos(ca) - t.q21) * wa;
-      t.q22 += (0.44 + 0.05 * Math.sin(ca) - t.q22) * wa;
-      t.q23 += (0.58 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa;
-      t.q24 += (0.56 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
+      t.q7 *= 1 + 0.5 * wa; // bigger orbs (was 1.3 → ballooned + overlapped in this scene)
+      t.q21 += (0.3 + 0.05 * Math.cos(ca) - t.q21) * wa;
+      t.q22 += (0.4 + 0.05 * Math.sin(ca) - t.q22) * wa;
+      t.q23 += (0.7 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa; // spread the pair WIDE apart (was 0.4/0.58 cluster → overlapped)
+      t.q24 += (0.6 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
       t.q25 = Math.max(t.q25, wa);
       t.q14 = Math.max(t.q14, wa); // both orbs present
       t.q13 *= 1 - wa; // #24 is NOT folded — fade out any kaleidoscope fold strength
