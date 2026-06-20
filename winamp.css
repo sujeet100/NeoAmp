@@ -350,10 +350,10 @@
   --wa-key-lo:   color-mix(in srgb, var(--wa-key-base) 90%, #000000 10%);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 19px; padding: 0 8px; cursor: pointer;
-  /* same VT323 "NeoAmp LCD" face as the song title; font smoothing off so it renders crisp,
-     not blurry/anti-aliased (now that the @font-face actually loads — see injectFonts). */
-  font: 400 14px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
-  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  /* render exactly like the song title: same VT323 "NeoAmp LCD" face + ~same size (16px)
+     + same default smoothing. The keys only looked "smooth" because they were smaller
+     (14px) and had font-smoothing forced off, which differed from the title. */
+  font: 400 16px/1 var(--wa-lcd-font); letter-spacing: 0.5px; text-transform: uppercase;
   /* contrast-derived from the key face (near-black on light keys, near-white on dark)
      so labels stay readable on every skin — NOT --pl-normal, which went invisible. */
   color: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
