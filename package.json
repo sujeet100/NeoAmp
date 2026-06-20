@@ -1,0 +1,23 @@
+{
+  "name": "neoamp",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Winamp-style player + WMP/MilkDrop visualizations overlaid on YouTube Music & Spotify (MV3 extension).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node tools/test.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm test",
+    "release": "npm run check && node tools/package-release.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0",
+    "prettier": "^3.3.3"
+  }
+}

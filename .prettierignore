@@ -1,0 +1,8 @@
+# Third-party / generated — never reformat
+vendor/
+node_modules/
+fonts/
+icons/
+*.min.js
+*.wsz
+package-lock.json
