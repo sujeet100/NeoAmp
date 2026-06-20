@@ -109,6 +109,13 @@ AudioContext's `destination` is what keeps it audible (and EQ'd). EQ state persi
 
 ## 6. Next planned work
 
+- **★ Multi-provider + anti-fragility — see `MULTI-PROVIDER-DESIGN.md`.** Spotify is
+  already supported (EQ/viz/metadata, verified live — DRM does NOT block audio capture);
+  now-playing is read from the web-standard `navigator.mediaSession` (`mediasession.js`,
+  `world:"MAIN"`) instead of fragile CSS scraping. Next: a provider-adapter refactor +
+  transport (media element for play/pause/seek, per-provider DOM for next/prev) + a
+  jsDelivr-hosted remote selector-config hot-fix channel. Read that doc first.
+
 - Tune the FFT relay if it's heavy (offscreen→SW→content at ~50fps); could throttle or move
   to an AudioWorklet-driven read (immune to any offscreen timer throttling).
 - SW state (`capturing`/`capturedTabId`) is lost if the worker is evicted mid-capture — the
