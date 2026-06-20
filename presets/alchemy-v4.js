@@ -124,21 +124,37 @@
     // the three pigments blend wet-on-wet (muddy transition zones, no crisp seam). breath/flow applied ONLY to
     // the noise-sampling coords (npd) — never the screen pdc used by the fold/vignette (would wobble the wedges).
     "  float ft = time * 0.05;\n" +
-    "  float breath = 1.0 + 0.12 * sin(time * 0.06) + 0.06 * bb;\n" + // slow depth breath + gentle beat push-in
-    "  vec2 npd = pdc * breath;\n" +
+    "  float swell = max(0.0, q32 - 1.0);\n" + // ~0 at rest, spikes on the beat (q32 = bass + 1.4f) — drives the splash surge + bloom + aurora
+    "  float sw1 = min(swell, 1.0);\n" +
+    // VIRTUAL CAMERA THROUGH THE COLOUR FIELD — the bg used to be glued to the screen (colours morphed in
+    // place → looked static). Now the noise-sampling domain ROTATES + DRIFTS + zoom-BREATHES continuously and
+    // PARALLAXES opposite the camera's vanishing-point (q20/q27) → colours travel across the frame + through
+    // space, coupled to the camera. (Applied to npd ONLY, never the screen pdc used by the fold/vignette.)
+    "  float breath = 1.0 + 0.22 * sin(time * 0.07) + 0.14 * sw1;\n" + // STRONGER depth zoom-breath + beat push-in (was too gentle vs the motif)
+    "  float bgAng = time * 0.09;\n" + // FASTER continuous rotation → colours visibly orbit (was 0.035 → barely moved)
+    "  mat2 bgR = mat2(cos(bgAng), -sin(bgAng), sin(bgAng), cos(bgAng));\n" +
+    "  vec2 par = vec2(q20 - 0.5, q27 - 0.5) * 3.5;\n" + // PARALLAX: bg shifts OPPOSITE the camera VP orbit (stronger)
+    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.05, time * 0.034) - par;\n" + // rotate + zoom + FASTER continuous drift + parallax
     "  vec2 flow = curl(npd * 1.1 + vec2(ft, -ft));\n" +
-    "  vec2 w = npd * 1.3 + 0.22 * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
-    "  float n1 = fbm(w * 1.3 + 0.10 * flow + time * 0.025);\n" +
-    "  float n2 = fbm(w * 2.0 - 0.10 * flow - time * 0.02 + 3.0);\n" +
+    "  float warpAmt = 0.20 + 0.18 * sw1;\n" + // bass-driven WARP SURGE → colours SPLASH/stretch on the kick, settle when quiet
+    "  vec2 w = npd * 1.3 + warpAmt * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
+    "  float fw = 0.10 + 0.12 * sw1;\n" +
+    "  float n1 = fbm(w * 1.3 + fw * flow + time * 0.025);\n" +
+    "  float n2 = fbm(w * 2.0 - fw * flow - time * 0.02 + 3.0);\n" +
     "  vec3 ground = mix(cB, cC, smoothstep(0.20, 0.80, n1));\n" + // WIDE band → soft feathered bleed
     "  ground = mix(ground, cA, smoothstep(0.35, 0.95, n2) * 0.55);\n" + // overlaps the cB/cC band → 3-way muddy mix
     // FLUID BEAT COLOUR-BLOOM — a soft complementary pigment welling from the core, breathing/bleeding OUTWARD
     // with the beat (q32 = bass + 1.4f now carries the kick). exp() feather + outward mix = wet-on-wet, never a flash.
     "  float bloomHue = hb + 0.5;\n" +
     "  float brad = exp(-prad * prad * 4.5);\n" +
-    "  float swell = max(0.0, q32 - 1.0);\n" + // ~0 at rest, spikes on the beat
     "  ground += dusty(pal(bloomHue), 0.9) * brad * (0.08 + 0.5 * swell);\n" +
     "  ground = mix(ground, dusty(pal(bloomHue), 0.8), smoothstep(0.0, 0.9, n2) * brad * 0.4 * swell);\n" +
+    // AURORA WASH — a large, slow, CONTRASTING hue field that drifts ACROSS the canvas and merges into the
+    // ground (the "another hue comes in / aurora" feel). Its hue VARIES spatially (bands of different hues
+    // blending) AND advances on the beat (swell) so a NEW hue washes in with the pulse. dusty() keeps it muted.
+    "  float aur = fbm(w * 0.7 + flow * 0.6 - time * 0.05);\n" +
+    "  vec3 auroraCol = dusty(pal(hb + 0.62 + 0.35 * aur + 0.3 * swell), 0.92);\n" +
+    "  ground = mix(ground, auroraCol, smoothstep(0.40, 0.85, aur) * 0.5);\n" +
     "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré DOTS (0) — kept
     "  else if (q29 < 1.5) { ground = mix(ground, alcMoireStripes(uv, time, bb, cA), 0.7); }\n" + // moiré vertical STRIPES (1) — NEW (WMP scene F3), mixed stronger so columns read over the fbm ground
     "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (2)
