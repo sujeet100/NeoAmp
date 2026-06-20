@@ -16,9 +16,16 @@ Winamp skins. We reproduce those looks as Butterchurn presets driven by the live
 YouTube Music audio.
 
 **TWO WORKSTREAMS.** Most of *this* file is the **visualizer presets**. The other
-half of the project is the **Winamp-style player UI** (`content.js` / `winamp.js` /
-`wsz.js` / `winamp.css` + now `sw.js` / `offscreen.js` — floating windowed player,
-real `.wsz` skins, now-playing / playlist / library, **real EQ**). If you're working
+half of the project is the **Winamp-style player UI** (`content.js` / `winamp-*.js` /
+`wsz.js` / `winamp.css` + `sw.js` / `offscreen.js` — floating windowed player,
+real `.wsz` skins, now-playing / playlist / library, **real EQ**). The former
+monolithic `winamp.js` was split into 8 cohesive, load-ordered content scripts that
+share the content-script global scope (like `presets/kit.js`→families): `winamp-core`
+(state + base helpers `h`/`icon` + fonts) → `winamp-window-manager` → `winamp-layout-zoom`
+→ `winamp-skins` → `winamp-windows-build` (the `build*` windows) → `winamp-library-lyrics`
+→ `winamp-transport-audio` (`onTrack`/`onAudio`/analyzer) → `winamp-bootstrap` (entry +
+all load-time wiring, gated to run once). Find a symbol by subsystem; the load order is
+fixed in `manifest.json`. If you're working
 on the player UI (windows, skins, controls, EQ, keyboard), read
 **`docs/neoamp-ui/HANDOFF.md`** first — and note you can **self-render that UI
 headlessly** via `node tools/render-neoamp.mjs` (sibling of the viz's
@@ -352,7 +359,7 @@ Scratch frames were kept under `/tmp/` (not committed). Re-extract as needed.
   content-script-injected CSS (e.g. an `@font-face` in `winamp.css`) does NOT resolve to the
   extension — it 404s and text silently falls back to a system font. Inject the `@font-face`
   from JS with `chrome.runtime.getURL(...)` and list the file in `web_accessible_resources`
-  (see `injectFonts()` in `winamp.js`; this is why VT323 wasn't rendering live).
+  (see `injectFonts()` in `winamp-core.js`; this is why VT323 wasn't rendering live).
 - **Least privilege:** keep `host_permissions` to `music.youtube.com`; add
   permissions only when needed.
 - **Service workers are ephemeral** (if one is added later): don't keep state in

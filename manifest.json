@@ -34,7 +34,19 @@
   "content_scripts": [
     {
       "matches": ["https://music.youtube.com/*", "https://open.spotify.com/*"],
-      "js": ["skins.js", "content.js", "wsz.js", "winamp.js"],
+      "js": [
+        "skins.js",
+        "content.js",
+        "wsz.js",
+        "winamp-core.js",
+        "winamp-window-manager.js",
+        "winamp-layout-zoom.js",
+        "winamp-skins.js",
+        "winamp-windows-build.js",
+        "winamp-library-lyrics.js",
+        "winamp-transport-audio.js",
+        "winamp-bootstrap.js"
+      ],
       "css": ["overlay.css", "winamp.css"],
       "run_at": "document_idle"
     },
