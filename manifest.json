@@ -48,6 +48,7 @@
         "presets/ambience.js",
         "presets/battery.js",
         "fonts/VT323-Regular.ttf",
+        "fonts/Silkscreen-Bold.ttf",
         "vendor/butterchurn.min.js",
         "vendor/butterchurnPresets.min.js",
         "vendor/butterchurnPresetsExtra.min.js",

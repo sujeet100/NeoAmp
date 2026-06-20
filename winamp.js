@@ -27,7 +27,7 @@
     try {
       var f = function (fam, file) { return '@font-face{font-family:"' + fam + '";src:url("' + chrome.runtime.getURL("fonts/" + file) + '") format("truetype");font-display:swap}'; };
       var st = document.createElement("style");
-      st.textContent = f("NeoAmp LCD", "VT323-Regular.ttf");
+      st.textContent = f("NeoAmp LCD", "VT323-Regular.ttf") + f("NeoAmp Pixel", "Silkscreen-Bold.ttf");
       (document.head || document.documentElement).appendChild(st);
     } catch (_) {}
   })();
