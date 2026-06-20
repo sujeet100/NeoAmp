@@ -750,7 +750,7 @@
     // FELT within a loud passage (was a ~30-60s drift, invisible in a short span) + a per-beat nudge.
     // SMOOTH continuous hue drift — faster + energy-coupled so colour keeps evolving, but NO beat snaps
     // (the user wants smooth, no jerks). New hues still arrive via the drift + the aurora wash.
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.04, 0.08);
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.09, 0.15); // FAST hue cycle (~11s rest, ~5-6s loud): the orb reads as its CURRENT colour while its trail holds the RECENT-PAST colours → the trail looks a different colour (pink orb, purple trail). The "rainbow trail" — needs the long trails (decay 0.95) below to show the gradient
     t.q8 = huePhase;
     // SMOOTHED pulse envelope — ease toward the beat flash (~0.4s) so q32-driven effects (bloom/warp/aurora)
     // swell and settle smoothly instead of jerking on each sharp transient.
@@ -897,7 +897,7 @@
     // VOID stage (modes 10/11 — wire star-net / crossed-X): steer the bg toward near-black, eased so it
     // fades in/out (q29 5.5..5.9 → COMP voidAmt crush) and the wires read as the only light.
     if (netVoid > 0.01) t.q29 = 5.5 + 0.4 * netVoid;
-    t.q1 = Math.max(t.q1, 0.92); // floor decay → motif trails PERSIST + build the moving colour field (longer orb smudge); dim base gives milky-out headroom
+    t.q1 = Math.max(t.q1, 0.95); // LONGER trails → the trail captures more colour history (so the colour CHANGES along its length) + a longer orb smudge; dim base gives milky-out headroom
     t.q11 = focusAmt; // COMP pupil amount + anemone-squash strength (high for modes 0/5/6)
     return t;
   }
