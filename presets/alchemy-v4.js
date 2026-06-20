@@ -130,11 +130,11 @@
     // place → looked static). Now the noise-sampling domain ROTATES + DRIFTS + zoom-BREATHES continuously and
     // PARALLAXES opposite the camera's vanishing-point (q20/q27) → colours travel across the frame + through
     // space, coupled to the camera. (Applied to npd ONLY, never the screen pdc used by the fold/vignette.)
-    "  float breath = 1.0 + 0.15 * sin(time * 0.06) + 0.09 * sw1;\n" + // gentle depth breath + beat push-in (bg is mostly ANCHORED — depth comes from the foreground moving against it)
-    "  float bgAng = time * 0.045;\n" + // slow rotation → a calm bubble, not a fast orbit
+    "  float breath = 1.0 + 0.18 * sin(time * 0.09) + 0.05 * sw1;\n" + // SMOOTH depth breath (faster, tiny beat push — no jerk)
+    "  float bgAng = time * 0.07;\n" + // SMOOTH continuous rotation, a bit faster (no jerks)
     "  mat2 bgR = mat2(cos(bgAng), -sin(bgAng), sin(bgAng), cos(bgAng));\n" +
     "  vec2 par = vec2(q20 - 0.5, q27 - 0.5) * 1.8;\n" + // light parallax off the camera VP
-    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.022, time * 0.015) - par;\n" + // calm bubble + slow drift + light parallax
+    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.034, time * 0.024) - par;\n" + // smooth bubble + faster continuous drift + light parallax
     "  vec2 flow = curl(npd * 1.1 + vec2(ft, -ft));\n" +
     "  float warpAmt = 0.20 + 0.18 * sw1;\n" + // bass-driven WARP SURGE → colours SPLASH/stretch on the kick, settle when quiet
     "  vec2 w = npd * 1.3 + warpAmt * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
@@ -714,9 +714,7 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
-    hueStep = 0,
-    hueStepTarget = 0,
-    lastSnap = -10,
+    pulseSmooth = 0, // SMOOTHED beat envelope (rises/settles ~0.4s) so pulse-driven effects swell, not JERK
     waveAmt = 0,
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
@@ -740,15 +738,13 @@
 
     // shared HUE clock (fg + bg) — clock-driven base + STRONGER music coupling so colour migration is
     // FELT within a loud passage (was a ~30-60s drift, invisible in a short span) + a per-beat nudge.
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.04);
-    // BEAT-GATED PALETTE SNAP (Gemini) — on a big beat (with cooldown) jump the hue toward a CONTRASTING
-    // target and lerp over ~0.3s → "new paint thrown" dramatic colour change, not a slow predictable drift.
-    if (f > 0.6 && time - lastSnap > 1.4) {
-      hueStepTarget += 0.34 + 0.2 * Math.random();
-      lastSnap = time;
-    }
-    hueStep += (hueStepTarget - hueStep) * Math.min(1, dt * 3.5); // smooth lerp to the new palette (~0.3s)
-    t.q8 = huePhase + hueStep + 0.04 * f;
+    // SMOOTH continuous hue drift — faster + energy-coupled so colour keeps evolving, but NO beat snaps
+    // (the user wants smooth, no jerks). New hues still arrive via the drift + the aurora wash.
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.04, 0.08);
+    t.q8 = huePhase;
+    // SMOOTHED pulse envelope — ease toward the beat flash (~0.4s) so q32-driven effects (bloom/warp/aurora)
+    // swell and settle smoothly instead of jerking on each sharp transient.
+    pulseSmooth += (f - pulseSmooth) * Math.min(1, dt * 2.5);
 
     // LOOK — camera + exposure + fold eased between two looks on a slow clock
     var lk = lookPick(time, dt, f > 0.6),
@@ -775,7 +771,7 @@
     t.q27 = L("py") + pan * Math.sin(time * 0.11);
     t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // stronger 3D plane tilt (side-angle)
     t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
-    t.q32 = bass + 1.4 * f; // carry the BEAT into the shader (raw bass barely crosses 1.0 live) → drives bb + the colour-bloom swell
+    t.q32 = bass + 1.4 * pulseSmooth; // SMOOTHED beat into the shader → bloom/warp/aurora swell smoothly, no jerk
 
     // BACKGROUND — its OWN slow clock, decoupled from the motif (the same motif now appears over
     // different backgrounds, like the original). Continuous 0..3 → COMP_V4's q29 variant select.
