@@ -764,6 +764,21 @@
   // skin's GEN.BMP if present, else its PLEDIT.BMP (every skin ships PLEDIT, so
   // the frame always matches — no more gold fallback for GEN-less skins).
   // PLEDIT.TXT colors drive the playlist/library list text.
+  // Parse "#rgb"/"#rrggbb"/"rgb(r,g,b)" → [r,g,b] (for the key-label contrast calc).
+  function parseColor(c) {
+    if (!c) return null;
+    c = String(c).trim();
+    if (c[0] === "#") {
+      if (c.length === 4) c = "#" + c[1] + c[1] + c[2] + c[2] + c[3] + c[3];
+      if (c.length < 7) return null;
+      return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+    }
+    var m = c.match(/rgba?\(([^)]+)\)/);
+    if (m) { var p = m[1].split(",").map(function (x) { return parseInt(x, 10); }); return [p[0], p[1], p[2]]; }
+    return null;
+  }
+  function mixWhite(rgb, t) { return rgb && [rgb[0] + (255 - rgb[0]) * t, rgb[1] + (255 - rgb[1]) * t, rgb[2] + (255 - rgb[2]) * t]; }
+
   var GEN_WINDOWS = ["wa-pl", "wa-lib", "wa-viz", "wa-np"];
   var GEN_KEYS = { TL: "tl", GOLD: "gold", TR: "tr", LEND: "lend", CFILL: "cfill", REND: "rend", ML: "ml", MR: "mr", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
   var PLF_KEYS = { TL: "tl", TFILL: "tfill", TITLE: "title", TR: "tr", LEFT: "left", RIGHT: "right", BL: "bl", BR: "br", BFILL: "bfill", CLOSE: "close" };
@@ -796,6 +811,16 @@
       if (p.normalbg) root.style.setProperty("--pl-normalbg", p.normalbg);
       if (p.selectedbg) root.style.setProperty("--pl-selectedbg", p.selectedbg);
     }
+    // Contrast-safe LABEL colour: the key face is the sampled button metal (or, with
+    // no sample, the panel bg lightened ~40% toward white). Pick near-black text on a
+    // light face / near-white on a dark face — so VIS/LIB/gear labels are always
+    // readable (the old --pl-normal went invisible / mismatched the skin on some skins).
+    var baseRgb = parseColor(face) || (p && mixWhite(parseColor(p.normalbg), 0.4)) || null;
+    if (baseRgb) {
+      var L = (0.299 * baseRgb[0] + 0.587 * baseRgb[1] + 0.114 * baseRgb[2]) / 255;
+      L = L * 0.84 + 0.16;   // CSS lightens the face ~16% toward white for the visible top
+      root.style.setProperty("--wa-key-fg", L > 0.55 ? "#15171d" : "#eef1f8");
+    } else root.style.removeProperty("--wa-key-fg");
     // unify width with the 550px (275*2) skin stack (explicit on each framed
     // window so the gold titlebar always spans the full window width)
     root.style.setProperty("--wa-stack-w", "550px");
@@ -810,6 +835,7 @@
     ["normal", "current", "normalbg", "selectedbg"].forEach(function (k) { s.removeProperty("--pl-" + k); });
     s.removeProperty("--wa-btn-face");
     s.removeProperty("--wa-led-on");
+    s.removeProperty("--wa-key-fg");
     s.removeProperty("--wa-stack-w");
     if (wins["wa-lib"]) wins["wa-lib"].el.style.width = "";
     if (wins["wa-pl"]) wins["wa-pl"].el.style.width = "";

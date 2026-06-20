@@ -352,7 +352,9 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 19px; padding: 0 8px; cursor: pointer;
   font: 700 12px/1 var(--wa-font); letter-spacing: 0.6px; text-transform: uppercase;
-  color: var(--pl-normal, #cdd2e6);
+  /* contrast-derived from the key face (near-black on light keys, near-white on dark)
+     so labels stay readable on every skin — NOT --pl-normal, which went invisible. */
+  color: var(--wa-key-fg, var(--pl-normal, #cdd2e6));
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--wa-key-face) 70%, #fff 30%) 0%,
     var(--wa-key-face) 44%,
@@ -370,26 +372,28 @@
   border-color: rgba(0,0,0,0.5) rgba(255,255,255,0.32) rgba(255,255,255,0.45) rgba(0,0,0,0.42);
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-/* LED = a real recessed lamp set into the metal. Off: a dark domed well sunk in with
-   a bezel. On: lit glass — a saturated dome + a small specular highlight + outer glow.
-   Colour is the skin's OWN indicator LED (--wa-led-on, sampled from its shuffle light),
-   falling back to the text-highlight then the green accent. */
+/* FLAT pixel LED (the glossy 3D dome read too modern for these pixel skins). Off: a
+   dark recessed square. On: a solid square in the skin's OWN indicator colour
+   (--wa-led-on, sampled from its shuffle light) with a chunky 1px pixel bevel — light
+   top-left, dark bottom-right — and only a tight 2px glow. No specular, no soft bloom. */
 .wa-np-tog::before {
-  content: ""; width: 9px; height: 9px; flex: 0 0 auto; border-radius: 2px;
-  background: radial-gradient(circle at 50% 38%, #2b2e35, #0b0d0f);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.14);
+  content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 0;
+  background: rgba(0,0,0,0.5);
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.55), inset -1px -1px 0 rgba(255,255,255,0.10);
+  image-rendering: pixelated;
 }
 .wa-np-tog.on::before {
   --led: var(--wa-led-on, var(--pl-current, var(--wa-accent, #16e651)));
-  background:
-    radial-gradient(circle at 36% 30%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 42%),
-    radial-gradient(circle at 50% 62%, var(--led) 0%, color-mix(in srgb, var(--led) 52%, #000) 100%);
-  box-shadow: 0 0 5px var(--led), inset 0 0 0 1px rgba(0,0,0,0.32);
+  background: var(--led);
+  box-shadow:
+    inset 1px 1px 0 color-mix(in srgb, var(--led) 72%, #fff),
+    inset -1px -1px 0 color-mix(in srgb, var(--led) 60%, #000),
+    0 0 2px color-mix(in srgb, var(--led) 65%, transparent);
 }
 /* ⚙ gear key: icon only (no LED, no text label), square-ish, themed like the keys */
 .wa-gear-btn { padding: 0 6px; }
 .wa-gear-btn::before { display: none; }
-.wa-gear-btn svg { width: 15px; height: 15px; display: block; fill: var(--pl-normal, #cdd2e6); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
+.wa-gear-btn svg { width: 15px; height: 15px; display: block; fill: var(--wa-key-fg, var(--pl-normal, #cdd2e6)); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
 /* like/dislike: chrome key, NO label LED — the icon SHAPE is the indicator and
    behaves like an LED: dark/unlit when off, glowing NEON when on (liked/disliked). */
 .wa-rate-btn { padding: 0 7px; }
@@ -398,7 +402,7 @@
    glass via a tight 3-stage glow (hot near-white core → saturated colour → soft
    halo) instead of one fat blurry blob. Like = red (love), dislike = blue — both
    clear of the green VIS/LIB/BG LEDs sitting right beside them. */
-.wa-rate-btn svg { width: 13px; height: 13px; display: block; fill: #3a3a44; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.55)); }
+.wa-rate-btn svg { width: 13px; height: 13px; display: block; fill: color-mix(in srgb, var(--wa-key-fg, #3a3a44) 50%, transparent); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
 .wa-rate-btn.wa-like.on svg {
   fill: #ff415f;
   filter: drop-shadow(0 0 0.5px rgba(255,224,232,0.95)) drop-shadow(0 0 2px #ff415f) drop-shadow(0 0 5px rgba(255,65,95,0.5));
