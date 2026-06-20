@@ -1,4 +1,11 @@
-/* Alchemy V4: Random — ONE seamless self-sequencing preset (single menu entry).
+/* Alchemy V5: Random — EXPERIMENTAL fork of V4 (2026-06-21). Same single-preset spine, but reworks the
+ * BACKGROUND/COLOUR toward the original's watercolour look: simple dim base + colour comes from the MOVING
+ * motif/orb/tether trails (high-decay feedback), curl-flow watercolour mixing, FBM blur-smudge, fast-hue
+ * colour-shifting trails, defined colour boundaries + pigment-pooling ridge, more-neon resaturate, faster
+ * scene-change clocks. User is "not much happy" with this yet — to be rebuilt with the same principles.
+ * V4 (presets/alchemy-v4.js) is reverted to the pre-experiment baseline (commit 2dffe4d) for comparison.
+ *
+ * Alchemy V4: Random — ONE seamless self-sequencing preset (single menu entry).
  *
  * REBUILD 2026-06-18 (see docs/alchemy-v4/FINDINGS-AND-REBUILD-PLAN.md). Collapses the former 8
  * shuffle-cycled v4 presets into a SINGLE preset that morphs continuously — no cross-preset
@@ -53,6 +60,7 @@
     "  pd *= (1.0 + q15);\n" +
     "  pd.x /= asp;\n" +
     "  vec2 suv = piv + pd + vec2(q18, q19);\n" +
+    "  suv += vec2(sin(uv.y * 11.0 + time * 0.7), cos(uv.x * 11.0 + time * 0.6)) * 0.0016;\n" + // micro fluid distortion → the trace BLEEDS/warps like ink in wet paper as it fades (the watercolour smudge)
     "  vec2 wp = 1.0 / resolution; float br = 1.1;\n" +
     "  vec3 acc = texture2D(sampler_main, suv).rgb * 0.6;\n" +
     "  acc += texture2D(sampler_main, suv + vec2(wp.x * br, 0.0)).rgb * 0.1;\n" +
@@ -69,6 +77,10 @@
     PAL_GLSL +
     ALC_MOIRE_GLSL +
     "vec3 dusty(vec3 c, float s){ float l = dot(c, vec3(0.333)); return mix(vec3(l), c, s); }\n" +
+    // CURL of the fbm potential (90°-rotated gradient) — a DIVERGENCE-FREE flow field. Advecting the
+    // colour domain by it swirls the noise like dye in water (watercolour marbling) and CANNOT shear it
+    // into radial rays (zero divergence) — the safe alternative to the directional advection that "rained".
+    "vec2 curl(vec2 p){ float e = 0.12; float a1 = fbm(p + vec2(0.0, e)); float a2 = fbm(p - vec2(0.0, e)); float a3 = fbm(p + vec2(e, 0.0)); float a4 = fbm(p - vec2(e, 0.0)); return vec2(a1 - a2, a4 - a3) / (2.0 * e); }\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
@@ -115,10 +127,44 @@
     // NEW full DIAGONAL-X kaleidoscope (fold>=8): mirror the BACKGROUND across BOTH diagonals about
     // screen centre (rotate -45°, abs, rotate +45°) → 4 triangular wedges like the original (f_18).
     "  if (q12 > 7.5) { vec2 dr = vec2(pdc.x + pdc.y, pdc.y - pdc.x) * 0.70711; dr = abs(dr); pdc = vec2(dr.x - dr.y, dr.x + dr.y) * 0.70711; }\n" +
-    "  vec2 w = pdc * 1.3 + vec2(fbm(pdc * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(pdc * 1.1 + 7.0 - time * 0.035));\n" +
-    "  float n1 = fbm(w * 1.3 + time * 0.025), n2 = fbm(w * 2.0 - time * 0.02 + 3.0);\n" +
-    "  vec3 ground = mix(cB, cC, smoothstep(0.30, 0.75, n1));\n" +
-    "  ground = mix(ground, cA, smoothstep(0.45, 0.85, n2) * 0.45);\n" +
+    // WATERCOLOUR FLUID — curl-advected domain (swirls/marbles, no shear) + a smooth isotropic SCALE-BREATH
+    // (the colour field recedes/advances = moving through space, no shear) + WIDE overlapping bleed bands so
+    // the three pigments blend wet-on-wet (muddy transition zones, no crisp seam). breath/flow applied ONLY to
+    // the noise-sampling coords (npd) — never the screen pdc used by the fold/vignette (would wobble the wedges).
+    "  float ft = time * 0.05;\n" +
+    "  float swell = max(0.0, q32 - 1.0);\n" + // ~0 at rest, spikes on the beat (q32 = bass + 1.4f) — drives the splash surge + bloom + aurora
+    "  float sw1 = min(swell, 1.0);\n" +
+    // VIRTUAL CAMERA THROUGH THE COLOUR FIELD — the bg used to be glued to the screen (colours morphed in
+    // place → looked static). Now the noise-sampling domain ROTATES + DRIFTS + zoom-BREATHES continuously and
+    // PARALLAXES opposite the camera's vanishing-point (q20/q27) → colours travel across the frame + through
+    // space, coupled to the camera. (Applied to npd ONLY, never the screen pdc used by the fold/vignette.)
+    "  float breath = 1.0 + 0.18 * sin(time * 0.09) + 0.05 * sw1;\n" + // SMOOTH depth breath (faster, tiny beat push — no jerk)
+    "  float bgAng = time * 0.07;\n" + // SMOOTH continuous rotation, a bit faster (no jerks)
+    "  mat2 bgR = mat2(cos(bgAng), -sin(bgAng), sin(bgAng), cos(bgAng));\n" +
+    "  vec2 par = vec2(q20 - 0.5, q27 - 0.5) * 1.8;\n" + // light parallax off the camera VP
+    "  vec2 npd = bgR * (pdc * breath) + vec2(time * 0.034, time * 0.024) - par;\n" + // smooth bubble + faster continuous drift + light parallax
+    "  vec2 flow = curl(npd * 1.1 + vec2(ft, -ft));\n" +
+    "  float warpAmt = 0.20 + 0.18 * sw1;\n" + // bass-driven WARP SURGE → colours SPLASH/stretch on the kick, settle when quiet
+    "  vec2 w = npd * 1.3 + warpAmt * flow + vec2(fbm(npd * 1.1 + vec2(time * 0.04, -time * 0.03)), fbm(npd * 1.1 + 7.0 - time * 0.035));\n" +
+    "  float fw = 0.10 + 0.12 * sw1;\n" +
+    "  float n1 = fbm(w * 1.3 + fw * flow + time * 0.025);\n" +
+    "  float n2 = fbm(w * 2.0 - fw * flow - time * 0.02 + 3.0);\n" +
+    "  vec3 ground = mix(cB, cC, smoothstep(0.42, 0.56, n1));\n" + // TIGHT band → DEFINED colour boundary (was 0.20-0.80 = foggy mud)
+    "  ground = mix(ground, cA, smoothstep(0.46, 0.62, n2) * 0.7);\n" + // defined 3-way pools that push against each other
+    "  float edge = smoothstep(0.055, 0.0, abs(n1 - 0.5));\n" + // PIGMENT POOLING — a defined darker contour where the colours meet (capillary edge)
+    "  ground -= edge * 0.13;\n" +
+    // FLUID BEAT COLOUR-BLOOM — a soft complementary pigment welling from the core, breathing/bleeding OUTWARD
+    // with the beat (q32 = bass + 1.4f now carries the kick). exp() feather + outward mix = wet-on-wet, never a flash.
+    "  float bloomHue = hb + 0.5;\n" +
+    "  float brad = exp(-prad * prad * 4.5);\n" +
+    "  ground += dusty(pal(bloomHue), 0.9) * brad * (0.08 + 0.5 * swell);\n" +
+    "  ground = mix(ground, dusty(pal(bloomHue), 0.8), smoothstep(0.0, 0.9, n2) * brad * 0.4 * swell);\n" +
+    // AURORA WASH — a large, slow, CONTRASTING hue field that drifts ACROSS the canvas and merges into the
+    // ground (the "another hue comes in / aurora" feel). Its hue VARIES spatially (bands of different hues
+    // blending) AND advances on the beat (swell) so a NEW hue washes in with the pulse. dusty() keeps it muted.
+    "  float aur = fbm(w * 0.7 + flow * 0.6 - time * 0.05);\n" +
+    "  vec3 auroraCol = dusty(pal(hb + 0.62 + 0.35 * aur + 0.3 * swell), 0.92);\n" +
+    "  ground = mix(ground, auroraCol, smoothstep(0.47, 0.68, aur) * 0.55);\n" + // tighter → defined aurora bands, not a soft fog
     "  if (q29 < 0.5) { ground = mix(ground, alcMoire(uv, time, bb, cA), 0.45); }\n" + // moiré DOTS (0) — kept
     "  else if (q29 < 1.5) { ground = mix(ground, alcMoireStripes(uv, time, bb, cA), 0.7); }\n" + // moiré vertical STRIPES (1) — NEW (WMP scene F3), mixed stronger so columns read over the fbm ground
     "  else if (q29 < 2.5) { float vein = smoothstep(0.10, 0.0, abs(fract(n1 * 4.0) - 0.5) - 0.06); ground = mix(ground, cC * 1.25, vein * 0.6); }\n" + // marble (2)
@@ -150,9 +196,23 @@
     "  float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
     "  ground = mix(ground, cA * 1.25, pool * 0.45);\n" +
     "  ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.08 + 0.12 * bb);\n" +
-    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.66, 1.02, smoothstep(1.5, 0.15, prad));\n" + // darker, higher-contrast ground (orig is darker) — saturated motifs POP; still colour-bled, not flat-black
+    "  ground *= (0.42 + 0.42 * n1 + 0.12 * bb) * mix(0.60, 1.04, smoothstep(1.5 * breath, 0.15, prad));\n" + // depth vignette coupled to the breath → corners deepen as you push in (darker, higher-contrast ground)
     "  ground *= mix(1.0, 0.05, voidAmt);\n" + // VOID: crush to near-black so wire/X motifs read as the only light (faint corner-pool survives)
-    "  vec3 col = ground + sharp * 1.25 + cA * bl;\n" + // kit-coloured motif over the vibrant ground
+    // WATERCOLOUR STAIN (Gemini) — the "paint mixing" is the heavily-BLURRED foreground bleeding into the
+    // bg, not bg texture scrolling. Sample the wide blur buffers (soft out-of-focus motif) and STAIN the
+    // ground with their actual colour where the foreground light pools → colours seamlessly merge/wash, and
+    // when the motif flares on a beat it dumps colour that blooms across the surrounding watercolour field.
+    // DRAG the blurred trail along an FBM field → it bleeds into watercolour TENDRILS/clouds (a colour drop
+    // spreading on wet paper), bass-driven. blur1 (sharper) weighted MORE so it doesn't fog; gentler strength
+    // so the DEFINED colour pools survive — only the edges smudge. The crisp sharp_main is composited ON TOP.
+    "  vec2 smudge = vec2(fbm(uv * 2.2 + time * 0.1), fbm(uv * 2.2 - time * 0.1 + 5.0)) * (0.016 + 0.03 * sw1);\n" +
+    "  vec3 wetInk = texture2D(sampler_blur1, uv + smudge).rgb * 0.62 + texture2D(sampler_blur2, uv + smudge).rgb * 0.38;\n" +
+    // ★ THE COLOUR COMES FROM THE MOVING MOTIF TRAILS, not the bg (the original's bg is simple; the drama is
+    // the motifs bleeding colour AS THEY MOVE). The generated ground is dimmed + desaturated to a SIMPLE base;
+    // the blurred/smudged/decaying trails of the moving motifs (wetInk) ARE the dynamic colour field — and
+    // because the motifs MOVE, this colour MOVES (vs the old baked-in bg bleed that read static).
+    "  vec3 baseBg = dusty(ground, 0.88) * 0.6;\n" + // simple base, but more SATURATED + a touch brighter (was 0.7*0.5 → too drab/muted)
+    "  vec3 col = baseBg + wetInk * 2.0 + sharp * 1.5 + cA * bl;\n" + // moving blurred trails = the dramatic dynamic colour; crisp motif on top
     // (orb ripples removed — the original's rings are the orb's 3D feedback TRACE/tube-stack, not a drawn
     //  shape; the flat procedural rings read as fake. q11 is unused now.)
     "  col *= q31;\n" +
@@ -173,8 +233,8 @@
     // POP against more near-black, matching the vibrant 1080p reference. Still luminous, not neon/blown-white.
     "  vec3 toned = col / (col + vec3(0.6));\n" +
     "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
-    "  toned = mix(vec3(tl), toned, 1.22);\n" + // resaturate toward the original's SATMAX (gentler → not neon)
-    "  toned = mix(toned * toned, toned, 0.72);\n" + // deepen darks/mids ONLY (x*x ≤ x) → contrast without lifting highlights to blowout
+    "  toned = mix(vec3(tl), toned, 1.5);\n" + // RESATURATE harder → more NEON/vivid colour (user wants less muted)
+    "  toned = mix(toned * toned, toned, 0.86);\n" + // lighter dark-deepen → brighter, glowier mids (more neon, still Reinhard-capped so no white-out)
     "  ret = clamp(toned, 0.0, 1.0);\n" +
     "}\n";
 
@@ -224,10 +284,10 @@
         var br = orbCol(hb, 0),
           bg = orbCol(hb, 0.33),
           bb = orbCol(hb, 0.67);
-        var bri = 0.85 + 0.55 * be; // FILL brightness pulses with bass
+        var bri = 0.9 + 0.3 * be; // FILL brightness pulses GENTLY with bass
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1 + 0.4 * be); // size pulses with bass
+        s.rad = (s.q7 || 0.06) * (1 + 0.12 * be); // size pulses GENTLY with bass (was 0.4 → boomed on every bass hit)
         s.r = Math.min(1, fr * bri);
         s.g = Math.min(1, fg * bri);
         s.b = Math.min(1, fb * bri); // COLOURED core (not washed white)
@@ -269,7 +329,7 @@
           gb = orbCol(hf, 0.67);
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be); // WIDER than the core → a surrounding halo
+        s.rad = (s.q7 || 0.06) * (1.3 + 0.12 * be); // a bit WIDER than the core → soft halo (was 1.7+0.5 → boomed on bass)
         s.r = gr * 0.85;
         s.g = gg * 0.85;
         s.b = Math.min(1, gb * 1.5 + 0.15); // push the halo toward teal (orig glow)
@@ -671,6 +731,7 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
+    pulseSmooth = 0, // SMOOTHED beat envelope (rises/settles ~0.4s) so pulse-driven effects swell, not JERK
     waveAmt = 0,
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
@@ -679,9 +740,9 @@
     lastStrobeT = 0,
     strobeOn = 1;
   var beat = alcBeatFlash({ rise: 1.22 });
-  var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
-  var bgPick = makePicker(6, 14, 26, 5.0); // 6 bg variants: moiré-DOTS/moiré-STRIPES/marble/horizon/ribbon/aurora — own slow clock
-  var motifPick = makePicker(MODES.length, 6, 12, 2.0); // central motif — own clock, dip-swap
+  var lookPick = makePicker(LOOKS.length, 6, 11, 3.0); // camera/look — MORE FREQUENT changes (was 9-16; felt prolonged/boring)
+  var bgPick = makePicker(6, 9, 17, 4.0); // 6 bg variants — more frequent (was 14-26)
+  var motifPick = makePicker(MODES.length, 4, 8, 1.6); // central motif — more frequent (was 6-12), dip-swap
 
   function frame(t) {
     var time = t.time || 0;
@@ -692,9 +753,15 @@
     var energy = typeof alcEnergy === "function" ? alcEnergy(t) : bassA;
     var f = beat(t.bass || 1, dt); // per-beat flash (fast decay)
 
-    // shared HUE clock (fg + bg) — mostly clock-driven, faster when loud, tiny per-beat warm nudge
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.05);
-    t.q8 = huePhase + 0.04 * f;
+    // shared HUE clock (fg + bg) — clock-driven base + STRONGER music coupling so colour migration is
+    // FELT within a loud passage (was a ~30-60s drift, invisible in a short span) + a per-beat nudge.
+    // SMOOTH continuous hue drift — faster + energy-coupled so colour keeps evolving, but NO beat snaps
+    // (the user wants smooth, no jerks). New hues still arrive via the drift + the aurora wash.
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.09, 0.15); // FAST hue cycle (~11s rest, ~5-6s loud): the orb reads as its CURRENT colour while its trail holds the RECENT-PAST colours → the trail looks a different colour (pink orb, purple trail). The "rainbow trail" — needs the long trails (decay 0.95) below to show the gradient
+    t.q8 = huePhase;
+    // SMOOTHED pulse envelope — ease toward the beat flash (~0.4s) so q32-driven effects (bloom/warp/aurora)
+    // swell and settle smoothly instead of jerking on each sharp transient.
+    pulseSmooth += (f - pulseSmooth) * Math.min(1, dt * 2.5);
 
     // LOOK — camera + exposure + fold eased between two looks on a slow clock
     var lk = lookPick(time, dt, f > 0.6),
@@ -711,7 +778,7 @@
       fold > 1.5 && fold < 7.5
         ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07))
         : 0; // fold>=8 = the COMP diagonal full-mirror (WARP itself doesn't fold it)
-    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (no global recede — it smeared bristles into a net)
+    t.q15 = L("zoom") + 0.012 * (bassA - 1) + 0.004 * Math.sin(time * 0.13) + L("zoom") * 0.9 * f; // per-look zoom + a BEAT PUNCH: each kick amplifies the look's own push direction (dive in / stream out) → felt 3D lurch on the pulse
     t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
@@ -721,7 +788,7 @@
     t.q27 = L("py") + pan * Math.sin(time * 0.11);
     t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // stronger 3D plane tilt (side-angle)
     t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
-    t.q32 = bass;
+    t.q32 = bass + 1.4 * pulseSmooth; // SMOOTHED beat into the shader → bloom/warp/aurora swell smoothly, no jerk
 
     // BACKGROUND — its OWN slow clock, decoupled from the motif (the same motif now appears over
     // different backgrounds, like the original). Continuous 0..3 → COMP_V4's q29 variant select.
@@ -769,8 +836,19 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat)
+    t.q7 = (0.058 + 0.006 * Math.max(0, bass - 1)) * (1 + 0.3 * f); // orb radius — BRIEF beat flare (f is a fast transient) stamps a ripple/trace, then settles; NOT a sustained boom
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
+    // REVERSE PARALLAX — on the beat the orbs slide OUTWARD from center + grow, while the feedback field
+    // recedes INWARD: two layers in opposite radial senses = the "rushing past in 3D space" depth cue.
+    var po = 1 + 0.1 * f + 0.04 * Math.max(0, bassA - 1);
+    var clmp = function (v) {
+      return v < -0.1 ? -0.1 : v > 1.1 ? 1.1 : v;
+    };
+    t.q21 = clmp(0.5 + (t.q21 - 0.5) * po);
+    t.q22 = clmp(0.5 + (t.q22 - 0.5) * po);
+    t.q23 = clmp(0.5 + (t.q23 - 0.5) * po);
+    t.q24 = clmp(0.5 + (t.q24 - 0.5) * po);
+    // (radius is NOT inflated by po — keep the parallax POSITIONAL only; compounding it onto q7 boomed the orbs on bass)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
     if (waveAmt > 0.01) {
@@ -778,11 +856,11 @@
         ca = time * 0.03;
       t.q19 -= 0.004 * wa; // downward drift → descending comb
       t.q1 += (0.945 - t.q1) * 0.6 * wa; // a touch more decay for the comb trail
-      t.q7 *= 1 + 1.3 * wa; // BIG orbs
-      t.q21 += (0.4 + 0.05 * Math.cos(ca) - t.q21) * wa;
-      t.q22 += (0.44 + 0.05 * Math.sin(ca) - t.q22) * wa;
-      t.q23 += (0.58 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa;
-      t.q24 += (0.56 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
+      t.q7 *= 1 + 0.5 * wa; // bigger orbs (was 1.3 → ballooned + overlapped in this scene)
+      t.q21 += (0.3 + 0.05 * Math.cos(ca) - t.q21) * wa;
+      t.q22 += (0.4 + 0.05 * Math.sin(ca) - t.q22) * wa;
+      t.q23 += (0.7 + 0.05 * Math.cos(ca + 1.3) - t.q23) * wa; // spread the pair WIDE apart (was 0.4/0.58 cluster → overlapped)
+      t.q24 += (0.6 + 0.05 * Math.sin(ca + 1.3) - t.q24) * wa;
       t.q25 = Math.max(t.q25, wa);
       t.q14 = Math.max(t.q14, wa); // both orbs present
       t.q13 *= 1 - wa; // #24 is NOT folded — fade out any kaleidoscope fold strength
@@ -826,6 +904,7 @@
     // VOID stage (modes 10/11 — wire star-net / crossed-X): steer the bg toward near-black, eased so it
     // fades in/out (q29 5.5..5.9 → COMP voidAmt crush) and the wires read as the only light.
     if (netVoid > 0.01) t.q29 = 5.5 + 0.4 * netVoid;
+    t.q1 = Math.max(t.q1, 0.95); // LONGER trails → the trail captures more colour history (so the colour CHANGES along its length) + a longer orb smudge; dim base gives milky-out headroom
     t.q11 = focusAmt; // COMP pupil amount + anemone-squash strength (high for modes 0/5/6)
     return t;
   }
@@ -908,7 +987,7 @@
     point_eqs: function (a) {
       fTether(a);
       var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
-      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // BEAT gate: flashes on the kick, gone when quiet (orig 0:27-0:39 — not permanent)
+      var beatG = 0.4 + 0.6 * Math.max(0, Math.min(1, ((a.q32 || 1) - 1.0) / 0.5)); // present-ish always (so it leaves a continuous colour-shifting trail like the orbs), BRIGHTER on the kick
       a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
       return a;
     },
@@ -956,5 +1035,5 @@
   preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25"); // NEW gradient glow-halo for orb A (existing orb UNCHANGED)
   preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14"); // NEW gradient glow-halo for orb B
 
-  P["Alchemy V4: Random"] = preset;
+  P["Alchemy V5: Random"] = preset;
 })();

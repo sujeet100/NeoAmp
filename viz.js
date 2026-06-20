@@ -84,7 +84,8 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // ONE seamless self-sequencing preset
+    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // baseline (commit 2dffe4d, pre-watercolor-experiment)
+    { label: "Alchemy V5: Random", wmp: "Alchemy V5: Random" }, // EXPERIMENTAL watercolour-trail fork (compare vs V4)
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     {
       label: "Dance of the Freaky Circles (Nebula Spectrum)",
