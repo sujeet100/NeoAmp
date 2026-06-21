@@ -426,13 +426,82 @@
     a.sample = saved;
     return a;
   }
-  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons. ROSE (smooth Lissajous
-  // loops) and ROTLINE (radial filament net) were REMOVED — the user rejected both ("WTF is this shape" /
-  // "mess of net"); they never matched the Alchemy design language. Radial-tunnel DEPTH still lives in the
-  // background regime (q29=2), so removing the rotline motif loses no depth.
-  var MODES = [fAnem, fStarNet, fUrchin, fCrossX, fTri, fNgon, fHexagram];
-  // ADDITIVE dense modes (anemone/urchin) pile up → lower alpha; crisp outline modes keep more.
-  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7];
+  // WIREFRAME NET (survey gap #1, recurring 0:06-0:12 / 0:33 / 2:08 / 2:42): a dense crisscross of STRAIGHT
+  // chords — a {P/stride} star-art polygon walked as a continuous path so the chords overlay into a woven
+  // NET, FORESHORTENED toward an off-center vanishing direction so it reads as a 3D-tilted sheet/knot (the
+  // depth cue the original gets from crossing-line meshes, not from a flat rosette). Live-waveform jag adds
+  // the Alchemy texture. Distinct from star-net (clean radial spokes) — this is irregular crossing chords.
+  function fNet(a) {
+    var CH = 22,
+      fk = (a.sample || 0) * CH,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var P = 13,
+      stride = 5; // {13/5} star polygon → dense crossing net
+    var i0 = (seg * stride) % P,
+      i1 = (seg * stride + stride) % P;
+    var spin = (a.q9 || 0) * 0.6;
+    var aa0 = (i0 / P) * 6.2832 + spin,
+      aa1 = (i1 / P) * 6.2832 + spin;
+    var R = (a.q5 || 0.4) * 1.4;
+    var x0 = Math.cos(aa0) * R,
+      y0 = Math.sin(aa0) * R,
+      x1 = Math.cos(aa1) * R,
+      y1 = Math.sin(aa1) * R;
+    var px = x0 + (x1 - x0) * u,
+      py = y0 + (y1 - y0) * u;
+    var dxc = x1 - x0,
+      dyc = y1 - y0,
+      ln = Math.hypot(dxc, dyc) || 1;
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.7; // live-waveform jag, perpendicular to the chord
+    px += (-dyc / ln) * jag;
+    py += (dxc / ln) * jag;
+    // PERSPECTIVE foreshorten toward a slowly-rotating off-center tilt direction → 3D-tilted net sheet
+    var tA = (a.q9 || 0) * 0.5 + 1.0;
+    var proj = px * Math.cos(tA) + py * Math.sin(tA);
+    var d = 1.0 / (1.0 + 0.85 * proj);
+    if (d > 1.8) d = 1.8;
+    px *= d;
+    py *= d;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + px;
+    a.y = cy + py;
+    var h = (a.q8 || 0) + u * 0.15;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0; // hide chord-to-chord jumps
+    return a;
+  }
+  // SPIRAL VORTEX / whirlpool (survey gap, 1:05-1:16): radial filaments whose angle GROWS with radius →
+  // they curl into a rotating log-spiral DRAIN (distinct from urchin/tunnel's straight radial spokes).
+  function fVortex(a) {
+    var N = 56,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var baseAng = (seg / N) * 6.2832 + (a.q9 || 0) * 2.0;
+    var rad = (a.q5 || 0.4) * (0.12 + 0.9 * u) + (a.value1 || 0) * 0.05 * u;
+    var ang = baseAng + 3.0 * rad; // log-spiral twist: outer filaments wind tangentially → the drain
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + rad * Math.cos(ang);
+    a.y = cy + rad * Math.sin(ang);
+    var h = (a.q8 || 0) + rad * 0.3;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.03) a.a = 0;
+    return a;
+  }
+  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons + wireframe-net + vortex.
+  // ROSE (smooth Lissajous loops) and ROTLINE (radial filament SPRAY) were REMOVED — the user rejected
+  // both ("WTF is this shape" / "mess of net"). NOTE: fNet is the DELIBERATE woven net (star-art +
+  // foreshorten), distinct from the rejected chaotic rotline spray. Radial-tunnel DEPTH lives in q29=2.
+  var MODES = [fAnem, fStarNet, fUrchin, fCrossX, fTri, fNgon, fHexagram, fNet, fVortex];
+  // ADDITIVE dense modes (anemone/urchin/net/vortex) pile up → lower alpha; crisp outline modes keep more.
+  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
   }
@@ -474,7 +543,7 @@
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 1, 3]; // 0 wavy-fluid · 1 kaleidoscope · 2 radial-tunnel · 3 corridor
-  var MOTIF_BAG = [0, 0, 0, 1, 1, 1, 2, 3, 4, 5, 6, 6]; // anemone + star-mandala DOMINANT; urchin/cross/triangle/square/hexagram accents
+  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]; // anemone/star DOMINANT; urchin/cross/tri/square/hexagram + wireframe-NET (×2, iconic) + vortex accents
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
