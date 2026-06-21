@@ -79,102 +79,138 @@
   //    composited on top so the vivid trails POP on the dark calm field; soft bloom glow; the
   //    kaleidoscope tiled-diamond fold + radial tunnel as accent regimes; tone-map + measured
   //    resaturate (sat ~0.4-0.5, NOT neon). fg + bg share the q8 hue clock → harmonious/analogous. ──
-  var COMP_V7 =
-    NOISE_GLSL +
-    PAL_GLSL +
-    "vec3 rgb2hsv(vec3 c){ vec4 K=vec4(0.0,-1.0/3.0,2.0/3.0,-1.0); vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g)); vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r)); float d=q.x-min(q.w,q.y); float e=1.0e-10; return vec3(abs(q.z+(q.w-q.y)/(6.0*d+e)), d/(q.x+e), q.x); }\n" +
-    "vec3 hsv2rgb(vec3 c){ vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0); vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www); return c.z*mix(K.xxx, clamp(p-K.xxx,0.0,1.0), c.y); }\n" +
-    "shader_body {\n" +
-    "  float asp = resolution.x / resolution.y;\n" +
-    "  float m = floor(q29 + 0.5);\n" + // 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel
-    "  vec2 c = uv - 0.5; c.x *= asp; float prad = length(c);\n" +
-    "  float hb = q8;\n" +
-    // ── sample coord: KALEIDOSCOPE tiled-diamond mirror-fold when m==1 (the reference's repeating
-    //    diamond lattice of mirrored bursts) — a 4-fold abs mirror repeated ~1.6× across the frame. ──
-    "  vec2 suv = uv;\n" +
-    "  if (m > 0.5 && m < 1.5) {\n" +
-    "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * q13); kc.x *= asp;\n" +
-    "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
-    "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
-    "  }\n" +
-    // ── the watercolour TRAIL + motif buffer (a tiny max-dilate so thin lines survive) + bloom glow ──
-    "  vec2 dpx = 1.0 / resolution;\n" +
-    "  vec3 trail = texture2D(sampler_main, suv).rgb;\n" +
-    "  trail = max(trail, texture2D(sampler_main, suv + vec2(dpx.x, 0.0)).rgb);\n" +
-    "  trail = max(trail, texture2D(sampler_main, suv - vec2(dpx.x, 0.0)).rgb);\n" +
-    "  trail = max(trail, texture2D(sampler_main, suv + vec2(0.0, dpx.y)).rgb);\n" +
-    "  trail = max(trail, texture2D(sampler_main, suv - vec2(0.0, dpx.y)).rgb);\n" +
-    "  vec3 glow = texture2D(sampler_blur1, suv).rgb;\n" +
-    // ── DARK WAVY-FLUID GROUND (the W scene). Domain-warped fbm → liquid wavy bands; 3 ANALOGOUS dusty
-    //    tones; kept DARK (measured V~0.2) + desaturated so the trails carry the vivid colour. ──
-    "  vec2 g = c * 1.25;\n" +
-    "  vec2 dw = vec2(fbm(g + vec2(time * 0.05, -time * 0.03)), fbm(g + vec2(4.0, 1.3) - time * 0.04));\n" +
-    "  float n = fbm(g * 1.4 + dw * 1.7 + vec2(-time * 0.02, time * 0.025));\n" +
-    "  float n2 = fbm(g * 2.3 - dw * 1.1 + vec2(0.0, -time * 0.05));\n" +
-    "  vec3 ga = pal(hb + 0.03), gb2 = pal(hb + 0.17), gcc = pal(hb - 0.12);\n" +
-    "  vec3 ground = mix(ga, gb2, smoothstep(0.3, 0.7, n));\n" +
-    "  ground = mix(ground, gcc, smoothstep(0.45, 0.82, n2) * 0.55);\n" +
-    "  { float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.55); }\n" + // calm/dusty
-    "  ground *= 0.17 * (0.55 + 0.85 * n);\n" + // DARK ground — trails do the talking
-    // ── RADIAL-TUNNEL regime (m==2): converging spokes from the centre vanishing point = depth. ──
-    "  if (m > 1.5 && m < 2.5) {\n" +
-    "    float pa = atan(c.y, c.x);\n" +
-    "    float spokes = pow(0.5 + 0.5 * cos(pa * 40.0 + time * 0.1), 7.0);\n" +
-    "    float depth = smoothstep(1.25, 0.05, prad);\n" +
-    "    ground = ground * 0.45 + pal(hb + 0.12) * spokes * depth * 0.55;\n" +
-    "  }\n" +
-    // CORRIDOR regime (m==3): a near-black VOID so the marching ring-orbs + the jagged waveform thread
-    // glow as the only light (the reference's 0:06-0:16 corridor is on pure black), with a faint central
-    // horizontal depth-haze along the orbit line.
-    "  if (m > 2.5 && m < 3.5) {\n" +
-    "    ground = ground * 0.05 + pal(hb + 0.1) * 0.03 * exp(-pow(c.y * 6.0, 2.0));\n" +
-    "  }\n" +
-    // ── STRUCTURED-FIELD backgrounds (survey gaps) — they REPLACE the wavy ground. ──
-    // 4 VERTICAL BARS / barcode (1:48-2:02): purple↔green vertical stripes, top-bottom mirrored.
-    "  else if (m > 3.5 && m < 4.5) {\n" +
-    "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
-    "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
-    "    ground = barCol * (0.07 + 0.16 * bars);\n" +
-    "  }\n" +
-    // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
-    "  else if (m > 4.5 && m < 5.5) {\n" +
-    "    ground = mix(pal(hb), pal(hb + 0.13), 0.5 + 0.5 * sin(time * 0.06));\n" +
-    "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.5);\n" +
-    "    ground *= 0.15 + 0.03 * n;\n" + // faint fbm tooth so it's not dead-flat
-    "  }\n" +
-    // 6 HORIZONTAL colour BANDS (2:28-2:39): smooth horizontal stripes, slow vertical drift.
-    "  else if (m > 5.5 && m < 6.5) {\n" +
-    "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
-    "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
-    "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
-    "    ground *= 0.14;\n" +
-    "  }\n" +
-    // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
-    "  else if (m > 6.5) {\n" +
-    "    float rng = 0.5 + 0.5 * sin((prad * 7.0 - time * 0.2) * 6.2832);\n" +
-    "    ground = mix(pal(hb + 0.02), pal(hb + 0.2), rng) * (0.05 + 0.13 * rng);\n" +
-    "  }\n" +
-    // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
-    //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
-    "  if (m > 0.5 && m < 1.5) {\n" +
-    "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
-    "    vec3 kcol = pal(hb + cell * 0.45 + 0.12 * suv.x);\n" + // bold 2-tone duo across cells
-    "    kcol = kcol * kcol * 1.7;\n" + // strong contrast → vivid, not pastel
-    "    ground = mix(ground * 0.12, kcol, 0.9);\n" +
-    "  }\n" +
-    "  ground *= mix(0.55, 1.06, smoothstep(1.45, 0.1, prad));\n" + // depth vignette
-    // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth). ──
-    "  vec3 col = ground + trail * 1.28 + glow * 0.6;\n" +
-    "  col *= q31;\n" + // exposure (smoothed beat lift)
-    // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
-    //    luminance-preserving resaturate toward the measured ~0.45 + a darks-deepen so the dark ground
-    //    stays near-black and saturated trails pop. Never lift highlights to neon-white. ──
-    "  vec3 toned = col / (col + vec3(0.55));\n" +
-    "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
-    "  toned = mix(vec3(tl), toned, 1.2);\n" +
-    "  toned = mix(toned * toned, toned, 0.68);\n" +
-    "  ret = clamp(toned, 0.0, 1.0);\n" +
-    "}\n";
+  // GLSL float-literal formatter (so int profile values splice as floats, e.g. 1 → "1.0").
+  function G(n) {
+    n = String(n);
+    return /[.eE]/.test(n) ? n : n + ".0";
+  }
+  // ── COMP factory: the ONLY thing that differs between the two variants (Pastel vs Vivid) is this
+  //    final COLOUR profile P. All geometry/engine/motifs/scenes/camera are shared. P knobs:
+  //    gboost (ground brightness) · kbold (kaleidoscope boldness) · tonek (Reinhard knee) ·
+  //    sat (resaturate: >1 boost / <1 mute) · deepen (darks: <1 deepen / →1 milky) · lift (milky floor) ·
+  //    tintR/G/B + tintAmt (a subtle hue bias, used for the pastel mauve/sage cast). ──
+  function makeComp(P) {
+    return (
+      NOISE_GLSL +
+      PAL_GLSL +
+      "vec3 rgb2hsv(vec3 c){ vec4 K=vec4(0.0,-1.0/3.0,2.0/3.0,-1.0); vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g)); vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r)); float d=q.x-min(q.w,q.y); float e=1.0e-10; return vec3(abs(q.z+(q.w-q.y)/(6.0*d+e)), d/(q.x+e), q.x); }\n" +
+      "vec3 hsv2rgb(vec3 c){ vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0); vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www); return c.z*mix(K.xxx, clamp(p-K.xxx,0.0,1.0), c.y); }\n" +
+      "shader_body {\n" +
+      "  float asp = resolution.x / resolution.y;\n" +
+      "  float m = floor(q29 + 0.5);\n" + // 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel
+      "  vec2 c = uv - 0.5; c.x *= asp; float prad = length(c);\n" +
+      "  float hb = q8;\n" +
+      // ── sample coord: KALEIDOSCOPE tiled-diamond mirror-fold when m==1 (the reference's repeating
+      //    diamond lattice of mirrored bursts) — a 4-fold abs mirror repeated ~1.6× across the frame. ──
+      "  vec2 suv = uv;\n" +
+      "  if (m > 0.5 && m < 1.5) {\n" +
+      "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * q13); kc.x *= asp;\n" +
+      "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
+      "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
+      "  }\n" +
+      // ── the watercolour TRAIL + motif buffer (a tiny max-dilate so thin lines survive) + bloom glow ──
+      "  vec2 dpx = 1.0 / resolution;\n" +
+      "  vec3 trail = texture2D(sampler_main, suv).rgb;\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv + vec2(dpx.x, 0.0)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv - vec2(dpx.x, 0.0)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv + vec2(0.0, dpx.y)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv - vec2(0.0, dpx.y)).rgb);\n" +
+      "  vec3 glow = texture2D(sampler_blur1, suv).rgb;\n" +
+      // ── DARK WAVY-FLUID GROUND (the W scene). Domain-warped fbm → liquid wavy bands; 3 ANALOGOUS dusty
+      //    tones; kept DARK (measured V~0.2) + desaturated so the trails carry the vivid colour. ──
+      "  vec2 g = c * 1.25;\n" +
+      "  vec2 dw = vec2(fbm(g + vec2(time * 0.05, -time * 0.03)), fbm(g + vec2(4.0, 1.3) - time * 0.04));\n" +
+      "  float n = fbm(g * 1.4 + dw * 1.7 + vec2(-time * 0.02, time * 0.025));\n" +
+      "  float n2 = fbm(g * 2.3 - dw * 1.1 + vec2(0.0, -time * 0.05));\n" +
+      "  vec3 ga = pal(hb + 0.03), gb2 = pal(hb + 0.17), gcc = pal(hb - 0.12);\n" +
+      "  vec3 ground = mix(ga, gb2, smoothstep(0.3, 0.7, n));\n" +
+      "  ground = mix(ground, gcc, smoothstep(0.45, 0.82, n2) * 0.55);\n" +
+      "  { float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.55); }\n" + // calm/dusty
+      "  ground *= 0.17 * (0.55 + 0.85 * n);\n" + // DARK ground — trails do the talking
+      // ── RADIAL-TUNNEL regime (m==2): converging spokes from the centre vanishing point = depth. ──
+      "  if (m > 1.5 && m < 2.5) {\n" +
+      "    float pa = atan(c.y, c.x);\n" +
+      "    float spokes = pow(0.5 + 0.5 * cos(pa * 40.0 + time * 0.1), 7.0);\n" +
+      "    float depth = smoothstep(1.25, 0.05, prad);\n" +
+      "    ground = ground * 0.45 + pal(hb + 0.12) * spokes * depth * 0.55;\n" +
+      "  }\n" +
+      // CORRIDOR regime (m==3): a near-black VOID so the marching ring-orbs + the jagged waveform thread
+      // glow as the only light (the reference's 0:06-0:16 corridor is on pure black), with a faint central
+      // horizontal depth-haze along the orbit line.
+      "  if (m > 2.5 && m < 3.5) {\n" +
+      "    ground = ground * 0.05 + pal(hb + 0.1) * 0.03 * exp(-pow(c.y * 6.0, 2.0));\n" +
+      "  }\n" +
+      // ── STRUCTURED-FIELD backgrounds (survey gaps) — they REPLACE the wavy ground. ──
+      // 4 VERTICAL BARS / barcode (1:48-2:02): purple↔green vertical stripes, top-bottom mirrored.
+      "  else if (m > 3.5 && m < 4.5) {\n" +
+      "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
+      "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
+      "    ground = barCol * (0.07 + 0.16 * bars);\n" +
+      "  }\n" +
+      // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
+      "  else if (m > 4.5 && m < 5.5) {\n" +
+      "    ground = mix(pal(hb), pal(hb + 0.13), 0.5 + 0.5 * sin(time * 0.06));\n" +
+      "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.5);\n" +
+      "    ground *= 0.15 + 0.03 * n;\n" + // faint fbm tooth so it's not dead-flat
+      "  }\n" +
+      // 6 HORIZONTAL colour BANDS (2:28-2:39): smooth horizontal stripes, slow vertical drift.
+      "  else if (m > 5.5 && m < 6.5) {\n" +
+      "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
+      "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
+      "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
+      "    ground *= 0.14;\n" +
+      "  }\n" +
+      // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
+      "  else if (m > 6.5) {\n" +
+      "    float rng = 0.5 + 0.5 * sin((prad * 7.0 - time * 0.2) * 6.2832);\n" +
+      "    ground = mix(pal(hb + 0.02), pal(hb + 0.2), rng) * (0.05 + 0.13 * rng);\n" +
+      "  }\n" +
+      // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
+      //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
+      "  if (m > 0.5 && m < 1.5) {\n" +
+      "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
+      "    vec3 kcol = pal(hb + cell * 0.45 + 0.12 * suv.x);\n" + // bold 2-tone duo across cells
+      "    kcol = kcol * kcol * " +
+      G(P.kbold) +
+      ";\n" + // PROFILE: kaleidoscope boldness (vivid bold / pastel soft)
+      "    ground = mix(ground * 0.12, kcol, 0.9);\n" +
+      "  }\n" +
+      "  ground *= mix(0.55, 1.06, smoothstep(1.45, 0.1, prad));\n" + // depth vignette
+      "  ground *= " +
+      G(P.gboost) +
+      ";\n" + // PROFILE: ground brightness (pastel lifts the washes; vivid keeps dark)
+      // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth). ──
+      "  vec3 col = ground + trail * 1.28 + glow * 0.6;\n" +
+      "  col *= q31;\n" + // exposure (smoothed beat lift)
+      // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
+      //    luminance-preserving resaturate toward the measured ~0.45 + a darks-deepen so the dark ground
+      //    stays near-black and saturated trails pop. Never lift highlights to neon-white. ──
+      "  vec3 toned = col / (col + vec3(" +
+      G(P.tonek) +
+      "));\n" +
+      "  float tl = dot(toned, vec3(0.299, 0.587, 0.114));\n" +
+      "  toned = mix(vec3(tl), toned, " +
+      G(P.sat) +
+      ");\n" + // PROFILE: saturation (vivid >1 / pastel <1)
+      "  toned = mix(toned * toned, toned, " +
+      G(P.deepen) +
+      ");\n" + // PROFILE: darks (vivid deepen / pastel milky)
+      "  toned = toned + " +
+      G(P.lift) +
+      " * (1.0 - toned);\n" + // PROFILE: milky lift (pastel softens the floor)
+      "  toned = mix(toned, toned * vec3(" +
+      G(P.tintR) +
+      ", " +
+      G(P.tintG) +
+      ", " +
+      G(P.tintB) +
+      ") * 1.8, " +
+      G(P.tintAmt) +
+      ");\n" + // PROFILE: tint (pastel mauve/sage cast)
+      "  ret = clamp(toned, 0.0, 1.0);\n" +
+      "}\n"
+    );
+  }
 
   var BASE = {
     wave_a: 0,
@@ -904,128 +940,164 @@
 
   // ── build: WAVE0 central motif · WAVE1 star-net companion lattice (gated) · WAVE2 tether ·
   //    SHAPE0/1 filled orbs · SHAPE2/3 additive glow halos. ──
-  var preset = build(BASE, { frame: frame, warp: WARP_V7, comp: COMP_V7 });
-  preset.waves[0] = {
-    baseVals: Object.assign({}, WAVE_BASE, {
-      enabled: 1,
-      samples: 512,
-      additive: 1,
-      usedots: 0,
-      scaling: 1,
-      smoothing: 0.25,
-      thick: 1,
-      a: 0.62,
-    }),
-    init_eqs: passthrough,
-    frame_eqs: passthrough,
-    point_eqs: function (a) {
-      return centralDraw(a);
-    },
-  };
-  // WAVE1 = star-net companion (a 2nd star rotated a half-step + shorter) — denser 12-point mandala;
-  // gated to motif mode 1 so it never bleeds through other motifs.
-  preset.waves[1] = {
-    baseVals: Object.assign({}, WAVE_BASE, {
-      enabled: 1,
-      samples: 512,
-      additive: 1,
-      usedots: 0,
-      scaling: 1,
-      smoothing: 0.25,
-      thick: 1,
-      a: 0.5,
-    }),
-    init_eqs: passthrough,
-    frame_eqs: passthrough,
-    point_eqs: function (a) {
-      if (Math.abs((a.q30 || 0) - 1) > 0.5) {
-        a.a = 0;
+  function buildV7(comp) {
+    var preset = build(BASE, { frame: frame, warp: WARP_V7, comp: comp });
+    preset.waves[0] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 1,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.25,
+        thick: 1,
+        a: 0.62,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        return centralDraw(a);
+      },
+    };
+    // WAVE1 = star-net companion (a 2nd star rotated a half-step + shorter) — denser 12-point mandala;
+    // gated to motif mode 1 so it never bleeds through other motifs.
+    preset.waves[1] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 1,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.25,
+        thick: 1,
+        a: 0.5,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        if (Math.abs((a.q30 || 0) - 1) > 0.5) {
+          a.a = 0;
+          return a;
+        }
+        var N = 6,
+          fk = (a.sample || 0) * N,
+          seg = Math.floor(fk),
+          u = fk - seg,
+          s = u * 2 - 1;
+        var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
+        var len = (a.q5 || 0.4) * 0.85,
+          jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
+        var cx = a.q2 !== undefined ? a.q2 : 0.5,
+          cy = a.q3 !== undefined ? a.q3 : 0.5;
+        a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
+        a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
+        var h = (a.q8 || 0) + 0.18;
+        a.r = orbCol(h, 0);
+        a.g = orbCol(h, 0.33);
+        a.b = orbCol(h, 0.67);
+        a.a = u < 0.02 ? 0 : 0.5;
         return a;
-      }
-      var N = 6,
-        fk = (a.sample || 0) * N,
-        seg = Math.floor(fk),
-        u = fk - seg,
-        s = u * 2 - 1;
-      var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
-      var len = (a.q5 || 0.4) * 0.85,
-        jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
-      var cx = a.q2 !== undefined ? a.q2 : 0.5,
-        cy = a.q3 !== undefined ? a.q3 : 0.5;
-      a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
-      a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
-      var h = (a.q8 || 0) + 0.18;
-      a.r = orbCol(h, 0);
-      a.g = orbCol(h, 0.33);
-      a.b = orbCol(h, 0.67);
-      a.a = u < 0.02 ? 0 : 0.5;
-      return a;
-    },
-  };
-  preset.waves[2] = {
-    baseVals: Object.assign({}, WAVE_BASE, {
-      enabled: 1,
-      samples: 512,
-      additive: 0,
-      usedots: 0,
-      scaling: 1,
-      smoothing: 0.0,
-      thick: 1,
-      a: 0.9,
-    }),
-    init_eqs: passthrough,
-    frame_eqs: passthrough,
-    point_eqs: function (a) {
-      fTether(a);
-      var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
-      var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // flashes on the beat
-      var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
-      a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor);
-      return a;
-    },
-  };
-  // waves[3] = CORRIDOR ring-dot ROW — a row of glowing dots receding from the near-left anchor toward a
-  // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
-  // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
-  preset.waves[3] = {
-    baseVals: Object.assign({}, WAVE_BASE, {
-      enabled: 1,
-      samples: 80,
-      additive: 1,
-      usedots: 1,
-      scaling: 1,
-      smoothing: 0.0,
-      thick: 1,
-      a: 0.85,
-    }),
-    init_eqs: passthrough,
-    frame_eqs: passthrough,
-    point_eqs: function (a) {
-      if (Math.abs((a.q29 || 0) - 3) > 0.5) {
-        a.a = 0;
+      },
+    };
+    preset.waves[2] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 0,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.0,
+        thick: 1,
+        a: 0.9,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        fTether(a);
+        var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
+        var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // flashes on the beat
+        var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
+        a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor);
         return a;
-      }
-      var K = 10,
-        idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
-      var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
-      var nearX = 0.16,
-        nearY = 0.52,
-        vpx = 0.82,
-        vpy = 0.49;
-      a.x = nearX + (vpx - nearX) * d;
-      a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-      var h = a.q8 || 0;
-      a.r = orbCol(h, 0);
-      a.g = orbCol(h, 0.33);
-      a.b = orbCol(h, 0.67);
-      a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
-      return a;
-    },
-  };
-  preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25"); // orb A (near-persistent anchor)
-  preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14"); // orb B (comes & goes; different hue)
-  preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25"); // additive glow halo A
-  preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14"); // additive glow halo B
+      },
+    };
+    // waves[3] = CORRIDOR ring-dot ROW — a row of glowing dots receding from the near-left anchor toward a
+    // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
+    // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
+    preset.waves[3] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 80,
+        additive: 1,
+        usedots: 1,
+        scaling: 1,
+        smoothing: 0.0,
+        thick: 1,
+        a: 0.85,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        if (Math.abs((a.q29 || 0) - 3) > 0.5) {
+          a.a = 0;
+          return a;
+        }
+        var K = 10,
+          idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+        var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
+        var nearX = 0.16,
+          nearY = 0.52,
+          vpx = 0.82,
+          vpy = 0.49;
+        a.x = nearX + (vpx - nearX) * d;
+        a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+        var h = a.q8 || 0;
+        a.r = orbCol(h, 0);
+        a.g = orbCol(h, 0.33);
+        a.b = orbCol(h, 0.67);
+        a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+        return a;
+      },
+    };
+    preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25"); // orb A (near-persistent anchor)
+    preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14"); // orb B (comes & goes; different hue)
+    preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25"); // additive glow halo A
+    preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14"); // additive glow halo B
 
-  P["Alchemy V7: Random"] = preset;
+    return preset;
+  }
+
+  // ── TWO VARIANTS — identical geometry/engine/motifs/scenes/camera; ONLY the COMP colour profile differs. ──
+  // PASTEL = the accurate WMP look (480p + the orig-19s clip both measure muted/dusty/pastel, true blacks):
+  // lower saturation, lifted softer washes, milky low-contrast, a faint mauve/sage cast.
+  var PROFILE_PASTEL = {
+    gboost: 1.7,
+    kbold: 0.85,
+    tonek: 0.85,
+    sat: 0.62,
+    deepen: 0.95,
+    lift: 0.05,
+    tintR: 0.5,
+    tintG: 0.5,
+    tintB: 0.62,
+    tintAmt: 0.12,
+  };
+  // VIVID = the punchier 1080p-tuned look (what the user liked): boosted saturation, dark grounds,
+  // deepened darks, bold kaleidoscope, no tint.
+  var PROFILE_VIVID = {
+    gboost: 1.0,
+    kbold: 1.7,
+    tonek: 0.55,
+    sat: 1.2,
+    deepen: 0.68,
+    lift: 0.0,
+    tintR: 0.5,
+    tintG: 0.5,
+    tintB: 0.5,
+    tintAmt: 0.0,
+  };
+  P["Alchemy V7: Random (Pastel)"] = buildV7(makeComp(PROFILE_PASTEL));
+  P["Alchemy V7: Random (Vivid)"] = buildV7(makeComp(PROFILE_VIVID));
+  // back-compat: the old single name still resolves (→ Vivid, the look the user already liked).
+  P["Alchemy V7: Random"] = P["Alchemy V7: Random (Vivid)"];
 })();
