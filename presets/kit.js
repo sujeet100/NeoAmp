@@ -2465,16 +2465,33 @@ function alcSmokeVortex(opts) {
     eye > 0
       ? "  lum *= smoothstep(" + (eye * 0.18).toFixed(4) + ", " + eye.toFixed(3) + ", ar);\n"
       : "";
-  // cloud advection: rotating around the eye (vortex) or pure cartesian drift (smoke-or-water)
-  var rotateCloud = opts.rotateCloud === undefined ? true : opts.rotateCloud;
-  var cloudLines = rotateCloud
-    ? "  float aa = atan(dd.y, dd.x) + time*0.12 + 0.6/(ar+0.18);\n" +
-      "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
-      "  float dens = fbm(csw*4.5 + time*0.05);\n"
-    : "  float dens = fbm(dd*4.5 + vec2(time*0.06, -time*0.04));\n"; // cartesian drift, no vortex
   // optional radius-dependent COUNTER-ROTATION shear: inner core spins one way, outer layer the
   // other (the "vortex shear" of the-world). opts.shear = the boundary radius (0 = uniform swirl).
   var shear = opts.shear === undefined ? 0 : opts.shear;
+  // optional concentric RING (radiating band) modulation of the cloud — the satellite-storm shells.
+  var rings = opts.rings === undefined ? 0 : opts.rings;
+  var ringExpr =
+    rings > 0 ? " * (1.0 - " + rings.toFixed(3) + "*(0.5+0.5*sin(ar*26.0 - time*1.6)))" : "";
+  // cloud advection: counter-rotating shear (the-world), uniform swirl (vortex), or cartesian drift
+  var rotateCloud = opts.rotateCloud === undefined ? true : opts.rotateCloud;
+  var cloudLines = !rotateCloud
+    ? "  float dens = fbm(dd*4.5 + vec2(time*0.06, -time*0.04))" + ringExpr + ";\n" // cartesian drift, no vortex
+    : shear > 0
+      ? "  float spin = mix(1.0, -1.0, smoothstep(" +
+        (shear - 0.05).toFixed(3) +
+        ", " +
+        (shear + 0.05).toFixed(3) +
+        ", ar));\n" + // inner vs outer COUNTER-rotate
+        "  float aa = atan(dd.y, dd.x) + spin*time*0.26;\n" +
+        "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
+        "  float dens = fbm(csw*4.5 + time*0.05)" +
+        ringExpr +
+        ";\n"
+      : "  float aa = atan(dd.y, dd.x) + time*0.12 + 0.6/(ar+0.18);\n" +
+        "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
+        "  float dens = fbm(csw*4.5 + time*0.05)" +
+        ringExpr +
+        ";\n";
   var saExpr =
     shear > 0
       ? sw + " * clamp((" + shear.toFixed(3) + " - sr)*7.0, -1.0, 1.0) / (sr + 0.12)"

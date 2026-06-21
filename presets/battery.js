@@ -1222,6 +1222,7 @@
       vignette: 0.6,
       speckle: 0.08,
       cloud: 1.0, // dense satellite-storm cloud
+      rings: 0.45, // concentric radiating bands (the satellite-storm shells)
       eye: 0.1, // small dark center between the twin eyes
       toneK: 0.46, // mid-grey body (target YAVG ~120)
     });
@@ -1242,13 +1243,13 @@
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
-          var oa = t.time * 0.4; // the twin circles orbit each other
-          var ro = 0.16; // orbit radius
+          var oa = t.time * 0.3; // the twin circles orbit each other (slow enough to read as 2)
+          var ro = 0.17; // orbit radius
           t.q21 = 0.5 + ro * Math.cos(oa);
           t.q22 = 0.49 + ro * Math.sin(oa);
           t.q23 = 0.5 - ro * Math.cos(oa); // opposite phase -> the twin eye
           t.q24 = 0.49 - ro * Math.sin(oa);
-          t.q5 = 0.07 + 0.03 * (b - 1); // each circle's radius pulses with bass
+          t.q5 = 0.085 + 0.03 * (b - 1); // each circle's radius pulses with bass
           t.decay = 0.96;
           return t;
         },
@@ -1260,10 +1261,10 @@
     preset.waves[0] = circleWave("q21", "q22");
     preset.waves[1] = circleWave("q23", "q24");
     for (var wi = 0; wi < 2; wi++) {
-      preset.waves[wi].baseVals.r = 0.85;
-      preset.waves[wi].baseVals.g = 0.86;
-      preset.waves[wi].baseVals.b = 0.9;
-      preset.waves[wi].baseVals.a = 0.5;
+      preset.waves[wi].baseVals.r = 0.9;
+      preset.waves[wi].baseVals.g = 0.91;
+      preset.waves[wi].baseVals.b = 0.95;
+      preset.waves[wi].baseVals.a = 0.85; // prominent — reads as the 2-circle engine
       preset.waves[wi].baseVals.additive = 1;
       preset.waves[wi].baseVals.smoothing = 0.04; // jagged
     }
