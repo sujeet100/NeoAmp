@@ -170,6 +170,9 @@
       "  if (m > 0.5 && m < 1.5) {\n" +
       "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
       "    vec3 kcol = pal(hb + cell * 0.45 + 0.12 * suv.x);\n" + // bold 2-tone duo across cells
+      "    float kl = dot(kcol, vec3(0.333)); kcol = mix(vec3(kl), kcol, " +
+      G(P.ksat) +
+      ");\n" + // PROFILE: kaleidoscope SATURATION (vivid full / pastel muted — was reading too vivid in pastel)
       "    kcol = kcol * kcol * " +
       G(P.kbold) +
       ";\n" + // PROFILE: kaleidoscope boldness (vivid bold / pastel soft)
@@ -1070,7 +1073,8 @@
   // lower saturation, lifted softer washes, milky low-contrast, a faint mauve/sage cast.
   var PROFILE_PASTEL = {
     gboost: 1.32, // was 1.7 — too washed; muted but the geometry keeps presence on a darker-ish ground
-    kbold: 1.0,
+    kbold: 0.85,
+    ksat: 0.38, // kaleidoscope diamonds DESATURATED → soft pastel (they were reading too vivid in pastel)
     tonek: 0.68,
     sat: 0.82, // was 0.62 — keep real (muted) COLOUR, not greyed-out
     deepen: 0.84, // was 0.95 — restore some contrast so it isn't flat/milky
@@ -1085,6 +1089,7 @@
   var PROFILE_VIVID = {
     gboost: 1.0,
     kbold: 1.7,
+    ksat: 1.0, // full-saturation bold diamonds (the vivid red/green kaleidoscope)
     tonek: 0.55,
     sat: 1.2,
     deepen: 0.68,
