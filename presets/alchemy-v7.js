@@ -515,11 +515,11 @@
       gx = t * R;
       gy = p * R;
     }
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.45; // gentle perpendicular live-waveform jag
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.2; // SOFTENED: gentler perpendicular jag (cleaner grid)
     if (half === 0) gy += jag;
     else gx += jag;
     // GENTLE perspective foreshorten toward a slow tilt direction → a tilted sheet (not an extreme stretch)
-    var tA = (a.q9 || 0) * 0.5 + 0.7;
+    var tA = (a.q9 || 0) * 0.15 + 0.7; // SOFTENED: tilt direction barely rotates → less rotational smear
     var proj = gx * Math.cos(tA) + gy * Math.sin(tA);
     var d = 1.0 / (1.0 + 0.4 * proj);
     if (d > 1.4) d = 1.4;
@@ -595,7 +595,7 @@
       u = fk - seg;
     var i0 = (seg * stride) % P,
       i1 = (seg * stride + stride) % P;
-    var sp = (a.q9 || 0) * 0.4;
+    var sp = (a.q9 || 0) * 0.12; // SOFTENED: barely rotate (was 0.4) → no rotational smear-into-a-gear-web
     var aa0 = (i0 / P) * 6.2832 + sp,
       aa1 = (i1 / P) * 6.2832 + sp;
     var R = (a.q5 || 0.4) * 1.3;
@@ -608,7 +608,7 @@
     var dxc = x1 - x0,
       dyc = y1 - y0,
       ln = Math.hypot(dxc, dyc) || 1;
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.5;
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.15; // SOFTENED: clean star points (was 0.5 → toothed/gear-like)
     px += (-dyc / ln) * jag;
     py += (dxc / ln) * jag;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
