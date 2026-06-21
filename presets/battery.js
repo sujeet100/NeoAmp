@@ -76,19 +76,22 @@
   })();
 
   // ── Battery strawberryaid ──────────────────────────────────────────────────
-  // Pink/red radial starburst: two jagged rings spiking outward on the bass.
+  // A WHITE-HOT core bloom (alcGlowDisc) threaded by a jagged oscilloscope waveform RIBBON,
+  // with fine radial STREAKS shooting outward, on a FIXED strawberry-crimson field (highlights
+  // read pink naturally — NOT a hue cycle). Opens with a brief GREEN ignition (alcIntroRamp,
+  // ~3s) then holds red. Bass swells the core + scales the burst. Moderate saturation.
   P["Battery strawberryaid"] = (function () {
+    var intro = alcIntroRamp(3.0); // one-shot green -> red on spawn
     var preset = build(
       {
         wave_a: 0,
-        wave_smoothing: 0.1,
         additivewave: 1,
         wave_scale: 1.4,
         decay: 0.93,
         gammaadj: 2.0,
-        zoom: 1.0,
-        rot: 0.01,
-        warp: 0.05,
+        zoom: 1.008,
+        rot: 0.008,
+        warp: 0.04,
         cx: 0.5,
         cy: 0.5,
         darken_center: 0,
@@ -98,46 +101,50 @@
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1;
           var treb = t.treb || 1;
-          t.q1 = 0.5;
           t.q2 = 0.5;
-          t.q3 = 0.5;
-          t.q4 = 0.5;
-          t.q5 = 0.14 + 0.12 * bass;
-          t.q6 = 0.26 + 0.16 * bass;
-          t.wave_scale = 1.0 + 0.9 * bass + 0.3 * treb;
-          t.zoom = 1.0 + 0.02 * bass;
-          t.rot = 0.01 + 0.003 * Math.sin(t.time * 0.3);
+          t.q3 = 0.5; // ribbon + burst center
+          t.q5 = 0.06 + 0.05 * bass; // burst inner radius
+          t.q6 = 0.18 + 0.35 * bass; // burst spike reach (big on bass)
+          t.q20 = intro(t); // 0->1 green -> red ignition
+          t.wave_scale = 1.0 + 0.6 * bass;
+          t.zoom = 1.008 + 0.02 * (bass - 1);
+          t.rot = 0.008;
           t.decay = 0.93;
           return t;
         },
         comp:
           "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float lum = dot(c, vec3(0.4));\n" +
-          // strawberryaid slowly cycles its warm hue over time (red <-> pink/berry).
-          "vec3 pink = mix(vec3(0.95,0.16,0.22), vec3(0.95,0.30,0.62), 0.5+0.5*sin(time*0.06));\n" +
-          "vec3 deep = vec3(0.22, 0.0, 0.06);\n" +
-          "ret = deep + pink * lum * (1.6 + 0.8 * bass);\n" +
-          "float d = distance(uv, vec2(0.5));\n" +
-          "ret += vec3(0.5, 0.1, 0.2) * (0.25 - d) * 1.5;\n" +
+          "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+          "  float lum = dot(c, vec3(0.4));\n" +
+          "  vec3 redC = vec3(0.78,0.12,0.16);\n" + // strawberry crimson (fixed)
+          "  vec3 greenC = vec3(0.22,0.62,0.20);\n" + // intro green
+          "  vec3 hue = mix(greenC, redC, clamp(q20,0.0,1.0));\n" +
+          "  vec3 deep = mix(vec3(0.05,0.10,0.04), vec3(0.20,0.0,0.05), clamp(q20,0.0,1.0));\n" + // deep base
+          "  vec3 col = deep + hue * lum * 1.7;\n" +
+          "  ret = col;\n" +
+          alcGlowDisc("vec3(1.0,0.95,0.92)", "vec3(0.95,0.42,0.45)", 0.22) + // white-hot core + rose halo
+          alcVignette(0.4) +
+          "  ret = ret/(ret + vec3(0.7));\n" + // Reinhard -> soft pink highlights, not blown white
           "}\n",
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
+    // (1) horizontal jagged oscilloscope ribbon through center (the WMP signature)
+    preset.waves[0] = waveLine();
     preset.waves[0].baseVals.smoothing = 0.05;
-    preset.waves[0].baseVals.r = 0.95;
-    preset.waves[0].baseVals.g = 0.25;
-    preset.waves[0].baseVals.b = 0.45;
-    preset.waves[1] = circleWave("q3", "q4");
-    preset.waves[1].baseVals.smoothing = 0.05;
-    preset.waves[1].baseVals.r = 0.95;
-    preset.waves[1].baseVals.g = 0.35;
+    preset.waves[0].baseVals.a = 0.9;
+    // (2) radial spike burst -> fine streaks via the outward feedback zoom
+    preset.waves[1] = circleWave("q2", "q3");
+    preset.waves[1].baseVals.smoothing = 0.04;
+    preset.waves[1].baseVals.a = 0.85;
+    preset.waves[1].baseVals.additive = 1;
+    preset.waves[1].baseVals.r = 1.0;
+    preset.waves[1].baseVals.g = 0.5;
     preset.waves[1].baseVals.b = 0.55;
     preset.waves[1].point_eqs = function (a) {
       var ang = a.sample * 6.2832;
-      var rad = (a.q6 || 0.26) + 0.07 * a.value1;
-      a.x = 0.5 + rad * Math.cos(ang);
-      a.y = 0.5 + rad * Math.sin(ang);
+      var rad = (a.q5 || 0.06) + (a.q6 || 0.3) * a.value1; // big bass-scaled spikes
+      a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
+      a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
       return a;
     };
     return preset;
