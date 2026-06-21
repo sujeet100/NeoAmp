@@ -552,6 +552,41 @@
     if (u < 0.02) a.a = 0; // hide the half-to-half jump
     return a;
   }
+  // ROSE / RHODONEA (mode 12) — the original's central FLOWER as a SMOOTH CONTINUOUS curve (flowing,
+  // intersecting petals), NOT spiky bursts. r=cos(k·θ) traced over turns; negative r loops the curve
+  // THROUGH centre → the intersecting-petal flower. Bass breathes the size; slow spin (q9). Uniform line.
+  function fRose(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var k = 5.0; // 5-fold flower (odd → traces all petals in one continuous loop)
+    var th = s * 6.2832 + (a.q9 || 0);
+    var r = (a.q5 || 0.4) * (0.9 + 0.18 * (a.q10 || 0)) * Math.cos(k * th); // smooth petals, bass breathes
+    a.x = cx + r * Math.cos(th);
+    a.y = cy + r * Math.sin(th);
+    var h = (a.q8 || 0) + Math.abs(r) * 0.35; // gentle analogous shade base→tip
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
+  // LISSAJOUS WEB (mode 13) — smooth intersecting closed curve (coprime freqs) = the original's web/flower
+  // variant (continuous flowing loops). 2 turns → a denser web; slow phase drift via q9.
+  function fLissa(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var t = s * 6.2832 * 2.0;
+    var R = (a.q5 || 0.4) * (0.95 + 0.16 * (a.q10 || 0));
+    var rot = a.q9 || 0;
+    a.x = cx + R * Math.sin(3.0 * t + rot + 1.5708);
+    a.y = cy + R * Math.sin(2.0 * t);
+    var h = (a.q8 || 0) + s * 0.18;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
   var MODES = [
     fAnem,
     fSpin,
@@ -565,16 +600,20 @@
     fRibbon,
     fStarNet,
     fCrossX,
+    fRose,
+    fLissa,
   ];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
   // dense ADDITIVE radial modes (anem/spindle/urchin/fountain) pile up additively → white-out core, so
   // they get LOWER alpha; crisp outline/line modes keep more.
-  var MODE_ALPHA = [0.48, 0.34, 0.9, 0.82, 0.8, 0.52, 0.66, 0.36, 0.78, 0.52, 0.7, 0.68]; // anem·spin·ngon·tri·bolt·urchin·rotline·fountain·wavefan·ribbon·starnet·crossX
+  var MODE_ALPHA = [
+    0.48, 0.34, 0.9, 0.82, 0.8, 0.52, 0.66, 0.36, 0.78, 0.52, 0.7, 0.68, 0.78, 0.78,
+  ]; // …·ROSE·LISSA (smooth single-stroke curves → moderate alpha)
   function scaleFor(m) {
     // smaller central motif → it's an OBJECT in a deep space (dark surround + floating orbs in front),
     // not a flat starburst filling the whole frame edge-to-edge (the "flat" complaint).
-    return m === 0 ? 0.36 : m === 1 ? 0.3 : m === 7 ? 0.34 : 0.4;
+    return m === 0 ? 0.36 : m === 1 ? 0.3 : m === 7 ? 0.34 : m === 12 || m === 13 ? 0.42 : 0.4;
   }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
@@ -740,7 +779,7 @@
   // kaleidoscope/vortex/burst as ACCENTS. Uniform-random over all modes felt like a chaotic grab-bag of
   // neon/wireframe scenes; these bags bias toward the painterly looks so the OVERALL character matches.
   var BG_BAG = [0, 0, 0, 0, 5, 5, 6, 6, 3, 3, 2, 8, 1, 4, 7]; // FLUID-field dominant; tilt/vortex/bands next; kaleido (X-wedge/mandala) RARE (the 4-colour diamond read out of place); neon-dark dropped from rotation (it's only steered in for the wire/X motifs → reads flat as a bg)
-  var MOTIF_BAG = [0, 0, 0, 5, 5, 9, 9, 8, 6, 2, 1, 7, 4, 10, 11]; // anemone/urchin/ribbon-led (the central flower); fountain/wireframe/X rarer
+  var MOTIF_BAG = [12, 12, 12, 13, 13, 0, 0, 5, 9, 2, 8, 6, 1, 10, 11]; // SMOOTH parametric FLOWER (rose/Lissajous) DOMINANT — the original's flowing continuous curves; the spiky bursts (fountain/spindle) now rare
   var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
   var bgPick = makePicker(BG_BAG.length, 12, 22, 5.0); // background — own slow clock, long morph (mapped through BG_BAG)
   var motifPick = makePicker(MOTIF_BAG.length, 6, 12, 2.0); // central motif — own clock, dip-swap (mapped through MOTIF_BAG)
@@ -804,8 +843,12 @@
     // piled bursts to white). So zoom/roll are ~0 here; the depth/motion comes from the FLOWING colourful
     // bg + the orbiting shapes + soft fading trails. The structural modes (tilt/vortex/bullseye) ADD their
     // own feedback motion below — feedback camera is now scene-specific, not always-on.
-    t.q15 = 0.004 * Math.sin(time * 0.05) - 0.004 * Math.max(0, bassA - 1); // ≈stationary
-    t.q16 = L("rot") * 0.35 + 0.012 * Math.sin(time * 0.04); // GENTLE roll only (heavy roll spun the trails into spirals)
+    // POLAR TUNNEL (the original's real depth — 2D zoom+rotation feedback, NOT a faked 3D floor): a gentle
+    // continuous inward zoom + a continuous ROTATION → content spirals outward into a receding tunnel. The
+    // ROTATION is what makes it read as a 3D spinning tunnel rather than a flat "pulled-forward" zoom (the
+    // earlier straight plunge). Gentle + smooth-curve motif (thin) → no white-out.
+    t.q15 = -0.011 + 0.004 * Math.sin(time * 0.06) - 0.006 * Math.max(0, bassA - 1);
+    t.q16 = 0.013 + L("rot") * 0.3 + 0.01 * Math.sin(time * 0.045); // continuous slow rotation → spinning tunnel
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
     // GENTLE constant UPWARD DRIFT (Gemini's dy) — the feedback buffer (painted motif + trails) rises with
