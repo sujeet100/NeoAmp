@@ -125,6 +125,7 @@
     { label: "Battery green is not your enemy", wmp: "Battery green is not your enemy" },
     { label: "Battery sleepyspray", wmp: "Battery sleepyspray" },
     { label: "Battery smoke or water?", wmp: "Battery smoke or water?" },
+    { label: "Battery sepiaswirl", wmp: "Battery sepiaswirl" },
     { label: "Battery spider's last moment", wmp: "Battery spider's last moment" },
     { label: "Battery the world", wmp: "Battery the world" },
     { label: "Battery back to the groove", wmp: "Battery back to the groove" },

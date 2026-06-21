@@ -1312,4 +1312,97 @@
     preset.waves[0].baseVals.smoothing = 0.02;
     return preset;
   })();
+
+  // ── Battery sepiaswirl (NEW) ─────────────────────────────────────────────────
+  // A feathered ANEMONE burst (real-waveform jagged rim, ~16 petals) + a small central RING,
+  // over a soft GLOW DISC, with slow corner SWIRL lens-bands from the feedback. Colour does a
+  // one-way GREEN -> WHITE-bloom -> SEPIA sweep over ~11s (alcIntroRamp, then holds sepia). A
+  // BRIGHT (inverted) canvas, NOT dark. Bass pulses the burst + glow; mid drives the swirl.
+  P["Battery sepiaswirl"] = (function () {
+    var intro = alcIntroRamp(11.0); // one-way green -> white -> sepia colour sweep
+    var preset = build(
+      {
+        wave_a: 0,
+        additivewave: 1,
+        decay: 0.94,
+        gammaadj: 1.7,
+        zoom: 1.004,
+        rot: 0.02,
+        warp: 0.04,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
+      },
+      {
+        frame: function (t) {
+          var b = t.bass_att || t.bass || 1,
+            m = t.mid || 1;
+          t.q2 = 0.5;
+          t.q3 = 0.5; // burst / ring center
+          t.q5 = 0.14 + 0.06 * (b - 1); // anemone reach pulses with bass
+          t.q6 = 0.04 + 0.01 * (b - 1); // inner ring radius
+          t.q9 = t.time * 0.15; // slow anemone rotation
+          t.q20 = intro(t); // colour-sweep phase 0->1
+          t.rot = 0.02 + 0.01 * (m - 1); // corner swirl (mid drives it)
+          t.zoom = 1.004;
+          t.decay = 0.94;
+          return t;
+        },
+        comp:
+          "shader_body {\n" +
+          "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+          "  float lum = dot(c, vec3(0.4));\n" +
+          "  float ph = clamp(q20, 0.0, 1.0);\n" +
+          // background migrates GREEN(dark) -> WHITE(bright bloom) -> SEPIA(warm)
+          "  vec3 bgGreen = vec3(0.10,0.16,0.08);\n" +
+          "  vec3 bgWhite = vec3(0.92,0.93,0.95);\n" +
+          "  vec3 bgSepia = vec3(0.66,0.47,0.25);\n" +
+          "  vec3 bg = mix(mix(bgGreen, bgWhite, smoothstep(0.05,0.40,ph)), bgSepia, smoothstep(0.45,0.95,ph));\n" +
+          // anemone filament colour: sage-green early -> burnt-sienna late
+          "  vec3 fg = mix(vec3(0.34,0.52,0.22), vec3(0.50,0.27,0.10), smoothstep(0.1,0.7,ph));\n" +
+          "  vec3 col = bg + fg * lum * 1.7;\n" +
+          // soft glow disc behind centre: ramps in after the green phase, white -> orange
+          "  vec2 gd = uv - 0.5; gd.x *= resolution.x/resolution.y;\n" +
+          "  float gr = length(gd);\n" +
+          "  float glow = exp(-gr*gr*5.0);\n" +
+          "  float gl = smoothstep(0.12, 0.5, ph);\n" +
+          "  col += mix(vec3(1.0,0.97,0.92), vec3(0.95,0.62,0.30), smoothstep(0.45,0.95,ph)) * glow * (0.35 + 0.5*gl) * (0.6 + 0.5*bass);\n" +
+          "  ret = min(col, vec3(1.1));\n" + // bright canvas — clamp, do NOT Reinhard (would darken the white bloom)
+          "}\n",
+      }
+    );
+    // (1) feathered anemone — real-waveform jagged rim, ~16 petal lobes, slow rotation
+    preset.waves[0] = circleWave("q2", "q3");
+    preset.waves[0].baseVals.r = 0.95;
+    preset.waves[0].baseVals.g = 0.8;
+    preset.waves[0].baseVals.b = 0.6;
+    preset.waves[0].baseVals.a = 0.7;
+    preset.waves[0].baseVals.additive = 1;
+    preset.waves[0].baseVals.smoothing = 0.15;
+    preset.waves[0].point_eqs = function (a) {
+      var ang = a.sample * 6.2832 + (a.q9 || 0);
+      var petal = 0.62 + 0.38 * Math.abs(Math.sin(ang * 8.0)); // ~16 petal lobes
+      var rad = ((a.q5 || 0.14) + 0.1 * a.value1) * petal; // real-waveform jagged rim
+      a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
+      a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
+      return a;
+    };
+    // (2) small central ring
+    preset.waves[1] = circleWave("q2", "q3");
+    preset.waves[1].baseVals.r = 0.95;
+    preset.waves[1].baseVals.g = 0.85;
+    preset.waves[1].baseVals.b = 0.7;
+    preset.waves[1].baseVals.a = 0.7;
+    preset.waves[1].baseVals.additive = 1;
+    preset.waves[1].baseVals.smoothing = 0.3;
+    preset.waves[1].point_eqs = function (a) {
+      var ang = a.sample * 6.2832;
+      var rad = (a.q6 || 0.04) + 0.012 * a.value1;
+      a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
+      a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
+      return a;
+    };
+    return preset;
+  })();
 })();
