@@ -488,16 +488,14 @@
   // particles drift outward like snow. (Short decay keeps the folded waveform CRISP, not a
   // smeared tiled mandala.)
   P["Battery elektrination"] = (function () {
-    var spin = 0,
-      lastT = 0; // accumulated, audio-reactive LAGGED rotation (surges on bass, drags between)
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.88, // (overridden by the custom warp below)
+        decay: 0.88, // medium trail: the small ring streaks OUTWARD into radial fronds
         gammaadj: 1.9,
-        zoom: 1.0, // the custom warp handles the outward drift + fade
+        zoom: 1.04, // outward feedback -> the rotating centre waveform is pushed out as fronds
         rot: 0,
-        warp: 0.0,
+        warp: 0.02,
         wrap: 0,
         darken_center: 1,
         additivewave: 1,
@@ -505,36 +503,20 @@
       {
         frame: function (t) {
           var ba = t.bass_att || t.bass || 1;
-          var kick = Math.max((t.bass || 1) - 1.0, 0.0); // RAW bass surge (punchy, not smoothed)
-          var tm = t.time,
-            dt = Math.min(0.1, Math.max(0, tm - lastT));
-          lastT = tm;
-          spin += dt * (0.2 + 2.4 * kick); // slow drag + JUMPS forward on bass hits -> lagged spin
-          var STEP = 0.34; // QUANTIZE the rotation into discrete jumps -> stepped, LOW-FPS strobing motion
-          var qSpin = Math.floor(spin / STEP) * STEP;
           t.q2 = 0.5;
           t.q3 = 0.5;
-          t.q5 = 0.08 + 0.04 * (ba - 1);
-          t.q11 = qSpin; // unified STEPPED rotation -> drives the comp fold
-          t.q9 = qSpin; // frond ring rotates (stepped)
-          t.q1 = qSpin * 1.3; // central jagged LINE rotates around the axis in steps
+          t.q5 = 0.08 + 0.04 * (ba - 1); // small centre ring; the outward zoom streaks it into fronds
+          t.q9 = t.time * 0.35; // the core waveform rotates
+          t.decay = 0.88;
           return t;
         },
-        // custom warp = the ripple engine: drift the feedback OUTWARD a touch and fade it a fixed amount
-        // each frame -> the stepped rotation's positions expand into echoing ripple rings, at a STABLE
-        // equilibrium (the explicit *0.93 fade prevents the runaway brightness drift).
-        warp:
-          "shader_body {\n" +
-          "  vec2 p = 0.5 + (uv - 0.5) / 1.035;\n" + // outward drift -> ripple rings
-          "  ret = texture2D(sampler_main, p).rgb * 0.93;\n" + // fixed fade -> stable, long ripple trails
-          "}\n",
         comp:
           NOISE_GLSL +
           ALC_KALEIDOQUAD_GLSL +
           "shader_body {\n" +
           "  vec2 dd = uv - 0.5; dd.x *= resolution.x/resolution.y;\n" +
-          "  float pulse = 1.0/(1.0 + 0.35*max(bass-1.0, 0.0));\n" + // RAW bass zooms the star (punchy beat pulse)
-          "  float rt = q11;\n" + // audio-reactive LAGGED rotation (accumulated in frame_eqs)
+          "  float pulse = 1.0/(1.0 + 0.4*max(bass-1.0, 0.0));\n" + // bass zooms the star OUT (beat pulse)
+          "  float rt = time*0.16;\n" + // continuous clockwise rotation
           "  float cr = cos(rt), sr = sin(rt);\n" +
           "  vec2 d = vec2(dd.x*cr - dd.y*sr, dd.x*sr + dd.y*cr) * pulse;\n" +
           "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm mirror star
@@ -550,47 +532,26 @@
           "  float prad = 0.05 + life*0.62;\n" +
           "  float laneAng = (lane+0.5)/22.0*6.2832 - 3.14159;\n" +
           "  vec2 ppos = vec2(cos(laneAng), sin(laneAng))*prad;\n" +
-          "  col += vec3(0.82,0.90,0.78) * smoothstep(0.012, 0.0, length(dd - ppos)) * (1.0-life) * smoothstep(0.0, 0.14, life);\n" + // fade IN at spawn + OUT at edge (no pop)
+          "  col += vec3(0.82,0.90,0.78) * smoothstep(0.012, 0.0, length(dd - ppos)) * (1.0-life);\n" +
           "  ret = col;\n" +
           alcVignette(0.35) +
           "  ret = ret/(ret + vec3(0.5));\n" + // gentle Reinhard
           "}\n",
       }
     );
-    // THE central waveform is a jagged real-audio LINE through the centre that rotates (lagged) around
-    // the axis. The kaleido fold mirrors it into the frond-star; the outward zoom + long-decay feedback
-    // streak its rotating sweep into echoing RIPPLES. This single line is the engine (no centre ring).
-    preset.waves[0] = waveLine();
-    preset.waves[0].baseVals.r = 0.85;
-    preset.waves[0].baseVals.g = 0.95;
-    preset.waves[0].baseVals.b = 0.85;
-    preset.waves[0].baseVals.a = 0.5;
+    // sharp jagged real-audio waveform -> mirrored into the star through the fold
+    preset.waves[0] = circleWave("q2", "q3");
+    preset.waves[0].baseVals.r = 0.8;
+    preset.waves[0].baseVals.g = 0.9;
+    preset.waves[0].baseVals.b = 0.82;
+    preset.waves[0].baseVals.a = 0.9;
     preset.waves[0].baseVals.additive = 1;
-    preset.waves[0].baseVals.smoothing = 0.02; // jagged
+    preset.waves[0].baseVals.smoothing = 0.02; // very jagged
     preset.waves[0].point_eqs = function (a) {
-      var th = a.q1 || 0; // lagged rotation around the centre axis
-      var s = a.sample * 2.0 - 1.0; // -1..1 along the line
-      var ct = Math.cos(th),
-        st = Math.sin(th);
-      var disp = (a.value1 || 0) * 0.18; // jagged perpendicular waveform displacement (real audio)
-      a.x = 0.5 + s * 0.34 * ct - disp * st;
-      a.y = 0.5 + s * 0.34 * st + disp * ct;
-      return a;
-    };
-    // faint frond-source ring at the centre -> the outward zoom streaks it into the radial green
-    // fronds that fill the frame (it's NOT a visible ring; it immediately streaks outward).
-    preset.waves[1] = circleWave("q2", "q3");
-    preset.waves[1].baseVals.r = 0.5;
-    preset.waves[1].baseVals.g = 0.62;
-    preset.waves[1].baseVals.b = 0.42;
-    preset.waves[1].baseVals.a = 0.55;
-    preset.waves[1].baseVals.additive = 1;
-    preset.waves[1].baseVals.smoothing = 0.04;
-    preset.waves[1].point_eqs = function (a) {
-      var ang = a.sample * 6.2832 + (a.q9 || 0); // stepped rotation
-      var rad = (a.q5 || 0.08) + 0.14 * a.value1;
-      a.x = 0.5 + rad * Math.cos(ang);
-      a.y = 0.5 + rad * Math.sin(ang);
+      var ang = a.sample * 6.2832 + (a.q9 || 0); // rotating waveform
+      var rad = (a.q5 || 0.13) + 0.17 * a.value1; // big sharp bass-scaled spikes
+      a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
+      a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
       return a;
     };
     return preset;
