@@ -632,7 +632,8 @@
     var bx = Math.cos(ang) * t * R,
       by = Math.sin(ang) * t * R;
     var mid = Math.round((B - 1) / 2);
-    var br = 0.02 * (seg === mid ? 2.3 : 1.0); // central bead bigger = the eye
+    var be = Math.max(0, (a.q32 || 1) - 1); // beat energy (q32 = smoothed beat carrier)
+    var br = 0.02 * (seg === mid ? 2.3 : 1.0) * (1 + 0.5 * be); // central bead bigger = the eye; beads POP on the beat
     var ringAng = u * 6.2832;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
