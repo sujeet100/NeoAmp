@@ -149,11 +149,15 @@
     //    washes; 1/2/3/4/7/8 = intrinsic high-sat structured fields). WARP owns the GEOMETRY (fold/
     //    spiral/shear/recede → parallax); COMP owns the COLOUR (which hue at this angle/radius/tile). ──
     "  vec3 ground; float sat;\n" +
-    "  if (m < 0.5) {\n" + // 0 FLOWING FLUID FIELD — the original's signature ambient bg: 3 ANALOGOUS dusty colours
-    // (close on the wheel = harmonious, NOT rainbow) bleeding through a domain-warped fbm that FLOWS +
-    // parallaxes (gpd). Colourful + moving (the user's "bg flat/static" fix), the milky motif paints on top.
-    "    sat = 0.6; float fl = fbm(gpd * 1.6 + vec2(time * 0.05, -time * 0.04)); float fl2 = fbm(gpd * 2.5 - vec2(time * 0.035, time * 0.05) + 4.0);\n" +
-    "    vec3 fA = pal(hb + 0.06), fB = pal(hb + 0.2), fC = pal(hb - 0.12); ground = mix(fA, fB, smoothstep(0.3, 0.7, fl)); ground = mix(ground, fC, smoothstep(0.45, 0.82, fl2) * 0.6); ground *= 0.5 + 0.55 * fl;\n" +
+    "  if (m < 0.5) {\n" + // 0 SCROLLING COLOUR BANDS — the original's signature: soft WAVY horizontal colour bands that
+    // SCROLL VERTICALLY (upward) while their colours cycle (teal→olive→pink) → the "scene feels like it's
+    // moving up" + "a series of colour changes" (the user's key note). The colour at a fixed point CHANGES
+    // over time as bands pass through (vs the old in-place fbm = same colours in the same spots = static).
+    "    sat = 0.6; float warp1 = fbm(gpd * 1.3 + vec2(time * 0.04, time * 0.02)) * 0.9;\n" + // wavy/organic band edges
+    "    float yb = gpd.y * 4.0 - time * 0.36 + warp1;\n" + // VERTICAL SCROLL up + waviness
+    "    float band = 0.5 + 0.5 * sin(yb * 3.14159), band2 = 0.5 + 0.5 * sin(yb * 1.7 + 2.0);\n" +
+    "    vec3 fA = pal(hb + 0.04), fB = pal(hb + 0.19), fC = pal(hb - 0.12);\n" + // 3 ANALOGOUS dusty tones
+    "    ground = mix(fA, fB, band); ground = mix(ground, fC, band2 * 0.5); ground *= (0.42 + 0.55 * band) * (0.72 + 0.4 * fbm(gpd * 2.0 - vec2(0.0, time * 0.06)));\n" + // LIGHT/DARK band value contrast → the upward scroll is clearly visible
     "  } else if (m < 1.5) {\n" + // 1 X-WEDGE bowtie — TWO analogous-complementary tones (not a 4-colour rainbow diamond, which read out of place)
     "    sat = 0.82; float seg = 6.2832 / 4.0; float wpar = mod(floor((pang + 3.14159) / seg), 2.0); ground = mix(pal(hb + 0.04), pal(hb + 0.42), wpar) * (0.8 + 0.28 * tooth);\n" +
     "  } else if (m < 2.5) {\n" + // 2 BULLSEYE — concentric rings alternating TWO analogous hues (not full rainbow); expand outward = recede
@@ -181,7 +185,7 @@
     "  if (m < 8.5) {\n" +
     "    vec2 poolC = 0.42 * vec2(cos(time * 0.05 + hb * 6.2832), sin(time * 0.037 + 1.3));\n" +
     "    float pool = exp(-dot(pdc - poolC, pdc - poolC) * 2.2);\n" +
-    "    ground = mix(ground, cA * 1.2, pool * 0.32);\n" +
+    "    ground = mix(ground, cA * 1.2, pool * 0.2);\n" + // gentler off-center pool — it was flattening the scrolling bands
     "    ground += dusty(pal(hb + 0.86), 0.8) * smoothstep(0.55, -0.05, uv.y) * (0.06 + 0.10 * bb);\n" +
     "  }\n" +
     "  ground *= mix(0.72, 1.06, smoothstep(1.5, 0.12, prad));\n" + // clean depth vignette (corners deepen) — no fbm mottle on the structured fields
@@ -805,7 +809,10 @@
     t.q16 = L("rot") * 0.35 + 0.012 * Math.sin(time * 0.04); // GENTLE roll only (heavy roll spun the trails into spirals)
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
-    t.q19 = L("dy");
+    // GENTLE constant UPWARD DRIFT (Gemini's dy) — the feedback buffer (painted motif + trails) rises with
+    // the scrolling bg bands, so the WHOLE scene reads as "moving up" (the user's note). A drift, not a
+    // tunnel → no white-out, varied (the VP still roams). Vortex overrides this to its inward pull.
+    t.q19 = L("dy") + 0.004;
     // OFF-CENTER, DRIFTING vanishing point on an ELLIPTICAL path (different x/y rates) — the plunge streams
     // TOWARD this roaming VP, so the depth is asymmetric/oblique (not a symmetric centred zoom) and edge
     // content sweeps several× faster than near-VP content = parallax. Amp ~0.14 (v4's 0.02-0.06 was tiny).
