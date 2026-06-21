@@ -7,53 +7,71 @@
   var P = (window.WMP_PRESETS = window.WMP_PRESETS || {});
 
   // ── Battery relatively calm ────────────────────────────────────────────────
-  // Soft milky teal swirl that drifts green<->blue; lazy rotation, gentle.
+  // Deep blue-teal swirling VORTEX/TUNNEL (concentric wavy shells, dark eye sitting high)
+  // with a horizontal jagged lightning waveLine sweeping edge-to-edge + a bright feathery
+  // SPRAY-FOUNTAIN fanning up from bottom-center. Opens with a one-shot GREEN ignition then
+  // HOLDS fixed blue-teal (NOT a perpetual cycle). Muted (sat ~17). Gentle, calm.
   P["Battery relatively calm"] = (function () {
+    var intro = alcIntroRamp(1.6); // one-shot green -> teal ignition on spawn
     var preset = build(
       {
         wave_a: 0,
-        wave_smoothing: 0.9,
         additivewave: 1,
-        wave_scale: 0.7,
-        decay: 0.96,
-        gammaadj: 1.8,
-        zoom: 0.999,
-        rot: 0.012,
-        warp: 0.02,
+        decay: 0.955,
+        gammaadj: 1.9,
+        zoom: 0.992,
+        rot: 0.006,
+        warp: 0.18,
+        warpscale: 1.4,
         cx: 0.5,
-        cy: 0.5,
-        darken_center: 0,
+        cy: 0.42, // eye sits slightly high
+        darken_center: 1,
         wrap: 0,
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          t.q1 = 0.5;
+          var b = t.bass_att || t.bass || 1,
+            tr = t.treb_att || t.treb || 1;
+          t.q1 = 0.0; // horizontal waveLine
           t.q2 = 0.5;
-          t.q5 = 0.3 + 0.04 * bass;
-          t.rot = 0.012 + 0.004 * Math.sin(t.time * 0.15);
-          t.zoom = 0.999 - 0.0008 * bass;
-          t.decay = 0.96;
+          t.q3 = 0.5; // waveLine center
+          t.q20 = intro(t); // 0->1 ignition ramp (green -> teal)
+          t.rot = 0.005 + 0.004 * Math.sin(t.time * 0.2); // gentle swirl (no radial sunburst)
+          t.zoom = 0.992 - 0.004 * (b - 1);
+          t.warp = 0.18 + 0.06 * (tr - 1);
+          t.decay = 0.955;
           return t;
         },
         comp:
           "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float h = 0.5 + 0.5 * sin(time * 0.07);\n" +
-          "vec3 tint = mix(vec3(0.30,0.70,0.45), vec3(0.40,0.60,0.85), h);\n" +
-          "float lum = dot(c, vec3(0.33));\n" +
-          "float r = distance(uv, vec2(0.5));\n" +
-          "vec3 base = tint * (0.22 * (1.0 - smoothstep(0.0, 0.8, r)));\n" + // soft teal cloud, always present
-          "ret = mix(c, lum * tint * 1.8, 0.6) + base;\n" +
+          "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+          "  float lum = dot(c, vec3(0.4));\n" +
+          "  float e = 0.55 + lum*1.5;\n" + // bright teal field everywhere, brighter on the wave streaks
+          "  vec3 tealC = vec3(0.30,0.64,0.80);\n" + // muted blue-teal
+          "  vec3 greenC = vec3(0.38,0.78,0.42);\n" + // ignition green
+          "  vec3 col = mix(greenC, tealC, clamp(q20,0.0,1.0)) * e;\n" + // one-shot green -> teal, then holds
+          "  col += vec3(0.62,0.80,0.86) * smoothstep(0.55,1.1,lum);\n" + // white froth on bright wave streaks
+          "  ret = col;\n" +
+          alcVignette(0.45) +
+          "  ret = ret/(ret + vec3(0.6));\n" + // Reinhard
           "}\n",
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.smoothing = 0.9;
+    // (1) horizontal jagged lightning waveLine edge-to-edge (comp re-tints by luma)
+    preset.waves[0] = waveLine();
+    preset.waves[0].baseVals.smoothing = 0.04;
     preset.waves[0].baseVals.a = 0.8;
-    preset.waves[0].baseVals.r = 0.35;
-    preset.waves[0].baseVals.g = 0.7;
-    preset.waves[0].baseVals.b = 0.6;
+    // (2) bright feathery spray-fountain fanning UP from bottom-center
+    preset.waves[1] = alcSprayFountain({
+      cx: 0.5,
+      cy: 0.78,
+      dir: -1.5708,
+      spread: 1.5,
+      reach: 0.5,
+      r: 0.8,
+      g: 0.94,
+      b: 0.98,
+    });
     return preset;
   })();
 
