@@ -132,7 +132,7 @@ in `viz.js`. Symptom if wrong: content fills only a corner and/or is blurry.
 | `viz.html` | Sandboxed page: `<canvas>` + control bar + script includes (vendor, `presets/*.js` in order, `viz.js`). |
 | `viz.js` | Butterchurn init, canvas sizing, favorites menu, keyboard, message handling, render loop. `FAVORITES` array defines the buttons. |
 | `presets/kit.js` | **Shared kit**, loaded first: helpers, GLSL constants, the `build()` factory, and every reusable `alc*` element/motif/background/orb factory. Its top-level declarations are shared globals the family files build on. |
-| `presets/{dance,ambience,battery}.js` + `presets/alchemy-{random,scenes,eras,motifs}.js` | Per-family hand-authored presets; each registers into `window.WMP_PRESETS`. **Most preset work happens in these.** Alchemy was split from the former monolithic `presets/alchemy.js` (2.5k lines) into four themed files — `random` (the two flagship engines), `scenes`, `eras`, `motifs` — to stay navigable; they're independent IIFEs, so a preset's file is found by name. (Earlier split out of the former monolithic `wmp-presets.js`; load order in `viz.html` is kit → families → `viz.js`.) |
+| `presets/{dance,ambience,battery}.js` + `presets/alchemy-v7.js` | Per-family hand-authored presets; each registers into `window.WMP_PRESETS`. **Most preset work happens in these.** `alchemy-v7.js` is the SHIPPED Alchemy (`Alchemy (Pastel)`/`(Vivid)` — see Current state); the old v1/v2/v4/v5/v6 Alchemy files were removed. Files are independent IIFEs, so a preset's file is found by name; load order in `viz.html` is kit → families → `viz.js`. |
 | `overlay.css` | Launcher button, fullscreen iframe, toast styling. |
 | `vendor/*.min.js` | Butterchurn 2.6.7 core + 3 preset packs (2.4.7). Vendored locally — MV3 bans remote code. |
 
@@ -219,22 +219,26 @@ startup loads "Dance of the Freaky Circles" (known-good).
 
 ## Current state
 
-**★ ACTIVE WORK — Alchemy V4 (`presets/alchemy-v4.js`):** a ground-up rebuild that
-reproduces WMP Alchemy by composing the **REAL v2 kit factories** into 8 shuffle-cycled
-scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst) with vibrant
-multi-colour-fusion backgrounds + a dynamic camera + the viz.js `Director`. The user
-confirmed this direction ("looks way better"). **★ SHIPPED (2026-06-18): `alchemy-v4.js` is now ONE
-seamless self-sequencing preset** `P["Alchemy V4: Random"]` (single menu entry) — the 8-scene Director
-was collapsed because the cross-preset crossfade read "foggy". The user is happy with it after a round
-of fixes (orbs, mandala, lines, camera, ripples, vortex/fountain, backgrounds). **Before touching it,
-read `docs/alchemy-v4/MISTAKES.md` — especially §0 (current architecture) + §8 (this session's working
-cadence + the new gotchas: additive-density milky-out, feedback-rotation spiral → do ripples in COMP,
-radial-fold-on-flower spirograph → use quad, no always-on orb).** And `FINDINGS-AND-REBUILD-PLAN.md`
-(the authoritative reverse-engineering plan + the vendor finding that OVERTURNS MISTAKES.md §4: only
-`enabled` is build-fixed, so one preset CAN morph geometry per frame). **Verify with
-`tools/selfrender.mjs`** (pure-Node CDP self-render harness, no MCP). Open follow-ups (tasks #21–#26):
-kaleidoscope one-quarter + diagonal/X fold; dense daisy-spirograph; the 2:40-2:50 / 0:39-0:45 scenes;
-beat-synced tether. Specs: `docs/alchemy-v4/SPEC.md`, `docs/alchemy-v4/CATALOG.md`.
+**★ ALCHEMY = SHIPPED / DONE (2026-06-21).** The whole Alchemy effort converged on ONE file,
+**`presets/alchemy-v7.js`**, registering TWO colour variants that share ALL geometry/engine/motifs/scenes
+and differ only in a `makeComp(PROFILE)` colour profile: **`P["Alchemy (Pastel)"]` (the DEFAULT — the
+accurate muted/dusty WMP colour, validated by measurement against the 480p reference) + `P["Alchemy (Vivid)"]`
+(punchier).** It is a single self-sequencing preset: a watercolour FEEDBACK engine (decay + compounding
+blur diffusion + tiny growth) over a dark wavy-fluid ground, with 15 motif modes (anemone/star/urchin/
+crossed-X/triangle/square/hexagram/wireframe-net/vortex/jellyfish/12-star/beaded-chain/valley/organic-
+tangle/mountains), 8 background regimes (wavy-fluid/kaleidoscope/tunnel/corridor/bars/wash/bands/bullseye),
+glowing pulsing orbs + a colour-cycling waveform tether, and an abrupt-snap-pan / valley-dolly camera.
+Two full reference videos were surveyed for gaps; colour was validated (the 480p is colour-accurate, the
+1080p is a washed/boosted re-encode — see memory `alchemy-measured-color-facts`). **All OLD versions were
+REMOVED** (v1 `alchemy-random`, all v2 `alchemy-{scenes,eras,motifs}`, and the v4/v5/v6 compare files —
+7 files deleted). The user may refine later but ships this. **Before touching Alchemy, read the memories
+`alchemy-v7-watercolour-rebuild`, `alchemy-v7-gap-analysis`, `alchemy-480p-gap-analysis`,
+`alchemy-measured-color-facts`.** Verify with `tools/selfrender.mjs` (+ the scratchpad `pinrender.mjs`
+which pins `window.__ALC_FORCE` q29 bg-mode / q30 motif).
+
+**★ NEXT (a fresh session): the BATTERY visualiser family** — the user wants to build out Battery next; it
+has a DIFFERENT character than Alchemy (see the `presets/battery.js` presets + the Battery colour notes
+below). Approach it like Alchemy: study its reference frames, measure colour, build/verify via self-render.
 
 **Done & committed (`git log`):** Dance of the Freaky Circles (two orbiting
 waveform circles — the best one, use it as the reference pattern), and batch 1:
