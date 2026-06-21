@@ -114,8 +114,9 @@
           "  vec3 hue = mix(greenC, redC, clamp(q20,0.0,1.0));\n" +
           "  vec3 deep = mix(vec3(0.05,0.10,0.04), vec3(0.20,0.0,0.05), clamp(q20,0.0,1.0));\n" + // deep base
           "  vec3 col = deep + hue * lum * 1.7;\n" +
+          "  col += vec3(0.85,0.95,1.0) * smoothstep(0.78, 1.0, lum);\n" + // white-cyan jagged LIGHTNING on the SHARPEST peaks only
           "  ret = col;\n" +
-          alcGlowDisc("vec3(1.0,0.95,0.92)", "vec3(0.95,0.42,0.45)", 0.22) + // white-hot core + rose halo
+          alcGlowDisc("vec3(1.0,0.96,0.93)", "vec3(0.95,0.42,0.45)", 0.12) + // tight white-hot core + rose halo
           alcVignette(0.4) +
           "  ret = ret/(ret + vec3(0.7));\n" + // Reinhard -> soft pink highlights, not blown white
           "}\n",
