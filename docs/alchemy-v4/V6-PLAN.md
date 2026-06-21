@@ -252,3 +252,39 @@ Additive milky-out (low alpha for dense modes, decay ≤0.93/0.94); feedback-rot
 - Implementation base: /Users/sujitk/projects/personal/ytmusic-wmp-visualizer/presets/alchemy-v4.js (WARP_V4 lines 34-63, COMP_V4 lines 67-179, MODES line 506, LOOKS line 548, frame() line 686).
 - Kit helpers: /Users/sujitk/projects/personal/ytmusic-wmp-visualizer/presets/kit.js (alcKaleido 273, alcMoire/alcMoireStripes 286, pal 166, fbm 165, alcRotLines 1272, alcRadialBurst 1348, alcTether 1873, alcCamVortex 707, ALC_PAL 791).
 - Gotchas: docs/alchemy-v4/MISTAKES.md §8; prior plan: docs/alchemy-v4/FINDINGS-AND-REBUILD-PLAN.md; V5 lessons: docs/alchemy-v4/V5-HANDOFF.md.
+
+---
+
+# IMPLEMENTATION STATUS (2026-06-21)
+
+`presets/alchemy-v6.js` → `P["Alchemy V6: Random"]` (single seamless preset; boots by default; in
+viz.html + viz.js FAVORITES). Built v4 → v6 in 4 commits, each headless-verified via the self-render
+harnesses (`tools/selfrender.mjs` + scratchpad `render-bgmodes.mjs` / `render-motion.mjs`, which pin
+`window.__ALC_FORCE` — a production-no-op debug hook in frame()):
+
+- **03e3e4e — backgrounds.** COMP rebuilt as a `q29` BG_MODE 0..9 selector: 0 motif-wash · 1 X-wedge ·
+  2 bullseye · 3 sine-bands · 4 quad-mandala · 5 tilt-planes · 6 vortex · 7 wallpaper · 8 pickets ·
+  9 neon-on-dark. Two regimes (dusty motif-painted washes 0/5/6/9 vs intrinsic high-sat structured
+  fields). Per-scene saturation in-shader. Milky pastelize (rgb2hsv desaturate-on-bright) gated to the
+  wash regimes. Fold decoupled from looks → driven by BG_MODE. bgPick widened to 10, DISCRETE snap.
+- **d8f0aee — parallax.** Intrinsic field now built at a CAMERA-WARPED coord `gpd` (fractional shear +
+  slow roll + depth-breath) so it's no longer screen-locked → layered depth vs the full-rate buffer.
+  WARP: VP-referenced single-ended perspective shear + strengthened 1/r vortex. frame(): off-center
+  DRIFTING vanishing point (amp ~0.12) + per-BG_MODE camera intent (tilt/picket shear, vortex inward
+  swirl, bullseye outward dolly).
+- **dffea69 — colour speed.** Slow drift (~0.03) normally; FAST cycle (~0.1) in the spatial-multicolor
+  modes (1/2/4) so wedges/rings sweep colour; scene-cut palette FLIP (60-160°) at each bg change;
+  along-wave rainbow on the burst/wave modes.
+- **047da33 — pickets** = true perspective floor (converging columns).
+
+## Verified headless (NO live audio — synthetic beat only)
+All 10 modes compile + render with no shader errors; fields animate/recede/roll (parallax); mode-0
+wash shows the orbs/tether painting a spreading milky trail; mode-1/2 sweep multicolour. The dynamic
+colour-bleed + beat behaviour under REAL music must be judged from the user's screen.
+
+## DEFERRED (plan steps 9-10 — intentionally not done this pass)
+- **Orbs ring-outline + offset gaussian fill (ring≠fill).** v4's filled-colour orbs were praised
+  ("orbs look gorgeous") — left untouched to avoid regressing a liked element (MISTAKES: small targeted
+  changes for liked elements). Revisit only if the user wants the distinct cyan-ring/pink-fill look.
+- **Decay-split (crisp tether vs long-decay sweep fan) + COMP beat-shed ripples.** Lower priority.
+- Vortex spiral drama + wallpaper-dot visibility may need tuning from the user's live screenshots.
