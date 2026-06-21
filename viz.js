@@ -84,7 +84,8 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V6: Random", wmp: "Alchemy V6: Random" }, // ACTIVE rebuild (correct two-regime bg + parallax + motif-paint) — see docs/alchemy-v4/V6-PLAN.md
+    { label: "Alchemy V7: Random", wmp: "Alchemy V7: Random" }, // ACTIVE rebuild — watercolour feedback engine + dark wavy-fluid bg + measured colour (2026-06-21, from the 1080p reference)
+    { label: "Alchemy V6: Random", wmp: "Alchemy V6: Random" }, // prior rebuild (two-regime bg + parallax + motif-paint) — kept to compare
     { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // baseline (commit 2dffe4d, pre-watercolor-experiment)
     { label: "Alchemy V5: Random", wmp: "Alchemy V5: Random" }, // EXPERIMENTAL watercolour-trail fork (compare vs V4)
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
@@ -634,13 +635,15 @@
     // Boot straight into the single seamless "Alchemy V4: Random" preset (it self-sequences in
     // frame_eqs — no cross-preset Director crossfade, which read foggy/like-a-new-preset). The
     // Director (viz.js) stays dormant; reachable only via the postMessage debug toggle.
-    var bootName = presets["Alchemy V6: Random"]
-      ? "Alchemy V6: Random"
-      : presets["Alchemy V4: Random"]
-        ? "Alchemy V4: Random"
-        : presets["Alchemy Random"]
-          ? "Alchemy Random"
-          : names[0];
+    var bootName = presets["Alchemy V7: Random"]
+      ? "Alchemy V7: Random"
+      : presets["Alchemy V6: Random"]
+        ? "Alchemy V6: Random"
+        : presets["Alchemy V4: Random"]
+          ? "Alchemy V4: Random"
+          : presets["Alchemy Random"]
+            ? "Alchemy Random"
+            : names[0];
     loadByName(bootName);
     renderLoop();
     post({ type: "ready", presets: names.length });
