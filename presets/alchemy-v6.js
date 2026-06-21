@@ -57,9 +57,14 @@
     "  pdf = mix(pdf, fquad, step(3.5, q12) * step(q12, 4.5));\n" +
     "  pdf = mix(pdf, fmand, step(5.5, q12));\n" +
     "  pd = mix(pd, pdf, q13);\n" +
-    "  pd /= max(1.0 + q28 * pd.y, 0.25);\n" +
+    // VP-REFERENCED single-ended perspective shear: compress toward the (off-center) vanishing-point ROW
+    // q27, not symmetrically about center. Rows above the VP recede, rows below loom → a tilted floor/
+    // plane with single-ended foreshortening (the original's side-angle depth). q28 = shear strength.
+    "  pd /= max(1.0 + q28 * (uv.y - q27), 0.25);\n" +
     "  float pr = length(pd);\n" +
-    "  float pang = q16 + q17 * pr + q17 * 0.10 / (pr * 6.0 + 1.0);\n" + // +center-growing twist (q17-gated) -> inward log-spiral DRAIN (Vortex); zero effect on swirl=0 looks
+    // ROLL (q16) + VORTEX swirl (q17): a small OUTER twist + a strong 1/r INNER twist so inner rotation is
+    // several× the outer → the log-spiral DRAIN winds toward the (off-center) eye. Zero effect when q17=0.
+    "  float pang = q16 + q17 * (pr * 0.5 + 0.7 / (pr * 3.0 + 0.3));\n" +
     "  float cs = cos(pang), sn = sin(pang);\n" +
     "  pd = mat2(cs, -sn, sn, cs) * pd;\n" +
     "  pd *= (1.0 + q15);\n" +
@@ -129,8 +134,17 @@
     "  else if (q12 > 5.5 && q12 < 7.5) { float fa = atan(pdc.y, pdc.x); float fseg = 6.2832 / max(q12, 2.0); fa = abs(fa - fseg * floor(fa / fseg + 0.5)); fpd = length(pdc) * vec2(cos(fa), sin(fa)); }\n" +
     "  pdc = mix(pdc, fpd, clamp(q13, 0.0, 1.0));\n" +
     "  if (q12 > 7.5) { vec2 dr = vec2(pdc.x + pdc.y, pdc.y - pdc.x) * 0.70711; dr = abs(dr); pdc = vec2(dr.x - dr.y, dr.x + dr.y) * 0.70711; }\n" +
-    "  float pang = atan(pdc.y, pdc.x); float pr2 = length(pdc);\n" +
-    "  float tooth = fbm(pdc * 2.0 + vec2(time * 0.03, -time * 0.025));\n" + // shared LOW-freq texture 'tooth' (≤0.4 amp) — adds tooth, never the dominant field
+    // PARALLAX of the intrinsic field: the bg used to be screen-locked (computed at raw uv → it sat FLAT
+    // behind everything, the v4 staticness). Build the field at a CAMERA-WARPED coord `gpd` — a FRACTION
+    // of the camera's shear/roll/zoom — so the field tilts/rolls/recedes WITH the camera but SLOWER than
+    // the full-rate feedback buffer (the painted motifs). Different layer speeds = genuine depth parallax.
+    "  vec2 gpd = pdc;\n" +
+    "  gpd /= max(1.0 + q28 * 0.6 * (uv.y - q27), 0.3);\n" + // fractional perspective shear → receding plane/floor depth
+    "  float groll = time * 0.026 + q16 * 6.0;\n" + // slow bg roll (slower than the fg feedback roll) + a nudge from the camera roll
+    "  gpd = mat2(cos(groll), -sin(groll), sin(groll), cos(groll)) * gpd;\n" +
+    "  gpd *= 1.0 + 0.12 * sin(time * 0.05);\n" + // gentle depth breath (push in/out)
+    "  float pang = atan(gpd.y, gpd.x); float pr2 = length(gpd);\n" +
+    "  float tooth = fbm(gpd * 2.0 + vec2(time * 0.03, -time * 0.025));\n" + // shared LOW-freq texture 'tooth' (≤0.4 amp) — moves with the field
     // ── BG_MODE colour FIELD + per-scene SATURATION (the two regimes: 0/5/6/9 = dusty motif-painted
     //    washes; 1/2/3/4/7/8 = intrinsic high-sat structured fields). WARP owns the GEOMETRY (fold/
     //    spiral/shear/recede → parallax); COMP owns the COLOUR (which hue at this angle/radius/tile). ──
@@ -145,10 +159,10 @@
     "    sat = 0.72; float wv = sin(uv.y * 5.0 + sin(uv.x * 3.0 + time * 0.2) * 0.6); ground = mix(pal(hb), pal(hb + 0.35), 0.5 + 0.5 * wv);\n" +
     "  } else if (m < 4.5) {\n" + // 4 QUAD MANDALA — green-biased radial gradient over the quad-folded coord (motif mirrors via WARP fold)
     "    sat = 0.76; ground = pal(0.33 + pr2 * 0.55 + 0.1 * sin(pang * 4.0)) * (0.78 + 0.3 * tooth);\n" +
-    "  } else if (m < 5.5) {\n" + // 5 TILT PLANES — diagonal colour gradient (WARP perspective-shears it into a receding plane)
-    "    sat = 0.5; ground = pal(hb + dot(pdc, vec2(0.7, 0.6)) * 1.1) * (0.5 + 0.42 * tooth);\n" +
-    "  } else if (m < 6.5) {\n" + // 6 VORTEX — soft teal/lavender milky (WARP spins it into the drain spiral)
-    "    sat = 0.46; ground = mix(dusty(pal(0.55), 0.85), dusty(pal(0.78), 0.85), 0.5 + 0.5 * sin(pang * 2.0 + pr2 * 3.0 + time * 0.1)) * (0.5 + 0.4 * tooth);\n" +
+    "  } else if (m < 5.5) {\n" + // 5 TILT PLANES — diagonal colour gradient over the camera-sheared coord → a receding plane that slides
+    "    sat = 0.5; ground = pal(hb + dot(gpd, vec2(0.7, 0.6)) * 1.1 + time * 0.04) * (0.5 + 0.42 * tooth);\n" +
+    "  } else if (m < 6.5) {\n" + // 6 VORTEX — soft TEAL↔LAVENDER milky (WARP spins it into the drain spiral); cool fixed mood (the original vortex is consistently cool, not hue-cycling)
+    "    sat = 0.5; vec3 vTeal = vec3(0.16, 0.52, 0.60), vLav = vec3(0.58, 0.50, 0.82); ground = mix(vTeal, vLav, 0.5 + 0.5 * sin(pang * 2.0 + pr2 * 3.0 + time * 0.12)) * (0.55 + 0.4 * tooth);\n" +
     "  } else if (m < 7.5) {\n" + // 7 WALLPAPER — repeating dot/diamond lattice (kit moiré dots)
     "    sat = 0.56; ground = mix(dusty(pal(hb + 0.5), 0.55) * 0.45, alcMoire(uv, time, bb, pal(hb)), 0.82);\n" +
     "  } else if (m < 8.5) {\n" + // 8 PICKETS — vertical columns / perspective floor (kit moiré stripes)
@@ -747,17 +761,39 @@
     t.q12 = fold;
     t.q13 = fold > 1.5 ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)) : 0;
 
-    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (parallax recede strengthened in a later step)
-    t.q16 = L("rot") + 0.055 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks ±~3°) → not a locked top-view
+    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (+ structural recede below)
+    t.q16 = L("rot") + 0.05 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
     t.q19 = L("dy");
-    var pan = L("pan");
-    t.q20 = L("px") + pan * Math.cos(time * 0.11); // VP orbits → parallax
-    t.q27 = L("py") + pan * Math.sin(time * 0.11);
+    // OFF-CENTER, DRIFTING vanishing point on an ELLIPTICAL path (different x/y rates) — THE always-on
+    // parallax bed: displacement scales with distance-from-pivot, so edge content sweeps several× faster
+    // than near-pivot content as the VP roams. Amplitude raised to ~0.12 (v4's 0.02-0.06 was too small).
+    var pan = Math.max(L("pan"), 0.1);
+    t.q20 = L("px") + pan * Math.cos(time * 0.066);
+    t.q27 = L("py") + pan * 0.85 * Math.sin(time * 0.051);
     t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // 3D plane tilt (side-angle)
     t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
     t.q32 = bass;
+
+    // ── PARALLAX / camera-intent coupled to the structural BG_MODES. For these grounds the CAMERA
+    //    geometry IS what makes the field read as tilted / spiralling / receding (the original's depth).
+    //    Layered on the general drifting bed above. (Kept off the dense-bristle/wash modes to avoid the
+    //    feedback milky-out + spiral gotchas.) ──
+    if (bgMode === 5 || bgMode === 8) {
+      // TILT PLANES (5) / PICKET FLOOR (8): strong VP-referenced perspective shear → a receding plane/floor.
+      t.q28 = 0.72 + 0.28 * Math.sin(time * 0.05) + 0.15 * (bassA - 1);
+      t.q15 += -0.01; // gentle recede along the plane
+    } else if (bgMode === 6) {
+      // VORTEX (6): inward swirl about an OFF-CENTER eye + inward pull → the drain spiral.
+      t.q17 += 0.12 + 0.05 * (bassA - 1);
+      t.q15 += -0.018;
+      t.q20 = 0.43 + 0.05 * Math.cos(time * 0.08); // eye off-center
+      t.q27 = 0.46 + 0.05 * Math.sin(time * 0.08);
+    } else if (bgMode === 2) {
+      // BULLSEYE (2): gentle OUTWARD dolly so the concentric rings expand toward the viewer (parallax recede).
+      t.q15 += 0.012 + 0.01 * (bassA - 1);
+    }
 
     // CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly.
     var mo = motifPick(time, dt, f > 0.6);
