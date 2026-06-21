@@ -117,11 +117,17 @@
     "  { float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.55); }\n" + // calm/dusty
     "  ground *= 0.17 * (0.55 + 0.85 * n);\n" + // DARK ground — trails do the talking
     // ── RADIAL-TUNNEL regime (m==2): converging spokes from the centre vanishing point = depth. ──
-    "  if (m > 1.5) {\n" +
+    "  if (m > 1.5 && m < 2.5) {\n" +
     "    float pa = atan(c.y, c.x);\n" +
     "    float spokes = pow(0.5 + 0.5 * cos(pa * 40.0 + time * 0.1), 7.0);\n" +
     "    float depth = smoothstep(1.25, 0.05, prad);\n" +
     "    ground = ground * 0.45 + pal(hb + 0.12) * spokes * depth * 0.55;\n" +
+    "  }\n" +
+    // CORRIDOR regime (m==3): a near-black VOID so the marching ring-orbs + the jagged waveform thread
+    // glow as the only light (the reference's 0:06-0:16 corridor is on pure black), with a faint central
+    // horizontal depth-haze along the orbit line.
+    "  if (m > 2.5) {\n" +
+    "    ground = ground * 0.05 + pal(hb + 0.1) * 0.03 * exp(-pow(c.y * 6.0, 2.0));\n" +
     "  }\n" +
     // ── KALEIDOSCOPE regime (m==1): BOLD saturated diamonds (the reference's vivid red↔green). ──
     "  if (m > 0.5 && m < 1.5) {\n" +
@@ -188,22 +194,27 @@
         var br = orbCol(hb, 0),
           bg = orbCol(hb, 0.33),
           bb = orbCol(hb, 0.67);
-        var bri = 0.85 + 0.55 * be; // fill brightness pulses with the beat
+        var bri = 0.9 + 0.5 * be; // fill brightness pulses with the beat
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1 + 0.4 * be); // radius pulses with the beat
+        s.rad = (s.q7 || 0.06) * (1 + 0.45 * be); // radius pulses with the beat
+        // SOLID coloured fill — near-1 opacity when present (the original's orbs are solid, THEN fade;
+        // the `vis` come-and-go envelope does the fade). Body kept solid too, not translucent.
         s.r = Math.min(1, fr * bri);
         s.g = Math.min(1, fg * bri);
         s.b = Math.min(1, fb * bri);
-        s.a = 0.96 * vis;
-        s.r2 = fr * 0.85;
-        s.g2 = fg * 0.85;
-        s.b2 = fb * 0.85;
-        s.a2 = 0.3 * vis;
-        s.border_r = br * 0.34;
-        s.border_g = bg * 0.34;
-        s.border_b = bb * 0.34;
-        s.border_a = 0.95 * vis; // contrast-hue rim — gets prominent on the beat (radius+brightness)
+        s.a = 1.0 * vis;
+        s.r2 = fr * 0.9;
+        s.g2 = fg * 0.9;
+        s.b2 = fb * 0.9;
+        s.a2 = 0.78 * vis;
+        // PROMINENT border — BRIGHT contrast-hue rim (was dim ×0.34) that pulses hard on the beat (the
+        // user: "border is still not prominent when it pulses" / "solid border with almost 1 opacity").
+        var bbri = 0.8 + 0.7 * be;
+        s.border_r = Math.min(1, br * bbri);
+        s.border_g = Math.min(1, bg * bbri);
+        s.border_b = Math.min(1, bb * bbri);
+        s.border_a = Math.min(1, 0.7 + 0.6 * be) * vis;
         return s;
       },
     };
@@ -301,7 +312,20 @@
   }
 
   // ── central-motif modes (curated to the reference's vocabulary). Each = a point fn for one wave. ──
-  var fAnem = alcAnemone(10, ALC_PAL.roseGreen).point_eqs; // soft 10-arm flower (hollow centre)
+  // ANEMONE — soft 10-arm flower with a hollow centre (matches the reference's flower, A_95). The kit
+  // factory bakes a FIXED green↔magenta two-tone; we override the colour so the base hue DRIFTS with the
+  // shared q8 clock (dynamic, not 2 constant colours — the user's note) while keeping an alternating-arm
+  // DUO spread so it still reads as the canonical anemone.
+  var anemPts = alcAnemone(10, ALC_PAL.roseGreen).point_eqs;
+  function fAnem(a) {
+    anemPts(a);
+    var arm = Math.floor((a.sample || 0) * 10);
+    var h = (a.q8 || 0) + (arm & 1 ? 0.5 : 0.0);
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
   // STAR-NET — crisp straight-line star-polygon mandala (the clean 12-point star, A_95). N diameter
   // lines through centre with a small live-waveform jag → a clean star, folds into a mandala.
   function fStarNet(a) {
@@ -322,22 +346,6 @@
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
     if (u < 0.02) a.a = 0;
-    return a;
-  }
-  // ROSE — the central FLOWER as a smooth continuous curve (intersecting petals). r=cos(k·θ); bass breathes.
-  function fRose(a) {
-    var s = a.sample || 0;
-    var cx = a.q2 !== undefined ? a.q2 : 0.5,
-      cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var k = 5.0;
-    var th = s * 6.2832 + (a.q9 || 0);
-    var r = (a.q5 || 0.4) * (0.9 + 0.18 * (a.q10 || 0)) * Math.cos(k * th);
-    a.x = cx + r * Math.cos(th);
-    a.y = cy + r * Math.sin(th);
-    var h = (a.q8 || 0) + Math.abs(r) * 0.35;
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
     return a;
   }
   // URCHIN — all 512 live-waveform samples form a spiky rosette whose spike LENGTH is the amplitude.
@@ -376,49 +384,59 @@
     if (u < 0.02) a.a = 0;
     return a;
   }
-  // ROTLINE — N live-waveform diameter lines sharing one fast rotation (q9), smeared by feedback into a
-  // swept fan/tunnel (the rotating-lines / radial-tunnel scenes).
-  function fRotLine(a) {
-    var N = 3,
-      fk = (a.sample || 0) * N,
-      seg = Math.floor(fk),
-      u = fk - seg,
-      s = u * 2 - 1;
-    var th = (a.q9 || 0) * 4.0;
-    var len = (a.q5 || 0.4) * 1.05,
-      disp = (a.value1 || 0) * (a.q6 || 0.05) * 1.8;
-    var off = disp + (seg - 1) * 0.0012;
-    var cx = a.q2 !== undefined ? a.q2 : 0.5,
-      cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + s * len * Math.cos(th) - off * Math.sin(th);
-    a.y = cy + s * len * Math.sin(th) + off * Math.cos(th);
-    var h = a.q8 || 0;
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+  // ── N-GON MOTIFS (the user asked: "square, triangle, double triangle, mandala using triangles"). The
+  //    kit factories draw waveform-jagged polygon edges + already colour-cycle with q8 (dynamic). Under
+  //    the kaleidoscope bg (q29=1) any of these FOLDS into a triangle/polygon MANDALA. ──
+  var fTri = alcTriangle(0, 0).point_eqs; // single triangle (3 live-waveform edges)
+  var fNgon = alcNgon({ sides: 4, aspectX: 1.0, hueOff: 0.0 }).point_eqs; // SQUARE
+  // HEXAGRAM / Star-of-David — two triangles 60° apart packed into ONE wave (split the samples).
+  var triUp = alcTriangle(0, 0).point_eqs;
+  var triDn = alcTriangle(1.0472, 0.0).point_eqs; // +60°
+  function fHexagram(a) {
+    var half = (a.sample || 0) < 0.5 ? 0 : 1;
+    var saved = a.sample;
+    a.sample = ((a.sample || 0) - half * 0.5) * 2.0; // remap to 0..1 per triangle
+    if (half === 0) triUp(a);
+    else triDn(a);
+    if (a.sample < 0.02 && half === 1) a.a = 0; // hide the half-to-half connector
+    a.sample = saved;
     return a;
   }
-  var MODES = [fAnem, fStarNet, fRose, fUrchin, fCrossX, fRotLine];
-  // ADDITIVE dense modes (anemone/urchin/rotline) pile up → lower alpha; crisp outline modes keep more.
-  var MODE_ALPHA = [0.5, 0.72, 0.78, 0.54, 0.7, 0.66];
+  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons. ROSE (smooth Lissajous
+  // loops) and ROTLINE (radial filament net) were REMOVED — the user rejected both ("WTF is this shape" /
+  // "mess of net"); they never matched the Alchemy design language. Radial-tunnel DEPTH still lives in the
+  // background regime (q29=2), so removing the rotline motif loses no depth.
+  var MODES = [fAnem, fStarNet, fUrchin, fCrossX, fTri, fNgon, fHexagram];
+  // ADDITIVE dense modes (anemone/urchin) pile up → lower alpha; crisp outline modes keep more.
+  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7];
   function scaleFor(m) {
-    return m === 0 ? 0.36 : m === 3 ? 0.4 : m === 2 ? 0.32 : 0.4;
+    return m === 0 ? 0.36 : 0.4;
   }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
     if (m < 0) m = 0;
     if (m >= MODES.length) m = MODES.length - 1;
     MODES[m](a);
-    // PULSAR oblate squash — the anemone/urchin read as a tilted 3D eye, not a flat face-on circle.
-    if ((m === 0 || m === 3) && (a.q12 || 1) < 1.5) {
+    // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on circle.
+    if ((m === 0 || m === 2) && (a.q12 || 1) < 1.5) {
       var cyS = a.q3 !== undefined ? a.q3 : 0.5;
       a.y = cyS + (a.y - cyS) * (1.0 - 0.34 * (a.q11 || 0));
     }
     a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m];
     return a;
   }
-  var fTether = alcTether("q21", "q22", "q23", "q24", "q26", ALC_PAL.warm).point_eqs;
+  // TETHER — the jagged waveform line joining the two orbs. The kit bakes a fixed colour; we override so
+  // it CYCLES with the shared q8 clock (in the original the line changes colour like everything else —
+  // the user noticed ours was stuck amber). Slight offset from the orbs so it reads as its own element.
+  var tetherPts = alcTether("q21", "q22", "q23", "q24", "q26", null).point_eqs;
+  function fTether(a) {
+    tetherPts(a);
+    var h = (a.q8 || 0) + 0.08;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
 
   // ── director state (closure → persists; ONE preset, never reloaded) ──
   var lastT = 0,
@@ -427,12 +445,12 @@
     lastBgMode = -1,
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
     panMag = 0,
-    spinAmt = 0, // mode 5 (rotline) → fast constant spin
-    focusAmt = 0; // modes 0/3/5 → COMP pupil + anemone squash
+    focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
+    corridorAmt = 0; // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
-  var BG_BAG = [0, 0, 0, 0, 0, 0, 2, 2, 1, 1]; // 0 wavy-fluid · 1 kaleidoscope · 2 radial-tunnel
-  var MOTIF_BAG = [0, 0, 0, 1, 1, 1, 2, 2, 4, 5]; // flower/star/rose DOMINANT; cross/rotline rare accents; urchin dropped (it sprayed a frame-filling burst — the rejected spiky look)
+  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 1, 3]; // 0 wavy-fluid · 1 kaleidoscope · 2 radial-tunnel · 3 corridor
+  var MOTIF_BAG = [0, 0, 0, 1, 1, 1, 2, 3, 4, 5, 6, 6]; // anemone + star-mandala DOMINANT; urchin/cross/triangle/square/hexagram accents
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
@@ -500,9 +518,7 @@
     var dd = (mo.mix - 0.5) * 4.0;
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips at the swap instant
 
-    focusAmt +=
-      ((mCur === 0 || mCur === 3 || mCur === 5 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6);
-    spinAmt += ((mCur === 5 ? 1 : 0) - spinAmt) * Math.min(1, dt * 0.6);
+    focusAmt += ((mCur === 0 || mCur === 2 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6);
 
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
@@ -512,7 +528,7 @@
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
     t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // breathing + smoothed beat pop
     t.q6 = 0.05;
-    t.q9 = time * 0.06 * (1 - spinAmt) + time * 0.85 * spinAmt; // slow spin → fast when rotline
+    t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
     t.q11 = focusAmt; // COMP pupil + anemone squash
 
@@ -532,6 +548,29 @@
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
+
+    // ── CORRIDOR SCENE (the iconic 0:06-0:16 marching-orbiter corridor, side-view + rightward drift).
+    //    When bgMode 3 is active: the central flower fades, the two orbs become the NEAR-LEFT + FAR-RIGHT
+    //    anchors of a receding row, the tether draws the jagged WAVEFORM thread ALONG the corridor, and
+    //    the camera pans RIGHT so the whole row + its trail-echoes march toward a right vanishing point.
+    //    waves[3] adds the receding ring-dot row between the anchors. (The "wave scene" the user asked.) ──
+    corridorAmt += ((bgMode === 3 ? 1 : 0) - corridorAmt) * Math.min(1, dt * 0.5);
+    if (corridorAmt > 0.01) {
+      var co = corridorAmt;
+      t.q4 *= 1 - 0.94 * co; // fade the central flower almost OUT — the corridor IS the orbs + row + thread
+      t.q18 += (0.0065 - t.q18) * co; // strong RIGHTWARD pan (camera/motifs move right)
+      t.q19 += (0.0 - t.q19) * co; // kill the vertical drift
+      t.q15 += (0.0 - t.q15) * co; // kill the magnify (a clean recede, not a watercolour bloom)
+      t.q25 = Math.max(t.q25, co); // both orbs present (the corridor anchors)
+      t.q14 = Math.max(t.q14, co);
+      t.q7 *= 1 + 0.4 * co; // a touch bigger anchor orbs
+      // near-LEFT anchor (foreground) ← orb A; far-RIGHT-ish anchor (recedes) ← orb B
+      t.q21 += (0.16 - t.q21) * co;
+      t.q22 += (0.52 - t.q22) * co;
+      t.q23 += (0.7 - t.q23) * co;
+      t.q24 += (0.49 - t.q24) * co;
+      t.q26 += (0.05 - t.q26) * co; // steady tether-waveform jag along the corridor
+    }
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
     if (typeof window !== "undefined" && window.__ALC_FORCE) {
@@ -618,7 +657,46 @@
       fTether(a);
       var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
       var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // flashes on the beat
-      a.a = (a.a === undefined ? 0.9 : a.a) * g * beatG;
+      var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
+      a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor);
+      return a;
+    },
+  };
+  // waves[3] = CORRIDOR ring-dot ROW — a row of glowing dots receding from the near-left anchor toward a
+  // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
+  // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
+  preset.waves[3] = {
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 80,
+      additive: 1,
+      usedots: 1,
+      scaling: 1,
+      smoothing: 0.0,
+      thick: 1,
+      a: 0.85,
+    }),
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
+    point_eqs: function (a) {
+      if (Math.abs((a.q29 || 0) - 3) > 0.5) {
+        a.a = 0;
+        return a;
+      }
+      var K = 10,
+        idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+      var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
+      var nearX = 0.16,
+        nearY = 0.52,
+        vpx = 0.82,
+        vpy = 0.49;
+      a.x = nearX + (vpx - nearX) * d;
+      a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+      var h = a.q8 || 0;
+      a.r = orbCol(h, 0);
+      a.g = orbCol(h, 0.33);
+      a.b = orbCol(h, 0.67);
+      a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
       return a;
     },
   };
