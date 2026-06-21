@@ -488,21 +488,22 @@
   })();
 
   // ── Battery elektrination ───────────────────────────────────────────────────
-  // Muted SAGE-GREEN quad-mirror KALEIDOSCOPE frond-star (~12 arms) with concentric ripple
-  // rings at the center, blanketed in grainy metallic SPECKLE, on a mid-dark olive ground with
-  // a heavy vignette (sat ~7.5, hue ~50deg). NOT electric lightning bolts — the old impl was
-  // wrong. A jagged real-audio circleWave feeds the frond tips through the bilateral mirror fold.
+  // A sharp, dynamic, audio-reactive WAVEFORM mirrored ~12x into a jagged STAR with a dark void
+  // eye at the exact centre — PALE silvery green-grey on a dark ground (ethereal/metallic, NOT
+  // dark olive). The star rotates clockwise and PULSES/zooms on the beat; scattered white
+  // particles drift outward like snow. (Short decay keeps the folded waveform CRISP, not a
+  // smeared tiled mandala.)
   P["Battery elektrination"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.93,
+        decay: 0.82, // short trail -> the folded waveform stays CRISP (not a smeared cloud)
         gammaadj: 1.9,
-        zoom: 1.006,
-        rot: 0.01,
-        warp: 0.04,
+        zoom: 1.0,
+        rot: 0,
+        warp: 0.02,
         wrap: 0,
-        darken_center: 0,
+        darken_center: 1,
         additivewave: 1,
       },
       {
@@ -510,47 +511,51 @@
           var ba = t.bass_att || t.bass || 1;
           t.q2 = 0.5;
           t.q3 = 0.5;
-          t.q5 = 0.12 + 0.1 * (ba - 1); // frond reach pulses with bass
-          t.q9 = t.time * 0.3; // the core waveform "engine" rotates independently
-          t.rot = 0.008 + 0.01 * Math.sin(t.time * 0.2); // slow swirl
-          t.decay = 0.93;
+          t.q5 = 0.13 + 0.12 * (ba - 1); // waveform reach pulses with bass
+          t.q9 = t.time * 0.35; // the core waveform rotates
+          t.decay = 0.82;
           return t;
         },
         comp:
           NOISE_GLSL +
           ALC_KALEIDOQUAD_GLSL +
           "shader_body {\n" +
-          "  vec2 d = uv - 0.5; d.x *= resolution.x/resolution.y;\n" +
-          "  float rt = time*0.05;\n" + // slow kaleidoscope rotation
+          "  vec2 dd = uv - 0.5; dd.x *= resolution.x/resolution.y;\n" +
+          "  float pulse = 1.0/(1.0 + 0.4*max(bass-1.0, 0.0));\n" + // bass zooms the star OUT (beat pulse)
+          "  float rt = time*0.16;\n" + // continuous clockwise rotation
           "  float cr = cos(rt), sr = sin(rt);\n" +
-          "  d = vec2(d.x*cr - d.y*sr, d.x*sr + d.y*cr);\n" +
-          "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm star
+          "  vec2 d = vec2(dd.x*cr - dd.y*sr, dd.x*sr + dd.y*cr) * pulse;\n" +
+          "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm mirror star
           "  fold.x /= resolution.x/resolution.y;\n" +
-          "  vec3 c = texture2D(sampler_main, fold + 0.5).rgb;\n" +
-          "  float lum = dot(c, vec3(0.4));\n" +
-          "  vec3 sage = mix(vec3(0.34,0.40,0.27), vec3(0.66,0.72,0.56), smoothstep(0.0,0.85,lum));\n" + // fixed muted sage
-          "  vec3 col = sage * (0.62 + 1.1*lum);\n" +
-          "  float ar = length(d);\n" +
-          "  float ripple = 0.5 + 0.5*sin(ar*52.0 - time*3.0 - bass*6.0);\n" + // concentric ripple rings
-          "  col += vec3(0.16,0.20,0.12) * ripple * exp(-ar*ar*20.0);\n" +
+          "  float lum = dot(texture2D(sampler_main, fold + 0.5).rgb, vec3(0.4));\n" +
+          "  vec3 pale = mix(vec3(0.09,0.12,0.10), vec3(0.82,0.88,0.80), smoothstep(0.0,0.6,lum));\n" + // pale silvery green-grey
+          "  vec3 col = pale * (0.4 + 1.4*lum);\n" +
+          "  float rr = length(dd);\n" +
+          "  col *= smoothstep(0.015, 0.07, rr);\n" + // dark void eye at the exact centre
+          "  float pang = atan(dd.y, dd.x);\n" + // scattered white particles radiating outward
+          "  float lane = floor((pang+3.14159)/6.2832*22.0);\n" +
+          "  float life = fract(time*0.22 + hash21(vec2(lane,1.7)));\n" +
+          "  float prad = 0.05 + life*0.62;\n" +
+          "  float laneAng = (lane+0.5)/22.0*6.2832 - 3.14159;\n" +
+          "  vec2 ppos = vec2(cos(laneAng), sin(laneAng))*prad;\n" +
+          "  col += vec3(0.88,0.94,0.86) * smoothstep(0.013, 0.0, length(dd - ppos)) * (1.0-life);\n" +
           "  ret = col;\n" +
-          alcSpeckle("vec3(0.52,0.58,0.42)", 0.07, 3.0, "1.0") + // faint metallic sparkle (texture is mostly the folded waveform)
-          alcVignette(0.7) + // heavy vignette
-          "  ret = ret/(ret + vec3(0.6));\n" + // Reinhard -> muted, never blown white
+          alcVignette(0.5) +
+          "  ret = ret/(ret + vec3(0.5));\n" + // gentle Reinhard
           "}\n",
       }
     );
-    // jagged real-audio ring -> frond tips through the mirror fold
+    // sharp jagged real-audio waveform -> mirrored into the star through the fold
     preset.waves[0] = circleWave("q2", "q3");
-    preset.waves[0].baseVals.r = 0.5;
-    preset.waves[0].baseVals.g = 0.62;
-    preset.waves[0].baseVals.b = 0.4;
-    preset.waves[0].baseVals.a = 0.8;
+    preset.waves[0].baseVals.r = 0.8;
+    preset.waves[0].baseVals.g = 0.9;
+    preset.waves[0].baseVals.b = 0.82;
+    preset.waves[0].baseVals.a = 0.9;
     preset.waves[0].baseVals.additive = 1;
-    preset.waves[0].baseVals.smoothing = 0.05; // jagged frond outline
+    preset.waves[0].baseVals.smoothing = 0.02; // very jagged
     preset.waves[0].point_eqs = function (a) {
-      var ang = a.sample * 6.2832 + (a.q9 || 0); // continuous rotating geometric core
-      var rad = (a.q5 || 0.12) + 0.12 * a.value1; // big bass-scaled spikes
+      var ang = a.sample * 6.2832 + (a.q9 || 0); // rotating waveform
+      var rad = (a.q5 || 0.13) + 0.17 * a.value1; // big sharp bass-scaled spikes
       a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
       a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
       return a;
