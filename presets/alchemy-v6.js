@@ -193,9 +193,11 @@
     "    sharp = hsv2rgb(hsv);\n" +
     "  }\n" +
     // DEPTH via VALUE separation: the background RECEDES (dimmed) so the bright foreground motif/orbs POP
-    // forward — without this fg=bg brightness the scene reads FLAT (the user's note). Still colourful, just
-    // dimmer than the fg. The painted motif (sharp) is boosted so it clearly sits in front.
-    "  vec3 col = ground * 0.66 + sharp * 1.55 + cA * bl;\n" +
+    // forward (fg=bg brightness reads FLAT). Kept colourful (0.78 dim, not murky). The motif is composited
+    // as SHARP core + a soft BLUR-GLOW halo (sampler_blur1) so lines read as glowing ENERGY BEAMS with
+    // volume, not thin wireframes (Gemini's note) — the original's beams have body.
+    "  vec3 glow = texture2D(sampler_blur1, kuv).rgb;\n" +
+    "  vec3 col = ground * 0.78 + sharp * 1.32 + glow * 0.75 + cA * bl;\n" +
     "  col *= q31;\n" +
     // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
     // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
@@ -728,9 +730,14 @@
     lastStrobeT = 0,
     strobeOn = 1;
   var beat = alcBeatFlash({ rise: 1.22 });
+  // WEIGHTED bags — the original is DOMINANTLY the soft painterly field + flower + orbs + tether, with
+  // kaleidoscope/vortex/burst as ACCENTS. Uniform-random over all modes felt like a chaotic grab-bag of
+  // neon/wireframe scenes; these bags bias toward the painterly looks so the OVERALL character matches.
+  var BG_BAG = [0, 0, 0, 5, 5, 6, 6, 1, 1, 2, 2, 8, 3, 4, 7, 9]; // wash·tilt·vortex·X-wedge·bullseye prominent; bands/mandala/wallpaper/neon rarer
+  var MOTIF_BAG = [0, 0, 0, 5, 5, 9, 9, 8, 6, 2, 1, 7, 4, 10, 11]; // anemone/urchin/ribbon-led (the central flower); fountain/wireframe/X rarer
   var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
-  var bgPick = makePicker(10, 12, 22, 5.0); // 10 BG_MODEs: wash/X-wedge/bullseye/sine-bands/quad-mandala/tilt/vortex/wallpaper/pickets/neon-dark — own slow clock, long morph
-  var motifPick = makePicker(MODES.length, 6, 12, 2.0); // central motif — own clock, dip-swap
+  var bgPick = makePicker(BG_BAG.length, 12, 22, 5.0); // background — own slow clock, long morph (mapped through BG_BAG)
+  var motifPick = makePicker(MOTIF_BAG.length, 6, 12, 2.0); // central motif — own clock, dip-swap (mapped through MOTIF_BAG)
 
   function frame(t) {
     var time = t.time || 0;
@@ -750,7 +757,7 @@
     // scene changes; sweeping q29 through intermediate modes would flash every field. The persistent
     // high-decay feedback buffer + the motif/orbs (own clocks) bridge the cut so it doesn't read as a
     // "new preset".
-    t.q29 = bg.mix < 0.5 ? bg.a : bg.b;
+    t.q29 = BG_BAG[bg.mix < 0.5 ? bg.a : bg.b]; // discrete snap, mapped through the weighted bag
     var bgMode = Math.floor(t.q29 + 0.5);
 
     // SHARED HUE clock (fg + bg). TWO colour-speed regimes (per the reference): the SPATIAL-multicolor
@@ -829,7 +836,7 @@
 
     // CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly.
     var mo = motifPick(time, dt, f > 0.6);
-    var mCur = mo.mix < 0.5 ? mo.a : mo.b;
+    var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b]; // mapped through the weighted bag (anemone-led)
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips to ~0.21 at the swap instant
