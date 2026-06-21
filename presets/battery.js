@@ -504,40 +504,38 @@
       },
       {
         frame: function (t) {
-          var ba = t.bass_att || t.bass || 1;
-          var kick = Math.max((t.bass || 1) - 1.0, 0.0); // RAW bass surge (punchy, not smoothed)
-          var tm = t.time,
-            dt = Math.min(0.1, Math.max(0, tm - lastT));
-          lastT = tm;
-          spin += dt * (0.2 + 2.4 * kick); // slow drag + JUMPS forward on bass hits -> lagged spin
-          var STEP = 0.34; // QUANTIZE the rotation into discrete jumps -> stepped, LOW-FPS strobing motion
-          var qSpin = Math.floor(spin / STEP) * STEP;
+          // NO bass-reactive gross motion (the original doesn't pulse/jump on bass) and NO rigid spin
+          // (that read as "radial movement"). Motion = the waveform MORPHING + a fluid fbm drift = water-like.
           t.q2 = 0.5;
           t.q3 = 0.5;
-          t.q5 = 0.08 + 0.04 * (ba - 1);
-          t.q11 = qSpin; // unified STEPPED rotation -> drives the comp fold
-          t.q9 = qSpin; // frond ring rotates (stepped)
-          t.q1 = qSpin * 1.3; // central jagged LINE rotates around the axis in steps
+          t.q5 = 0.09; // frond-fill ring radius (steady)
+          t.q11 = t.time * 0.02; // barely-there fold drift (axis-aligned so the horizontal line stays visible)
+          t.q9 = 0.0; // frond ring fixed angle (its spikes still morph with the audio)
+          t.q1 = 0.0; // central jagged waveform LINE stays HORIZONTAL & visible
           return t;
         },
-        // custom warp = the ripple engine: drift the feedback OUTWARD a touch and fade it a fixed amount
-        // each frame -> the stepped rotation's positions expand into echoing ripple rings, at a STABLE
-        // equilibrium (the explicit *0.93 fade prevents the runaway brightness drift).
+        // custom warp = the FLUID ripple engine: gentle outward drift + an fbm WATER-flow advection + a
+        // fixed per-frame fade. The morphing line's trail flows/ripples like water (not a rigid spin), at a
+        // STABLE equilibrium (the *0.94 fade prevents runaway brightness).
         warp:
+          NOISE_GLSL +
           "shader_body {\n" +
-          "  vec2 p = 0.5 + (uv - 0.5) / 1.035;\n" + // outward drift -> ripple rings
-          "  ret = texture2D(sampler_main, p).rgb * 0.93;\n" + // fixed fade -> stable, long ripple trails
+          "  vec2 p = 0.5 + (uv - 0.5) / 1.02;\n" + // gentle outward drift -> ripples
+          "  float fx = fbm(uv*3.0 + vec2(time*0.05, -time*0.04));\n" +
+          "  float fy = fbm(uv*3.0 + vec2(7.3, 2.1) - time*0.045);\n" +
+          "  p += (vec2(fx, fy) - 0.5) * 0.025;\n" + // FLUID water-like advection (the 'not radial' fix)
+          "  ret = texture2D(sampler_main, p).rgb * 0.94;\n" + // fade -> stable + flowing ripple trails
           "}\n",
         comp:
           NOISE_GLSL +
           ALC_KALEIDOQUAD_GLSL +
           "shader_body {\n" +
           "  vec2 dd = uv - 0.5; dd.x *= resolution.x/resolution.y;\n" +
-          "  float pulse = 1.0/(1.0 + 0.35*max(bass-1.0, 0.0));\n" + // RAW bass zooms the star (punchy beat pulse)
-          "  float rt = q11;\n" + // audio-reactive LAGGED rotation (accumulated in frame_eqs)
+          "  float pulse = 1.0;\n" + // NO bass pulse (the original gross motion is not bass-reactive)
+          "  float rt = q11;\n" + // barely-there fold drift (set in frame_eqs) — fluid, not a spin
           "  float cr = cos(rt), sr = sin(rt);\n" +
           "  vec2 d = vec2(dd.x*cr - dd.y*sr, dd.x*sr + dd.y*cr) * pulse;\n" +
-          "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm mirror star
+          "  vec2 fold = abs(d);\n" + // gentle quad mirror (V+H): horizontal line stays VISIBLE, less rigidly radial
           "  fold.x /= resolution.x/resolution.y;\n" +
           "  float lum = dot(texture2D(sampler_main, fold + 0.5).rgb, vec3(0.4));\n" + // fronds (zoom-streaked) mirrored by the fold
           "  vec3 sage = mix(vec3(0.13,0.18,0.11), vec3(0.68,0.80,0.52), smoothstep(0.0,0.6,lum));\n" + // pale-ish sage GREEN (not silvery-white)
@@ -557,24 +555,24 @@
           "}\n",
       }
     );
-    // THE central waveform is a jagged real-audio LINE through the centre that rotates (lagged) around
-    // the axis. The kaleido fold mirrors it into the frond-star; the outward zoom + long-decay feedback
-    // streak its rotating sweep into echoing RIPPLES. This single line is the engine (no centre ring).
+    // THE central waveform: a bright jagged real-audio LINE held HORIZONTAL (q1=0) across the centre. It
+    // MORPHS with the audio; the quad mirror + fluid fbm warp spread its trail into flowing fronds and
+    // ripples (water-like), so the horizontal line stays VISIBLE while the field undulates around it.
     preset.waves[0] = waveLine();
     preset.waves[0].baseVals.r = 0.85;
     preset.waves[0].baseVals.g = 0.95;
     preset.waves[0].baseVals.b = 0.85;
-    preset.waves[0].baseVals.a = 0.5;
+    preset.waves[0].baseVals.a = 0.8; // bright -> the horizontal line reads as the central feature
     preset.waves[0].baseVals.additive = 1;
     preset.waves[0].baseVals.smoothing = 0.02; // jagged
     preset.waves[0].point_eqs = function (a) {
-      var th = a.q1 || 0; // lagged rotation around the centre axis
+      var th = a.q1 || 0; // held HORIZONTAL (q1 = 0)
       var s = a.sample * 2.0 - 1.0; // -1..1 along the line
       var ct = Math.cos(th),
         st = Math.sin(th);
-      var disp = (a.value1 || 0) * 0.18; // jagged perpendicular waveform displacement (real audio)
-      a.x = 0.5 + s * 0.34 * ct - disp * st;
-      a.y = 0.5 + s * 0.34 * st + disp * ct;
+      var disp = (a.value1 || 0) * 0.2; // jagged perpendicular waveform displacement (real audio)
+      a.x = 0.5 + s * 0.46 * ct - disp * st; // long horizontal line spanning the centre
+      a.y = 0.5 + s * 0.46 * st + disp * ct;
       return a;
     };
     // faint frond-source ring at the centre -> the outward zoom streaks it into the radial green
@@ -583,7 +581,7 @@
     preset.waves[1].baseVals.r = 0.5;
     preset.waves[1].baseVals.g = 0.62;
     preset.waves[1].baseVals.b = 0.42;
-    preset.waves[1].baseVals.a = 0.55;
+    preset.waves[1].baseVals.a = 0.3; // faint frond-fill (de-emphasised -> less radial, the LINE leads)
     preset.waves[1].baseVals.additive = 1;
     preset.waves[1].baseVals.smoothing = 0.04;
     preset.waves[1].point_eqs = function (a) {
