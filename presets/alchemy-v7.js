@@ -489,52 +489,49 @@
     a.sample = saved;
     return a;
   }
-  // WIREFRAME NET (survey gap #1, recurring 0:06-0:12 / 0:33 / 2:08 / 2:42): a dense crisscross of STRAIGHT
-  // chords — a {P/stride} star-art polygon walked as a continuous path so the chords overlay into a woven
-  // NET, FORESHORTENED toward an off-center vanishing direction so it reads as a 3D-tilted sheet/knot (the
-  // depth cue the original gets from crossing-line meshes, not from a flat rosette). Live-waveform jag adds
-  // the Alchemy texture. Distinct from star-net (clean radial spokes) — this is irregular crossing chords.
+  // WIREFRAME NET (survey gap #1, recurring 0:06-0:12 / 0:33 / 2:08 / 2:42): a clean CROSSHATCH GRID —
+  // N horizontal + N vertical strands, GENTLY foreshortened toward a slow tilt so it reads as a tilted 3D
+  // SHEET (the reference's actual net is a crossing-strand grid, NOT a chaotic star-art spray). Mild
+  // live-waveform jag for the Alchemy texture. (Replaced the old {13/5} star-art version — it read as a
+  // "hideous" chaotic mess; the user rejected it.)
   function fNet(a) {
-    var CH = 22,
-      fk = (a.sample || 0) * CH,
-      seg = Math.floor(fk),
-      u = fk - seg;
-    var P = 13,
-      stride = 5; // {13/5} star polygon → dense crossing net
-    var i0 = (seg * stride) % P,
-      i1 = (seg * stride + stride) % P;
-    var spin = (a.q9 || 0) * 0.6;
-    var aa0 = (i0 / P) * 6.2832 + spin,
-      aa1 = (i1 / P) * 6.2832 + spin;
+    var half = (a.sample || 0) < 0.5 ? 0 : 1;
+    var ss = half ? ((a.sample || 0) - 0.5) * 2.0 : (a.sample || 0) * 2.0; // 0..1 within each strand set
+    var N = 9,
+      fk = ss * N,
+      line = Math.floor(fk),
+      u = fk - line;
+    var t = (line / (N - 1)) * 2.0 - 1.0; // strand offset across the sheet, -1..1
+    var p = u * 2.0 - 1.0; // position along the strand, -1..1
     var R = (a.q5 || 0.4) * 1.4;
-    var x0 = Math.cos(aa0) * R,
-      y0 = Math.sin(aa0) * R,
-      x1 = Math.cos(aa1) * R,
-      y1 = Math.sin(aa1) * R;
-    var px = x0 + (x1 - x0) * u,
-      py = y0 + (y1 - y0) * u;
-    var dxc = x1 - x0,
-      dyc = y1 - y0,
-      ln = Math.hypot(dxc, dyc) || 1;
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.7; // live-waveform jag, perpendicular to the chord
-    px += (-dyc / ln) * jag;
-    py += (dxc / ln) * jag;
-    // PERSPECTIVE foreshorten toward a slowly-rotating off-center tilt direction → 3D-tilted net sheet
-    var tA = (a.q9 || 0) * 0.5 + 1.0;
-    var proj = px * Math.cos(tA) + py * Math.sin(tA);
-    var d = 1.0 / (1.0 + 0.85 * proj);
-    if (d > 1.8) d = 1.8;
-    px *= d;
-    py *= d;
+    var gx, gy;
+    if (half === 0) {
+      gx = p * R;
+      gy = t * R;
+    } else {
+      gx = t * R;
+      gy = p * R;
+    }
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.45; // gentle perpendicular live-waveform jag
+    if (half === 0) gy += jag;
+    else gx += jag;
+    // GENTLE perspective foreshorten toward a slow tilt direction → a tilted sheet (not an extreme stretch)
+    var tA = (a.q9 || 0) * 0.5 + 0.7;
+    var proj = gx * Math.cos(tA) + gy * Math.sin(tA);
+    var d = 1.0 / (1.0 + 0.4 * proj);
+    if (d > 1.4) d = 1.4;
+    if (d < 0.65) d = 0.65;
+    gx *= d;
+    gy *= d;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + px;
-    a.y = cy + py;
-    var h = (a.q8 || 0) + u * 0.15;
+    a.x = cx + gx;
+    a.y = cy + gy;
+    var h = (a.q8 || 0) + 0.12;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0; // hide chord-to-chord jumps
+    if (u < 0.02) a.a = 0; // hide strand-to-strand jumps
     return a;
   }
   // SPIRAL VORTEX / whirlpool (survey gap, 1:05-1:16): radial filaments whose angle GROWS with radius →
@@ -1071,16 +1068,16 @@
   // PASTEL = the accurate WMP look (480p + the orig-19s clip both measure muted/dusty/pastel, true blacks):
   // lower saturation, lifted softer washes, milky low-contrast, a faint mauve/sage cast.
   var PROFILE_PASTEL = {
-    gboost: 1.7,
-    kbold: 0.85,
-    tonek: 0.85,
-    sat: 0.62,
-    deepen: 0.95,
-    lift: 0.05,
+    gboost: 1.32, // was 1.7 — too washed; muted but the geometry keeps presence on a darker-ish ground
+    kbold: 1.0,
+    tonek: 0.68,
+    sat: 0.82, // was 0.62 — keep real (muted) COLOUR, not greyed-out
+    deepen: 0.84, // was 0.95 — restore some contrast so it isn't flat/milky
+    lift: 0.02, // was 0.05 — barely a milky floor
     tintR: 0.5,
     tintG: 0.5,
-    tintB: 0.62,
-    tintAmt: 0.12,
+    tintB: 0.58,
+    tintAmt: 0.06, // was 0.12 — subtler cast
   };
   // VIVID = the punchier 1080p-tuned look (what the user liked): boosted saturation, dark grounds,
   // deepened darks, bold kaleidoscope, no tint.

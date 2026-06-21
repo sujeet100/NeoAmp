@@ -84,8 +84,8 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
+    { label: "Alchemy V7: Random (Pastel)", wmp: "Alchemy V7: Random (Pastel)" }, // DEFAULT — accurate muted/dusty WMP colour (480p), validated to match
     { label: "Alchemy V7: Random (Vivid)", wmp: "Alchemy V7: Random (Vivid)" }, // punchier 1080p-tuned colour
-    { label: "Alchemy V7: Random (Pastel)", wmp: "Alchemy V7: Random (Pastel)" }, // accurate muted/dusty WMP colour (480p)
     { label: "Alchemy V6: Random", wmp: "Alchemy V6: Random" }, // prior rebuild (two-regime bg + parallax + motif-paint) — kept to compare
     { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // baseline (commit 2dffe4d, pre-watercolor-experiment)
     { label: "Alchemy V5: Random", wmp: "Alchemy V5: Random" }, // EXPERIMENTAL watercolour-trail fork (compare vs V4)
@@ -636,10 +636,10 @@
     // Boot straight into the single seamless "Alchemy V4: Random" preset (it self-sequences in
     // frame_eqs — no cross-preset Director crossfade, which read foggy/like-a-new-preset). The
     // Director (viz.js) stays dormant; reachable only via the postMessage debug toggle.
-    var bootName = presets["Alchemy V7: Random (Vivid)"]
-      ? "Alchemy V7: Random (Vivid)"
-      : presets["Alchemy V7: Random"]
-        ? "Alchemy V7: Random"
+    var bootName = presets["Alchemy V7: Random (Pastel)"]
+      ? "Alchemy V7: Random (Pastel)"
+      : presets["Alchemy V7: Random (Vivid)"]
+        ? "Alchemy V7: Random (Vivid)"
         : presets["Alchemy V6: Random"]
           ? "Alchemy V6: Random"
           : presets["Alchemy V4: Random"]
