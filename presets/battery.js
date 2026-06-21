@@ -497,9 +497,9 @@
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.82, // short trail -> the folded waveform stays CRISP (not a smeared cloud)
+        decay: 0.88, // medium trail: the small ring streaks OUTWARD into radial fronds
         gammaadj: 1.9,
-        zoom: 1.0,
+        zoom: 1.04, // outward feedback -> the rotating centre waveform is pushed out as fronds
         rot: 0,
         warp: 0.02,
         wrap: 0,
@@ -511,9 +511,9 @@
           var ba = t.bass_att || t.bass || 1;
           t.q2 = 0.5;
           t.q3 = 0.5;
-          t.q5 = 0.13 + 0.12 * (ba - 1); // waveform reach pulses with bass
+          t.q5 = 0.08 + 0.04 * (ba - 1); // small centre ring; the outward zoom streaks it into fronds
           t.q9 = t.time * 0.35; // the core waveform rotates
-          t.decay = 0.82;
+          t.decay = 0.88;
           return t;
         },
         comp:
@@ -527,9 +527,9 @@
           "  vec2 d = vec2(dd.x*cr - dd.y*sr, dd.x*sr + dd.y*cr) * pulse;\n" +
           "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm mirror star
           "  fold.x /= resolution.x/resolution.y;\n" +
-          "  float lum = dot(texture2D(sampler_main, fold + 0.5).rgb, vec3(0.4));\n" +
-          "  vec3 pale = mix(vec3(0.09,0.12,0.10), vec3(0.82,0.88,0.80), smoothstep(0.0,0.6,lum));\n" + // pale silvery green-grey
-          "  vec3 col = pale * (0.4 + 1.4*lum);\n" +
+          "  float lum = dot(texture2D(sampler_main, fold + 0.5).rgb, vec3(0.4));\n" + // fronds (zoom-streaked) mirrored by the fold
+          "  vec3 sage = mix(vec3(0.13,0.18,0.11), vec3(0.68,0.80,0.52), smoothstep(0.0,0.6,lum));\n" + // pale-ish sage GREEN (not silvery-white)
+          "  vec3 col = sage * (0.5 + 1.3*lum) + vec3(0.05,0.09,0.04);\n" + // faint green ground so it never reads black
           "  float rr = length(dd);\n" +
           "  col *= smoothstep(0.015, 0.07, rr);\n" + // dark void eye at the exact centre
           "  float pang = atan(dd.y, dd.x);\n" + // scattered white particles radiating outward
@@ -538,9 +538,9 @@
           "  float prad = 0.05 + life*0.62;\n" +
           "  float laneAng = (lane+0.5)/22.0*6.2832 - 3.14159;\n" +
           "  vec2 ppos = vec2(cos(laneAng), sin(laneAng))*prad;\n" +
-          "  col += vec3(0.88,0.94,0.86) * smoothstep(0.013, 0.0, length(dd - ppos)) * (1.0-life);\n" +
+          "  col += vec3(0.82,0.90,0.78) * smoothstep(0.012, 0.0, length(dd - ppos)) * (1.0-life);\n" +
           "  ret = col;\n" +
-          alcVignette(0.5) +
+          alcVignette(0.35) +
           "  ret = ret/(ret + vec3(0.5));\n" + // gentle Reinhard
           "}\n",
       }
