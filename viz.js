@@ -84,45 +84,14 @@
 
   // Curated hand-authored WMP presets, grouped at the top of the picker.
   var FAVORITES = [
-    { label: "Alchemy V7: Random (Pastel)", wmp: "Alchemy V7: Random (Pastel)" }, // DEFAULT — accurate muted/dusty WMP colour (480p), validated to match
-    { label: "Alchemy V7: Random (Vivid)", wmp: "Alchemy V7: Random (Vivid)" }, // punchier 1080p-tuned colour
-    { label: "Alchemy V6: Random", wmp: "Alchemy V6: Random" }, // prior rebuild (two-regime bg + parallax + motif-paint) — kept to compare
-    { label: "Alchemy V4: Random", wmp: "Alchemy V4: Random" }, // baseline (commit 2dffe4d, pre-watercolor-experiment)
-    { label: "Alchemy V5: Random", wmp: "Alchemy V5: Random" }, // EXPERIMENTAL watercolour-trail fork (compare vs V4)
+    { label: "Alchemy (Pastel)", wmp: "Alchemy (Pastel)" }, // DEFAULT — accurate muted/dusty WMP colour (480p), validated
+    { label: "Alchemy (Vivid)", wmp: "Alchemy (Vivid)" }, // punchier colour variant
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     {
       label: "Dance of the Freaky Circles (Nebula Spectrum)",
       wmp: "Dance of the Freaky Circles (Nebula Spectrum)",
     },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
-    { label: "Alchemy v2: Random", wmp: "Alchemy v2: Random" },
-    { label: "Alchemy Random", wmp: "Alchemy Random" },
-    { label: "Alchemy v2: Era — Corridor", wmp: "Alchemy v2: Era — Corridor" },
-    { label: "Alchemy v2: Era — Anemone/Vortex", wmp: "Alchemy v2: Era — Anemone/Vortex" },
-    { label: "Alchemy v2: Era — Mandala/Fluid", wmp: "Alchemy v2: Era — Mandala/Fluid" },
-    { label: "Alchemy v2: Era — Supernova", wmp: "Alchemy v2: Era — Supernova" },
-    { label: "Alchemy v2: Orbiters", wmp: "Alchemy v2: Orbiters" },
-    { label: "Alchemy v2: Kaleidoscope", wmp: "Alchemy v2: Kaleidoscope" },
-    { label: "Alchemy v2: Anemone Pulsar", wmp: "Alchemy v2: Anemone Pulsar" },
-    { label: "Alchemy v2: Vortex", wmp: "Alchemy v2: Vortex" },
-    { label: "Alchemy v2: Wireframe Net", wmp: "Alchemy v2: Wireframe Net" },
-    { label: "Alchemy v2: Net Corridor", wmp: "Alchemy v2: Net Corridor" },
-    { label: "Alchemy v2: Gradient Orbs", wmp: "Alchemy v2: Gradient Orbs" },
-    { label: "Alchemy v2: Bullseye Orbiters", wmp: "Alchemy v2: Bullseye Orbiters" },
-    { label: "Alchemy v2: Marble", wmp: "Alchemy v2: Marble" },
-    { label: "Alchemy v2: Net Tunnel", wmp: "Alchemy v2: Net Tunnel" },
-    { label: "Alchemy v2: Fountain", wmp: "Alchemy v2: Fountain" },
-    { label: "Alchemy v2: Waveform Sheet", wmp: "Alchemy v2: Waveform Sheet" },
-    { label: "Alchemy v2: Ray Burst", wmp: "Alchemy v2: Ray Burst" },
-    { label: "Alchemy v2: N-gon Proof", wmp: "Alchemy v2: N-gon Proof" },
-    { label: "Alchemy v2: Mandala", wmp: "Alchemy v2: Mandala" },
-    { label: "Alchemy v2: Nested Mandala", wmp: "Alchemy v2: Nested Mandala" },
-    { label: "Alchemy v2: Anemone", wmp: "Alchemy v2: Anemone" },
-    { label: "Alchemy v2: Anemone (Petals)", wmp: "Alchemy v2: Anemone (Petals)" },
-    { label: "Alchemy v2: Anemone (Mandala)", wmp: "Alchemy v2: Anemone (Mandala)" },
-    { label: "Alchemy v2: Spindle", wmp: "Alchemy v2: Spindle" },
-    { label: "Alchemy v2: Ribbon", wmp: "Alchemy v2: Ribbon" },
-    { label: "Alchemy v2: Moiré", wmp: "Alchemy v2: Moiré" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
     { label: "Ambience Water", wmp: "Ambience Water" },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },
@@ -492,9 +461,9 @@
           : "Featured";
       groups[g].push([f.wmp, f.label]);
     });
-    addGroup("◢◤ WMP — Featured", groups.Featured);
-    addGroup("◢◤ WMP — Ambience", groups.Ambience);
-    addGroup("◢◤ WMP — Battery", groups.Battery);
+    addGroup("◢◤ NeoAmp — Featured", groups.Featured);
+    addGroup("◢◤ NeoAmp — Ambience", groups.Ambience);
+    addGroup("◢◤ NeoAmp — Battery", groups.Battery);
 
     var milkdrop = names
       .filter(function (n) {
@@ -598,33 +567,13 @@
 
     buildBar();
 
-    // Stand-in era playlist for the Director until the four purpose-built
-    // era-presets exist: cycle the strongest existing Alchemy v2 scenes, one per
-    // macro era (corridor / anemone-vortex / mandala-fluid / ribbon). Filtered to
-    // those actually present; falls back to every Alchemy v2 preset.
-    // The four real Tier-1 era-presets (each runs the decoupled state machine internally,
-    // one per macro era of the reference timeline). The Director crossfades between THESE.
-    var ERA_PLAYLIST = [
-      "Alchemy v2: Era — Corridor",
-      "Alchemy v2: Era — Anemone/Vortex",
-      "Alchemy v2: Era — Mandala/Fluid",
-      "Alchemy v2: Era — Supernova",
-    ];
-    // V4 = the 8 kit-factory scenes (Pulsar/Corridor/Vortex/Mandala/Anemone/Orbiters/Star/Burst),
-    // shuffle-cycled by the Director. Fall back to the v2 era playlist if V4 isn't present.
-    var v4Scenes = (window.WMP_V4_SCENES || []).filter(function (n) {
+    // The Director (Tier-2 era sequencer) is RETIRED — the shipped Alchemy is a single self-sequencing
+    // preset ("Alchemy (Pastel)"/(Vivid)). It stays dormant (togglable via postMessage for debugging);
+    // give it the shipped Alchemy variants so it has valid targets if ever toggled.
+    var eraList = ["Alchemy (Pastel)", "Alchemy (Vivid)"].filter(function (n) {
       return presets[n];
     });
-    var eraList =
-      v4Scenes.length >= 2
-        ? v4Scenes
-        : ERA_PLAYLIST.filter(function (n) {
-            return presets[n];
-          });
-    if (eraList.length < 2)
-      eraList = names.filter(function (n) {
-        return /^Alchemy v[24]:/.test(n);
-      });
+    if (eraList.length < 1) eraList = names.slice(0, 2);
     Director.setEras(eraList);
     Director.setOnSwitch(function (name, blend) {
       loadByName(name, blend);
@@ -633,20 +582,14 @@
     window.addEventListener("resize", sizeCanvas);
     requestAnimationFrame(sizeCanvas);
     setTimeout(sizeCanvas, 400);
-    // Boot straight into the single seamless "Alchemy V4: Random" preset (it self-sequences in
-    // frame_eqs — no cross-preset Director crossfade, which read foggy/like-a-new-preset). The
-    // Director (viz.js) stays dormant; reachable only via the postMessage debug toggle.
-    var bootName = presets["Alchemy V7: Random (Pastel)"]
-      ? "Alchemy V7: Random (Pastel)"
-      : presets["Alchemy V7: Random (Vivid)"]
-        ? "Alchemy V7: Random (Vivid)"
-        : presets["Alchemy V6: Random"]
-          ? "Alchemy V6: Random"
-          : presets["Alchemy V4: Random"]
-            ? "Alchemy V4: Random"
-            : presets["Alchemy Random"]
-              ? "Alchemy Random"
-              : names[0];
+    // Boot straight into "Alchemy (Pastel)" — the shipped default (the accurate muted/dusty WMP colour).
+    // It self-sequences in frame_eqs (no cross-preset Director crossfade). The Director (viz.js) stays
+    // dormant; reachable only via the postMessage debug toggle.
+    var bootName = presets["Alchemy (Pastel)"]
+      ? "Alchemy (Pastel)"
+      : presets["Alchemy (Vivid)"]
+        ? "Alchemy (Vivid)"
+        : names[0];
     loadByName(bootName);
     renderLoop();
     post({ type: "ready", presets: names.length });

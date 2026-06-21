@@ -1099,8 +1099,6 @@
     tintB: 0.5,
     tintAmt: 0.0,
   };
-  P["Alchemy V7: Random (Pastel)"] = buildV7(makeComp(PROFILE_PASTEL));
-  P["Alchemy V7: Random (Vivid)"] = buildV7(makeComp(PROFILE_VIVID));
-  // back-compat: the old single name still resolves (→ Vivid, the look the user already liked).
-  P["Alchemy V7: Random"] = P["Alchemy V7: Random (Vivid)"];
+  P["Alchemy (Pastel)"] = buildV7(makeComp(PROFILE_PASTEL));
+  P["Alchemy (Vivid)"] = buildV7(makeComp(PROFILE_VIVID));
 })();
