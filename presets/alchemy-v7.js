@@ -387,9 +387,29 @@
   // ── N-GON MOTIFS (the user asked: "square, triangle, double triangle, mandala using triangles"). The
   //    kit factories draw waveform-jagged polygon edges + already colour-cycle with q8 (dynamic). Under
   //    the kaleidoscope bg (q29=1) any of these FOLDS into a triangle/polygon MANDALA. ──
-  var fTri = alcTriangle(0, 0).point_eqs; // single triangle (3 live-waveform edges)
-  var fNgon = alcNgon({ sides: 4, aspectX: 1.0, hueOff: 0.0 }).point_eqs; // SQUARE
-  // HEXAGRAM / Star-of-David — two triangles 60° apart packed into ONE wave (split the samples).
+  // The kit polygon factories colour via alcSetColor (a NARROW-spread, brighter palette) — off-theme vs
+  // the rest of v7 (the orbCol cosine palette on the q8 clock). So we wrap them and re-colour with orbCol
+  // so the n-gons match the flowers/orbs/tether exactly (same hue clock, same analogous spread).
+  var triPts = alcTriangle(0, 0).point_eqs;
+  function fTri(a) {
+    triPts(a);
+    var h = (a.q8 || 0) + (a.sample || 0) * 0.12; // gentle analogous gradient along the edges
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
+  var ngonPts = alcNgon({ sides: 4, aspectX: 1.0, hueOff: 0.0 }).point_eqs; // SQUARE
+  function fNgon(a) {
+    ngonPts(a);
+    var h = (a.q8 || 0) + (a.sample || 0) * 0.1;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
+  // HEXAGRAM / Star-of-David — two triangles 60° apart packed into ONE wave (split the samples). The two
+  // triangles take a DUO of hues 0.45 apart (drifting with q8) — the canonical two-tone, on-theme.
   var triUp = alcTriangle(0, 0).point_eqs;
   var triDn = alcTriangle(1.0472, 0.0).point_eqs; // +60°
   function fHexagram(a) {
@@ -398,6 +418,10 @@
     a.sample = ((a.sample || 0) - half * 0.5) * 2.0; // remap to 0..1 per triangle
     if (half === 0) triUp(a);
     else triDn(a);
+    var h = (a.q8 || 0) + (half ? 0.45 : 0.0);
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
     if (a.sample < 0.02 && half === 1) a.a = 0; // hide the half-to-half connector
     a.sample = saved;
     return a;
