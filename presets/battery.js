@@ -1064,28 +1064,27 @@
           NOISE_GLSL +
           PAL_GLSL +
           "shader_body {\n" +
-          "  float ca = cos(1.05), sa = sin(1.05);\n" + // ~60deg diagonal
+          "  float ca = cos(0.95), sa = sin(0.95);\n" + // diagonal
           "  float drift = time*0.05;\n" +
-          "  float a1 = (uv.x*ca - uv.y*sa)*42.0 + drift;\n" + // diagonal stripe family 1
-          "  float a2 = (uv.x*ca + uv.y*sa)*42.0 - drift;\n" + // crossing family 2
-          "  float s1 = 0.5+0.5*sin(a1*6.2832);\n" +
-          "  float s2 = 0.5+0.5*sin(a2*6.2832);\n" +
-          "  float weave = pow(s1*s2, 1.3);\n" + // plaid / moire weave
-          "  float grain = fbm(uv*vec2(resolution.x/resolution.y,1.0)*7.0 + drift);\n" +
-          "  weave *= 0.45 + 0.8*grain;\n" + // combed-filament modulation
-          "  float diss = smoothstep(0.15, 1.05, distance(uv, vec2(0.85,0.85)));\n" + // dissolve toward far corner
-          "  float stip = step(0.82 - 0.3*treb, hash21(floor(uv*resolution/3.0)+floor(time*6.0)));\n" +
-          "  weave = mix(weave, weave*0.35 + stip*(0.35+0.5*treb), diss);\n" + // -> granular stipple at the corner
+          "  float ax1 = uv.x*ca - uv.y*sa;\n" + // along the diagonal
+          "  float ax2 = uv.x*ca + uv.y*sa;\n" + // across the diagonal
+          "  float grain = fbm(uv*vec2(resolution.x/resolution.y,1.0)*4.0 + drift);\n" +
+          "  float s1 = sin((ax1*5.0 + drift)*6.2832);\n" + // FEW broad streaks (primary direction)
+          "  float streaks = clamp(0.62 + 0.30*s1 + 0.28*(grain-0.5), 0.0, 1.2);\n" + // mostly-bright brushed swath, soft grooves
+          "  float band = exp(-pow((ax2-0.72)*1.7, 2.0));\n" + // broad diagonal SWATH (field shows at the corners)
+          "  float diss = smoothstep(0.30, 1.15, distance(uv, vec2(0.85,0.16)));\n" + // dissolve to stipple at one corner
+          "  float stip = step(0.84 - 0.3*treb, hash21(floor(uv*resolution/4.0)+floor(time*6.0)));\n" +
+          "  streaks = mix(streaks, streaks*0.4 + stip*(0.4+0.5*treb), diss);\n" +
           "  float phase = fract(time/80.0);\n" + // slow one-way ~80s hue march
-          "  vec3 hue = pal(phase + 0.5);\n" +
-          "  float luma = dot(hue, vec3(0.33));\n" +
-          "  float sat = 0.2 + 0.6*(0.5+0.5*sin(time*0.09));\n" + // breathes white(low) <-> vivid(high)
-          "  vec3 tone = mix(vec3(luma), hue, sat);\n" +
-          "  float sheet = 0.6 + 0.7*smoothstep(-0.3, 1.2, uv.x*ca - uv.y*sa + 0.4);\n" + // brighter diagonal swath toward UR
-          "  vec3 col = tone * (0.30 + 2.4*weave*sheet) * (0.9 + 0.3*bass);\n" + // field + bright weave, gentle bass swell
+          "  vec3 fieldC = pal(phase + 0.55);\n" + // field colour (e.g. blue)
+          "  vec3 sprayC = pal(phase + 0.05);\n" + // COMPLEMENTARY spray colour (e.g. gold)
+          "  float satB = 0.62 + 0.32*(0.5+0.5*sin(time*0.09));\n" + // breathes, kept fairly bold
+          "  fieldC = mix(vec3(dot(fieldC,vec3(0.33))), fieldC, satB);\n" +
+          "  sprayC = mix(vec3(dot(sprayC,vec3(0.33))), sprayC, satB);\n" +
+          "  vec3 col = fieldC*0.5 + sprayC * streaks * band * (1.7 + 0.4*bass);\n" + // bold spray swath over a contrasting field
           "  ret = col;\n" +
-          alcVignette(0.5) +
-          "  ret = ret/(ret + vec3(0.5));\n" + // Reinhard -> muted, never blown
+          alcVignette(0.4) +
+          "  ret = ret/(ret + vec3(0.55));\n" + // Reinhard -> muted, never blown
           "}\n",
       }
     );
