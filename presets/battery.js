@@ -1042,58 +1042,54 @@
   })();
 
   // ── Battery sleepyspray ─────────────────────────────────────────────────────
-  // A gentle drifting spray of soft particles floating upward, dreamy and calm;
-  // soft cyan/lavender; slow upward feedback drift, a soft real-audio ring.
+  // A dreamy DIRECTIONAL swept-filament CROSSHATCH/plaid wash (two crossing diagonal stripe
+  // families woven into a moire), drifting slowly, dissolving into granular treble stipple at
+  // one corner; NO centre figure. Colour does a slow ONE-WAY ~80s multi-hue MARCH that also
+  // breathes saturation white<->vivid. Purely procedural (no custom waves). Calm, low energy.
   P["Battery sleepyspray"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.95,
-        gammaadj: 1.9,
+        decay: 0.5,
+        gammaadj: 1.7,
         zoom: 1.0,
-        warp: 0.05,
+        warp: 0.0,
         rot: 0,
-        dy: -0.012,
         cx: 0.5,
         cy: 0.5,
-        darken_center: 1,
+        darken_center: 0,
         wrap: 0,
-        wave_smoothing: 0.6,
-        additivewave: 1,
       },
       {
-        frame: function (t) {
-          var b = t.bass_att || 1,
-            tr = t.treb || 1;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.1 + 0.07 * b;
-          t.zoom = 1.006 + 0.004 * b;
-          t.dy = -0.01 - 0.006 * tr;
-          t.warp = 0.05;
-          t.decay = 0.95;
-          return t;
-        },
         comp:
+          NOISE_GLSL +
+          PAL_GLSL +
           "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float lum = dot(c, vec3(0.33));\n" +
-          "vec3 cyan = vec3(0.45,0.85,1.0);\n" +
-          "vec3 lav  = vec3(0.70,0.62,1.0);\n" +
-          "float h = 0.5 + 0.5*sin(time*0.12);\n" +
-          "vec3 tint = mix(cyan, lav, h);\n" +
-          "ret = tint * lum * 1.25;\n" +
-          "vec2 d = uv - 0.5; d.x *= resolution.x/resolution.y;\n" +
-          "ret += tint * exp(-dot(d,d)*6.0) * (0.06 + 0.18*bass);\n" +
+          "  float ca = cos(1.05), sa = sin(1.05);\n" + // ~60deg diagonal
+          "  float drift = time*0.05;\n" +
+          "  float a1 = (uv.x*ca - uv.y*sa)*42.0 + drift;\n" + // diagonal stripe family 1
+          "  float a2 = (uv.x*ca + uv.y*sa)*42.0 - drift;\n" + // crossing family 2
+          "  float s1 = 0.5+0.5*sin(a1*6.2832);\n" +
+          "  float s2 = 0.5+0.5*sin(a2*6.2832);\n" +
+          "  float weave = pow(s1*s2, 1.3);\n" + // plaid / moire weave
+          "  float grain = fbm(uv*vec2(resolution.x/resolution.y,1.0)*7.0 + drift);\n" +
+          "  weave *= 0.45 + 0.8*grain;\n" + // combed-filament modulation
+          "  float diss = smoothstep(0.15, 1.05, distance(uv, vec2(0.85,0.85)));\n" + // dissolve toward far corner
+          "  float stip = step(0.82 - 0.3*treb, hash21(floor(uv*resolution/3.0)+floor(time*6.0)));\n" +
+          "  weave = mix(weave, weave*0.35 + stip*(0.35+0.5*treb), diss);\n" + // -> granular stipple at the corner
+          "  float phase = fract(time/80.0);\n" + // slow one-way ~80s hue march
+          "  vec3 hue = pal(phase + 0.5);\n" +
+          "  float luma = dot(hue, vec3(0.33));\n" +
+          "  float sat = 0.2 + 0.6*(0.5+0.5*sin(time*0.09));\n" + // breathes white(low) <-> vivid(high)
+          "  vec3 tone = mix(vec3(luma), hue, sat);\n" +
+          "  float sheet = 0.6 + 0.7*smoothstep(-0.3, 1.2, uv.x*ca - uv.y*sa + 0.4);\n" + // brighter diagonal swath toward UR
+          "  vec3 col = tone * (0.30 + 2.4*weave*sheet) * (0.9 + 0.3*bass);\n" + // field + bright weave, gentle bass swell
+          "  ret = col;\n" +
+          alcVignette(0.5) +
+          "  ret = ret/(ret + vec3(0.5));\n" + // Reinhard -> muted, never blown
           "}\n",
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.55;
-    preset.waves[0].baseVals.g = 0.85;
-    preset.waves[0].baseVals.b = 1.0;
-    preset.waves[0].baseVals.a = 0.7;
-    preset.waves[0].baseVals.smoothing = 0.5;
     return preset;
   })();
 
