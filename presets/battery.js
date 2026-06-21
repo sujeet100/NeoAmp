@@ -463,65 +463,72 @@
   })();
 
   // ── Battery elektrination ───────────────────────────────────────────────────
-  // Electric lightning: several jagged real-audio bolts crossing center, flickering
-  // with treble, electric cyan-white on near-black with a faint blue glow.
+  // Muted SAGE-GREEN quad-mirror KALEIDOSCOPE frond-star (~12 arms) with concentric ripple
+  // rings at the center, blanketed in grainy metallic SPECKLE, on a mid-dark olive ground with
+  // a heavy vignette (sat ~7.5, hue ~50deg). NOT electric lightning bolts — the old impl was
+  // wrong. A jagged real-audio circleWave feeds the frond tips through the bilateral mirror fold.
   P["Battery elektrination"] = (function () {
     var preset = build(
-      { wave_a: 0, decay: 0.9, gammaadj: 2.1, zoom: 1.0, warp: 0.02, wrap: 0, darken_center: 1 },
+      {
+        wave_a: 0,
+        decay: 0.93,
+        gammaadj: 1.9,
+        zoom: 1.006,
+        rot: 0.01,
+        warp: 0.04,
+        wrap: 0,
+        darken_center: 0,
+        additivewave: 1,
+      },
       {
         frame: function (t) {
-          var tr = t.treb || 1,
-            ba = t.bass_att || 1;
-          t.q1 = t.time * 0.25;
+          var ba = t.bass_att || t.bass || 1;
           t.q2 = 0.5;
           t.q3 = 0.5;
-          t.q10 = 0.45 + 0.55 * Math.min(tr, 2.0);
-          t.warp = 0.02 + 0.05 * (tr - 1);
-          t.decay = 0.9;
-          t.zoom = 1.0 + 0.01 * (ba - 1);
+          t.q5 = 0.12 + 0.1 * (ba - 1); // frond reach pulses with bass
+          t.rot = 0.008 + 0.01 * Math.sin(t.time * 0.2); // slow swirl
+          t.decay = 0.93;
           return t;
         },
         comp:
+          NOISE_GLSL +
+          ALC_KALEIDOQUAD_GLSL +
           "shader_body {\n" +
-          "vec2 w = uv;\n" +
-          "ret = texture2D(sampler_main, w).rgb;\n" +
-          "vec2 d = uv - vec2(0.5);\n" +
-          "d.x *= resolution.x/resolution.y;\n" +
-          "float glow = 0.05/(length(d)*8.0 + 0.4);\n" +
-          "ret += vec3(0.06, 0.30, 0.12) * glow * (0.6 + 0.5*treb);\n" + // green electric glow
+          "  vec2 d = uv - 0.5; d.x *= resolution.x/resolution.y;\n" +
+          "  float rt = time*0.05;\n" + // slow kaleidoscope rotation
+          "  float cr = cos(rt), sr = sin(rt);\n" +
+          "  d = vec2(d.x*cr - d.y*sr, d.x*sr + d.y*cr);\n" +
+          "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm star
+          "  fold.x /= resolution.x/resolution.y;\n" +
+          "  vec3 c = texture2D(sampler_main, fold + 0.5).rgb;\n" +
+          "  float lum = dot(c, vec3(0.4));\n" +
+          "  vec3 sage = mix(vec3(0.28,0.34,0.22), vec3(0.60,0.65,0.52), smoothstep(0.0,0.85,lum));\n" + // fixed muted sage
+          "  vec3 col = sage * (0.45 + 1.0*lum);\n" +
+          "  float ar = length(d);\n" +
+          "  float ripple = 0.5 + 0.5*sin(ar*52.0 - time*3.0 - bass*6.0);\n" + // concentric ripple rings
+          "  col += vec3(0.16,0.20,0.12) * ripple * exp(-ar*ar*20.0);\n" +
+          "  ret = col;\n" +
+          alcSpeckle("vec3(0.52,0.58,0.42)", 0.16, 3.0, "1.0") + // metallic dust
+          alcVignette(0.7) + // heavy vignette
+          "  ret = ret/(ret + vec3(0.6));\n" + // Reinhard -> muted, never blown white
           "}\n",
       }
     );
-    var bolts = 4;
-    for (var i = 0; i < bolts; i++) {
-      (function (idx) {
-        var off = (Math.PI / bolts) * idx;
-        var wl = waveLine();
-        wl.baseVals.smoothing = 0.02;
-        wl.baseVals.r = 0.55;
-        wl.baseVals.g = 1.0;
-        wl.baseVals.b = 0.6;
-        wl.baseVals.a = 0.85;
-        wl.baseVals.additive = 1;
-        wl.baseVals.usedots = 0;
-        wl.point_eqs = function (a) {
-          var ang = (a.q1 || 0) + off;
-          var s = a.sample - 0.5;
-          var disp = ((a.value1 || 0.5) - 0.5) * 1.2;
-          var c = Math.cos(ang),
-            sn = Math.sin(ang);
-          a.x = 0.5 + s * c - disp * sn;
-          a.y = 0.5 + s * sn + disp * c;
-          var fl = a.q10 || 0.6;
-          a.r = 0.55 * fl;
-          a.g = 1.0 * fl;
-          a.b = 0.6 * fl;
-          a.a = 0.85 * fl;
-          return a;
-        };
-        preset.waves[idx] = wl;
-      })(i);
-    }
+    // jagged real-audio ring -> frond tips through the mirror fold
+    preset.waves[0] = circleWave("q2", "q3");
+    preset.waves[0].baseVals.r = 0.5;
+    preset.waves[0].baseVals.g = 0.62;
+    preset.waves[0].baseVals.b = 0.4;
+    preset.waves[0].baseVals.a = 0.8;
+    preset.waves[0].baseVals.additive = 1;
+    preset.waves[0].baseVals.smoothing = 0.05; // jagged frond outline
+    preset.waves[0].point_eqs = function (a) {
+      var ang = a.sample * 6.2832;
+      var rad = (a.q5 || 0.12) + 0.12 * a.value1; // big bass-scaled spikes
+      a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
+      a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
+      return a;
+    };
     return preset;
   })();
 
