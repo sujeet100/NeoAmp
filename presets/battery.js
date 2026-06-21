@@ -1190,61 +1190,59 @@
   })();
 
   // ── Battery the world ───────────────────────────────────────────────────────
-  // A rotating globe: a sphere shaded in comp (blue oceans, hints of green) with a
-  // real-audio equator ring; rotation via a scrolling longitude pattern. Deep blue.
+  // GREYSCALE swirling smoke WHIRLPOOL around a dark central eye (NOT a globe — the
+  // reference is a satellite-storm of monochrome smoke bands, sat ~7). A bright jagged
+  // real-audio ring is the source the vortex smears into spiraling smoke; the dark eye
+  // comes from darken_center. Engine via alcSmokeVortex + treble speckle + heavy vignette.
   P["Battery the world"] = (function () {
+    var sv = alcSmokeVortex({
+      eyeX: 0.52,
+      eyeY: 0.49,
+      swirl: 0.075,
+      pull: 0.991, // inward pull -> spiraling whirlpool
+      floor: "vec3(0.05,0.05,0.055)",
+      tint: "vec3(0.96,0.97,0.99)", // neutral grey wisps (bright body, sat ~0)
+      vignette: 0.6,
+      speckle: 0.1,
+      cloud: 1.0, // dense satellite-storm cloud
+      eye: 0.15, // dark central eye
+      toneK: 0.55, // brighter mid-grey (target YAVG ~120)
+    });
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.9,
-        gammaadj: 2.0,
+        decay: 0.96,
+        gammaadj: 1.9,
         zoom: 1.0,
         warp: 0.0,
         rot: 0,
-        cx: 0.5,
-        cy: 0.5,
-        darken_center: 0,
-        wrap: 0,
+        cx: 0.52,
+        cy: 0.49,
+        darken_center: 1, // the dark eye
+        wrap: 1,
         additivewave: 1,
       },
       {
         frame: function (t) {
-          var b = t.bass_att || 1;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.3 + 0.03 * b;
-          t.decay = 0.9;
+          var b = t.bass_att || t.bass || 1;
+          t.q2 = 0.52;
+          t.q3 = 0.49; // source ring / eye center
+          t.q5 = 0.16 + 0.05 * (b - 1); // ring pulses with bass
+          t.decay = 0.96;
           return t;
         },
-        comp:
-          NOISE_GLSL +
-          "shader_body {\n" +
-          "vec3 fb = texture2D(sampler_main, uv).rgb;\n" +
-          "vec2 d = uv - 0.5; d.x *= resolution.x/resolution.y;\n" +
-          "float r = length(d);\n" +
-          "float R = 0.32;\n" +
-          "float sphere = smoothstep(R, R-0.02, r);\n" +
-          "float z = sqrt(max(R*R - dot(d,d), 0.0)) / R;\n" +
-          "float lon = atan(d.x, z) * 1.4 + time*0.25;\n" +
-          "float lat = d.y / R;\n" +
-          "float land = fbm(vec2(lon*1.2, lat*2.0));\n" +
-          "vec3 ocean = vec3(0.06,0.22,0.55);\n" +
-          "vec3 deep  = vec3(0.02,0.10,0.35);\n" +
-          "vec3 grn   = vec3(0.12,0.45,0.22);\n" +
-          "vec3 surf = mix(mix(deep, ocean, smoothstep(0.0,0.6,land)), grn, smoothstep(0.62,0.72,land));\n" +
-          "float shade = 0.45 + 0.55*z;\n" +
-          "vec3 globe = surf * shade * sphere;\n" +
-          "globe += vec3(0.5,0.7,1.0) * pow(z, 4.0) * 0.15 * sphere;\n" +
-          "ret = globe + fb * (0.30 + sphere*0.20);\n" +
-          "}\n",
+        warp: sv.warp,
+        comp: sv.comp,
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.55;
-    preset.waves[0].baseVals.g = 0.8;
-    preset.waves[0].baseVals.b = 1.0;
-    preset.waves[0].baseVals.a = 0.7;
-    preset.waves[0].baseVals.smoothing = 0.4;
+    // bright jagged real-audio ring — the source the vortex smears into smoke bands.
+    preset.waves[0] = circleWave("q2", "q3");
+    preset.waves[0].baseVals.r = 0.85;
+    preset.waves[0].baseVals.g = 0.86;
+    preset.waves[0].baseVals.b = 0.9;
+    preset.waves[0].baseVals.a = 0.5;
+    preset.waves[0].baseVals.additive = 1;
+    preset.waves[0].baseVals.smoothing = 0.04; // jagged waveform
     return preset;
   })();
 

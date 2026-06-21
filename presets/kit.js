@@ -2347,3 +2347,236 @@ function alcNetFrame(headFn, baseZoom) {
     return t;
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BATTERY KIT — shared vocabulary for the WMP "Battery" family (smoke or water?,
+// the world, elektrination, sleepyspray, strawberryaid, relatively calm, sepiaswirl).
+//
+// Battery DNA (measured + frame-analysed; see memory battery-family-scene-architecture):
+// a CENTER-anchored FEEDBACK family — one breathing central figure (burst / vortex /
+// anemone) that PULSES (not spawns) over heavy decay trails, with a real-audio WAVEFORM
+// thread woven through it, fine treble SPECKLE, a soft corner VIGNETTE, and a dark central
+// eye. Colour is MUTED (never neon; always tone-map). Crucially it OPENS in a different hue
+// (usually green) for ~2-3s then HOLDS a fixed hue — a one-shot INTRO RAMP, NOT the
+// perpetual sin() cycle the old code used.
+//
+// Additive only (no existing symbol touched). Generic terms (vignette/speckle/glow/kaleido-
+// quad) are reusable by any family; smoke-vortex/spray-fountain/intro-ramp are Battery-flavoured.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// alcVignette(strength) — soft 4-corner dark vignette. GLSL snippet to splice into a comp
+// shader_body AFTER `ret` is set (reads uv/resolution/ret). strength ~0.3 subtle .. 0.85 heavy.
+// Braced so its locals never collide. Was previously re-inlined per preset.
+function alcVignette(strength) {
+  var s = (strength === undefined ? 0.5 : strength).toFixed(3);
+  return (
+    "{ vec2 vgd = uv - 0.5; vgd.x *= resolution.x/resolution.y;\n" +
+    "  ret *= 1.0 - " +
+    s +
+    " * smoothstep(0.28, 0.95, length(vgd)); }\n"
+  );
+}
+
+// alcSpeckle(colGlsl, density, cellPx, maskGlsl) — granular treble-driven SPARKLE (metallic
+// dust / particulate). GLSL snippet spliced AFTER `ret` in a comp; needs NOISE_GLSL (hash21)
+// prepended. colGlsl = vec3 string (dust colour); density 0..~0.3 (higher = more dust); cellPx
+// = grain cell size in px (~3 fine .. 6 coarse); maskGlsl (optional) = a float factor to gate
+// the dust (e.g. "lum" to sparkle only on bright bands — caller must have defined it). Twinkles
+// via floor(time*8). Battery signature (elektrination / the-world / sleepyspray edges).
+function alcSpeckle(colGlsl, density, cellPx, maskGlsl) {
+  var thr = (1.0 - (density === undefined ? 0.12 : density)).toFixed(3);
+  var cp = (cellPx === undefined ? 3.0 : cellPx).toFixed(1);
+  return (
+    "{ vec2 spc = floor(uv*resolution/" +
+    cp +
+    ") + floor(time*8.0);\n" +
+    "  float spk = step(" +
+    thr +
+    ", hash21(spc));\n" +
+    "  ret += (" +
+    colGlsl +
+    ") * spk * (0.25 + 0.6*treb) * (" +
+    (maskGlsl || "1.0") +
+    "); }\n"
+  );
+}
+
+// alcGlowDisc(coreGlsl, edgeGlsl, radius) — a centered radial GLOW DISC: a tight bright core
+// (coreGlsl) + a broad warm halo (edgeGlsl), additive. GLSL snippet spliced AFTER `ret`
+// (reads uv/resolution/ret). radius ~0.2..0.5 = halo extent. The soft bloom behind sepiaswirl
+// and strawberryaid's white-hot core.
+function alcGlowDisc(coreGlsl, edgeGlsl, radius) {
+  var R = (radius === undefined ? 0.35 : radius).toFixed(3);
+  return (
+    "{ vec2 ggd = uv - 0.5; ggd.x *= resolution.x/resolution.y;\n" +
+    "  float ggr = length(ggd)/" +
+    R +
+    ";\n" +
+    "  float gcore = exp(-ggr*ggr*6.0);\n" +
+    "  float ghalo = exp(-ggr*ggr*1.5);\n" +
+    "  ret += (" +
+    coreGlsl +
+    ") * gcore + (" +
+    edgeGlsl +
+    ") * ghalo * 0.5; }\n"
+  );
+}
+
+// ALC_KALEIDOQUAD_GLSL — QUAD (vertical+horizontal bilateral) kaleidoscope fold: reflect across
+// BOTH axes, then subdivide each quadrant into `folds` mirrored wedges. Returns folded centered
+// coords; sample the feedback/field at the result for a mirror-symmetric frond-star
+// (elektrination). Distinct from kit's alcKaleido (single rotational n-fold) — this is the
+// bilateral V+H variant the family wants. Prepend before a shader_body that calls alcKaleidoQuad.
+var ALC_KALEIDOQUAD_GLSL =
+  "vec2 alcKaleidoQuad(vec2 d, float folds){\n" +
+  "  d = abs(d);\n" + // reflect across BOTH axes -> the V+H quad mirror
+  "  float ka = atan(d.y, d.x);\n" + // 0..PI/2 within one quadrant
+  "  float kr = length(d);\n" +
+  "  float kseg = 1.5708/folds;\n" + // subdivide the quadrant into `folds` mirrored wedges
+  "  ka = abs(ka - kseg*floor(ka/kseg + 0.5));\n" +
+  "  return kr*vec2(cos(ka), sin(ka));\n" +
+  "}\n";
+
+// alcSmokeVortex(opts) — the greyscale fbm SMOKE-WHIRLPOOL engine shared by the-world,
+// smoke-or-water? and my-tornado. Returns {warp, comp} strings to spread into build()'s opts
+// (it prepends its own NOISE_GLSL — caller adds nothing). A bright additive source wave drawn
+// by the preset is what the vortex smears into smoke. opts:
+//   eyeX/eyeY  vortex center (default 0.5/0.5)
+//   swirl      rotational strength near the eye (default 0.06; 0 = no swirl)
+//   pull       inward feedback factor <1 (default 0.992; 1.0 = pure cartesian stir, no vortex)
+//   floor      vec3 dark-floor colour string; tint = vec3 bright-wisp colour string
+//   vignette   0..1 corner darkening; speckle 0..~0.2 treble dust
+// MONOCHROME luma ramp + treble speckle on bright bands + vignette + Reinhard tone-map.
+function alcSmokeVortex(opts) {
+  opts = opts || {};
+  var ex = (opts.eyeX === undefined ? 0.5 : opts.eyeX).toFixed(3);
+  var ey = (opts.eyeY === undefined ? 0.5 : opts.eyeY).toFixed(3);
+  var sw = (opts.swirl === undefined ? 0.06 : opts.swirl).toFixed(3);
+  var pull = (opts.pull === undefined ? 0.992 : opts.pull).toFixed(4);
+  var floorc = opts.floor || "vec3(0.05,0.05,0.06)";
+  var tint = opts.tint || "vec3(0.88,0.89,0.92)";
+  var vig = opts.vignette === undefined ? 0.5 : opts.vignette;
+  var spk = opts.speckle === undefined ? 0.1 : opts.speckle;
+  var cloud = (opts.cloud === undefined ? 0.85 : opts.cloud).toFixed(3); // procedural cloud density
+  var eye = opts.eye === undefined ? 0 : opts.eye; // dark-eye radius (0 = no eye, e.g. smoke-or-water)
+  var toneK = (opts.toneK === undefined ? 0.7 : opts.toneK).toFixed(3); // Reinhard knee
+  // carve the dark central eye when requested
+  var eyeLine =
+    eye > 0
+      ? "  lum *= smoothstep(" + (eye * 0.18).toFixed(4) + ", " + eye.toFixed(3) + ", ar);\n"
+      : "";
+  return {
+    warp:
+      NOISE_GLSL +
+      "shader_body {\n" +
+      "  vec2 ec = vec2(" +
+      ex +
+      "," +
+      ey +
+      ");\n" +
+      "  vec2 sd = uv - ec;\n" +
+      "  float sr = length(sd);\n" +
+      "  float sa = " +
+      sw +
+      "/(sr + 0.12);\n" + // swirl stronger near the eye
+      "  float cs = cos(sa), sn = sin(sa);\n" +
+      "  vec2 rot2 = vec2(sd.x*cs - sd.y*sn, sd.x*sn + sd.y*cs);\n" +
+      "  vec2 p = ec + rot2*" +
+      pull +
+      ";\n" + // slight inward pull toward the eye
+      "  float n = fbm(uv*3.0 + vec2(time*0.05, -time*0.04));\n" +
+      "  float n2 = fbm(uv*3.0 + 7.3 - time*0.03);\n" +
+      "  p += (vec2(n, n2) - 0.5) * (0.018 + 0.03*bass);\n" + // turbulent stir, bass-driven (big billows)
+      "  ret = texture2D(sampler_main, p).rgb;\n" +
+      "  ret -= 0.0018;\n" + // dissipate (controls trail length in this build)
+      "}\n",
+    comp:
+      NOISE_GLSL +
+      "shader_body {\n" +
+      "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+      "  float fb = dot(c, vec3(0.4));\n" + // audio-reactive feedback streaks
+      "  vec2 dd = uv - vec2(" +
+      ex +
+      "," +
+      ey +
+      ");\n" +
+      "  dd.x *= resolution.x/resolution.y;\n" +
+      "  float ar = length(dd);\n" +
+      "  float aa = atan(dd.y, dd.x) + time*0.12 + 0.6/(ar+0.18);\n" + // swirl the cloud around the eye
+      "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
+      "  float dens = fbm(csw*4.5 + time*0.05);\n" + // rotating procedural cloud (fills the frame)
+      "  dens = smoothstep(0.30, 0.95, dens);\n" + // bands of cloud vs darker veins
+      "  float lum = clamp(dens*" +
+      cloud +
+      "*(0.7+0.5*bass) + fb*1.3, 0.0, 1.0);\n" +
+      eyeLine +
+      "  vec3 col = mix(" +
+      floorc +
+      ", " +
+      tint +
+      ", lum);\n" +
+      "  ret = col;\n" +
+      alcSpeckle(tint, spk, 3.0, "lum") +
+      alcVignette(vig) +
+      "  ret = ret/(ret + vec3(" +
+      toneK +
+      "));\n" + // Reinhard -> soft, never blown white
+      "}\n",
+  };
+}
+
+// alcSprayFountain(opts) — a directional FAN of fine real-waveform filaments from an anchor.
+// A custom-wave factory (one of the 4 wave slots): the 512 samples are splayed across `spread`
+// radians around `dir`, each pushed out from (cx,cy) by |value1| for the feathered spray
+// (relatively-calm's bottom fountain; any directional burst). opts: cx/cy anchor (default
+// 0.5/0.85), dir radians (default -1.5708 = straight up in wave-space), spread (default 1.4),
+// reach (default 0.5), r/g/b colour. Real-waveform displacement per the family waveform rule.
+function alcSprayFountain(opts) {
+  opts = opts || {};
+  var cx = opts.cx === undefined ? 0.5 : opts.cx;
+  var cy = opts.cy === undefined ? 0.85 : opts.cy;
+  var dir = opts.dir === undefined ? -1.5708 : opts.dir;
+  var spread = opts.spread === undefined ? 1.4 : opts.spread;
+  var reach = opts.reach === undefined ? 0.5 : opts.reach;
+  return {
+    baseVals: Object.assign({}, WAVE_BASE, {
+      enabled: 1,
+      samples: 512,
+      additive: 1,
+      usedots: 0,
+      scaling: 1,
+      smoothing: 0.06,
+      a: 0.85,
+      r: opts.r === undefined ? 0.85 : opts.r,
+      g: opts.g === undefined ? 0.92 : opts.g,
+      b: opts.b === undefined ? 0.95 : opts.b,
+    }),
+    init_eqs: passthrough,
+    frame_eqs: passthrough,
+    point_eqs: function (a) {
+      var s = a.sample; // 0..1 across the fan
+      var ang = dir + (s - 0.5) * spread;
+      var v = Math.abs(a.value1 || 0);
+      var rad = reach * (0.12 + 0.88 * v); // filaments crawl out from near the anchor
+      a.x = cx + rad * Math.cos(ang);
+      a.y = cy + rad * Math.sin(ang);
+      return a;
+    },
+  };
+}
+
+// alcIntroRamp(durSec) — one-shot 0->1 ramp over the first `durSec` seconds after the preset
+// first renders, then HOLDS 1 (captures spawn time lazily on the first frame). The structural
+// Battery INTRO trait: blend an intro hue/look toward the settled one by this value, instead of
+// the perpetual sin() cycle the old code used. Fires once per page-load; does not re-arm on
+// preset re-selection — acceptable for the WMP intro feel.
+function alcIntroRamp(durSec) {
+  var t0 = -1;
+  var dur = durSec === undefined ? 2.5 : durSec;
+  return function (t) {
+    var now = t && t.time !== undefined ? t.time : 0;
+    if (t0 < 0) t0 = now;
+    var e = (now - t0) / dur;
+    return e >= 1 ? 1 : e < 0 ? 0 : e;
+  };
+}
