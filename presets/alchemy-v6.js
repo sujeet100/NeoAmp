@@ -92,14 +92,20 @@
     "vec3 hsv2rgb(vec3 c){ vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0); vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www); return c.z*mix(K.xxx, clamp(p-K.xxx,0.0,1.0), c.y); }\n" +
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
-    "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
-    // DILATE the foreground (6-tap max) so thin waveform lines + orb rings read THICKER and defined
-    // against the vibrant background (the user's "lines too thin / not defined" note).
+    "  float m = floor(q29 + 0.5);\n" +
+    // HORIZON REFLECTION — a reflective WATER plane below the horizon: mirror the whole scene (motif + bands)
+    // with a ripple so it reflects → a 3D LANDSCAPE with real depth (the original's signature, frames of_7/
+    // of_13). On for the landscape modes (wash/bands/tilt/pickets), OFF for the radial/kaleido/vortex faces.
+    "  float reflOn = (m < 0.5 || (m > 2.5 && m < 3.5) || (m > 4.5 && m < 5.5) || (m > 7.5 && m < 8.5)) ? 1.0 : 0.0;\n" +
+    "  float horizonY = 0.6 + 0.03 * sin(time * 0.05);\n" +
+    "  float depthB = max(0.0, uv.y - horizonY);\n" + // how far below the horizon
+    "  float belowH = step(horizonY, uv.y) * reflOn;\n" +
+    "  vec2 wuv = uv;\n" +
+    "  if (belowH > 0.5) { wuv.y = 2.0 * horizonY - uv.y; wuv.x += 0.02 * sin(uv.y * 32.0 + time * 1.6) * (0.2 + depthB * 2.5); }\n" + // mirror above the horizon + water ripple (grows with depth)
+    "  vec2 pdc = wuv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
     "  vec2 dpx = 1.7 / resolution;\n" +
-    // foreground sample coord — folded across BOTH diagonals about screen centre for the new full
-    // DIAGONAL-X kaleidoscope (fold>=8), so the MOTIF mirrors into all 4 wedges (not just the bg).
-    "  vec2 kuv = uv;\n" +
-    "  if (q12 > 7.5) { vec2 kc = uv - 0.5; kc.x *= asp; vec2 kr = vec2(kc.x + kc.y, kc.y - kc.x) * 0.70711; kr = abs(kr); kc = vec2(kr.x - kr.y, kr.x + kr.y) * 0.70711; kc.x /= asp; kuv = kc + 0.5; }\n" +
+    "  vec2 kuv = wuv;\n" +
+    "  if (q12 > 7.5) { vec2 kc = wuv - 0.5; kc.x *= asp; vec2 kr = vec2(kc.x + kc.y, kc.y - kc.x) * 0.70711; kr = abs(kr); kc = vec2(kr.x - kr.y, kr.x + kr.y) * 0.70711; kc.x /= asp; kuv = kc + 0.5; }\n" +
     "  vec3 sharp = texture2D(sampler_main, kuv).rgb;\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv + vec2(dpx.x, 0.0)).rgb);\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv - vec2(dpx.x, 0.0)).rgb);\n" +
@@ -126,7 +132,7 @@
     "  float bl = (bloom.r + bloom.g + bloom.b) * 0.05;\n" +
     "  float hb = q8; float bb = 0.5 + 0.5 * (q32 - 1.0);\n" +
     "  vec3 cA = dusty(pal(hb), 0.9), cB = dusty(pal(hb + 0.5), 0.85), cC = dusty(pal(hb + 0.28), 0.9);\n" +
-    "  float m = floor(q29 + 0.5);\n" + // BG_MODE 0..9 (bgPick clock) — selects the COMP colour FIELD
+    // (m = BG_MODE already computed at the top for the reflection gate)
     // KALEIDOSCOPE fold of the bg colour coord (driven by q12/q13, set per BG_MODE in frame()). Quad
     // (q12=4) mirrors pdc to abs(pdc); radial (5/6) folds the angle; diagonal-X (>=8) mirrors both diagonals.
     "  vec2 fpd = pdc;\n" +
@@ -205,6 +211,10 @@
     // volume, not thin wireframes (Gemini's note) — the original's beams have body.
     "  vec3 glow = texture2D(sampler_blur1, kuv).rgb;\n" +
     "  vec3 col = ground * 0.92 + sharp * 1.28 + glow * 0.72 + cA * bl;\n" + // brighter, COLOURFUL ground (0.78 read murky/flat); fg still pops via glow + bloom + Reinhard
+    // WATER reflection finish: darken + cool the reflected zone (so it reads as a separate reflective plane,
+    // not a copy), and a bright WATERLINE glow along the horizon. Gives the 3D landscape its floor.
+    "  if (belowH > 0.5) { col *= mix(0.78, 0.34, smoothstep(0.0, 0.32, depthB)); col.b *= 1.08; }\n" +
+    "  col += cA * 1.1 * smoothstep(0.035, 0.0, abs(uv.y - horizonY)) * reflOn * (0.35 + 0.3 * bb);\n" + // glowing waterline at the horizon
     "  col *= q31;\n" +
     // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
     // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
