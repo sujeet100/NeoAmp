@@ -447,7 +447,7 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + rad * Math.cos(ang);
     a.y = cy + rad * Math.sin(ang);
-    var h = a.q8 || 0;
+    var h = (a.q8 || 0) + (seg / N) * 0.9; // rainbow AROUND the burst → a multicolour dandelion (per the reference)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -465,7 +465,7 @@
     var amp = (a.q6 || 0.05) * 4.8; // tall waveform peaks
     a.x = cx + (a.sample - 0.5) * width;
     a.y = cy + (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25;
-    var h = (a.q8 || 0) + a.sample * 0.34; // green→yellow→magenta gradient along the wave
+    var h = (a.q8 || 0) + a.sample * 0.8; // full rainbow along the wave (along-length multicolor, per the reference)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -707,6 +707,8 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
+    hueStep = 0, // accumulates a 60-160° palette FLIP at each bg scene-cut (the original hard-flips at cuts)
+    lastBgMode = -1,
     waveAmt = 0,
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
@@ -728,13 +730,34 @@
     var energy = typeof alcEnergy === "function" ? alcEnergy(t) : bassA;
     var f = beat(t.bass || 1, dt); // per-beat flash (fast decay)
 
-    // shared HUE clock (fg + bg) — mostly clock-driven, faster when loud, tiny per-beat warm nudge
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), 0.02, 0.05);
-    t.q8 = huePhase + 0.04 * f;
+    // BACKGROUND — its OWN slow clock, DECOUPLED from the motif + the camera (the same motif now appears
+    // over many grounds, like the original). q29 = BG_MODE 0..9 → COMP_V6's colour FIELD:
+    //   0 motif-wash · 1 X-wedge · 2 bullseye · 3 sine-bands · 4 quad-mandala · 5 tilt-planes ·
+    //   6 vortex · 7 wallpaper · 8 pickets · 9 neon-on-dark.
+    var bg = bgPick(time, dt, false);
+    // DISCRETE bg mode (snap at the crossfade midpoint) — the original hard-CUTS the background field at
+    // scene changes; sweeping q29 through intermediate modes would flash every field. The persistent
+    // high-decay feedback buffer + the motif/orbs (own clocks) bridge the cut so it doesn't read as a
+    // "new preset".
+    t.q29 = bg.mix < 0.5 ? bg.a : bg.b;
+    var bgMode = Math.floor(t.q29 + 0.5);
+
+    // SHARED HUE clock (fg + bg). TWO colour-speed regimes (per the reference): the SPATIAL-multicolor
+    // fields (X-wedge / bullseye / mandala) cycle hue FAST so their wedges/rings sweep many colours (the
+    // "hue changes very fast = multicolor" the user saw); every other scene drifts SLOW (~0.03 cyc/s).
+    var hueRate = bgMode === 1 || bgMode === 2 || bgMode === 4 ? 0.1 : 0.03;
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), hueRate, 0.05);
+    // SCENE-CUT palette FLIP: at each discrete bg change step the hue 60-160° (the original hard-flips
+    // the palette family at a cut, then holds + drifts). Snaps WITH the bg field change (one event).
+    if (bgMode !== lastBgMode) {
+      if (lastBgMode >= 0)
+        hueStep += (0.17 + 0.27 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      lastBgMode = bgMode;
+    }
+    t.q8 = huePhase + hueStep + 0.04 * f;
 
     // LOOK — camera + exposure eased between two looks on a slow clock. In V6 the FOLD is NOT a look
-    // property — it belongs to the kaleidoscope BG_MODES (see below), so the same camera can run over
-    // any background.
+    // property — it belongs to the kaleidoscope BG_MODES (below), so the same camera runs over any bg.
     var lk = lookPick(time, dt, f > 0.6),
       A = LOOKS[lk.a],
       B = LOOKS[lk.b],
@@ -744,17 +767,6 @@
     }
     t.q1 = L("decay");
 
-    // BACKGROUND — its OWN slow clock, DECOUPLED from the motif + the camera (the same motif now appears
-    // over many grounds, like the original). q29 = BG_MODE 0..9 → COMP_V6's colour FIELD:
-    //   0 motif-wash · 1 X-wedge · 2 bullseye · 3 sine-bands · 4 quad-mandala · 5 tilt-planes ·
-    //   6 vortex · 7 wallpaper · 8 pickets · 9 neon-on-dark.
-    var bg = bgPick(time, dt, false);
-    // DISCRETE bg mode (snap at the crossfade midpoint) — the original hard-CUTS the background field at
-    // scene changes; sweeping q29 through intermediate modes would flash every field. The persistent
-    // high-decay feedback buffer + the motif/orbs (own clocks) bridge the cut so it doesn't read as a
-    // "new preset". (The palette hue-step at the cut is added in the colour step.)
-    t.q29 = bg.mix < 0.5 ? bg.a : bg.b;
-    var bgMode = Math.floor(t.q29 + 0.5);
     // FOLD belongs to the kaleidoscope modes (1 X-wedge / 4 quad-mandala): engage the WARP quad fold so
     // BOTH the motif (WARP) and the bg colour coord (COMP) mirror into 4 wedges. Other modes = no fold.
     var fold = bgMode === 1 || bgMode === 4 ? 4 : 1;
