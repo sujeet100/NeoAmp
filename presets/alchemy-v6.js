@@ -192,7 +192,10 @@
     "    hsv.z = min(hsv.z, 0.85);\n" +
     "    sharp = hsv2rgb(hsv);\n" +
     "  }\n" +
-    "  vec3 col = ground + sharp * 1.30 + cA * bl;\n" + // kit-coloured motif PAINTED over the field; bloom glow
+    // DEPTH via VALUE separation: the background RECEDES (dimmed) so the bright foreground motif/orbs POP
+    // forward — without this fg=bg brightness the scene reads FLAT (the user's note). Still colourful, just
+    // dimmer than the fg. The painted motif (sharp) is boosted so it clearly sits in front.
+    "  vec3 col = ground * 0.66 + sharp * 1.55 + cA * bl;\n" +
     "  col *= q31;\n" +
     // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
     // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
@@ -444,7 +447,7 @@
       seg = Math.floor(fk),
       u = fk - seg;
     var ang = (seg / N) * 6.2832 + (a.q9 || 0);
-    var rad = (a.q5 || 0.4) * (0.1 + 0.9 * u) + (a.value1 || 0) * 0.06 * u; // spoke centre→out, waveform-tipped
+    var rad = (a.q5 || 0.4) * (0.3 + 0.7 * u) + (a.value1 || 0) * 0.06 * u; // spokes start OFF-centre (ring-burst) → no white-out pile-up at the convergence point
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + rad * Math.cos(ang);
@@ -557,9 +560,13 @@
   ];
   // per-mode alpha: dense ADDITIVE bristle modes (spindle/fountain) saturate to milky white in the
   // feedback buffer (equilibrium ~ input/(1-decay)), so they get much less alpha than outline modes.
-  var MODE_ALPHA = [0.62, 0.42, 0.95, 0.85, 0.85, 0.72, 0.68, 0.5, 0.8, 0.55, 0.72, 0.7]; // …·ribbon·STARNET·CROSSX (crisp lines → moderate alpha)
+  // dense ADDITIVE radial modes (anem/spindle/urchin/fountain) pile up additively → white-out core, so
+  // they get LOWER alpha; crisp outline/line modes keep more.
+  var MODE_ALPHA = [0.48, 0.34, 0.9, 0.82, 0.8, 0.52, 0.66, 0.36, 0.78, 0.52, 0.7, 0.68]; // anem·spin·ngon·tri·bolt·urchin·rotline·fountain·wavefan·ribbon·starnet·crossX
   function scaleFor(m) {
-    return m === 0 ? 0.46 : m === 1 ? 0.4 : 0.5;
+    // smaller central motif → it's an OBJECT in a deep space (dark surround + floating orbs in front),
+    // not a flat starburst filling the whole frame edge-to-edge (the "flat" complaint).
+    return m === 0 ? 0.36 : m === 1 ? 0.3 : m === 7 ? 0.34 : 0.4;
   }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
@@ -709,8 +716,10 @@
   // director state (closure → persists across frames; this is ONE preset, never reloaded)
   var lastT = 0,
     huePhase = 0,
-    hueStep = 0, // accumulates a 60-160° palette FLIP at each bg scene-cut (the original hard-flips at cuts)
+    hueStep = 0, // accumulates a palette FLIP at each bg scene-cut (the original hard-flips at cuts)
     lastBgMode = -1,
+    pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — drives scale/exposure/orb pops so
+    // they BREATHE instead of strobing (Gemini: don't feed raw audio straight to coords → jitter)
     waveAmt = 0,
     tunnelAmt = 0, // mode 6 active → still high-decay tunnel camera + strobe window
     focusAmt = 0, // modes 0/5/6 active → COMP central pupil + (anemone) oblate squash
@@ -747,16 +756,18 @@
     // SHARED HUE clock (fg + bg). TWO colour-speed regimes (per the reference): the SPATIAL-multicolor
     // fields (X-wedge / bullseye / mandala) cycle hue FAST so their wedges/rings sweep many colours (the
     // "hue changes very fast = multicolor" the user saw); every other scene drifts SLOW (~0.03 cyc/s).
-    var hueRate = bgMode === 1 || bgMode === 2 || bgMode === 4 ? 0.1 : 0.03;
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), hueRate, 0.05);
-    // SCENE-CUT palette FLIP: at each discrete bg change step the hue 60-160° (the original hard-flips
-    // the palette family at a cut, then holds + drifts). Snaps WITH the bg field change (one event).
+    // SMOOTHED beat envelope (fast attack ~80ms / slow release ~0.4s) — the damping Gemini flagged:
+    // size/exposure/orb pops ride THIS, not the raw flash, so they breathe instead of strobing.
+    pulse += (f - pulse) * Math.min(1, dt * (f > pulse ? 12 : 2.6));
+    var hueRate = bgMode === 1 || bgMode === 2 || bgMode === 4 ? 0.06 : 0.03; // fast(er) cycle in the spatial-multicolor modes, but calmer than before (0.1 read chaotic)
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), hueRate, 0.04);
+    // SCENE-CUT palette FLIP: nudge the hue at each discrete bg change (the original flips the family at a
+    // cut, then holds + drifts). GENTLER now (≈35-90°) so cuts read smooth, not abrupt/chaotic.
     if (bgMode !== lastBgMode) {
-      if (lastBgMode >= 0)
-        hueStep += (0.17 + 0.27 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      if (lastBgMode >= 0) hueStep += (0.1 + 0.16 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
       lastBgMode = bgMode;
     }
-    t.q8 = huePhase + hueStep + 0.04 * f;
+    t.q8 = huePhase + hueStep + 0.02 * pulse;
 
     // LOOK — camera + exposure eased between two looks on a slow clock. In V6 the FOLD is NOT a look
     // property — it belongs to the kaleidoscope BG_MODES (below), so the same camera runs over any bg.
@@ -775,20 +786,27 @@
     t.q12 = fold;
     t.q13 = fold > 1.5 ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)) : 0;
 
-    t.q15 = L("zoom") + 0.006 * (bassA - 1) + 0.004 * Math.sin(time * 0.13); // per-look zoom (+ structural recede below)
+    // PERSISTENT PLUNGE — THE fix for "feels flat": a continuous zoom so the motif + its feedback trails
+    // STREAM OUTWARD past the camera into a receding 3D tunnel/tube-stack (the original's depth), instead
+    // of a centred motif pulsing on a flat plane. Always-on (every scene), surges on the beat. Plunge
+    // (content flies outward → off-screen) self-limits the central pile-up, so it's milky-out-safe at
+    // decay ≤0.93. Structural modes add to this below.
+    t.q15 = -0.013 - 0.008 * Math.max(0, bassA - 1) + 0.004 * Math.sin(time * 0.11); // gentle plunge (a strong one piled additive bursts into a white-out core)
     t.q16 = L("rot") + 0.05 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks) → not a locked top-view
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
     t.q19 = L("dy");
-    // OFF-CENTER, DRIFTING vanishing point on an ELLIPTICAL path (different x/y rates) — THE always-on
-    // parallax bed: displacement scales with distance-from-pivot, so edge content sweeps several× faster
-    // than near-pivot content as the VP roams. Amplitude raised to ~0.12 (v4's 0.02-0.06 was too small).
-    var pan = Math.max(L("pan"), 0.1);
-    t.q20 = L("px") + pan * Math.cos(time * 0.066);
-    t.q27 = L("py") + pan * 0.85 * Math.sin(time * 0.051);
-    t.q28 = L("tilt") * 1.4 + L("tiltOsc") * Math.sin(time * 0.1); // 3D plane tilt (side-angle)
-    t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * f); // gentle beat lift (Reinhard compresses the rest)
-    t.q32 = bass;
+    // OFF-CENTER, DRIFTING vanishing point on an ELLIPTICAL path (different x/y rates) — the plunge streams
+    // TOWARD this roaming VP, so the depth is asymmetric/oblique (not a symmetric centred zoom) and edge
+    // content sweeps several× faster than near-VP content = parallax. Amp ~0.14 (v4's 0.02-0.06 was tiny).
+    var pan = Math.max(L("pan"), 0.13);
+    t.q20 = 0.5 + (L("px") - 0.5) + pan * Math.cos(time * 0.066) - 0.06;
+    t.q27 = 0.5 + (L("py") - 0.5) + pan * 0.85 * Math.sin(time * 0.051) - 0.04;
+    // PERSISTENT OBLIQUE TILT — never a flat top-down view. Floor ~0.3 so even the radial modes read at a
+    // slight angle (mild ellipse = depth). Structural tilt/picket modes push it harder below.
+    t.q28 = 0.3 + L("tilt") * 1.1 + L("tiltOsc") * Math.sin(time * 0.1);
+    t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * pulse); // gentle SMOOTHED beat lift (no strobe)
+    t.q32 = 1 + 1.3 * pulse; // beat carrier for the shaders = smoothed envelope (was raw bass → jittery bloom)
 
     // ── PARALLAX / camera-intent coupled to the structural BG_MODES. For these grounds the CAMERA
     //    geometry IS what makes the field read as tilted / spiralling / receding (the original's depth).
@@ -827,7 +845,7 @@
     // MOTIF contract (read by the kit factories)
     t.q2 = 0.5;
     t.q3 = 0.5;
-    t.q5 = scaleFor(mCur) * (0.82 + 0.4 * (bassA - 1) + 0.22 * f); // breathing + per-beat pop
+    t.q5 = scaleFor(mCur) * (0.82 + 0.32 * (bassA - 1) + 0.2 * pulse); // breathing + SMOOTHED beat pop (no strobe)
     if (fold > 1.5 && mCur !== 6 && mCur !== 9 && mCur !== 10 && mCur !== 11) t.q5 *= 0.52; // small mirrored flower under a fold; keep line/ribbon/star-net/X (6/9/10/11) FULL-length
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow spin
@@ -850,7 +868,7 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bass - 1)) * (1 + 0.4 * f); // orb radius (pops on beat)
+    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse); // orb radius (SMOOTHED beat pop)
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
     // #24 SCENE morph (eased by waveAmt): BIG orbs clustered centre-left on a slow diagonal + a downward
     // drift so the waveform trail smears into the descending comb-fan; both orbs present (soft spheres).
