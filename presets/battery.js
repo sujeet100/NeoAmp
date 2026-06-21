@@ -1102,12 +1102,12 @@
       pull: 1.0, // no vortex
       rotateCloud: false, // cartesian drift (horizontal/diagonal stir)
       eye: 0, // no eye
-      floor: "vec3(0.045,0.045,0.06)", // dark grey-violet veins
-      tint: "vec3(0.88,0.89,0.93)", // bright grey wisps, faint violet
+      floor: "vec3(0.16,0.16,0.19)", // soft grey-violet veins (NOT black — softer mid-grey smoke)
+      tint: "vec3(0.90,0.90,0.94)", // bright grey wisps, faint violet
       cloud: 1.0,
-      vignette: 0.35,
+      vignette: 0.25, // light — the original fills frame, not heavy corners
       speckle: 0, // pure fluid — no particulate dust
-      toneK: 0.55,
+      toneK: 0.42, // brighter mid-grey body (target Y ~110)
     });
     var preset = build(
       {
