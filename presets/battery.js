@@ -7,69 +7,62 @@
   var P = (window.WMP_PRESETS = window.WMP_PRESETS || {});
 
   // ── Battery relatively calm ────────────────────────────────────────────────
-  // Deep blue-teal swirling VORTEX/TUNNEL (concentric wavy shells, dark eye sitting high)
-  // with a horizontal jagged lightning waveLine sweeping edge-to-edge + a bright feathery
-  // SPRAY-FOUNTAIN fanning up from bottom-center. Opens with a one-shot GREEN ignition then
-  // HOLDS fixed blue-teal (NOT a perpetual cycle). Muted (sat ~17). Gentle, calm.
+  // Deep NAVY swirling VORTEX/TUNNEL (concentric shells receding to a dark eye sitting high) with
+  // bright WHITE FROTH churning at the BOTTOM. Opens with a one-shot GREEN ignition then HOLDS the
+  // navy (NOT a perpetual cycle). Muted (sat ~17), gentle. Vortex motion via alcSmokeVortex's warp.
   P["Battery relatively calm"] = (function () {
-    var intro = alcIntroRamp(1.6); // one-shot green -> teal ignition on spawn
+    var intro = alcIntroRamp(1.6); // one-shot green -> navy ignition on spawn
+    var sv = alcSmokeVortex({ eyeX: 0.5, eyeY: 0.4, swirl: 0.11, pull: 0.988 }); // swirling inward tunnel
     var preset = build(
       {
         wave_a: 0,
         additivewave: 1,
-        decay: 0.955,
+        decay: 0.95,
         gammaadj: 1.9,
-        zoom: 0.992,
-        rot: 0.006,
-        warp: 0.18,
-        warpscale: 1.4,
+        zoom: 1.0,
+        rot: 0,
         cx: 0.5,
-        cy: 0.42, // eye sits slightly high
-        darken_center: 1,
+        cy: 0.4,
+        darken_center: 0,
         wrap: 0,
       },
       {
         frame: function (t) {
-          var b = t.bass_att || t.bass || 1,
-            tr = t.treb_att || t.treb || 1;
-          t.q1 = 0.0; // horizontal waveLine
-          t.q2 = 0.5;
-          t.q3 = 0.5; // waveLine center
-          t.q20 = intro(t); // 0->1 ignition ramp (green -> teal)
-          t.rot = 0.005 + 0.004 * Math.sin(t.time * 0.2); // gentle swirl (no radial sunburst)
-          t.zoom = 0.992 - 0.004 * (b - 1);
-          t.warp = 0.18 + 0.06 * (tr - 1);
-          t.decay = 0.955;
+          var b = t.bass_att || t.bass || 1;
+          t.q20 = intro(t); // 0->1 ignition (green -> navy)
+          t.q5 = 0.1 + 0.04 * (b - 1); // froth source spread pulses with bass
+          t.decay = 0.95;
           return t;
         },
+        warp: sv.warp, // swirling inward vortex tunnel
         comp:
           "shader_body {\n" +
           "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
           "  float lum = dot(c, vec3(0.4));\n" +
-          "  float e = 0.55 + lum*1.5;\n" + // bright teal field everywhere, brighter on the wave streaks
-          "  vec3 tealC = vec3(0.30,0.64,0.80);\n" + // muted blue-teal
-          "  vec3 greenC = vec3(0.38,0.78,0.42);\n" + // ignition green
-          "  vec3 col = mix(greenC, tealC, clamp(q20,0.0,1.0)) * e;\n" + // one-shot green -> teal, then holds
-          "  col += vec3(0.62,0.80,0.86) * smoothstep(0.55,1.1,lum);\n" + // white froth on bright wave streaks
+          "  vec2 d = uv - vec2(0.5,0.4); d.x *= resolution.x/resolution.y;\n" +
+          "  float r = length(d);\n" +
+          "  float shells = 0.5 + 0.5*sin(r*20.0 - time*1.1);\n" + // concentric tunnel shells receding inward
+          "  float body = clamp((0.32 + 0.85*lum) * (0.55 + 0.5*shells), 0.0, 1.3);\n" +
+          "  vec3 navy = mix(vec3(0.05,0.10,0.20), vec3(0.34,0.58,0.80), body);\n" + // dark navy -> steel blue
+          "  vec3 green = mix(vec3(0.06,0.13,0.09), vec3(0.32,0.64,0.42), body);\n" + // ignition green
+          "  vec3 col = mix(green, navy, clamp(q20,0.0,1.0));\n" + // one-shot green -> navy, then holds
+          "  col += vec3(0.80,0.89,0.96) * smoothstep(0.32, 0.85, lum);\n" + // dense WHITE froth on the bright bottom source
+          "  col *= smoothstep(0.025, 0.11, r);\n" + // dark eye
           "  ret = col;\n" +
-          alcVignette(0.45) +
-          "  ret = ret/(ret + vec3(0.6));\n" + // Reinhard
+          alcVignette(0.5) +
+          "  ret = ret/(ret + vec3(0.5));\n" + // Reinhard
           "}\n",
       }
     );
-    // (1) horizontal jagged lightning waveLine edge-to-edge (comp re-tints by luma)
-    preset.waves[0] = waveLine();
-    preset.waves[0].baseVals.smoothing = 0.04;
-    preset.waves[0].baseVals.a = 0.8;
-    // (2) bright feathery spray-fountain fanning UP from bottom-center
-    preset.waves[1] = alcSprayFountain({
+    // bright white froth source fanning up from bottom-center — the vortex churns it into froth
+    preset.waves[0] = alcSprayFountain({
       cx: 0.5,
-      cy: 0.78,
+      cy: 0.82,
       dir: -1.5708,
-      spread: 1.5,
-      reach: 0.5,
-      r: 0.8,
-      g: 0.94,
+      spread: 2.0,
+      reach: 0.32,
+      r: 0.85,
+      g: 0.93,
       b: 0.98,
     });
     return preset;
