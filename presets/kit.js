@@ -2472,6 +2472,13 @@ function alcSmokeVortex(opts) {
       "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
       "  float dens = fbm(csw*4.5 + time*0.05);\n"
     : "  float dens = fbm(dd*4.5 + vec2(time*0.06, -time*0.04));\n"; // cartesian drift, no vortex
+  // optional radius-dependent COUNTER-ROTATION shear: inner core spins one way, outer layer the
+  // other (the "vortex shear" of the-world). opts.shear = the boundary radius (0 = uniform swirl).
+  var shear = opts.shear === undefined ? 0 : opts.shear;
+  var saExpr =
+    shear > 0
+      ? sw + " * clamp((" + shear.toFixed(3) + " - sr)*7.0, -1.0, 1.0) / (sr + 0.12)"
+      : sw + "/(sr + 0.12)";
   return {
     warp:
       NOISE_GLSL +
@@ -2484,8 +2491,8 @@ function alcSmokeVortex(opts) {
       "  vec2 sd = uv - ec;\n" +
       "  float sr = length(sd);\n" +
       "  float sa = " +
-      sw +
-      "/(sr + 0.12);\n" + // swirl stronger near the eye
+      saExpr +
+      ";\n" + // swirl stronger near the eye (or counter-rotation shear if opts.shear set)
       "  float cs = cos(sa), sn = sin(sa);\n" +
       "  vec2 rot2 = vec2(sd.x*cs - sd.y*sn, sd.x*sn + sd.y*cs);\n" +
       "  vec2 p = ec + rot2*" +

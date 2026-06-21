@@ -1201,23 +1201,24 @@
   })();
 
   // ── Battery the world ───────────────────────────────────────────────────────
-  // GREYSCALE swirling smoke WHIRLPOOL around a dark central eye (NOT a globe — the
-  // reference is a satellite-storm of monochrome smoke bands, sat ~7). A bright jagged
-  // real-audio ring is the source the vortex smears into spiraling smoke; the dark eye
-  // comes from darken_center. Engine via alcSmokeVortex + treble speckle + heavy vignette.
+  // GREYSCALE cosmic storm (NOT a globe): TWIN jagged circle emitters orbit each other (the
+  // "two eyes"), feeding a vortex with radius-dependent COUNTER-ROTATION SHEAR — the inner core
+  // spins one way, the outer dust cloud the other, grinding the circles into a grainy planetary
+  // dust texture (sat ~7). Engine via alcSmokeVortex (shear) + heavy vignette.
   P["Battery the world"] = (function () {
     var sv = alcSmokeVortex({
-      eyeX: 0.52,
+      eyeX: 0.5,
       eyeY: 0.49,
-      swirl: 0.075,
-      pull: 0.991, // inward pull -> spiraling whirlpool
+      swirl: 0.09,
+      shear: 0.22, // counter-rotation boundary radius -> inner vs outer grind
+      pull: 0.992, // inward pull
       floor: "vec3(0.05,0.05,0.055)",
       tint: "vec3(0.96,0.97,0.99)", // neutral grey wisps (bright body, sat ~0)
       vignette: 0.6,
-      speckle: 0.1,
+      speckle: 0.08,
       cloud: 1.0, // dense satellite-storm cloud
-      eye: 0.15, // dark central eye
-      toneK: 0.55, // brighter mid-grey (target YAVG ~120)
+      eye: 0.1, // small dark center between the twin eyes
+      toneK: 0.46, // mid-grey body (target YAVG ~120)
     });
     var preset = build(
       {
@@ -1227,18 +1228,22 @@
         zoom: 1.0,
         warp: 0.0,
         rot: 0,
-        cx: 0.52,
+        cx: 0.5,
         cy: 0.49,
-        darken_center: 1, // the dark eye
+        darken_center: 1,
         wrap: 1,
         additivewave: 1,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
-          t.q2 = 0.52;
-          t.q3 = 0.49; // source ring / eye center
-          t.q5 = 0.16 + 0.05 * (b - 1); // ring pulses with bass
+          var oa = t.time * 0.4; // the twin circles orbit each other
+          var ro = 0.16; // orbit radius
+          t.q21 = 0.5 + ro * Math.cos(oa);
+          t.q22 = 0.49 + ro * Math.sin(oa);
+          t.q23 = 0.5 - ro * Math.cos(oa); // opposite phase -> the twin eye
+          t.q24 = 0.49 - ro * Math.sin(oa);
+          t.q5 = 0.07 + 0.03 * (b - 1); // each circle's radius pulses with bass
           t.decay = 0.96;
           return t;
         },
@@ -1246,14 +1251,17 @@
         comp: sv.comp,
       }
     );
-    // bright jagged real-audio ring — the source the vortex smears into smoke bands.
-    preset.waves[0] = circleWave("q2", "q3");
-    preset.waves[0].baseVals.r = 0.85;
-    preset.waves[0].baseVals.g = 0.86;
-    preset.waves[0].baseVals.b = 0.9;
-    preset.waves[0].baseVals.a = 0.5;
-    preset.waves[0].baseVals.additive = 1;
-    preset.waves[0].baseVals.smoothing = 0.04; // jagged waveform
+    // TWIN jagged real-audio circles orbiting each other — the storm's two eyes / engine.
+    preset.waves[0] = circleWave("q21", "q22");
+    preset.waves[1] = circleWave("q23", "q24");
+    for (var wi = 0; wi < 2; wi++) {
+      preset.waves[wi].baseVals.r = 0.85;
+      preset.waves[wi].baseVals.g = 0.86;
+      preset.waves[wi].baseVals.b = 0.9;
+      preset.waves[wi].baseVals.a = 0.5;
+      preset.waves[wi].baseVals.additive = 1;
+      preset.waves[wi].baseVals.smoothing = 0.04; // jagged
+    }
     return preset;
   })();
 
