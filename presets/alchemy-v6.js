@@ -149,16 +149,19 @@
     //    washes; 1/2/3/4/7/8 = intrinsic high-sat structured fields). WARP owns the GEOMETRY (fold/
     //    spiral/shear/recede → parallax); COMP owns the COLOUR (which hue at this angle/radius/tile). ──
     "  vec3 ground; float sat;\n" +
-    "  if (m < 0.5) {\n" + // 0 MOTIF-WASH — a soft MEDIUM-value COMPLEMENTARY field (green under a pink motif, etc.); the painted buffer (pastelized below) reads as the dominant colour ON it. The ambient look.
-    "    sat = 0.38; ground = pal(hb + 0.5) * (0.40 + 0.16 * tooth);\n" +
-    "  } else if (m < 1.5) {\n" + // 1 X-WEDGE — hard angular colour wedges (gold/lime/magenta), the bold bowtie kaleidoscope
-    "    sat = 0.9; float seg = 6.2832 / 6.0; float wseg = floor((pang + 3.14159) / seg); ground = pal(hb + wseg * 0.27) * (0.85 + 0.25 * tooth);\n" +
-    "  } else if (m < 2.5) {\n" + // 2 BULLSEYE — concentric rainbow rings (WARP slow zoom expands them outward = parallax recede)
-    "    sat = 0.74; ground = pal(hb + pr2 * 5.0 - time * 0.08) * (0.78 + 0.3 * tooth);\n" +
+    "  if (m < 0.5) {\n" + // 0 FLOWING FLUID FIELD — the original's signature ambient bg: 3 ANALOGOUS dusty colours
+    // (close on the wheel = harmonious, NOT rainbow) bleeding through a domain-warped fbm that FLOWS +
+    // parallaxes (gpd). Colourful + moving (the user's "bg flat/static" fix), the milky motif paints on top.
+    "    sat = 0.6; float fl = fbm(gpd * 1.6 + vec2(time * 0.05, -time * 0.04)); float fl2 = fbm(gpd * 2.5 - vec2(time * 0.035, time * 0.05) + 4.0);\n" +
+    "    vec3 fA = pal(hb + 0.06), fB = pal(hb + 0.2), fC = pal(hb - 0.12); ground = mix(fA, fB, smoothstep(0.3, 0.7, fl)); ground = mix(ground, fC, smoothstep(0.45, 0.82, fl2) * 0.6); ground *= 0.5 + 0.55 * fl;\n" +
+    "  } else if (m < 1.5) {\n" + // 1 X-WEDGE bowtie — TWO analogous-complementary tones (not a 4-colour rainbow diamond, which read out of place)
+    "    sat = 0.82; float seg = 6.2832 / 4.0; float wpar = mod(floor((pang + 3.14159) / seg), 2.0); ground = mix(pal(hb + 0.04), pal(hb + 0.42), wpar) * (0.8 + 0.28 * tooth);\n" +
+    "  } else if (m < 2.5) {\n" + // 2 BULLSEYE — concentric rings alternating TWO analogous hues (not full rainbow); expand outward = recede
+    "    sat = 0.7; float rng = 0.5 + 0.5 * sin((pr2 * 4.5 - time * 0.1) * 6.2832); ground = mix(pal(hb + 0.02), pal(hb + 0.22), rng) * (0.72 + 0.32 * tooth);\n" +
     "  } else if (m < 3.5) {\n" + // 3 SINE BANDS — undulating horizontal colour bands
     "    sat = 0.72; float wv = sin(uv.y * 5.0 + sin(uv.x * 3.0 + time * 0.2) * 0.6); ground = mix(pal(hb), pal(hb + 0.35), 0.5 + 0.5 * wv);\n" +
-    "  } else if (m < 4.5) {\n" + // 4 QUAD MANDALA — green-biased radial gradient over the quad-folded coord (motif mirrors via WARP fold)
-    "    sat = 0.76; ground = pal(0.33 + pr2 * 0.55 + 0.1 * sin(pang * 4.0)) * (0.78 + 0.3 * tooth);\n" +
+    "  } else if (m < 4.5) {\n" + // 4 QUAD MANDALA — SOFT analogous radial gradient over the quad-folded coord (was a hard 4-COLOUR diamond that read 'out of place'; now two harmonious tones, no angular colour breaks)
+    "    sat = 0.6; ground = mix(pal(hb + 0.05), pal(hb + 0.24), 0.5 + 0.5 * sin(pr2 * 3.0 - time * 0.05)) * (0.7 + 0.3 * tooth);\n" +
     "  } else if (m < 5.5) {\n" + // 5 TILT PLANES — diagonal colour gradient over the camera-sheared coord → a receding plane that slides
     "    sat = 0.5; ground = pal(hb + dot(gpd, vec2(0.7, 0.6)) * 1.1 + time * 0.04) * (0.5 + 0.42 * tooth);\n" +
     "  } else if (m < 6.5) {\n" + // 6 VORTEX — soft TEAL↔LAVENDER milky (WARP spins it into the drain spiral); cool fixed mood (the original vortex is consistently cool, not hue-cycling)
@@ -197,7 +200,7 @@
     // as SHARP core + a soft BLUR-GLOW halo (sampler_blur1) so lines read as glowing ENERGY BEAMS with
     // volume, not thin wireframes (Gemini's note) — the original's beams have body.
     "  vec3 glow = texture2D(sampler_blur1, kuv).rgb;\n" +
-    "  vec3 col = ground * 0.78 + sharp * 1.32 + glow * 0.75 + cA * bl;\n" +
+    "  vec3 col = ground * 0.92 + sharp * 1.28 + glow * 0.72 + cA * bl;\n" + // brighter, COLOURFUL ground (0.78 read murky/flat); fg still pops via glow + bloom + Reinhard
     "  col *= q31;\n" +
     // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
     // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
@@ -454,7 +457,7 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + rad * Math.cos(ang);
     a.y = cy + rad * Math.sin(ang);
-    var h = (a.q8 || 0) + (seg / N) * 0.9; // rainbow AROUND the burst → a multicolour dandelion (per the reference)
+    var h = (a.q8 || 0) + (seg / N) * 0.25; // ANALOGOUS hue spread around the burst (not a full rainbow — user disliked the rainbow)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -472,7 +475,7 @@
     var amp = (a.q6 || 0.05) * 4.8; // tall waveform peaks
     a.x = cx + (a.sample - 0.5) * width;
     a.y = cy + (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25;
-    var h = (a.q8 || 0) + a.sample * 0.8; // full rainbow along the wave (along-length multicolor, per the reference)
+    var h = (a.q8 || 0) + a.sample * 0.3; // analogous gradient along the wave (not full rainbow)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -492,7 +495,7 @@
     var disp = (a.value1 || 0) * amp + (a.value2 || 0) * amp * 0.25; // real-waveform jag (primary-motif rule)
     a.x = cx + along * ct - disp * st;
     a.y = cy + along * st + disp * ct;
-    var h = (a.q8 || 0) + a.sample * 0.85; // FULL rainbow along the axis: cyan→green→magenta→gold
+    var h = (a.q8 || 0) + a.sample * 0.4; // analogous gradient along the ribbon (toned down from full rainbow)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -539,7 +542,7 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + s * len * ct - jag * st;
     a.y = cy + s * len * st + jag * ct;
-    var h = (a.q8 || 0) + a.sample * 0.5; // iridescent gradient (PRISM COMP adds the channel split)
+    var h = (a.q8 || 0) + a.sample * 0.25; // analogous gradient (PRISM COMP adds the channel split)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -733,7 +736,7 @@
   // WEIGHTED bags — the original is DOMINANTLY the soft painterly field + flower + orbs + tether, with
   // kaleidoscope/vortex/burst as ACCENTS. Uniform-random over all modes felt like a chaotic grab-bag of
   // neon/wireframe scenes; these bags bias toward the painterly looks so the OVERALL character matches.
-  var BG_BAG = [0, 0, 0, 5, 5, 6, 6, 1, 1, 2, 2, 8, 3, 4, 7, 9]; // wash·tilt·vortex·X-wedge·bullseye prominent; bands/mandala/wallpaper/neon rarer
+  var BG_BAG = [0, 0, 0, 0, 5, 5, 6, 6, 3, 3, 2, 8, 1, 4, 7]; // FLUID-field dominant; tilt/vortex/bands next; kaleido (X-wedge/mandala) RARE (the 4-colour diamond read out of place); neon-dark dropped from rotation (it's only steered in for the wire/X motifs → reads flat as a bg)
   var MOTIF_BAG = [0, 0, 0, 5, 5, 9, 9, 8, 6, 2, 1, 7, 4, 10, 11]; // anemone/urchin/ribbon-led (the central flower); fountain/wireframe/X rarer
   var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
   var bgPick = makePicker(BG_BAG.length, 12, 22, 5.0); // background — own slow clock, long morph (mapped through BG_BAG)
@@ -793,25 +796,28 @@
     t.q12 = fold;
     t.q13 = fold > 1.5 ? 0.6 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)) : 0;
 
-    // PERSISTENT PLUNGE — THE fix for "feels flat": a continuous zoom so the motif + its feedback trails
-    // STREAM OUTWARD past the camera into a receding 3D tunnel/tube-stack (the original's depth), instead
-    // of a centred motif pulsing on a flat plane. Always-on (every scene), surges on the beat. Plunge
-    // (content flies outward → off-screen) self-limits the central pile-up, so it's milky-out-safe at
-    // decay ≤0.93. Structural modes add to this below.
-    t.q15 = -0.013 - 0.008 * Math.max(0, bassA - 1) + 0.004 * Math.sin(time * 0.11); // gentle plunge (a strong one piled additive bursts into a white-out core)
-    t.q16 = L("rot") + 0.05 * Math.sin(time * 0.045); // slow camera ROLL (axis rocks) → not a locked top-view
+    // STABLE CANVAS by default — the original's dominant look is shapes moving + trails FADING IN PLACE,
+    // NOT a constant feedback tunnel (a persistent plunge read as "always the same direction" + tunnelled +
+    // piled bursts to white). So zoom/roll are ~0 here; the depth/motion comes from the FLOWING colourful
+    // bg + the orbiting shapes + soft fading trails. The structural modes (tilt/vortex/bullseye) ADD their
+    // own feedback motion below — feedback camera is now scene-specific, not always-on.
+    t.q15 = 0.004 * Math.sin(time * 0.05) - 0.004 * Math.max(0, bassA - 1); // ≈stationary
+    t.q16 = L("rot") * 0.35 + 0.012 * Math.sin(time * 0.04); // GENTLE roll only (heavy roll spun the trails into spirals)
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
     t.q19 = L("dy");
     // OFF-CENTER, DRIFTING vanishing point on an ELLIPTICAL path (different x/y rates) — the plunge streams
     // TOWARD this roaming VP, so the depth is asymmetric/oblique (not a symmetric centred zoom) and edge
     // content sweeps several× faster than near-VP content = parallax. Amp ~0.14 (v4's 0.02-0.06 was tiny).
-    var pan = Math.max(L("pan"), 0.13);
-    t.q20 = 0.5 + (L("px") - 0.5) + pan * Math.cos(time * 0.066) - 0.06;
-    t.q27 = 0.5 + (L("py") - 0.5) + pan * 0.85 * Math.sin(time * 0.051) - 0.04;
-    // PERSISTENT OBLIQUE TILT — never a flat top-down view. Floor ~0.3 so even the radial modes read at a
-    // slight angle (mild ellipse = depth). Structural tilt/picket modes push it harder below.
-    t.q28 = 0.3 + L("tilt") * 1.1 + L("tiltOsc") * Math.sin(time * 0.1);
+    // VP ORBITS THROUGH ALL DIRECTIONS (Lissajous, x/y rates incommensurate) so the plunge flies a
+    // CHANGING direction over ~25s — was a FIXED down-left bias → camera always moved the same way (user note).
+    var vpAng = time * 0.045;
+    var vpR = 0.13 + 0.05 * Math.sin(time * 0.02);
+    t.q20 = 0.5 + (L("px") - 0.5) + vpR * Math.cos(vpAng);
+    t.q27 = 0.5 + (L("py") - 0.5) + vpR * Math.sin(vpAng * 1.31);
+    // mostly FLAT-ON (the original's flower/field scenes face the viewer); a small tilt for life. The
+    // tilt-plane / picket modes push this hard below (those ARE the oblique scenes).
+    t.q28 = 0.12 + L("tilt") * 0.7 + L("tiltOsc") * Math.sin(time * 0.1);
     t.q31 = L("exp") * (1 + 0.12 * (bassA - 1) + 0.22 * pulse); // gentle SMOOTHED beat lift (no strobe)
     t.q32 = 1 + 1.3 * pulse; // beat carrier for the shaders = smoothed envelope (was raw bass → jittery bloom)
 
@@ -824,9 +830,10 @@
       t.q28 = 0.72 + 0.28 * Math.sin(time * 0.05) + 0.15 * (bassA - 1);
       t.q15 += -0.01; // gentle recede along the plane
     } else if (bgMode === 6) {
-      // VORTEX (6): inward swirl about an OFF-CENTER eye + inward pull → the drain spiral.
+      // VORTEX (6): inward swirl about an OFF-CENTER eye + inward pull + a little roll → the drain spiral.
       t.q17 += 0.12 + 0.05 * (bassA - 1);
       t.q15 += -0.018;
+      t.q16 += 0.02; // roll feeds the spiral
       t.q20 = 0.43 + 0.05 * Math.cos(time * 0.08); // eye off-center
       t.q27 = 0.46 + 0.05 * Math.sin(time * 0.08);
     } else if (bgMode === 2) {
@@ -953,7 +960,7 @@
       additive: 1,
       usedots: 0,
       scaling: 1,
-      smoothing: 0.05,
+      smoothing: 0.25,
       thick: 1,
       a: 0.62,
     }),
@@ -973,7 +980,7 @@
       additive: 1,
       usedots: 0,
       scaling: 1,
-      smoothing: 0.05,
+      smoothing: 0.25,
       thick: 1,
       a: 0.5,
     }),
