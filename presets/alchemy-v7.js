@@ -126,14 +126,41 @@
     // CORRIDOR regime (m==3): a near-black VOID so the marching ring-orbs + the jagged waveform thread
     // glow as the only light (the reference's 0:06-0:16 corridor is on pure black), with a faint central
     // horizontal depth-haze along the orbit line.
-    "  if (m > 2.5) {\n" +
+    "  if (m > 2.5 && m < 3.5) {\n" +
     "    ground = ground * 0.05 + pal(hb + 0.1) * 0.03 * exp(-pow(c.y * 6.0, 2.0));\n" +
     "  }\n" +
-    // ── KALEIDOSCOPE regime (m==1): BOLD saturated diamonds (the reference's vivid red↔green). ──
+    // ── STRUCTURED-FIELD backgrounds (survey gaps) — they REPLACE the wavy ground. ──
+    // 4 VERTICAL BARS / barcode (1:48-2:02): purple↔green vertical stripes, top-bottom mirrored.
+    "  else if (m > 3.5 && m < 4.5) {\n" +
+    "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
+    "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
+    "    ground = barCol * (0.07 + 0.16 * bars);\n" +
+    "  }\n" +
+    // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
+    "  else if (m > 4.5 && m < 5.5) {\n" +
+    "    ground = mix(pal(hb), pal(hb + 0.13), 0.5 + 0.5 * sin(time * 0.06));\n" +
+    "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.5);\n" +
+    "    ground *= 0.15 + 0.03 * n;\n" + // faint fbm tooth so it's not dead-flat
+    "  }\n" +
+    // 6 HORIZONTAL colour BANDS (2:28-2:39): smooth horizontal stripes, slow vertical drift.
+    "  else if (m > 5.5 && m < 6.5) {\n" +
+    "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
+    "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
+    "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
+    "    ground *= 0.14;\n" +
+    "  }\n" +
+    // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
+    "  else if (m > 6.5) {\n" +
+    "    float rng = 0.5 + 0.5 * sin((prad * 7.0 - time * 0.2) * 6.2832);\n" +
+    "    ground = mix(pal(hb + 0.02), pal(hb + 0.2), rng) * (0.05 + 0.13 * rng);\n" +
+    "  }\n" +
+    // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
+    //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
     "  if (m > 0.5 && m < 1.5) {\n" +
-    "    vec3 kcol = pal(hb + 0.4 * suv.x + 0.18 * suv.y);\n" +
-    "    kcol = kcol * kcol * 1.5;\n" + // contrast → BOLD vivid diamonds (the reference's punchy red/green), not pastel
-    "    ground = mix(ground * 0.22, kcol, 0.82);\n" +
+    "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
+    "    vec3 kcol = pal(hb + cell * 0.45 + 0.12 * suv.x);\n" + // bold 2-tone duo across cells
+    "    kcol = kcol * kcol * 1.7;\n" + // strong contrast → vivid, not pastel
+    "    ground = mix(ground * 0.12, kcol, 0.9);\n" +
     "  }\n" +
     "  ground *= mix(0.55, 1.06, smoothstep(1.45, 0.1, prad));\n" + // depth vignette
     // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth). ──
@@ -542,7 +569,7 @@
     corridorAmt = 0; // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
-  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 1, 3]; // 0 wavy-fluid · 1 kaleidoscope · 2 radial-tunnel · 3 corridor
+  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
   var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]; // anemone/star DOMINANT; urchin/cross/tri/square/hexagram + wireframe-NET (×2, iconic) + vortex accents
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
