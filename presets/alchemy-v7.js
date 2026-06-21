@@ -612,9 +612,42 @@
     if (u < 0.06) a.a = 0; // discrete beads — hide the bead-to-bead connector
     return a;
   }
+  // GREEN VALLEY (survey scene, 2:58-end): two line-SHEETS converging to a central vanishing point form an
+  // X/VALLEY, with a vertical live-waveform SPINE marching down the seam to the VP. The star nucleus at the
+  // VP = the focus pupil; a forward dolly (valley camera coupling) flies into it. Reads as 3D depth-corridor.
+  function fValley(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var L = a.q5 || 0.4;
+    var h = (a.q8 || 0) + 0.2; // green-lean (the reference valley is green/yellow)
+    if (s < 0.42 || (s >= 0.42 && s < 0.84)) {
+      var rightSheet = s >= 0.42;
+      var ss = rightSheet ? (s - 0.42) / 0.42 : s / 0.42;
+      var NL = 8,
+        fk = ss * NL,
+        seg = Math.floor(fk),
+        u = fk - seg;
+      var nearY = (seg / (NL - 1) - 0.5) * 1.7 * L; // near-edge points spread vertically
+      var nearX = (rightSheet ? 1.7 : -1.7) * L;
+      a.x = cx + nearX * (1 - u); // line from near-edge → VP at center (converging perspective)
+      a.y = cy + nearY * (1 - u);
+      if (u > 0.98 || u < 0.02) a.a = 0; // hide line-to-line jumps + the pile-up at the VP
+    } else {
+      var u2 = (s - 0.84) / 0.16; // central vertical WAVEFORM SPINE down the seam
+      var jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.6;
+      a.x = cx + jag;
+      a.y = cy + (u2 - 0.5) * 1.5 * L;
+      h = (a.q8 || 0) + 0.5; // spine in the complementary hue (pink over green)
+    }
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
   // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons + wireframe-net + vortex +
-  // jellyfish-disc + 12-pt-mandala + beaded-chain. ROSE/ROTLINE were REMOVED (user-rejected). fNet is the
-  // DELIBERATE woven net (distinct from the rejected chaotic spray). Radial-tunnel DEPTH lives in q29=2.
+  // jellyfish-disc + 12-pt-mandala + beaded-chain + valley. ROSE/ROTLINE were REMOVED (user-rejected). fNet
+  // is the DELIBERATE woven net (distinct from the rejected chaotic spray). Radial-tunnel DEPTH = q29=2.
   var MODES = [
     fAnem,
     fStarNet,
@@ -628,9 +661,10 @@
     fJelly,
     f12Star,
     fBeadChain,
+    fValley,
   ];
   // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly) pile up → lower alpha; crisp outlines keep more.
-  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82];
+  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82, 0.72];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
   }
@@ -668,11 +702,12 @@
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
     panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
-    corridorAmt = 0; // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
+    corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
+    valleyAmt = 0; // motif 12 → the green valley corridor (forward dolly into the vanishing point)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
-  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET(×2)/vortex/jelly/12-star/bead-chain accents
+  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 1, 12]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET(×2)/vortex/jelly/12-star/bead-chain/valley accents
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
@@ -741,7 +776,9 @@
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips at the swap instant
 
     focusAmt +=
-      ((mCur === 0 || mCur === 2 || mCur === 9 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6); // anemone/urchin/jelly get the warm-core pupil
+      ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 ? 1 : 0) - focusAmt) *
+      Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley get the warm-core pupil (valley's star nucleus)
+    valleyAmt += ((mCur === 12 ? 1 : 0) - valleyAmt) * Math.min(1, dt * 0.5); // valley → forward dolly
 
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
@@ -780,7 +817,9 @@
     corridorAmt += ((bgMode === 3 ? 1 : 0) - corridorAmt) * Math.min(1, dt * 0.5);
     if (corridorAmt > 0.01) {
       var co = corridorAmt;
-      t.q4 *= 1 - 0.94 * co; // fade the central flower almost OUT — the corridor IS the orbs + row + thread
+      // fade the central motif during the corridor — EXCEPT the wireframe NET (mode 7): keeping the net
+      // visible over the void with the orbs + beaded row IS the opening-signature look (0:06-0:12).
+      if (mCur !== 7) t.q4 *= 1 - 0.94 * co;
       t.q18 += (0.0065 - t.q18) * co; // strong RIGHTWARD pan (camera/motifs move right)
       t.q19 += (0.0 - t.q19) * co; // kill the vertical drift
       t.q15 += (0.0 - t.q15) * co; // kill the magnify (a clean recede, not a watercolour bloom)
@@ -793,6 +832,16 @@
       t.q23 += (0.7 - t.q23) * co;
       t.q24 += (0.49 - t.q24) * co;
       t.q26 += (0.05 - t.q26) * co; // steady tether-waveform jag along the corridor
+    }
+
+    // ── VALLEY camera (motif 12): a gentle forward DOLLY into the vanishing point — the sheets converge
+    //    at center, so a slow zoom-in flies down the valley. Brief + scene-local (not the rejected
+    //    always-on plunge). Slight extra decay so the receding sheet-lines leave a depth trail. ──
+    if (valleyAmt > 0.01) {
+      var va = valleyAmt;
+      t.q15 += (0.012 - t.q15) * va; // q15>0 magnifies the old buffer → forward DOLLY into the VP
+      t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
+      t.q16 *= 1 - va; // no roll (a clean dive down the valley)
     }
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
