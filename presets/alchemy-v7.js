@@ -522,13 +522,115 @@
     if (u < 0.03) a.a = 0;
     return a;
   }
-  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons + wireframe-net + vortex.
-  // ROSE (smooth Lissajous loops) and ROTLINE (radial filament SPRAY) were REMOVED — the user rejected
-  // both ("WTF is this shape" / "mess of net"). NOTE: fNet is the DELIBERATE woven net (star-art +
-  // foreshorten), distinct from the rejected chaotic rotline spray. Radial-tunnel DEPTH lives in q29=2.
-  var MODES = [fAnem, fStarNet, fUrchin, fCrossX, fTri, fNgon, fHexagram, fNet, fVortex];
-  // ADDITIVE dense modes (anemone/urchin/net/vortex) pile up → lower alpha; crisp outline modes keep more.
-  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5];
+  // JELLYFISH / EYE DISC (survey gap, 0:48): an oblate filament RING with a waveform fringe that TILTS in
+  // 3D — its Y-scale oscillates flat↔edge-on so it reads as a disc rotating in space (distinct from the
+  // flat front-on urchin). The warm core comes from the COMP focus pupil (mode added to the focus set).
+  function fJelly(a) {
+    var N = 80,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var ang = (seg / N) * 6.2832 + (a.q9 || 0);
+    var R = (a.q5 || 0.4) * 0.95;
+    var rr = R * (0.82 + 0.26 * Math.abs(a.value1 || 0)); // ring + live-waveform fringe
+    var x = Math.cos(ang) * rr,
+      y = Math.sin(ang) * rr;
+    var tilt = 0.32 + 0.68 * (0.5 + 0.5 * Math.sin((a.q9 || 0) * 1.7)); // oscillating Y-squash → 3D tilt
+    y *= tilt;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + x;
+    a.y = cy + y;
+    var h = a.q8 || 0;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0;
+    return a;
+  }
+  // 12-POINT STAR MANDALA (survey gap, 1:33): a {12/5} star polygon — finer/higher-order than the 6-arm
+  // star-net. Pairs with the bullseye bg (q29=7) for the "12-point star over a bullseye iris" look.
+  function f12Star(a) {
+    var P = 12,
+      stride = 5,
+      CH = 12,
+      fk = (a.sample || 0) * CH,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var i0 = (seg * stride) % P,
+      i1 = (seg * stride + stride) % P;
+    var sp = (a.q9 || 0) * 0.4;
+    var aa0 = (i0 / P) * 6.2832 + sp,
+      aa1 = (i1 / P) * 6.2832 + sp;
+    var R = (a.q5 || 0.4) * 1.3;
+    var x0 = Math.cos(aa0) * R,
+      y0 = Math.sin(aa0) * R,
+      x1 = Math.cos(aa1) * R,
+      y1 = Math.sin(aa1) * R;
+    var px = x0 + (x1 - x0) * u,
+      py = y0 + (y1 - y0) * u;
+    var dxc = x1 - x0,
+      dyc = y1 - y0,
+      ln = Math.hypot(dxc, dyc) || 1;
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.5;
+    px += (-dyc / ln) * jag;
+    py += (dxc / ln) * jag;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + px;
+    a.y = cy + py;
+    var h = (a.q8 || 0) + 0.1;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02) a.a = 0;
+    return a;
+  }
+  // BEADED ORB-CHAIN (survey gap, 0:06 / 1:42): a row of DISCRETE small ring-beads along a slowly-rotating
+  // line through center, the central bead larger (the 'eye'). Distinct from the continuous tether line.
+  function fBeadChain(a) {
+    var B = 9,
+      fk = (a.sample || 0) * B,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var t = (seg / (B - 1)) * 2 - 1; // -1..1 along the chain
+    var ang = (a.q9 || 0) * 0.3;
+    var R = (a.q5 || 0.4) * 1.5;
+    var bx = Math.cos(ang) * t * R,
+      by = Math.sin(ang) * t * R;
+    var mid = Math.round((B - 1) / 2);
+    var br = 0.02 * (seg === mid ? 2.3 : 1.0); // central bead bigger = the eye
+    var ringAng = u * 6.2832;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + bx + Math.cos(ringAng) * br;
+    a.y = cy + by + Math.sin(ringAng) * br;
+    var h = (a.q8 || 0) + Math.abs(t) * 0.2;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.06) a.a = 0; // discrete beads — hide the bead-to-bead connector
+    return a;
+  }
+  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons + wireframe-net + vortex +
+  // jellyfish-disc + 12-pt-mandala + beaded-chain. ROSE/ROTLINE were REMOVED (user-rejected). fNet is the
+  // DELIBERATE woven net (distinct from the rejected chaotic spray). Radial-tunnel DEPTH lives in q29=2.
+  var MODES = [
+    fAnem,
+    fStarNet,
+    fUrchin,
+    fCrossX,
+    fTri,
+    fNgon,
+    fHexagram,
+    fNet,
+    fVortex,
+    fJelly,
+    f12Star,
+    fBeadChain,
+  ];
+  // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly) pile up → lower alpha; crisp outlines keep more.
+  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
   }
@@ -570,7 +672,7 @@
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
-  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8]; // anemone/star DOMINANT; urchin/cross/tri/square/hexagram + wireframe-NET (×2, iconic) + vortex accents
+  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET(×2)/vortex/jelly/12-star/bead-chain accents
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
@@ -638,7 +740,8 @@
     var dd = (mo.mix - 0.5) * 4.0;
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips at the swap instant
 
-    focusAmt += ((mCur === 0 || mCur === 2 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6);
+    focusAmt +=
+      ((mCur === 0 || mCur === 2 || mCur === 9 ? 1 : 0) - focusAmt) * Math.min(1, dt * 0.6); // anemone/urchin/jelly get the warm-core pupil
 
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
