@@ -139,32 +139,30 @@
     // the full-rate feedback buffer (the painted motifs). Different layer speeds = genuine depth parallax.
     "  vec2 gpd = pdc;\n" +
     "  gpd /= max(1.0 + q28 * 0.6 * (uv.y - q27), 0.3);\n" + // fractional perspective shear → receding plane/floor depth
-    "  float groll = time * 0.026 + q16 * 6.0;\n" + // slow bg roll (slower than the fg feedback roll) + a nudge from the camera roll
+    "  float groll = time * 0.05 + q16 * 6.0;\n" + // bg roll (faster — the field visibly moves)
     "  gpd = mat2(cos(groll), -sin(groll), sin(groll), cos(groll)) * gpd;\n" +
-    "  gpd *= 1.0 + 0.12 * sin(time * 0.05);\n" + // gentle depth breath (push in/out)
+    "  gpd *= 1.0 + 0.12 * sin(time * 0.09);\n" + // depth breath (faster)
     "  float pang = atan(gpd.y, gpd.x); float pr2 = length(gpd);\n" +
     "  float tooth = fbm(gpd * 2.0 + vec2(time * 0.03, -time * 0.025));\n" + // shared LOW-freq texture 'tooth' (≤0.4 amp) — moves with the field
     // ── BG_MODE colour FIELD + per-scene SATURATION (the two regimes: 0/5/6/9 = dusty motif-painted
     //    washes; 1/2/3/4/7/8 = intrinsic high-sat structured fields). WARP owns the GEOMETRY (fold/
     //    spiral/shear/recede → parallax); COMP owns the COLOUR (which hue at this angle/radius/tile). ──
     "  vec3 ground; float sat;\n" +
-    "  if (m < 0.5) {\n" + // 0 SCROLLING COLOUR BANDS — the original's signature: soft WAVY horizontal colour bands that
-    // SCROLL VERTICALLY (upward) while their colours cycle (teal→olive→pink) → the "scene feels like it's
-    // moving up" + "a series of colour changes" (the user's key note). The colour at a fixed point CHANGES
-    // over time as bands pass through (vs the old in-place fbm = same colours in the same spots = static).
-    "    sat = 0.6; float warp1 = fbm(gpd * 1.3 + vec2(time * 0.04, time * 0.02)) * 0.9;\n" + // wavy/organic band edges
-    "    float yb = gpd.y * 4.0 - time * 0.36 + warp1;\n" + // VERTICAL SCROLL up + waviness
+    // 0 FLUID/scrolling-bands · 1 X-FOLD kaleidoscope · 4 QUAD mandala — ALL the same FLOWING colour field;
+    // for modes 1 & 4 the WARP + COMP fold simply MIRRORS this field (+ the motif) into a 4-fold/quad
+    // kaleidoscope — a true REFLECTIVE mandala, NOT the flat 4-colour wedge "diamond" (which read out of
+    // place; the user preferred the mirror kaleidoscope). The field: soft WAVY horizontal bands that SCROLL
+    // up while their analogous colours cycle (the "moving up" + "series of colour changes" note).
+    "  if (m < 1.5 || (m > 3.5 && m < 4.5)) {\n" +
+    "    sat = 0.6; float warp1 = fbm(gpd * 1.3 + vec2(time * 0.04, time * 0.02)) * 0.9;\n" +
+    "    float yb = gpd.y * 4.0 - time * 0.8 + warp1;\n" +
     "    float band = 0.5 + 0.5 * sin(yb * 3.14159), band2 = 0.5 + 0.5 * sin(yb * 1.7 + 2.0);\n" +
     "    vec3 fA = pal(hb + 0.04), fB = pal(hb + 0.19), fC = pal(hb - 0.12);\n" + // 3 ANALOGOUS dusty tones
-    "    ground = mix(fA, fB, smoothstep(0.32, 0.68, band)); ground = mix(ground, fC, smoothstep(0.4, 0.7, band2) * 0.6); ground *= (0.42 + 0.55 * band) * (0.72 + 0.4 * fbm(gpd * 2.0 - vec2(0.0, time * 0.06)));\n" + // tighter colour-zone transitions → DEFINED bands, not muddy bleed; light/dark value = visible upward scroll
-    "  } else if (m < 1.5) {\n" + // 1 X-WEDGE bowtie — TWO analogous-complementary tones (not a 4-colour rainbow diamond, which read out of place)
-    "    sat = 0.82; float seg = 6.2832 / 4.0; float wpar = mod(floor((pang + 3.14159) / seg), 2.0); ground = mix(pal(hb + 0.04), pal(hb + 0.42), wpar) * (0.8 + 0.28 * tooth);\n" +
+    "    ground = mix(fA, fB, smoothstep(0.32, 0.68, band)); ground = mix(ground, fC, smoothstep(0.4, 0.7, band2) * 0.6); ground *= (0.42 + 0.55 * band) * (0.72 + 0.4 * fbm(gpd * 2.0 - vec2(0.0, time * 0.06)));\n" +
     "  } else if (m < 2.5) {\n" + // 2 BULLSEYE — concentric rings alternating TWO analogous hues (not full rainbow); expand outward = recede
     "    sat = 0.7; float rng = 0.5 + 0.5 * sin((pr2 * 4.5 - time * 0.1) * 6.2832); ground = mix(pal(hb + 0.02), pal(hb + 0.22), rng) * (0.72 + 0.32 * tooth);\n" +
     "  } else if (m < 3.5) {\n" + // 3 SINE BANDS — undulating horizontal colour bands
     "    sat = 0.72; float wv = sin(uv.y * 5.0 + sin(uv.x * 3.0 + time * 0.2) * 0.6); ground = mix(pal(hb), pal(hb + 0.35), 0.5 + 0.5 * wv);\n" +
-    "  } else if (m < 4.5) {\n" + // 4 QUAD MANDALA — SOFT analogous radial gradient over the quad-folded coord (was a hard 4-COLOUR diamond that read 'out of place'; now two harmonious tones, no angular colour breaks)
-    "    sat = 0.6; ground = mix(pal(hb + 0.05), pal(hb + 0.24), 0.5 + 0.5 * sin(pr2 * 3.0 - time * 0.05)) * (0.7 + 0.3 * tooth);\n" +
     "  } else if (m < 5.5) {\n" + // 5 TILT PLANES — diagonal colour gradient over the camera-sheared coord → a receding plane that slides
     "    sat = 0.5; ground = pal(hb + dot(gpd, vec2(0.7, 0.6)) * 1.1 + time * 0.04) * (0.5 + 0.42 * tooth);\n" +
     "  } else if (m < 6.5) {\n" + // 6 VORTEX — soft TEAL↔LAVENDER milky (WARP spins it into the drain spiral); cool fixed mood (the original vortex is consistently cool, not hue-cycling)
@@ -613,7 +611,7 @@
   function scaleFor(m) {
     // smaller central motif → it's an OBJECT in a deep space (dark surround + floating orbs in front),
     // not a flat starburst filling the whole frame edge-to-edge (the "flat" complaint).
-    return m === 0 ? 0.36 : m === 1 ? 0.3 : m === 7 ? 0.34 : m === 12 || m === 13 ? 0.42 : 0.4;
+    return m === 0 ? 0.36 : m === 1 ? 0.3 : m === 7 ? 0.34 : m === 12 || m === 13 ? 0.3 : 0.4;
   }
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
@@ -779,9 +777,9 @@
   // kaleidoscope/vortex/burst as ACCENTS. Uniform-random over all modes felt like a chaotic grab-bag of
   // neon/wireframe scenes; these bags bias toward the painterly looks so the OVERALL character matches.
   var BG_BAG = [0, 0, 0, 0, 5, 5, 6, 6, 3, 3, 2, 8, 1, 4, 7]; // FLUID-field dominant; tilt/vortex/bands next; kaleido (X-wedge/mandala) RARE (the 4-colour diamond read out of place); neon-dark dropped from rotation (it's only steered in for the wire/X motifs → reads flat as a bg)
-  var MOTIF_BAG = [12, 12, 12, 13, 13, 0, 0, 5, 9, 2, 8, 6, 1, 10, 11]; // SMOOTH parametric FLOWER (rose/Lissajous) DOMINANT — the original's flowing continuous curves; the spiky bursts (fountain/spindle) now rare
+  var MOTIF_BAG = [0, 0, 0, 5, 5, 2, 9, 8, 12, 13, 6, 1, 10, 11]; // dense kit ANEMONE-led (real flower factory); rose/Lissajous occasional; spiky fountain/spindle rare
   var lookPick = makePicker(LOOKS.length, 9, 16, 4.0); // camera/look — slow, long morph
-  var bgPick = makePicker(BG_BAG.length, 12, 22, 5.0); // background — own slow clock, long morph (mapped through BG_BAG)
+  var bgPick = makePicker(BG_BAG.length, 6, 11, 3.0); // background — FASTER scene changes (orig changes bg every ~5-7s, was 12-22s)
   var motifPick = makePicker(MOTIF_BAG.length, 6, 12, 2.0); // central motif — own clock, dip-swap (mapped through MOTIF_BAG)
 
   function frame(t) {
@@ -811,8 +809,8 @@
     // SMOOTHED beat envelope (fast attack ~80ms / slow release ~0.4s) — the damping Gemini flagged:
     // size/exposure/orb pops ride THIS, not the raw flash, so they breathe instead of strobing.
     pulse += (f - pulse) * Math.min(1, dt * (f > pulse ? 12 : 2.6));
-    var hueRate = bgMode === 1 || bgMode === 2 || bgMode === 4 ? 0.06 : 0.03; // fast(er) cycle in the spatial-multicolor modes, but calmer than before (0.1 read chaotic)
-    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), hueRate, 0.04);
+    var hueRate = bgMode === 1 || bgMode === 2 || bgMode === 4 ? 0.13 : 0.075; // FASTER colour cycle (orig changes a full family in ~6s ≈ 0.1+ cyc/s; ours was ~half that)
+    huePhase = alcHueClock(huePhase, dt, Math.max(0, energy - 1), hueRate, 0.06);
     // SCENE-CUT palette FLIP: nudge the hue at each discrete bg change (the original flips the family at a
     // cut, then holds + drifts). GENTLER now (≈35-90°) so cuts read smooth, not abrupt/chaotic.
     if (bgMode !== lastBgMode) {
@@ -843,12 +841,11 @@
     // piled bursts to white). So zoom/roll are ~0 here; the depth/motion comes from the FLOWING colourful
     // bg + the orbiting shapes + soft fading trails. The structural modes (tilt/vortex/bullseye) ADD their
     // own feedback motion below — feedback camera is now scene-specific, not always-on.
-    // POLAR TUNNEL (the original's real depth — 2D zoom+rotation feedback, NOT a faked 3D floor): a gentle
-    // continuous inward zoom + a continuous ROTATION → content spirals outward into a receding tunnel. The
-    // ROTATION is what makes it read as a 3D spinning tunnel rather than a flat "pulled-forward" zoom (the
-    // earlier straight plunge). Gentle + smooth-curve motif (thin) → no white-out.
-    t.q15 = -0.011 + 0.004 * Math.sin(time * 0.06) - 0.006 * Math.max(0, bassA - 1);
-    t.q16 = 0.013 + L("rot") * 0.3 + 0.01 * Math.sin(time * 0.045); // continuous slow rotation → spinning tunnel
+    // GENTLE feedback only — a heavy zoom+rotation SMEARED the motif into giant fanned ghost-loops ("WTF
+    // is this flower"). Keep the motif CRISP/contained; the MOTION + speed now live in the background
+    // (fast band scroll + hue cycle). Small zoom/roll for a little life, not a smearing tunnel.
+    t.q15 = -0.004 + 0.003 * Math.sin(time * 0.06) - 0.004 * Math.max(0, bassA - 1);
+    t.q16 = L("rot") * 0.3 + 0.008 * Math.sin(time * 0.05); // gentle roll only (no constant spin → no ghost-fan)
     t.q17 = L("swirl") + (L("swirl") ? 0.03 * (bassA - 1) : 0);
     t.q18 = L("dx");
     // GENTLE constant UPWARD DRIFT (Gemini's dy) — the feedback buffer (painted motif + trails) rises with
