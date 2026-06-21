@@ -645,9 +645,55 @@
     a.b = orbCol(h, 0.67);
     return a;
   }
-  // MODES curated to the reference's flower/mandala/beam vocabulary + n-gons + wireframe-net + vortex +
-  // jellyfish-disc + 12-pt-mandala + beaded-chain + valley. ROSE/ROTLINE were REMOVED (user-rejected). fNet
-  // is the DELIBERATE woven net (distinct from the rejected chaotic spray). Radial-tunnel DEPTH = q29=2.
+  // ORGANIC FILAMENT TANGLE / hairball (480p survey — THE most-recurring central motif there): ~20 curly
+  // jittered thin strands radiating + curling from center with live-waveform jitter → a dense organic
+  // knot, NOT the clean spiky urchin or the geometric net. Pastel-soft when the flavor mode is up.
+  function fTangle(a) {
+    var S = 20,
+      fk = (a.sample || 0) * S,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var seed = seg * 2.39996; // golden-angle spread → strands fan all directions
+    var R = a.q5 || 0.4;
+    var rad = R * (0.08 + 0.92 * u);
+    var curl = seed + (a.q9 || 0) + 2.3 * u * Math.sin(seed * 1.7) + (a.value1 || 0) * 0.7 * u; // curl + audio jitter
+    var jit = (a.value1 || 0) * (a.q6 || 0.05) * 1.6 * u;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + rad * Math.cos(curl) + jit * Math.cos(curl + 1.5708);
+    a.y = cy + rad * Math.sin(curl) + jit * Math.sin(curl + 1.5708);
+    var h = (a.q8 || 0) + u * 0.1;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.04) a.a = 0; // hide strand-to-strand jumps
+    return a;
+  }
+  // WAVEFORM MOUNTAINS / terrain (480p survey, 0:03 / 1:05 / 2:41): several STACKED horizontal live-
+  // waveform ridgelines (|sample| = sawtooth peaks) → a mountain range; feedback leaves the comb beneath.
+  function fMountains(a) {
+    var ROWS = 4,
+      fk = (a.sample || 0) * ROWS,
+      row = Math.floor(fk),
+      u = fk - row;
+    var R = a.q5 || 0.4;
+    var W = R * 2.1; // wide span
+    var amp = (a.q6 || 0.05) * 3.2;
+    var rowY = (row / (ROWS - 1) - 0.5) * 0.95 * R; // stack the ridges vertically
+    var ridge = Math.abs(a.value1 || 0) * amp; // |waveform| → upward sawtooth peaks
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + (u - 0.5) * W;
+    a.y = cy + rowY - ridge;
+    var h = (a.q8 || 0) + row * 0.08;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02 || u > 0.98) a.a = 0;
+    return a;
+  }
+  // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains.
+  // ROSE/ROTLINE removed (user-rejected). fNet is the DELIBERATE woven net. Radial-tunnel DEPTH = q29=2.
   var MODES = [
     fAnem,
     fStarNet,
@@ -662,9 +708,13 @@
     f12Star,
     fBeadChain,
     fValley,
+    fTangle,
+    fMountains,
   ];
-  // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly) pile up → lower alpha; crisp outlines keep more.
-  var MODE_ALPHA = [0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82, 0.72];
+  // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle) pile up → lower alpha; outlines keep more.
+  var MODE_ALPHA = [
+    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82, 0.72, 0.5, 0.66,
+  ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
   }
@@ -707,7 +757,7 @@
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
-  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 1, 12]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET(×2)/vortex/jelly/12-star/bead-chain/valley accents
+  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET/vortex/jelly/12-star/bead-chain/valley/organic-TANGLE(×2)/mountains
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
@@ -776,8 +826,8 @@
     t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips at the swap instant
 
     focusAmt +=
-      ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 ? 1 : 0) - focusAmt) *
-      Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley get the warm-core pupil (valley's star nucleus)
+      ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 ? 1 : 0) - focusAmt) *
+      Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley/tangle get the warm-core pupil (orb-eye)
     valleyAmt += ((mCur === 12 ? 1 : 0) - valleyAmt) * Math.min(1, dt * 0.5); // valley → forward dolly
 
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
