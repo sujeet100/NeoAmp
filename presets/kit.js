@@ -2465,6 +2465,13 @@ function alcSmokeVortex(opts) {
     eye > 0
       ? "  lum *= smoothstep(" + (eye * 0.18).toFixed(4) + ", " + eye.toFixed(3) + ", ar);\n"
       : "";
+  // cloud advection: rotating around the eye (vortex) or pure cartesian drift (smoke-or-water)
+  var rotateCloud = opts.rotateCloud === undefined ? true : opts.rotateCloud;
+  var cloudLines = rotateCloud
+    ? "  float aa = atan(dd.y, dd.x) + time*0.12 + 0.6/(ar+0.18);\n" +
+      "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
+      "  float dens = fbm(csw*4.5 + time*0.05);\n"
+    : "  float dens = fbm(dd*4.5 + vec2(time*0.06, -time*0.04));\n"; // cartesian drift, no vortex
   return {
     warp:
       NOISE_GLSL +
@@ -2502,9 +2509,7 @@ function alcSmokeVortex(opts) {
       ");\n" +
       "  dd.x *= resolution.x/resolution.y;\n" +
       "  float ar = length(dd);\n" +
-      "  float aa = atan(dd.y, dd.x) + time*0.12 + 0.6/(ar+0.18);\n" + // swirl the cloud around the eye
-      "  vec2 csw = vec2(cos(aa), sin(aa))*ar;\n" +
-      "  float dens = fbm(csw*4.5 + time*0.05);\n" + // rotating procedural cloud (fills the frame)
+      cloudLines + // rotating procedural cloud, or cartesian drift if rotateCloud:false
       "  dens = smoothstep(0.30, 0.95, dens);\n" + // bands of cloud vs darker veins
       "  float lum = clamp(dens*" +
       cloud +

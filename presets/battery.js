@@ -511,6 +511,7 @@
           t.q2 = 0.5;
           t.q3 = 0.5;
           t.q5 = 0.12 + 0.1 * (ba - 1); // frond reach pulses with bass
+          t.q9 = t.time * 0.3; // the core waveform "engine" rotates independently
           t.rot = 0.008 + 0.01 * Math.sin(t.time * 0.2); // slow swirl
           t.decay = 0.93;
           return t;
@@ -527,13 +528,13 @@
           "  fold.x /= resolution.x/resolution.y;\n" +
           "  vec3 c = texture2D(sampler_main, fold + 0.5).rgb;\n" +
           "  float lum = dot(c, vec3(0.4));\n" +
-          "  vec3 sage = mix(vec3(0.28,0.34,0.22), vec3(0.60,0.65,0.52), smoothstep(0.0,0.85,lum));\n" + // fixed muted sage
-          "  vec3 col = sage * (0.45 + 1.0*lum);\n" +
+          "  vec3 sage = mix(vec3(0.34,0.40,0.27), vec3(0.66,0.72,0.56), smoothstep(0.0,0.85,lum));\n" + // fixed muted sage
+          "  vec3 col = sage * (0.62 + 1.1*lum);\n" +
           "  float ar = length(d);\n" +
           "  float ripple = 0.5 + 0.5*sin(ar*52.0 - time*3.0 - bass*6.0);\n" + // concentric ripple rings
           "  col += vec3(0.16,0.20,0.12) * ripple * exp(-ar*ar*20.0);\n" +
           "  ret = col;\n" +
-          alcSpeckle("vec3(0.52,0.58,0.42)", 0.16, 3.0, "1.0") + // metallic dust
+          alcSpeckle("vec3(0.52,0.58,0.42)", 0.07, 3.0, "1.0") + // faint metallic sparkle (texture is mostly the folded waveform)
           alcVignette(0.7) + // heavy vignette
           "  ret = ret/(ret + vec3(0.6));\n" + // Reinhard -> muted, never blown white
           "}\n",
@@ -548,7 +549,7 @@
     preset.waves[0].baseVals.additive = 1;
     preset.waves[0].baseVals.smoothing = 0.05; // jagged frond outline
     preset.waves[0].point_eqs = function (a) {
-      var ang = a.sample * 6.2832;
+      var ang = a.sample * 6.2832 + (a.q9 || 0); // continuous rotating geometric core
       var rad = (a.q5 || 0.12) + 0.12 * a.value1; // big bass-scaled spikes
       a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
       a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
@@ -1094,65 +1095,47 @@
   })();
 
   // ── Battery smoke or water? ─────────────────────────────────────────────────
-  // Ambiguous smoky/watery fluid: turbulent fbm warp billowing; blue-grey/teal;
-  // a real-audio ring stirs the fluid. Long decay for smoke trails.
+  // Near-GREYSCALE turbulent smoke/ink-in-water filling the whole frame — NO figure, NO
+  // central eye, NO vortex: a pure cartesian fbm stir with a faint cool/violet cast and a slow
+  // global luma swell. Uses alcSmokeVortex in drift mode (swirl 0, pull 1, rotateCloud false).
+  // Dark veins between bright wisps (wide dynamic range). The old visible teal ring is removed.
   P["Battery smoke or water?"] = (function () {
+    var sv = alcSmokeVortex({
+      swirl: 0,
+      pull: 1.0, // no vortex
+      rotateCloud: false, // cartesian drift (horizontal/diagonal stir)
+      eye: 0, // no eye
+      floor: "vec3(0.045,0.045,0.06)", // dark grey-violet veins
+      tint: "vec3(0.88,0.89,0.93)", // bright grey wisps, faint violet
+      cloud: 1.0,
+      vignette: 0.35,
+      speckle: 0, // pure fluid — no particulate dust
+      toneK: 0.55,
+    });
     var preset = build(
       {
         wave_a: 0,
         decay: 0.965,
         gammaadj: 2.0,
         zoom: 1.0,
-        warp: 0.18,
-        rot: 0.01,
+        warp: 0.0,
+        rot: 0,
         cx: 0.5,
         cy: 0.5,
         darken_center: 0,
         wrap: 1,
-        wave_smoothing: 0.7,
-        additivewave: 1,
       },
       {
         frame: function (t) {
-          var b = t.bass_att || 1,
-            m = t.mid || 1;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.12 + 0.06 * b;
-          t.warp = 0.16 + 0.1 * m;
-          t.rot = 0.008 + 0.012 * b;
+          // a slow global luma swell (bright->dim->bright over ~10s), driven into the cloud via bass.
           t.decay = 0.965;
           return t;
         },
-        warp:
-          NOISE_GLSL +
-          "shader_body {\n" +
-          "vec2 w = uv;\n" +
-          "float n = fbm(w*4.0 + vec2(time*0.08, -time*0.05));\n" +
-          "float n2 = fbm(w*7.0 - vec2(time*0.04));\n" +
-          "vec2 flow = vec2(n - 0.5, n2 - 0.5) * (0.020 + 0.020*bass);\n" +
-          "ret = texture2D(sampler_main, w + flow).rgb;\n" +
-          "ret -= 0.003;\n" +
-          "}\n",
-        comp:
-          "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float lum = dot(c, vec3(0.33));\n" +
-          // WMP smoke-or-water? is essentially greyscale (white/grey smoke, faint cool tint).
-          "vec3 grey = vec3(0.66, 0.70, 0.74);\n" +
-          "ret = grey * (0.45 + 1.2*lum);\n" +
-          "vec2 d = uv - 0.5; d.x *= resolution.x/resolution.y;\n" +
-          "ret += grey * exp(-dot(d,d)*5.0) * (0.05 + 0.18*bass);\n" +
-          "}\n",
+        warp: sv.warp,
+        comp: sv.comp,
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.45;
-    preset.waves[0].baseVals.g = 0.72;
-    preset.waves[0].baseVals.b = 0.78;
-    preset.waves[0].baseVals.a = 0.7;
-    preset.waves[0].baseVals.smoothing = 0.4; // keep the stirring waveform legible
-    return preset;
+    return preset; // no custom waves — pure fbm fluid
   })();
 
   // ── Battery spider's last moment ────────────────────────────────────────────
