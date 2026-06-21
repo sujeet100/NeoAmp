@@ -1344,29 +1344,26 @@
           t.q20 = intro(t); // colour-sweep phase 0->1
           t.rot = 0.02 + 0.01 * (m - 1); // corner swirl (mid drives it)
           t.zoom = 1.004;
-          t.decay = 0.94;
+          t.decay = 0.89;
           return t;
         },
         comp:
           "shader_body {\n" +
           "  vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "  float lum = dot(c, vec3(0.4));\n" +
+          "  float burst = clamp(dot(c, vec3(0.4))*1.05, 0.0, 1.0);\n" + // where the anemone/ink drew (delicate)
           "  float ph = clamp(q20, 0.0, 1.0);\n" +
-          // background migrates GREEN(dark) -> WHITE(bright bloom) -> SEPIA(warm)
-          "  vec3 bgGreen = vec3(0.10,0.16,0.08);\n" +
-          "  vec3 bgWhite = vec3(0.92,0.93,0.95);\n" +
-          "  vec3 bgSepia = vec3(0.66,0.47,0.25);\n" +
-          "  vec3 bg = mix(mix(bgGreen, bgWhite, smoothstep(0.05,0.40,ph)), bgSepia, smoothstep(0.45,0.95,ph));\n" +
-          // anemone filament colour: sage-green early -> burnt-sienna late
-          "  vec3 fg = mix(vec3(0.34,0.52,0.22), vec3(0.50,0.27,0.10), smoothstep(0.1,0.7,ph));\n" +
-          "  vec3 col = bg + fg * lum * 1.7;\n" +
-          // soft glow disc behind centre: ramps in after the green phase, white -> orange
+          // LIGHT canvas migrates: dark-green opener -> white bloom -> warm CREAM (the sepia bg is LIGHT, not dark)
+          "  vec3 bgGreen = vec3(0.16,0.22,0.12);\n" +
+          "  vec3 bgWhite = vec3(0.93,0.93,0.92);\n" +
+          "  vec3 bgCream = vec3(0.90,0.82,0.67);\n" +
+          "  vec3 bg = mix(mix(bgGreen, bgWhite, smoothstep(0.05,0.40,ph)), bgCream, smoothstep(0.45,0.95,ph));\n" +
+          // faint soft white glow disc behind centre (lightens the canvas), subtle — NOT a bright bloom
           "  vec2 gd = uv - 0.5; gd.x *= resolution.x/resolution.y;\n" +
-          "  float gr = length(gd);\n" +
-          "  float glow = exp(-gr*gr*5.0);\n" +
-          "  float gl = smoothstep(0.12, 0.5, ph);\n" +
-          "  col += mix(vec3(1.0,0.97,0.92), vec3(0.95,0.62,0.30), smoothstep(0.45,0.95,ph)) * glow * (0.35 + 0.5*gl) * (0.6 + 0.5*bass);\n" +
-          "  ret = min(col, vec3(1.1));\n" + // bright canvas — clamp, do NOT Reinhard (would darken the white bloom)
+          "  bg += vec3(0.10,0.09,0.07) * exp(-dot(gd,gd)*4.0) * smoothstep(0.15,0.5,ph);\n" +
+          // INK darkens the canvas toward sepia-brown (sage-green ink early -> burnt-sienna late) = ink-in-water
+          "  vec3 ink = mix(vec3(0.22,0.34,0.14), vec3(0.40,0.22,0.08), smoothstep(0.1,0.7,ph));\n" +
+          "  vec3 col = mix(bg, ink, burst);\n" + // DARK ink on a LIGHT canvas
+          "  ret = clamp(col, 0.0, 1.1);\n" + // bright canvas — clamp, do NOT Reinhard
           "}\n",
       }
     );
