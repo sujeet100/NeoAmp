@@ -93,19 +93,12 @@
     "shader_body {\n" +
     "  float asp = resolution.x / resolution.y;\n" +
     "  float m = floor(q29 + 0.5);\n" +
-    // HORIZON REFLECTION — a reflective WATER plane below the horizon: mirror the whole scene (motif + bands)
-    // with a ripple so it reflects → a 3D LANDSCAPE with real depth (the original's signature, frames of_7/
-    // of_13). On for the landscape modes (wash/bands/tilt/pickets), OFF for the radial/kaleido/vortex faces.
-    "  float reflOn = (m < 0.5 || (m > 2.5 && m < 3.5) || (m > 4.5 && m < 5.5) || (m > 7.5 && m < 8.5)) ? 1.0 : 0.0;\n" +
-    "  float horizonY = 0.6 + 0.03 * sin(time * 0.05);\n" +
-    "  float depthB = max(0.0, uv.y - horizonY);\n" + // how far below the horizon
-    "  float belowH = step(horizonY, uv.y) * reflOn;\n" +
-    "  vec2 wuv = uv;\n" +
-    "  if (belowH > 0.5) { wuv.y = 2.0 * horizonY - uv.y; wuv.x += 0.02 * sin(uv.y * 32.0 + time * 1.6) * (0.2 + depthB * 2.5); }\n" + // mirror above the horizon + water ripple (grows with depth)
-    "  vec2 pdc = wuv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
+    // (NO faked 3D horizon/water/floor — the original is 2D polar feedback; depth = zoom+rotation of the
+    //  radial field, applied in the WARP. A single unified canvas driven by the centre point.)
+    "  vec2 pdc = uv - 0.5; pdc.x *= asp; float prad = length(pdc);\n" +
     "  vec2 dpx = 1.7 / resolution;\n" +
-    "  vec2 kuv = wuv;\n" +
-    "  if (q12 > 7.5) { vec2 kc = wuv - 0.5; kc.x *= asp; vec2 kr = vec2(kc.x + kc.y, kc.y - kc.x) * 0.70711; kr = abs(kr); kc = vec2(kr.x - kr.y, kr.x + kr.y) * 0.70711; kc.x /= asp; kuv = kc + 0.5; }\n" +
+    "  vec2 kuv = uv;\n" +
+    "  if (q12 > 7.5) { vec2 kc = uv - 0.5; kc.x *= asp; vec2 kr = vec2(kc.x + kc.y, kc.y - kc.x) * 0.70711; kr = abs(kr); kc = vec2(kr.x - kr.y, kr.x + kr.y) * 0.70711; kc.x /= asp; kuv = kc + 0.5; }\n" +
     "  vec3 sharp = texture2D(sampler_main, kuv).rgb;\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv + vec2(dpx.x, 0.0)).rgb);\n" +
     "  sharp = max(sharp, texture2D(sampler_main, kuv - vec2(dpx.x, 0.0)).rgb);\n" +
@@ -163,7 +156,7 @@
     "    float yb = gpd.y * 4.0 - time * 0.36 + warp1;\n" + // VERTICAL SCROLL up + waviness
     "    float band = 0.5 + 0.5 * sin(yb * 3.14159), band2 = 0.5 + 0.5 * sin(yb * 1.7 + 2.0);\n" +
     "    vec3 fA = pal(hb + 0.04), fB = pal(hb + 0.19), fC = pal(hb - 0.12);\n" + // 3 ANALOGOUS dusty tones
-    "    ground = mix(fA, fB, band); ground = mix(ground, fC, band2 * 0.5); ground *= (0.42 + 0.55 * band) * (0.72 + 0.4 * fbm(gpd * 2.0 - vec2(0.0, time * 0.06)));\n" + // LIGHT/DARK band value contrast → the upward scroll is clearly visible
+    "    ground = mix(fA, fB, smoothstep(0.32, 0.68, band)); ground = mix(ground, fC, smoothstep(0.4, 0.7, band2) * 0.6); ground *= (0.42 + 0.55 * band) * (0.72 + 0.4 * fbm(gpd * 2.0 - vec2(0.0, time * 0.06)));\n" + // tighter colour-zone transitions → DEFINED bands, not muddy bleed; light/dark value = visible upward scroll
     "  } else if (m < 1.5) {\n" + // 1 X-WEDGE bowtie — TWO analogous-complementary tones (not a 4-colour rainbow diamond, which read out of place)
     "    sat = 0.82; float seg = 6.2832 / 4.0; float wpar = mod(floor((pang + 3.14159) / seg), 2.0); ground = mix(pal(hb + 0.04), pal(hb + 0.42), wpar) * (0.8 + 0.28 * tooth);\n" +
     "  } else if (m < 2.5) {\n" + // 2 BULLSEYE — concentric rings alternating TWO analogous hues (not full rainbow); expand outward = recede
@@ -210,11 +203,7 @@
     // as SHARP core + a soft BLUR-GLOW halo (sampler_blur1) so lines read as glowing ENERGY BEAMS with
     // volume, not thin wireframes (Gemini's note) — the original's beams have body.
     "  vec3 glow = texture2D(sampler_blur1, kuv).rgb;\n" +
-    "  vec3 col = ground * 0.92 + sharp * 1.28 + glow * 0.72 + cA * bl;\n" + // brighter, COLOURFUL ground (0.78 read murky/flat); fg still pops via glow + bloom + Reinhard
-    // WATER reflection finish: darken + cool the reflected zone (so it reads as a separate reflective plane,
-    // not a copy), and a bright WATERLINE glow along the horizon. Gives the 3D landscape its floor.
-    "  if (belowH > 0.5) { col *= mix(0.78, 0.34, smoothstep(0.0, 0.32, depthB)); col.b *= 1.08; }\n" +
-    "  col += cA * 1.1 * smoothstep(0.035, 0.0, abs(uv.y - horizonY)) * reflOn * (0.35 + 0.3 * bb);\n" + // glowing waterline at the horizon
+    "  vec3 col = ground * 0.92 + sharp * 1.28 + glow * 0.72 + cA * bl;\n" + // colourful ground + glowing motif; fg pops via glow + bloom + Reinhard
     "  col *= q31;\n" +
     // CENTRAL PUPIL / FOCUS (q11 = focus amount, high for anemone/urchin/tunnel modes; q30 = which mode).
     // Drawn FRESH here in COMP — never in the feedback buffer (gotcha §8b) so it can't smear/spiral.
