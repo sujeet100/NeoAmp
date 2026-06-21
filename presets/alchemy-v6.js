@@ -165,8 +165,10 @@
     "    sat = 0.5; vec3 vTeal = vec3(0.16, 0.52, 0.60), vLav = vec3(0.58, 0.50, 0.82); ground = mix(vTeal, vLav, 0.5 + 0.5 * sin(pang * 2.0 + pr2 * 3.0 + time * 0.12)) * (0.55 + 0.4 * tooth);\n" +
     "  } else if (m < 7.5) {\n" + // 7 WALLPAPER — repeating dot/diamond lattice (kit moiré dots)
     "    sat = 0.56; ground = mix(dusty(pal(hb + 0.5), 0.55) * 0.45, alcMoire(uv, time, bb, pal(hb)), 0.82);\n" +
-    "  } else if (m < 8.5) {\n" + // 8 PICKETS / PERSPECTIVE FLOOR — vertical columns that CONVERGE toward the (off-center) horizon row q27: dense far, wide near → a receding floor of pickets.
-    "    sat = 0.52; float ph = uv.y - q27; float pp = 1.0 / (abs(ph) * 2.4 + 0.14); float bars = pow(0.5 + 0.5 * cos((uv.x - q20) * pp * 9.0 + time * 0.15), 4.0); ground = mix(dusty(pal(hb + 0.3), 0.5) * 0.42, pal(hb), bars * smoothstep(0.0, 0.32, abs(ph) + 0.04));\n" +
+    "  } else if (m < 8.5) {\n" + // 8 VERTICAL BARCODE — rigid, evenly-spaced gold/dark vertical bars (orig 0:15-0:20). A FIXED,
+    // screen-locked independent layer (NOT perspective) that the moving foreground paints OVER — the
+    // depth here comes from the buffer/motif moving across the static bars, exactly as in the reference.
+    "    sat = 0.52; float bars = pow(0.5 + 0.5 * cos((uv.x + 0.012 * sin(uv.y * 9.0 + time * 0.3)) * 6.2832 * 13.0 + time * 0.08), 1.6); vec3 barDk = dusty(pal(hb + 0.5), 0.42) * 0.32; ground = mix(barDk, pal(hb), bars);\n" +
     "  } else {\n" + // 9 NEON-ON-DARK — near-black; ALL colour comes from the additive painted geometry over it
     "    sat = 0.4; ground = pal(hb + 0.5) * 0.04;\n" +
     "  }\n" +
