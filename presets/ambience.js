@@ -728,55 +728,101 @@
   // hue slowly DRIFTS yellow -> pale sage-green -> near-white with MAGENTA rim fringing.
   // CALM breathing — one stationary morphing ball. (Was 4 drifting wireframe rings —
   // the literal "four metaballs" misread, completely wrong.)
-  P["Ambience Bubble"] = build(
-    {
-      wave_a: 0,
-      decay: 0.9,
-      gammaadj: 1.4,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.0,
-      cx: 0.5,
-      cy: 0.5,
-      darken_center: 0,
-      wrap: 0,
-    },
-    {
-      frame: function (t) {
-        return t; // calm time-driven breathing, painted in the comp
+  P["Ambience Bubble"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.9,
+        gammaadj: 1.4,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      comp:
-        NOISE_GLSL +
-        "shader_body {\n" +
-        "vec2 p = uv - 0.5;\n" +
-        "p.x *= resolution.x / resolution.y;\n" +
-        "float pr = length(p);\n" +
-        "float pang = atan(p.y, p.x);\n" +
-        "float wob = (fbm(vec2(pang * 2.0 + 1.0, time * 0.2)) - 0.5) * 0.045;\n" + // soft organic rim wobble
-        "float prw = pr + wob;\n" +
-        "float R = 0.40 + 0.025 * bass + 0.015 * sin(time * 0.5);\n" + // breathing radius
-        "float disc = smoothstep(R + 0.02, R - 0.04, prw);\n" + // soft-rimmed filled sphere
-        "float petals = 0.5 + 0.5 * cos(pang * 13.0 + 0.6 * sin(time * 0.3));\n" + // radial fluting
-        "float flute = 0.68 + 0.32 * petals;\n" +
-        "float coreR = 0.05 + 0.015 * sin(time * 0.7) + 0.012 * bass;\n" + // breathing core eye
-        "float coreMask = smoothstep(coreR, coreR + 0.03, pr);\n" +
-        "float rim = smoothstep(R - 0.07, R - 0.01, prw) * smoothstep(R + 0.02, R - 0.03, prw);\n" + // bright rim ring
-        "float v = disc * flute * coreMask * 0.9 + rim * 0.6;\n" +
-        // transient horizontal lens-flare wings off the sides (slow come-and-go)
-        "float flare = exp(-p.y * p.y * 380.0) * smoothstep(R - 0.02, R + 0.16, abs(p.x)) * max(0.0, 0.2 + 0.3 * sin(time * 0.22));\n" +
-        "v += flare;\n" +
-        // colour: PALE/desaturated body, slow hue drift yellow -> sage -> white-with-magenta
-        "float ph = time * 0.05;\n" +
-        "vec3 tint = 0.5 + 0.5 * cos(6.2832 * (ph + vec3(0.0, 0.33, 0.67)));\n" +
-        "vec3 pale = mix(vec3(1.0), tint, 0.5);\n" + // white-biased -> muted/pale
-        "vec3 col = pale * v;\n" +
-        "col += vec3(0.5, 0.0, 0.42) * rim * (0.3 + 0.3 * sin(ph * 6.2832));\n" + // magenta rim fringe (phased)
-        "col = col / (col + 0.5);\n" + // Reinhard tone-map
-        "col *= 1.5;\n" +
-        "ret = col;\n" +
-        "}\n",
-    }
-  );
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          var treb = t.treb_att || t.treb || 1;
+          // the radial waveform RING expands out from the centre toward the rim on the beat
+          t.q5 = 0.05 + 0.34 * Math.max(0, Math.min(1, (bass - 0.95) / 0.55));
+          t.q6 = 0.015 + 0.03 * Math.min(treb, 1.6); // ring jaggedness
+          return t;
+        },
+        // fade the buffer so the expanding ring leaves a short glow trail (the procedural
+        // sphere is recomputed fresh each frame, so it doesn't accumulate).
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.5;\n}\n",
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(p);\n" +
+          "float pang = atan(p.y, p.x);\n" +
+          "float wob = (fbm(vec2(pang * 2.0 + 1.0, time * 0.2)) - 0.5) * 0.045;\n" + // soft organic rim wobble
+          "float prw = pr + wob;\n" +
+          "float R = 0.40 + 0.025 * bass + 0.015 * sin(time * 0.5);\n" + // breathing radius
+          "float disc = smoothstep(R + 0.02, R - 0.04, prw);\n" + // soft-rimmed filled sphere
+          "float petals = 0.5 + 0.5 * cos(pang * 13.0 + 0.6 * sin(time * 0.3));\n" + // radial fluting
+          "float flute = 0.68 + 0.32 * petals;\n" +
+          "float coreR = 0.05 + 0.015 * sin(time * 0.7) + 0.012 * bass;\n" + // breathing core eye
+          "float coreMask = smoothstep(coreR, coreR + 0.03, pr);\n" +
+          "float rim = smoothstep(R - 0.07, R - 0.01, prw) * smoothstep(R + 0.02, R - 0.03, prw);\n" + // bright rim ring
+          "float v = disc * flute * coreMask * 0.9 + rim * 0.6;\n" +
+          // transient horizontal lens-flare wings off the sides (slow come-and-go)
+          "float flare = exp(-p.y * p.y * 380.0) * smoothstep(R - 0.02, R + 0.16, abs(p.x)) * max(0.0, 0.2 + 0.3 * sin(time * 0.22));\n" +
+          "v += flare;\n" +
+          // colour: PALE/desaturated body, slow hue drift yellow -> sage -> white-with-magenta
+          "float ph = time * 0.05;\n" +
+          "vec3 tint = 0.5 + 0.5 * cos(6.2832 * (ph + vec3(0.0, 0.33, 0.67)));\n" +
+          "vec3 pale = mix(vec3(1.0), tint, 0.5);\n" + // white-biased -> muted/pale
+          "vec3 col = pale * v;\n" +
+          "col += vec3(0.5, 0.0, 0.42) * rim * (0.3 + 0.3 * sin(ph * 6.2832));\n" + // magenta rim fringe (phased)
+          // the real-audio waveform RING (feedback) — a jagged ring that pulses out from the
+          // centre to the rim on the beat; punched white, clipped to inside the bubble disc.
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float wave = max(src.r, max(src.g, src.b));\n" +
+          "col += vec3(1.0, 0.97, 0.9) * smoothstep(0.4, 0.85, wave) * smoothstep(R + 0.02, R - 0.02, prw) * 0.85;\n" +
+          "col = col / (col + 0.5);\n" + // Reinhard tone-map
+          "col *= 1.5;\n" +
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+    // The radial waveform: a jagged circular ring centred in the bubble whose radius q5
+    // pulses outward from the centre to the rim on the beat (aspect-squished x so it reads
+    // round on the wide canvas); jaggedness from the live sample (q6). White, additive.
+    preset.waves[0] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 1,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.2,
+        a: 0.9,
+        thick: 1,
+        r: 1.0,
+        g: 0.97,
+        b: 0.9,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var ang = a.sample * 6.2832;
+        var rad = (a.q5 || 0.1) + (a.value1 || 0) * (a.q6 || 0.03);
+        a.x = 0.5 + rad * 0.62 * Math.cos(ang); // 0.62 ~ 1/aspect -> round ring
+        a.y = 0.5 + rad * Math.sin(ang);
+        a.r = 1.0;
+        a.g = 0.97;
+        a.b = 0.9;
+        return a;
+      },
+    };
+    return preset;
+  })();
 
   // ── Ambience Dizzy ──────────────────────────────────────────────────────────
   // Re-derived from the reference (window ~114-125): a frame-FILLING tumbling cloud/smoke
