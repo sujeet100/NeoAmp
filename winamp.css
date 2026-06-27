@@ -844,7 +844,10 @@
 }
 /* the icon IS the lamp. Off = dim, unlit, seated with a 1px dark drop. On = lit via a
    FLAT saturated fill + a hard 1px top-highlight + bottom-shadow (pixel bevel) — ZERO
-   blur, matching the pixel LEDs (no modern bloom). Like = red, dislike = blue. */
+   blur, matching the pixel LEDs (no modern bloom). Like lights up in the SKIN'S OWN sampled
+   LED colour (--wa-led-on) so it always coordinates with the loaded skin instead of a fixed
+   red that fought cool-grey skins; dislike stays blue. The bevel highlight is neutral white
+   (not the old pink) so it reads correctly whatever colour the skin's LED is. */
 .wa-rate-btn svg {
   width: 13px;
   height: 13px;
@@ -853,8 +856,8 @@
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
 }
 .wa-rate-btn.wa-like.on svg {
-  fill: #ff415f;
-  filter: drop-shadow(0 -1px 0 #ffb0c0) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+  fill: var(--wa-led-on, #7d5cff); /* skin's LED colour; on-theme violet fallback (never red) */
+  filter: drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.5)) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 .wa-rate-btn.wa-dislike.on svg {
   fill: #4da6ff;
