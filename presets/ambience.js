@@ -1063,7 +1063,7 @@
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.9, // gentle — the warp's red-subtract does the fading; decay just smooths the trail
+        decay: 0.87, // shorter trail -> less vertical streaking (was 0.9 -> barcode-y)
         gammaadj: 1.4,
         zoom: 1.0,
         rot: 0.0,
@@ -1078,8 +1078,8 @@
           var b = t.bass_att || t.bass || 1;
           var tr = t.treb_att || t.treb || 1;
           // ONE column at rest -> SPLITS into 2-3 ropes on a beat, spreading FURTHER from
-          // centre on stronger hits (q1 = separation; reaches wider than before).
-          t.q1 = 0.22 * Math.max(0, b - 1.02);
+          // centre on stronger hits (q1 = separation).
+          t.q1 = 0.18 * Math.max(0, b - 1.05);
           // braided jaggedness (small + capped so loud beats stay ropes, not a fan of mush)
           t.q6 = 0.014 + 0.02 * Math.min(0.5 * tr + 0.5 * b, 1.6);
           return t;
@@ -1091,10 +1091,10 @@
           "shader_body {\n" +
           "vec2 w = uv;\n" +
           "float dx = uv.x - 0.5;\n" +
-          "w.x = 0.5 + dx * 0.99;\n" + // sample nearer centre -> content drifts outward (the fan)
-          "w.y += 0.010;\n" + // sample below -> content rises (upward flow)
+          "w.x = 0.5 + dx * 0.992;\n" + // gentle outward fan (strong fan barcoded the columns)
+          "w.y += 0.011;\n" + // sample below -> content rises (upward flow)
           "vec3 c = texture2D(sampler_main, w).rgb;\n" +
-          "c.r -= 0.018;\n" + // fade the water (red is its carrier) -> arcs of finite length
+          "c.r -= 0.016;\n" + // fade the water (red is its carrier) -> streaks of finite length
           "ret = c;\n" +
           "}\n",
         // The water (column + rising arc-trails) is carried entirely in the feedback RED
@@ -1106,10 +1106,10 @@
           "vec2 p = uv;\n" +
           "float dx = p.x - 0.5;\n" +
           // dusty teal -> royal-blue ground (slow drift), a touch lighter toward the bottom
-          "vec3 teal = vec3(0.09, 0.50, 0.55);\n" +
-          "vec3 blue = vec3(0.11, 0.22, 0.58);\n" +
+          "vec3 teal = vec3(0.02, 0.46, 0.52);\n" +
+          "vec3 blue = vec3(0.05, 0.24, 0.58);\n" +
           "vec3 base = mix(teal, blue, 0.5 + 0.5 * sin(time * 0.06));\n" +
-          "vec3 ground = base * (0.07 + 0.07 * p.y);\n" +
+          "vec3 ground = base * (0.40 + 0.22 * p.y);\n" + // MEDIUM teal ground (measured ~0,0.33,0.37), a touch lighter low
           // water = red-channel feedback, widened by two horizontal taps so the rope reads
           // as a fluid column with soft edges rather than a hairline.
           "float beam = texture2D(sampler_main, uv).r;\n" +
@@ -1122,6 +1122,13 @@
           "beam = max(beam, texture2D(sampler_main, uv + vec2(0.042, 0.0)).r * 0.38);\n" +
           "beam = max(beam, texture2D(sampler_main, uv - vec2(0.042, 0.0)).r * 0.38);\n" +
           "vec3 col = ground + beam * vec3(0.82, 0.94, 1.0);\n" + // MILKY white-cyan water over teal ground
+          // faint horizontal SIDE-LINES that curve toward the central column and drift slowly
+          // down (the side mist streaming toward the waterfall — user note); only at the sides,
+          // never on the bright column.
+          "float sy = p.y + 0.05 * cos(dx * 4.0) - time * 0.03;\n" + // slight concave curve + slow drift
+          "float side = pow(0.5 + 0.5 * sin(sy * 24.0), 7.0);\n" + // thin horizontal lines
+          "side *= smoothstep(0.06, 0.34, abs(dx)) * 0.14;\n" + // sides only, faint
+          "col += vec3(0.45, 0.82, 0.95) * side;\n" +
           "float lum = max(col.r, max(col.g, col.b));\n" +
           "col = mix(col, vec3(0.95, 0.99, 1.0), smoothstep(0.38, 0.9, lum));\n" + // milky-white column cores (lower threshold)
           "col = col / (col + 0.8) * 1.4;\n" + // Reinhard tone-map
