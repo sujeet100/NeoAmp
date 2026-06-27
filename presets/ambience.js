@@ -1220,9 +1220,10 @@
           var m = t.mid || 1;
           var tr = t.treb_att || t.treb || 1;
           t.zoom = 1.0 + 0.012 * b;
-          t.rot = 0.008 + 0.015 * m; // gentle field spin (was 0.03+0.06*m — too fast)
+          t.rot = 0.0; // the LINE stays horizontal (ref); only the background SWIRL rotates
           t.q5 = 0.78; // line half-width (spans the pane)
-          t.q6 = 0.1 + 0.1 * Math.min(tr, 1.6); // line jaggedness amplitude
+          // MORE music reaction: the line swings wider with bass+treble.
+          t.q6 = 0.09 + 0.13 * Math.min(0.5 * tr + 0.5 * b, 1.8); // line jaggedness amplitude
           t.q7 = 0.06; // gentle S-bend so the line isn't ruler-straight
           return t;
         },
@@ -1234,7 +1235,7 @@
           // looser swirl eye (0.40/(len+0.22)) + gentler bass turbulence -> organic churn,
           // not a crisp mathematical drain.
           "float a = 0.40 / (length(d) + 0.22) + turb * (0.3 + 0.5 * bass);\n" +
-          "float s = sin(a + time * 0.22), c = cos(a + time * 0.22);\n" + // slower swirl (was time*0.5 — too fast)
+          "float s = sin(a + time * 0.28), c = cos(a + time * 0.28);\n" + // swirl ~0.3 rad/s (measured from the reference)
           "vec2 sw = vec2(d.x * c - d.y * s, d.x * s + d.y * c);\n" +
           "ret = texture2D(sampler_main, vec2(0.5) + sw * 0.99).rgb;\n" +
           "ret -= 0.003;\n" +
@@ -1249,7 +1250,7 @@
           "vec3 tint = mix(vec3(0.18,0.34,0.98), vec3(0.92,0.32,0.88), 0.5+0.5*sin(time*0.07));\n" +
           "vec3 col = tint * v * 1.15;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
-          "col += tint * exp(-dd * dd * 2.2) * 0.30;\n" + // central bloom (trimmed so the centre doesn't wash white)
+          "col += tint * exp(-dd * dd * 2.2) * (0.28 + 0.16 * bass);\n" + // central bloom, pulses with the beat
           // the hot line blows WHITE, kept SELECTIVE (high threshold) so the bright wash
           // itself doesn't go white; thickness comes from the wave's thick=5, not the threshold.
           "col += vec3(1.0) * smoothstep(0.62, 0.95, lc) * 1.6;\n" +
