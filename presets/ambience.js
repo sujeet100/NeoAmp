@@ -516,24 +516,23 @@
         "vec2 p = uv - 0.5;\n" +
         "p.x *= resolution.x / resolution.y;\n" +
         "float pr = length(p);\n" +
-        "vec2 dir = p / (pr + 1e-3);\n" + // outward direction
-        // domain-warped scrolling fbm clouds that flow slowly OUTWARD from the hole
-        "float wn = fbm(p * 1.4 + vec2(time * 0.05, 5.0 - time * 0.04));\n" +
-        "float cloud = fbm(p * 2.6 - dir * time * 0.22 + wn * 1.6);\n" +
-        "cloud = pow(cloud, 1.3);\n" +
-        // central breathing HOLE the cloud parts around
+        "float pang = atan(p.y, p.x) + time * 0.15;\n" + // SWIRL: continuous circular rotation
+        // concentric SHELLS born at the centre and travelling OUTWARD (the phase moves out
+        // with time) + angular cloud lumps riding them = the rippling warp the user described.
+        "float lump = fbm(vec2(pang * 2.0, pr * 3.0 - time * 0.2));\n" +
+        "float rings = 0.5 + 0.5 * sin(pr * 28.0 - time * 1.6 + lump * 5.0);\n" + // shells emanate OUT
+        "rings = pow(rings, 1.4);\n" +
+        "float cloud = fbm(vec2(pang * 3.0, pr * 6.0 - time * 0.5));\n" + // caustic texture on the shells
+        "float band = mix(rings, cloud, 0.45);\n" +
+        // central breathing HOLE the shells part around
         "float holeR = 0.12 + 0.03 * sin(time * 0.4) + 0.04 * bass;\n" +
-        "float mask = smoothstep(holeR, holeR + 0.15, pr);\n" + // 0 inside the hole -> dark eye
-        "cloud *= mask;\n" +
-        "float v = (0.10 + 0.9 * cloud) * mask * (0.9 + 0.25 * bass);\n" + // lit field; the masked floor keeps the hole BLACK
+        "float mask = smoothstep(holeR, holeR + 0.12, pr);\n" + // 0 inside the hole -> dark eye
+        "float v = (0.12 + 0.85 * band) * mask * (0.9 + 0.2 * bass);\n" + // lit field; masked floor keeps the hole BLACK
         // blue <-> yellow cycle (~18s), both extremes saturated, grey-green midpoint
         "vec3 warm = amber_ramp(v);\n" +
         "vec3 cool = mix(vec3(0.03, 0.06, 0.20), vec3(0.55, 0.72, 1.0), v);\n" + // indigo -> light blue
         "vec3 col = mix(cool, warm, 0.5 + 0.5 * sin(time * 0.35));\n" +
-        "float speck = exp(-pr * pr * 700.0) * max(0.0, bass - 1.15) * 0.9;\n" + // tiny white-hot speck, ONLY on strong hits
-        "col += vec3(1.0) * speck;\n" +
-        "col = col / (col + 0.5);\n" + // Reinhard tone-map
-        "col *= 1.4;\n" +
+        "col = col / (col + 0.5) * 1.4;\n" + // Reinhard tone-map
         "ret = col;\n" +
         "}\n",
     }
