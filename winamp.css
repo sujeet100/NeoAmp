@@ -861,7 +861,7 @@
    because the auto LED was too low-contrast on some skins. */
 .wa-rate-btn.wa-like.on svg {
   fill: url(#likeScan);
-  filter: drop-shadow(0 0 2px rgba(242, 165, 46, 0.95))
+  filter: drop-shadow(0 0 2px rgba(242, 165, 46, 0.95)) drop-shadow(0 0 5px rgba(255, 176, 64, 0.6))
     drop-shadow(0 -1px 0 rgba(255, 235, 190, 0.5)) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 .wa-rate-btn.wa-dislike.on svg {
