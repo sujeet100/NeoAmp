@@ -863,7 +863,9 @@
           "float pr = length(p);\n" +
           // SWIRL: rotate the domain by an angle that grows toward the centre + drifts in
           // time, so the bands tumble/fold like a slow vortex.
-          "float a = time * 0.25 + 1.6 * (0.55 - pr) + 0.4 * sin(time * 0.1);\n" +
+          // rotation REVERSES direction (CW <-> CCW): a sinusoid in time -> the angular
+          // velocity changes sign, so the swirl tumbles one way then the other (user note).
+          "float a = 2.4 * sin(time * 0.22) + 1.6 * (0.55 - pr);\n" +
           "mat2 rot = mat2(cos(a), -sin(a), sin(a), cos(a));\n" +
           "vec2 q = rot * p;\n" +
           // horizontal-ish filament bands via scrolling fbm (two octaves)
