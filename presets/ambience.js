@@ -1083,14 +1083,19 @@
   })();
 
   // ── Ambience X Marks the Spot ───────────────────────────────────────────────
-  // A glowing amber X: two crossed real-audio spokes at +/-45 deg that pulse with
-  // the waveform, over a soft center bloom; the X slowly rotates.
+  // Re-derived from the reference (window ~168-175): the ENTIRE pane is a vivid magenta/
+  // pink plasma field; from a WHITE-HOT central core, thin WHITE lightning bolts radiate
+  // outward as a rotating + / X (4 arms), each a crisp jagged arc with a soft pink halo.
+  // It BREATHES — sharp crossed white bolts on energy, dissolving to a soft pink cloud with
+  // a bright centre at rest. Fixed magenta hue (no cycle). (Was thick magenta waveform
+  // ribbons on a near-BLACK vignetted field with a pink — not white — core: too dark, wrong
+  // texture, no white bolts.)
   P["Ambience X Marks the Spot"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.95,
-        gammaadj: 1.8,
+        decay: 0.92, // crisper arms (less feedback smear into thick ribbons); the comp floor
+        gammaadj: 1.8, // keeps the field pink, so a shorter trail doesn't leave black voids
         zoom: 1.0,
         rot: 0.0,
         warp: 0.02,
@@ -1100,29 +1105,42 @@
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
-          t.q1 = t.time * 0.15;
-          t.q6 = 0.14 + 0.1 * b;
+          t.q1 = t.time * 0.15; // slow cross rotation (passes through + and X)
+          // BREATHING: wide audio range so low energy -> faint thin arms (near-cloud),
+          // high energy -> bright reaching bolts.
+          t.q6 = 0.03 + 0.12 * b;
           return t;
         },
         comp:
-          // WMP X Marks the Spot sits in the magenta/pink family.
+          // Vivid PINK field (filled, never black) with WHITE-HOT bolt cores + centre bloom.
           "shader_body {\n" +
           "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
+          "float lc = max(c.r, max(c.g, c.b));\n" +
           "float v = dot(c, vec3(0.45));\n" +
-          "ret = vec3(0.95, 0.25, 0.70) * v * 1.7;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
-          "ret += vec3(1.0, 0.45, 0.85) * exp(-dd * dd * 6.0) * (0.12 + 0.35 * bass);\n" +
+          "vec3 col = vec3(0.95, 0.25, 0.70) * v * 1.3;\n" + // bolt feedback, tinted pink
+          "col += vec3(0.55, 0.11, 0.42) * (0.30 + 0.20 * bass);\n" + // PINK floor -> whole pane pink (lower = more contrast)
+          "col += vec3(0.80, 0.24, 0.60) * exp(-dd * dd * 2.2) * 0.32;\n" + // centre-weighted pink cloud
+          "col += vec3(1.0, 0.88, 0.97) * exp(-dd * dd * 3.0) * (0.22 + 0.5 * bass);\n" + // WHITE core bloom (beat-pulsed)
+          "col += vec3(1.0, 0.92, 0.98) * smoothstep(0.55, 0.95, lc) * 0.8;\n" + // white-hot bolt cores punch through
+          "ret = col / (col + 0.7) * 1.4;\n" + // tone-map -> bright pink field, bounded (no flat blow-out)
           "}\n",
       }
     );
+    // Two crossed real-audio spokes at +/-45 deg (= 4 arms) -> a rotating X. Drawn near-WHITE
+    // (the comp's pink tint provides the halo, the white punch keeps the cores white-hot);
+    // jagged from the live waveform = the lightning. q6 (audio) drives the bolt reach.
     var offs = [0.785, -0.785];
     for (var i = 0; i < 2; i++) {
-      preset.waves[i] = spokeLine(0, 0.55, 0.16, 1.0, 0.5, 0.85);
+      preset.waves[i] = spokeLine(0, 0.55, 0.1, 1.0, 0.85, 0.97);
+      // blend adjacent samples -> ONE jagged lightning arc per arm (not 512 strands /
+      // a wide oscilloscope ribbon); matches the reference's crisp single bolt.
+      preset.waves[i].baseVals.smoothing = 0.55;
       (function (off, idx) {
         preset.waves[idx].point_eqs = function (a) {
           var th = (a.q1 || 0) + off;
           var s = a.sample * 2.0 - 1.0;
-          var amp = a.q6 || 0.16;
+          var amp = a.q6 || 0.1;
           var ct = Math.cos(th),
             st = Math.sin(th);
           a.x = 0.5 + s * 0.55 * ct - a.value1 * amp * st;
