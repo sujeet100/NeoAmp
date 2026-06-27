@@ -168,14 +168,8 @@
   // cycle; cores stay blown white. ONE procedural comp shader (no custom waves, no feedback)
   // => calm and fully controllable.
   P["Ambience Water"] = (function () {
-    // Beat state (closure): a bass transient injects a new outward-travelling ripple into one
-    // of 4 ring slots; those ripples PUSH the radial splatter outward.
-    var avgBass = 0.4,
-      lastBeat = -10,
-      slot = 0;
-    var ringT = [-10, -10, -10, -10]; // birth time of each ring
-    var ringS = [0, 0, 0, 0]; // strength of each ring
-    var LIFE = 4.5; // seconds a ripple lives while it travels out
+    // Pure continuous water: the flow is TIME-DRIVEN only (no audio influence on flow speed or
+    // amplitude), so the music can never speed up / slow down / throb the flow — it just flows.
     return build(
       {
         wave_a: 0, // nothing drawn to feedback; the comp shader paints everything
@@ -190,22 +184,7 @@
       },
       {
         frame: function (t) {
-          var bassI = t.bass !== undefined ? t.bass : t.bass_att || 0;
-          avgBass = avgBass * 0.93 + bassI * 0.07; // slow running baseline
-          // bass transient -> drop a ripple into the next slot (refractory so it can't spam)
-          if (bassI > avgBass * 1.28 + 0.12 && t.time - lastBeat > 0.16) {
-            lastBeat = t.time;
-            ringT[slot] = t.time;
-            ringS[slot] = Math.min(bassI / Math.max(avgBass, 0.2), 2.2);
-            slot = (slot + 1) % 4;
-          }
-          // hand each ripple's AGE (q3,q5,q7,q9) + STRENGTH (q4,q6,q8,q10) to the shader
-          for (var i = 0; i < 4; i++) {
-            var age = t.time - ringT[i];
-            t["q" + (3 + i * 2)] = age;
-            t["q" + (4 + i * 2)] = age < LIFE ? ringS[i] : 0.0;
-          }
-          return t;
+          return t; // motion is purely time-driven; the music does not affect the flow
         },
         // COMP: the whole water surface, procedurally. fbm (NOISE_GLSL) = liquid irregularity;
         // hueCol() = slow monochromatic hue cycle.
@@ -215,29 +194,26 @@
           "  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (h + vec3(0.0, 0.33, 0.67)));\n" +
           "  return mix(vec3(1.0), rb, s);\n" + // s->0 white, s->1 full hue
           "}\n" +
-          // one music-spawned ripple: a gaussian shell at radius age*speed, fading as it ages.
-          "float ringDisp(float pr, float age, float s){\n" +
-          "  float front = age * 0.18;\n" +
-          "  float local = pr - front;\n" +
-          "  float env = exp(-(local * local) / (2.0 * 0.11 * 0.11));\n" +
-          "  return s * exp(-age * 0.5) * env * sin(local * 30.0 - age * 2.0);\n" +
-          "}\n" +
           "shader_body {\n" +
           "vec2 p = uv - 0.5;\n" +
           "p.x *= resolution.x / resolution.y;\n" + // aspect-correct -> circular ripples
           "float pr = length(p);\n" + // radius (NOT 'rad' — reserved builtin)
           "float pang = atan(p.y, p.x);\n" + // angle (NOT 'ang' — reserved builtin)
           "float wob = fbm(vec2(pang * 1.3 + 3.0, pr * 2.0 - time * 0.04)) - 0.5;\n" +
-          // music-spawned beat ripples + a faint ambient pulse — these PUSH the splatter outward
-          "float beats = ringDisp(pr,q3,q4) + ringDisp(pr,q5,q6) + ringDisp(pr,q7,q8) + ringDisp(pr,q9,q10);\n" +
-          "float ripple = 0.25 * sin(pr * 16.0 - time * 1.0) + 2.4 * beats;\n" +
+          // ★ CONTINUOUS ripples (fluid, never stuttered): an always-emitting wave train flowing
+          // OUTWARD from the centre. Amplitude is CONSTANT -> NO per-beat change, cannot stutter.
+          // Intensity (q1) only gently nudges the continuous flow SPEED (a smooth change, no jump).
+          "float amp = 0.55;\n" +
+          "float ripple = amp * (sin(pr * 15.0 - time * 1.9 + wob) + 0.5 * sin(pr * 26.0 - time * 2.8 - 0.6 * wob));\n" +
+          "float fsp = 0.70;\n" + // CONSTANT flow speed -> continuous flow; music never speeds/slows it
+          // a slow DOMAIN MORPH so the caustic ridges DANCE/flow like real water (not just slide out)
+          "float mph = 0.5 * fbm(vec2(pang * 1.2 + 2.0, time * 0.22));\n" +
           // RADIAL paint-splatter (not concentric): fbm on a CIRCLE (cos,sin)*scale (seamless in
-          // angle) shifted outward by radius+time -> streaks RADIATE from the centre, flow out,
-          // and break into splatter; the ripples push the splatter further out.
-          "float radPhase = pr * 3.5 - time * 0.5 - 0.8 * ripple;\n" +
-          "vec2 nc = vec2(cos(pang) * 2.6 + radPhase, sin(pang) * 2.6);\n" +
+          // angle) shifted outward by radius - flow -> streaks RADIATE from the centre & flow out.
+          "float radPhase = pr * 3.5 - time * fsp - 0.6 * ripple + mph;\n" +
+          "vec2 nc = vec2(cos(pang) * 2.6 + radPhase, sin(pang) * 2.6 + 0.4 * sin(time * 0.3 + pang));\n" +
           "float c1 = pow(1.0 - abs(2.0 * fbm(nc) - 1.0), 3.0);\n" +
-          "vec2 nc2 = vec2(cos(pang) * 5.5 + radPhase * 1.6 + 4.0, sin(pang) * 5.5);\n" +
+          "vec2 nc2 = vec2(cos(pang) * 5.5 + radPhase * 1.6 + 4.0, sin(pang) * 5.5 + mph);\n" +
           "float c2 = pow(1.0 - abs(2.0 * fbm(nc2) - 1.0), 4.0);\n" +
           "float caustic = max(c1, 0.6 * c2);\n" +
           // LIGHTING: central glare lights the surface (caustics brightest near centre, fading
