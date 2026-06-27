@@ -812,56 +812,55 @@
   );
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
-  // Four real-audio spokes (an 8-armed blade set) rotating about the center over a
-  // faint amber radial glow; spin and blade length react to the audio.
-  P["Ambience Windmill"] = (function () {
-    var preset = build(
-      {
-        wave_a: 0,
-        decay: 0.94,
-        gammaadj: 1.8,
-        zoom: 1.0,
-        rot: 0.0,
-        warp: 0.02,
-        darken_center: 0,
-        wrap: 0,
+  // Re-derived from the reference (window ~126-140): a full-frame flowing CAUSTIC/smoke
+  // field — bright white-cyan frothy filament RIDGES (inverted-ridge fbm crests) over a
+  // mid-teal body with darker teal troughs, the ridge axis running DIAGONALLY lower-left
+  // to upper-right and the whole field churning/translating along that diagonal. NO
+  // central object, NO spokes, NO radial structure, NO hot core. FIXED cyan (hue 180),
+  // luminous-but-clean. Built procedurally (no custom waves). (Was 4 rotating real-audio
+  // spokes + a center bloom — the literal "windmill blades" misread; wrong.)
+  P["Ambience Windmill"] = build(
+    {
+      wave_a: 0,
+      decay: 0.9,
+      gammaadj: 1.6,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.0,
+      cx: 0.5,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 0,
+    },
+    {
+      frame: function (t) {
+        return t; // continuous time-driven diagonal flow, painted in the comp
       },
-      {
-        frame: function (t) {
-          var b = t.bass_att || t.bass || 1;
-          t.q1 = t.time * (0.4 + 0.4 * b);
-          t.q6 = 0.16 + 0.1 * b;
-          return t;
-        },
-        comp:
-          // WMP Windmill is a cyan/teal swirl.
-          "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(c, vec3(0.45));\n" +
-          "ret = vec3(0.12, 0.80, 0.82) * v * 1.7;\n" +
-          "float dd = distance(uv, vec2(0.5));\n" +
-          "ret += vec3(0.20, 0.92, 0.88) * exp(-dd * dd * 5.0) * (0.10 + 0.30 * bass);\n" +
-          "}\n",
-      }
-    );
-    var offs = [0.0, 0.785, 1.571, 2.356];
-    for (var i = 0; i < 4; i++) {
-      preset.waves[i] = spokeLine(0, 0.5, 0.18, 0.4, 0.95, 1.0);
-      (function (off, idx) {
-        preset.waves[idx].point_eqs = function (a) {
-          var th = (a.q1 || 0) + off;
-          var s = a.sample * 2.0 - 1.0;
-          var amp = a.q6 || 0.18;
-          var ct = Math.cos(th),
-            st = Math.sin(th);
-          a.x = 0.5 + s * 0.5 * ct - a.value1 * amp * st;
-          a.y = 0.5 + s * 0.5 * st + a.value1 * amp * ct;
-          return a;
-        };
-      })(offs[i], i);
+      comp:
+        NOISE_GLSL +
+        "shader_body {\n" +
+        "vec2 p = uv;\n" +
+        "p.x *= resolution.x / resolution.y;\n" +
+        // diagonal advection (LL -> UR) + rotate/elongate the domain so ridges run diagonally
+        "vec2 flow = vec2(0.06, -0.05) * time;\n" +
+        "vec2 q = p * 4.0 + flow;\n" +
+        "q = mat2(0.707, -0.707, 0.707, 0.707) * q;\n" + // rotate 45deg
+        "q.y *= 0.5;\n" + // elongate features along the diagonal
+        "float n = fbm(q + 0.6 * fbm(q * 0.7 - flow * 0.5));\n" + // domain-warped base body
+        "float ridge = pow(1.0 - abs(2.0 * fbm(q * 1.6 + n) - 1.0), 3.0);\n" + // frothy inverted-ridge crests
+        "float ridge2 = pow(1.0 - abs(2.0 * fbm(q * 3.0 - n * 1.2 + flow) - 1.0), 4.0);\n" +
+        "float crest = max(ridge, 0.7 * ridge2);\n" +
+        "float body = 0.5 + 0.5 * n;\n" + // higher floor -> luminous, few dark troughs
+        "body *= (0.95 + 0.15 * bass);\n" +
+        // fixed BRIGHT cyan (measured ~rgb 0.53,0.90,0.90): only mild teal troughs, white crests
+        "vec3 col = mix(vec3(0.12, 0.48, 0.50), vec3(0.55, 0.95, 0.95), smoothstep(0.2, 0.85, body));\n" +
+        "col = mix(col, vec3(0.92, 1.0, 1.0), smoothstep(0.5, 1.0, crest));\n" +
+        "col = col / (col + 0.7);\n" + // gentler tone-map -> stays bright
+        "col *= 1.7;\n" +
+        "ret = col;\n" +
+        "}\n",
     }
-    return preset;
-  })();
+  );
 
   // ── Ambience Niagara ──────────────────────────────────────────────────────
   // A waterfall: shader streams of light falling downward, color CYCLING
