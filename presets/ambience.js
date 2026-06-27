@@ -701,77 +701,63 @@
   })();
 
   // ── Ambience Bubble ─────────────────────────────────────────────────────────
-  // Round amber bubbles floating up: four soft glowing metaball circles drift and
-  // pulse with bass, drawn as live circular waveforms (each a real-audio ring).
-  P["Ambience Bubble"] = (function () {
-    var preset = build(
-      {
-        wave_a: 0,
-        wave_mode: 0,
-        wave_smoothing: 0.9,
-        additivewave: 1,
-        decay: 0.95,
-        gammaadj: 1.9,
-        zoom: 1.0,
-        rot: 0.0,
-        warp: 0.05,
-        warpscale: 1.4,
-        warpanimspeed: 0.4,
-        cx: 0.5,
-        cy: 0.5,
-        dx: 0.0,
-        dy: -0.004,
-        darken_center: 0,
-        wrap: 1,
+  // Re-derived from the reference (window ~99-113): ONE big central glowing filled
+  // SPHERE/orb (~75% of the pane, face-on) with a soft bright RIM, an internal RADIAL
+  // FLUTING of ~13 soft petals/pleats (citrus cross-section / pleated lampshade), and a
+  // small DARK CENTRAL CORE 'eye' that gently opens/closes. Transient horizontal
+  // lens-flare WINGS flare off the sides early on. The body is PALE/desaturated and the
+  // hue slowly DRIFTS yellow -> pale sage-green -> near-white with MAGENTA rim fringing.
+  // CALM breathing — one stationary morphing ball. (Was 4 drifting wireframe rings —
+  // the literal "four metaballs" misread, completely wrong.)
+  P["Ambience Bubble"] = build(
+    {
+      wave_a: 0,
+      decay: 0.9,
+      gammaadj: 1.4,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.0,
+      cx: 0.5,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 0,
+    },
+    {
+      frame: function (t) {
+        return t; // calm time-driven breathing, painted in the comp
       },
-      {
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          t.dy = -0.003 - 0.004 * bass;
-          t.warp = 0.04 + 0.02 * bass;
-          t.zoom = 1.0 + 0.003 * Math.sin(t.time * 0.3);
-          t.decay = 0.95;
-          t.q1 = 0.3 + 0.1 * Math.sin(t.time * 0.5);
-          t.q2 = 0.4 + 0.15 * Math.sin(t.time * 0.27 + 1.0);
-          t.q3 = 0.7 + 0.1 * Math.sin(t.time * 0.4 + 2.0);
-          t.q4 = 0.55 + 0.18 * Math.sin(t.time * 0.31 + 3.0);
-          t.q6 = 0.5 + 0.12 * Math.sin(t.time * 0.43 + 4.0);
-          t.q7 = 0.35 + 0.16 * Math.sin(t.time * 0.22 + 5.0);
-          t.q8 = 0.6 + 0.1 * Math.sin(t.time * 0.37 + 6.0);
-          t.q9 = 0.65 + 0.15 * Math.sin(t.time * 0.29 + 7.0);
-          t.q5 = 0.09 + 0.05 * bass;
-          return t;
-        },
-        warp:
-          "shader_body {\n" +
-          "vec2 w = uv + 0.005 * vec2(sin(uv.y * 6.0 + time * 0.4), cos(uv.x * 6.0 + time * 0.3));\n" +
-          "ret = texture2D(sampler_main, w).rgb;\n" +
-          "ret -= 0.0025;\n" +
-          "}\n",
-        comp:
-          // WMP Bubble slowly cycles its base hue (observed magenta <-> teal across the video).
-          "shader_body {\n" +
-          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(src, vec3(0.33)) * (1.0 + 0.30 * bass);\n" +
-          "v = 0.04 + 1.05 * v;\n" +
-          "vec3 tint = mix(vec3(0.95,0.25,0.85), vec3(0.15,0.85,0.80), 0.5+0.5*sin(time*0.05));\n" +
-          "ret = tint * v;\n" +
-          "}\n",
-      }
-    );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[1] = circleWave("q3", "q4");
-    preset.waves[2] = circleWave("q6", "q7");
-    preset.waves[3] = circleWave("q8", "q9");
-    preset.waves.forEach(function (w) {
-      w.baseVals.r = 1.0;
-      w.baseVals.g = 1.0;
-      w.baseVals.b = 1.0;
-      w.baseVals.a = 0.7;
-      w.baseVals.smoothing = 0.5;
-    });
-    return preset;
-  })();
+      comp:
+        NOISE_GLSL +
+        "shader_body {\n" +
+        "vec2 p = uv - 0.5;\n" +
+        "p.x *= resolution.x / resolution.y;\n" +
+        "float pr = length(p);\n" +
+        "float pang = atan(p.y, p.x);\n" +
+        "float wob = (fbm(vec2(pang * 2.0 + 1.0, time * 0.2)) - 0.5) * 0.045;\n" + // soft organic rim wobble
+        "float prw = pr + wob;\n" +
+        "float R = 0.40 + 0.025 * bass + 0.015 * sin(time * 0.5);\n" + // breathing radius
+        "float disc = smoothstep(R + 0.02, R - 0.04, prw);\n" + // soft-rimmed filled sphere
+        "float petals = 0.5 + 0.5 * cos(pang * 13.0 + 0.6 * sin(time * 0.3));\n" + // radial fluting
+        "float flute = 0.68 + 0.32 * petals;\n" +
+        "float coreR = 0.05 + 0.015 * sin(time * 0.7) + 0.012 * bass;\n" + // breathing core eye
+        "float coreMask = smoothstep(coreR, coreR + 0.03, pr);\n" +
+        "float rim = smoothstep(R - 0.07, R - 0.01, prw) * smoothstep(R + 0.02, R - 0.03, prw);\n" + // bright rim ring
+        "float v = disc * flute * coreMask * 0.9 + rim * 0.6;\n" +
+        // transient horizontal lens-flare wings off the sides (slow come-and-go)
+        "float flare = exp(-p.y * p.y * 380.0) * smoothstep(R - 0.02, R + 0.16, abs(p.x)) * max(0.0, 0.2 + 0.3 * sin(time * 0.22));\n" +
+        "v += flare;\n" +
+        // colour: PALE/desaturated body, slow hue drift yellow -> sage -> white-with-magenta
+        "float ph = time * 0.05;\n" +
+        "vec3 tint = 0.5 + 0.5 * cos(6.2832 * (ph + vec3(0.0, 0.33, 0.67)));\n" +
+        "vec3 pale = mix(vec3(1.0), tint, 0.5);\n" + // white-biased -> muted/pale
+        "vec3 col = pale * v;\n" +
+        "col += vec3(0.5, 0.0, 0.42) * rim * (0.3 + 0.3 * sin(ph * 6.2832));\n" + // magenta rim fringe (phased)
+        "col = col / (col + 0.5);\n" + // Reinhard tone-map
+        "col *= 1.5;\n" +
+        "ret = col;\n" +
+        "}\n",
+    }
+  );
 
   // ── Ambience Dizzy ──────────────────────────────────────────────────────────
   // Dizzying spiral: fast rotation plus a center-pulling swirl warp; amber glow on
