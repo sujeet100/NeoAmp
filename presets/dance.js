@@ -786,7 +786,7 @@
           "  vec2 epp = edir * er + eperp * ewob + vec2(0.0, 0.30 * eage - 0.10 * eage * eage);\n" + // stronger rise
           "  float ed = length(p - epp);\n" +
           "  float efade = sin(eage * 3.14159);\n" + // smooth fade in -> peak -> out
-          "  float esize = 0.0028 + 0.0018 * a2;\n" + // BIGGER -> the embers are actually visible
+          "  float esize = 0.0020 + 0.0012 * a2;\n" + // visible but not blobby (trimmed from 0.0028 — was too big)
           "  float espark = (esize * esize) / (ed * ed + esize * esize);\n" +
           "  float esi = espark * espark * efade * (0.6 + 0.5 * vol_att);\n" +
           "  col += mix(vec3(1.0, 0.58, 0.14), vec3(0.5, 0.05, 0.0), eage) * esi * 0.85;\n" + // orange ember, cools to deep red
