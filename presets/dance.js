@@ -739,14 +739,16 @@
           "    vec2 perp = vec2(-dir.y, dir.x);\n" +
           // ballistic launch + DRAG -> speed is NON-uniform and decelerates toward terminal
           // velocity (fast off the line, easing out), per-spark v0 and drag constant
-          "    float v0 = 0.45 + 1.05 * h2;\n" +
+          "    float v0 = 0.32 + 0.70 * h2;\n" + // slower launch -> embers, not fireworks
           "    float drag = 2.2 + 3.0 * h3;\n" +
           "    float prog = (1.0 - exp(-age * drag)) / (1.0 - exp(-drag));\n" + // 0..1 ease-out
           "    float startR = 0.18 + 0.10 * h2;\n" +
-          // outward velocity surges with the BASS TRANSIENT (kick punch), not a BPM clock
-          "    float pr = startR + (0.30 + 0.50 * v0 + 0.45 * bass_att) * prog;\n" +
-          // BUOYANCY (rises while hot) then GRAVITY arc, + turbulence wobble that grows with age
-          "    float vert = (0.20 * age - 0.26 * age * age) * (0.6 + 0.8 * h2);\n" +
+          // outward velocity surges with the BASS TRANSIENT (kick punch), not a BPM clock.
+          // Reduced reach so sparks stay NEAR the fire (rise + drift) instead of shooting to the edges.
+          "    float pr = startR + (0.20 + 0.34 * v0 + 0.30 * bass_att) * prog;\n" +
+          // BUOYANCY (rises while hot) then GRAVITY arc, + turbulence wobble that grows with age.
+          // Stronger lift so they FLICK UPWARD like real embers rather than fly radially out.
+          "    float vert = (0.34 * age - 0.30 * age * age) * (0.7 + 0.8 * h2);\n" +
           "    float wob = (sin(age * 14.0 + h1 * 40.0) + 0.5 * sin(age * 31.0 + fi)) * 0.05 * age;\n" +
           "    vec2 pp = dir * pr + perp * wob + vec2(0.0, vert);\n" +
           "    float d = length(p - pp);\n" +
@@ -765,25 +767,26 @@
           "}\n" +
           "part *= 2.4 * clamp(bStr, 0.0, 2.0);\n" + // brighter -> sparks are the STAR now
           "col += part;\n" +
-          // --- AMBIENT embers: a second layer that is NOT beat-gated. Small, dim, slow
-          //     floating sparks that drift outward + rise continuously so the scene stays
-          //     alive between kicks. Fade in/out over a long life (sin) so they never pop.
+          // --- AMBIENT embers: a second layer that is NOT beat-gated. Floating sparks that
+          //     RISE on a WAVY (sinuous) path so the scene stays alive between kicks. Faster
+          //     turnover + bigger than before so they actually read. Fade in/out (sin) so no pop.
           "for (int j = 0; j < 26; j++) {\n" +
           "  float fj = float(j);\n" +
           "  float a1 = pHash(fj * 2.3 + 11.0);\n" +
           "  float a2 = pHash(fj * 4.1 + 19.0);\n" +
           "  float a3 = pHash(fj * 6.7 + 5.0);\n" +
-          "  float elife = 4.0 + 3.0 * a2;\n" + // long life -> slow drift
+          "  float elife = 1.8 + 1.6 * a2;\n" + // SHORTER life -> faster, livelier turnover
           "  float eage = fract(time / elife + a3);\n" +
           "  float eang = a1 * 6.2831 + 0.25 * sin(time * 0.15 + fj);\n" +
-          "  float er = 0.08 + eage * (0.55 + 0.25 * a2);\n" + // drift slowly outward (mid-field)
+          "  float er = 0.08 + eage * (0.40 + 0.20 * a2);\n" + // less radial spread (rise dominates)
           "  vec2 edir = vec2(cos(eang), sin(eang));\n" +
           "  vec2 eperp = vec2(-edir.y, edir.x);\n" +
-          "  float ewob = sin(eage * 6.0 + a1 * 30.0) * 0.04 * eage;\n" +
-          "  vec2 epp = edir * er + eperp * ewob + vec2(0.0, 0.12 * eage - 0.04 * eage * eage);\n" + // gentle rise
+          // pronounced WAVY trajectory: a bigger, faster sinuous sway perpendicular to travel
+          "  float ewob = sin(eage * 11.0 + a1 * 30.0) * 0.085 * eage;\n" +
+          "  vec2 epp = edir * er + eperp * ewob + vec2(0.0, 0.30 * eage - 0.10 * eage * eage);\n" + // stronger rise
           "  float ed = length(p - epp);\n" +
           "  float efade = sin(eage * 3.14159);\n" + // smooth fade in -> peak -> out
-          "  float esize = 0.0015 + 0.0010 * a2;\n" + // smaller than the burst sparks
+          "  float esize = 0.0028 + 0.0018 * a2;\n" + // BIGGER -> the embers are actually visible
           "  float espark = (esize * esize) / (ed * ed + esize * esize);\n" +
           "  float esi = espark * espark * efade * (0.6 + 0.5 * vol_att);\n" +
           "  col += mix(vec3(1.0, 0.58, 0.14), vec3(0.5, 0.05, 0.0), eage) * esi * 0.85;\n" + // orange ember, cools to deep red
