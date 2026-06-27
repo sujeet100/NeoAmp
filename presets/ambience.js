@@ -863,49 +863,115 @@
   );
 
   // ── Ambience Niagara ──────────────────────────────────────────────────────
-  // A waterfall: shader streams of light falling downward, color CYCLING
-  // yellow<->teal via tintComp; a real circular waveform rides on top for the beat.
+  // Re-derived from the reference (window ~141-155): a vertical luminous FLUID-COLUMN /
+  // fountain-rope on a dark ground. At rest, ONE bright white-cyan turbulent column
+  // rises from bottom-centre with faint curved arc-trails fanning up-and-out to the top
+  // corners; on energy it SPLITS into TWO mirror vertical ropes of jagged braided
+  // filaments. Dusty teal-cyan ground deepening to royal blue (slow teal<->blue drift);
+  // only the column cores blow to WHITE. Calm smooth vertical flow. The ropes are real-
+  // audio waveforms displaced HORIZONTALLY (jagged braid); a rise+fan feedback warp
+  // makes the arc streaklines. (Was a centred circular ring — wrong; no ring in the ref.)
   P["Ambience Niagara"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.97,
-        gammaadj: 1.7,
+        decay: 0.9, // gentle — the warp's red-subtract does the fading; decay just smooths the trail
+        gammaadj: 1.4,
         zoom: 1.0,
-        dy: 0.012,
-        warp: 0.03,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
         darken_center: 0,
-        wrap: 1,
+        wrap: 0,
       },
       {
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           var tr = t.treb_att || t.treb || 1;
-          t.dy = 0.01 + 0.012 * b;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.13 + 0.06 * b + 0.02 * tr;
+          // ONE column at rest -> SPLITS into 2-3 ropes only on a strong beat (q1 = separation)
+          t.q1 = 0.14 * Math.max(0, b - 1.05);
+          // braided jaggedness (small + capped so loud beats stay ropes, not a fan of mush)
+          t.q6 = 0.012 + 0.018 * Math.min(0.5 * tr + 0.5 * b, 1.6);
           return t;
         },
+        // FOUNTAIN warp: the trail RISES and fans slightly OUTWARD, leaving the curved
+        // arc-streaks. Only the RED channel (which carries the white-cyan water — see comp)
+        // is subtracted, so trails have a finite length and never wash the field.
         warp:
-          NOISE_GLSL +
           "shader_body {\n" +
           "vec2 w = uv;\n" +
-          "w.y += 0.012;\n" +
+          "float dx = uv.x - 0.5;\n" +
+          "w.x = 0.5 + dx * 0.99;\n" + // sample nearer centre -> content drifts outward (the fan)
+          "w.y += 0.010;\n" + // sample below -> content rises (upward flow)
           "vec3 c = texture2D(sampler_main, w).rgb;\n" +
-          "float streams = fbm(vec2(uv.x * 14.0, uv.y * 4.0 - time * 1.5));\n" +
-          "streams = smoothstep(0.55, 0.9, streams);\n" +
-          "c += vec3(streams) * (0.05 + 0.18 * bass);\n" +
-          "ret = c - 0.004;\n" +
+          "c.r -= 0.018;\n" + // fade the water (red is its carrier) -> arcs of finite length
+          "ret = c;\n" +
           "}\n",
-        // WMP Niagara cycles teal/cyan <-> blue (a waterfall, not amber).
-        comp: tintComp("vec3(0.10,0.80,0.80)", "vec3(0.10,0.35,0.95)", "0.06", "1.6"),
+        // The water (column + rising arc-trails) is carried entirely in the feedback RED
+        // channel: the rope is drawn white (high red), the teal ground has ~zero red, so
+        // reading src.r cleanly extracts the water and the ground is recomputed FRESH each
+        // frame (never fed back additively) -> it CANNOT accumulate into a grey wash.
+        comp:
+          "shader_body {\n" +
+          "vec2 p = uv;\n" +
+          "float dx = p.x - 0.5;\n" +
+          // dusty teal -> royal-blue ground (slow drift), a touch lighter toward the bottom
+          "vec3 teal = vec3(0.09, 0.50, 0.55);\n" +
+          "vec3 blue = vec3(0.11, 0.22, 0.58);\n" +
+          "vec3 base = mix(teal, blue, 0.5 + 0.5 * sin(time * 0.06));\n" +
+          "vec3 ground = base * (0.07 + 0.07 * p.y);\n" +
+          // water = red-channel feedback, widened by two horizontal taps so the rope reads
+          // as a fluid column with soft edges rather than a hairline.
+          "float beam = texture2D(sampler_main, uv).r;\n" +
+          "beam = max(beam, texture2D(sampler_main, uv + vec2(0.011, 0.0)).r * 0.6);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv - vec2(0.011, 0.0)).r * 0.6);\n" +
+          "vec3 col = ground + beam * vec3(0.66, 0.92, 1.0);\n" + // white-cyan water over teal ground
+          "float lum = max(col.r, max(col.g, col.b));\n" +
+          "col = mix(col, vec3(0.92, 1.0, 1.0), smoothstep(0.5, 1.0, lum));\n" + // hot white column cores
+          "col = col / (col + 0.8) * 1.4;\n" + // Reinhard tone-map
+          "ret = col;\n" +
+          "}\n",
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.95;
-    preset.waves[0].baseVals.g = 0.95;
-    preset.waves[0].baseVals.b = 0.8;
+    // THREE vertical jagged ropes (real-audio waveform): centre + left + right. At rest the
+    // separation q1~0 so they overlap into ONE fat column; on a strong beat they spread into
+    // 2-3 braided ropes (matches the reference: one faint jet -> tall split braids). Drawn
+    // WHITE (the comp carries them in red); displaced horizontally by the live sample.
+    function vRope(slot) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.3,
+          a: 0.85,
+          thick: 1,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0; // -1 bottom .. +1 top
+          var amp = a.q6 || 0.02;
+          var sep = a.q1 || 0.0;
+          var v = slot === 2 ? a.value2 : a.value1; // mix value1/value2 so the braids differ
+          a.x = 0.5 + slot * sep + v * amp; // slot -1/0/+1 -> left/centre/right
+          a.y = 0.5 + s * 0.47; // full-height vertical march
+          a.r = 1.0;
+          a.g = 1.0;
+          a.b = 1.0;
+          return a;
+        },
+      };
+    }
+    preset.waves[0] = vRope(0);
+    preset.waves[1] = vRope(-1);
+    preset.waves[2] = vRope(1);
     return preset;
   })();
 
