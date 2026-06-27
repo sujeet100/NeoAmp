@@ -44,7 +44,7 @@
           var bass = t.bass_att || t.bass || 1;
           var mid = t.mid_att || t.mid || 1;
           var treb = t.treb_att || t.treb || 1;
-          t.q1 = t.time * 0.28; // the CROSS visibly rotates CCW
+          t.q1 = t.time * 0.13; // the CROSS rotates CCW (slow -> broad smooth blades, not many thin copies)
           t.q5 = 0.72; // half-length (reaches the edges)
           // Waveform amplitude (the jaggedness). KEPT SMALL and CAPPED: each of the 512
           // samples is its own strand, so a big amplitude fans the bolt into a chaotic
@@ -52,7 +52,11 @@
           // -> the strands collapse toward one clean wavy bolt; the swirl makes the arms.
           t.q6 = 0.03 + 0.045 * Math.min(0.5 * treb + 0.5 * mid, 1.2);
           t.q7 = 0.06 + 0.04 * bass; // gentle S-bend depth (the broad arc, not the jaggedness)
-          t.q10 = Math.min(0.6 + 0.7 * bass, 1.5); // bolt brightness PULSES with bass
+          // The WHITE crossing bolt APPEARS on beats and fades between (user: "not visible
+          // continuously — disappears and appears on the beat"). Near-0 between beats (just
+          // enough to keep feeding the persistent yellow arms), bright on a bass hit.
+          t.q10 = 0.45 + 0.55 * bass; // line feeds the persistent yellow arms (the stark WHITE
+          // crossing bolt is what appears/disappears — gated by the beat in the comp punch)
           // The bolt rotates (q1); a single centered SWIRL in the warp curls its fading
           // trail into the pinwheel arms (rot=0 so the spin lives in the warp, not a
           // rigid background spin).
@@ -89,7 +93,7 @@
           PAL_GLSL +
           "shader_body {\n" +
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float R = 4.0 + 8.0 * bass;\n" + // line thickness (px) — thin/crisp; the swirl makes the arms, not dilation
+          "float R = 2.0 + 3.0 * bass;\n" + // line thickness (px) — thin/crisp; the swirl makes the arms, not dilation
           "vec2 ips = vec2(1.0 / resolution.x, 1.0 / resolution.y);\n" +
           "float lum = lc(src);\n" +
           // ONE ring x 8 directions -> thicken the bolt a little without balling it into blobs.
@@ -107,18 +111,17 @@
           "  lum = max(lum, lc(texture2D(sampler_main, uv + vec2(ed.x, -ed.y)).rgb));\n" +
           "  lum = max(lum, lc(texture2D(sampler_main, uv - vec2(ed.x, -ed.y)).rgb));\n" +
           "}\n" +
-          "float seg = time / 6.0;\n" + // new random hue every ~6s
-          "float i0 = floor(seg);\n" +
-          "float f = smoothstep(0.0, 1.0, fract(seg));\n" +
-          "float h = mix(h1d(i0), h1d(i0 + 1.0), f);\n" + // random hue, crossfaded
-          "vec3 base = pal(h);\n" +
-          "base = pow(base, vec3(1.5));\n" + // deepen (rich, not pastel)
-          "float bl = dot(base, vec3(0.333));\n" +
-          "base = clamp(bl + (base - bl) * 1.7, 0.0, 1.0);\n" + // boost saturation (kill muddy grays)
-          "float fill = (0.12 + 0.20 * bass) + 0.5 * lum;\n" + // DEEP saturated hue field
+          // FIXED vivid yellow <-> lime drift (the reference is a yellow/lime pinwheel, NOT a
+          // random rainbow). The colour rides ONLY on the swirled bolt-trail luminance, so the
+          // background between the arms stays BLACK (yellow arms on black, like the reference).
+          "float ph = 0.5 + 0.5 * sin(time * 0.08);\n" +
+          "vec3 base = mix(vec3(1.0, 0.85, 0.05), vec3(0.62, 1.0, 0.08), ph);\n" + // yellow <-> lime-green
+          "float fill = pow(lum, 1.7) * 1.5 * (1.0 + 0.4 * bass);\n" + // contrast: gaps -> BLACK, a few broad bright blades
           "vec3 col = base * fill;\n" +
-          "col += vec3(1.0) * smoothstep(0.45, 0.95, lum) * 0.9;\n" + // the fat bolt pops stark WHITE
-          "col = col / (col + 0.8);\n" + // gentler tonemap (less washout)
+          // the stark WHITE crossing bolt APPEARS on beats and fades between (gated by bass)
+          "float beat = smoothstep(1.05, 1.45, bass);\n" +
+          "col += vec3(1.0) * smoothstep(0.5, 0.95, lum) * (0.12 + 1.0 * beat);\n" +
+          "col = col / (col + 0.7) * 1.15;\n" + // tonemap -> bright yellow arms, bounded
           "ret = col;\n" +
           "}\n",
       }
@@ -760,56 +763,102 @@
   );
 
   // ── Ambience Dizzy ──────────────────────────────────────────────────────────
-  // Re-derived from the reference (window ~114-125): a frame-FILLING tumbling cloud/
-  // smoke field — soft wispy filament BANDS that curve, fold and swirl ('dizzy'), with
-  // bright white-cyan filament EDGES and darker teal gaps. NO centred ring, NO empty
-  // hole — content fills the whole pane. Bright PALE cyan (hue ~180), luminous not
-  // dusty. Smooth continuous swirl, mostly time-driven. Built procedurally (a slow
-  // radius-dependent swirl of a scrolling fbm band field). (Was a clean cyan ring with
-  // a dark hollow centre on near-black — wrong.)
-  P["Ambience Dizzy"] = build(
-    {
-      wave_a: 0,
-      decay: 0.9,
-      gammaadj: 2.0,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.0,
-      cx: 0.5,
-      cy: 0.5,
-      darken_center: 0,
-      wrap: 0,
-    },
-    {
-      frame: function (t) {
-        return t; // continuous time-driven swirl, painted in the comp
+  // Re-derived from the reference (window ~114-125): a frame-FILLING tumbling cloud/smoke
+  // field — soft wispy filament BANDS that curve, fold and swirl ('dizzy') with bright
+  // white-cyan edges — overlaid by TWO jagged WHITE audio-waveform 'lightning' lines (an
+  // UPPER and a LOWER, spanning the width, the WMP signature the user flagged). The whole
+  // field slowly cycles magenta -> sage -> teal -> CYAN. Smooth continuous swirl, mostly
+  // time-driven; the two lines re-draw every frame from the live samples. (Earlier version
+  // had the cloud swirl + colour cycle but was MISSING the two waveform lines.)
+  P["Ambience Dizzy"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.9,
+        gammaadj: 2.0,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      comp:
-        NOISE_GLSL +
-        "shader_body {\n" +
-        "vec2 p = uv - 0.5;\n" +
-        "p.x *= resolution.x / resolution.y;\n" +
-        "float pr = length(p);\n" +
-        // SWIRL: rotate the domain by an angle that grows toward the centre + drifts in
-        // time, so the bands tumble/fold like a slow vortex.
-        "float a = time * 0.25 + 1.6 * (0.55 - pr) + 0.4 * sin(time * 0.1);\n" +
-        "mat2 rot = mat2(cos(a), -sin(a), sin(a), cos(a));\n" +
-        "vec2 q = rot * p;\n" +
-        // horizontal-ish filament bands via scrolling fbm (two octaves)
-        "float bands = fbm(vec2(q.x * 3.0 + time * 0.10, q.y * 6.0 - time * 0.15));\n" +
-        "float bands2 = fbm(vec2(q.x * 7.0 - time * 0.08, q.y * 11.0 + time * 0.10));\n" +
-        "float v = (0.4 + 0.5 * bands + 0.3 * bands2) * (0.95 + 0.15 * bass);\n" +
-        // colour CYCLES magenta <-> cyan (~16s) — measured drift over the window; bright
-        // filament edges stay near-white in both phases.
-        "float ph = 0.5 + 0.5 * sin(time * 0.38);\n" + // 0 = cyan phase, 1 = magenta phase
-        "vec3 darkC = mix(vec3(0.05, 0.30, 0.32), vec3(0.20, 0.04, 0.22), ph);\n" + // dark teal <-> dark magenta
-        "vec3 litC = mix(vec3(0.55, 0.95, 0.95), vec3(0.95, 0.55, 0.95), ph);\n" + // cyan <-> magenta-pink
-        "vec3 col = mix(darkC, litC, smoothstep(0.30, 0.92, v));\n" +
-        "col = mix(col, vec3(0.90, 0.96, 1.0), smoothstep(0.82, 1.05, v));\n" + // white filament edges
-        "ret = col;\n" +
-        "}\n",
+      {
+        frame: function (t) {
+          var tr = t.treb_att || t.treb || 1;
+          t.q6 = 0.04 + 0.05 * Math.min(tr, 1.6); // waveform line amplitude (small, capped)
+          return t;
+        },
+        // Hard fade: the procedural cloud (also output) must NOT accumulate, and the two
+        // waveform lines (drawn into the buffer) keep only a faint 1-frame glow trail.
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb * 0.4;\n}\n",
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(p);\n" +
+          // SWIRL: rotate the domain by an angle that grows toward the centre + drifts in
+          // time, so the bands tumble/fold like a slow vortex.
+          "float a = time * 0.25 + 1.6 * (0.55 - pr) + 0.4 * sin(time * 0.1);\n" +
+          "mat2 rot = mat2(cos(a), -sin(a), sin(a), cos(a));\n" +
+          "vec2 q = rot * p;\n" +
+          // horizontal-ish filament bands via scrolling fbm (two octaves)
+          "float bands = fbm(vec2(q.x * 3.0 + time * 0.10, q.y * 6.0 - time * 0.15));\n" +
+          "float bands2 = fbm(vec2(q.x * 7.0 - time * 0.08, q.y * 11.0 + time * 0.10));\n" +
+          "float v = (0.4 + 0.5 * bands + 0.3 * bands2) * (0.95 + 0.15 * bass);\n" +
+          // colour CYCLES magenta <-> cyan (~16s) — measured drift over the window; bright
+          // filament edges stay near-white in both phases.
+          "float ph = 0.5 + 0.5 * sin(time * 0.38);\n" + // 0 = cyan phase, 1 = magenta phase
+          "vec3 darkC = mix(vec3(0.05, 0.30, 0.32), vec3(0.20, 0.04, 0.22), ph);\n" + // dark teal <-> dark magenta
+          "vec3 litC = mix(vec3(0.55, 0.95, 0.95), vec3(0.95, 0.55, 0.95), ph);\n" + // cyan <-> magenta-pink
+          "vec3 col = mix(darkC, litC, smoothstep(0.30, 0.92, v));\n" +
+          "col = mix(col, vec3(0.90, 0.96, 1.0), smoothstep(0.82, 1.05, v));\n" + // white filament edges
+          // the TWO jagged WHITE waveform lines (read from the feedback buffer) punched on top
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float beam = max(src.r, max(src.g, src.b));\n" +
+          "col = mix(col, vec3(0.93, 0.98, 1.0), smoothstep(0.55, 0.92, beam));\n" +
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+    // Two near-horizontal jagged WHITE audio-waveform lines (upper + lower), each spanning
+    // the full width, displaced vertically by the live samples = the lightning lines.
+    function dLine(yc, useV2) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.4,
+          a: 0.9,
+          thick: 1,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0; // -1 .. +1 across the pane
+          var amp = a.q6 || 0.06;
+          var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          a.x = 0.5 + s * 0.92;
+          a.y = yc + samp * amp;
+          a.r = 1.0;
+          a.g = 1.0;
+          a.b = 1.0;
+          return a;
+        },
+      };
     }
-  );
+    preset.waves[0] = dLine(0.34, false); // upper line
+    preset.waves[1] = dLine(0.66, true); // lower line
+    return preset;
+  })();
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
   // Re-derived from the reference (window ~126-140): a full-frame flowing CAUSTIC/smoke
