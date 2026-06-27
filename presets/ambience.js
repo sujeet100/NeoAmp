@@ -1312,7 +1312,10 @@
           "col += vec3(0.55, 0.11, 0.42) * (0.30 + 0.20 * bass);\n" + // PINK floor -> whole pane pink (lower = more contrast)
           "col += vec3(0.80, 0.24, 0.60) * exp(-dd * dd * 2.2) * 0.32;\n" + // centre-weighted pink cloud
           "col += vec3(1.0, 0.88, 0.97) * exp(-dd * dd * 3.0) * (0.22 + 0.5 * bass);\n" + // WHITE core bloom (beat-pulsed)
-          "col += vec3(1.0, 0.92, 0.98) * smoothstep(0.55, 0.95, lc) * 0.8;\n" + // white-hot bolt cores punch through
+          // the white crossing bolts APPEAR on the beat and fade between (user: waveform
+          // appears/disappears); the pink field persists so it never goes blank.
+          "float beat = smoothstep(1.05, 1.45, bass);\n" +
+          "col += vec3(1.0, 0.92, 0.98) * smoothstep(0.5, 0.92, lc) * (0.15 + 1.05 * beat);\n" +
           "ret = col / (col + 0.7) * 1.4;\n" + // tone-map -> bright pink field, bounded (no flat blow-out)
           "}\n",
       }
@@ -1326,6 +1329,7 @@
       // blend adjacent samples -> ONE jagged lightning arc per arm (not 512 strands /
       // a wide oscilloscope ribbon); matches the reference's crisp single bolt.
       preset.waves[i].baseVals.smoothing = 0.55;
+      preset.waves[i].baseVals.thick = 3; // a bit thicker (user note)
       (function (off, idx) {
         preset.waves[idx].point_eqs = function (a) {
           var th = (a.q1 || 0) + off;
