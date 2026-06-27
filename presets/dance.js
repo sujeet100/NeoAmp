@@ -574,10 +574,12 @@
     return preset;
   })();
 
-  // ── Dance of the Freaky Circles (Fire) ──────────────────────────────────────
-  // A procedural fire visualizer over a clean black background, recoloured by a
-  // MULTI-SHADE purple ramp (deep violet -> magenta -> pink-white). Two static inner
-  // "eye" circles sit at the center; the OUTER ring is an audio-gated oscilloscope
+  // ── Dance of the Freaky Circles (Fire) — "Ember Rose" ───────────────────────
+  // The nested-ring oscilloscope ROSE (kept from the original), recoloured to warm EMBER
+  // tones via a fire ramp (dark ember -> deep red -> orange -> yellow-white hot) so it reads
+  // as a glowing ember bloom, with the spark PARTICLES surfaced (brighter/bigger) as the star.
+  // Two static inner "eye" circles sit at the center as burning vents; the OUTER ring is an
+  // audio-gated oscilloscope
   // that fades to zero + contracts when mid/treb are quiet, expands/spikes when active,
   // and beat-punches on detected bass jumps (radius hard-clamped so it can't blow out).
   // PROCEDURAL GLSL PARTICLES (custom-wave dots degrade to lines in this build): a
@@ -680,11 +682,11 @@
         // (Reserved builtin names ang/rad are predeclared in main() -> use pang/pr.)
         comp:
           "float pHash(float n) { return fract(sin(n * 78.233) * 43758.5453); }\n" +
-          "vec3 pal(float x) {\n" + // multi-shade purple ramp (dramatic, not flat)
-          "  vec3 c1 = vec3(0.05, 0.02, 0.14);\n" + // deep blue-violet (dim)
-          "  vec3 c2 = vec3(0.40, 0.08, 0.80);\n" + // violet
-          "  vec3 c3 = vec3(0.82, 0.18, 1.00);\n" + // magenta-purple
-          "  vec3 c4 = vec3(0.92, 0.38, 1.00);\n" + // bright magenta peaks (not pure white)
+          "vec3 pal(float x) {\n" + // EMBER ramp: dark ember -> deep red -> orange -> yellow-white hot
+          "  vec3 c1 = vec3(0.10, 0.015, 0.0);\n" + // near-black ember (dim)
+          "  vec3 c2 = vec3(0.62, 0.09, 0.01);\n" + // deep red
+          "  vec3 c3 = vec3(1.00, 0.45, 0.05);\n" + // orange
+          "  vec3 c4 = vec3(1.00, 0.86, 0.42);\n" + // yellow-white hot (not pure white)
           "  vec3 c = mix(c1, c2, smoothstep(0.04, 0.34, x));\n" +
           "  c = mix(c, c3, smoothstep(0.34, 0.66, x));\n" +
           "  c = mix(c, c4, smoothstep(0.66, 1.0, x));\n" +
@@ -717,8 +719,8 @@
           //     WAVY (non-linear) fire trajectory: a perpendicular wobble that grows + a
           //     brightness flicker. When no recent burst, all sparks are dead -> none show.
           "vec2 p = uv - 0.5; p.x *= resolution.x / resolution.y;\n" +
-          // subtle deep-purple radial vignette so the shapes don't float in a pure-black vacuum
-          "col += vec3(0.05, 0.012, 0.09) * (1.0 - smoothstep(0.10, 0.92, length(p)));\n" +
+          // subtle deep-ember radial vignette so the shapes don't float in a pure-black vacuum
+          "col += vec3(0.09, 0.022, 0.0) * (1.0 - smoothstep(0.10, 0.92, length(p)));\n" +
           "float bAge = q11;\n" +
           "float bStr = q12;\n" +
           "float bSeed = q13;\n" +
@@ -751,17 +753,17 @@
           "    float flick = 0.65 + 0.35 * sin(age * 34.0 + fi * 2.0);\n" + // fire flicker
           // size/brightness FLARE with loudness (vol/treb) instead of changing the count:
           // loud -> thick blinding sparks, quiet -> tiny dim embers (keeps dynamic range)
-          "    float size = (0.0032 + 0.0038 * heat) * (1.0 + 1.2 * vol_att + 0.6 * treb);\n" +
+          "    float size = (0.0042 + 0.0050 * heat) * (1.0 + 1.2 * vol_att + 0.6 * treb);\n" + // bigger -> embers read
           "    float spark = (size * size) / (d * d + size * size);\n" +
           "    float si = spark * spark * heat * flick;\n" +
-          // colour TEMPERATURE by distance: blinding hot white-pink at the core ->
-          // cools to deep electric violet as it flies to the border (cinematic depth)
+          // colour TEMPERATURE by distance: blinding white-yellow HOT at the core ->
+          // cools to deep red ember as it flies to the border (real fire temperature)
           "    float radT = clamp((pr - 0.18) / 0.85, 0.0, 1.0);\n" +
-          "    vec3 sparkCol = mix(vec3(1.0, 0.80, 1.0), vec3(0.40, 0.0, 1.0), radT);\n" +
+          "    vec3 sparkCol = mix(vec3(1.0, 0.92, 0.60), vec3(0.70, 0.06, 0.0), radT);\n" +
           "    part += sparkCol * si;\n" +
           "  }\n" +
           "}\n" +
-          "part *= 1.8 * clamp(bStr, 0.0, 2.0);\n" + // brightness scales with the jump strength
+          "part *= 2.4 * clamp(bStr, 0.0, 2.0);\n" + // brighter -> sparks are the STAR now
           "col += part;\n" +
           // --- AMBIENT embers: a second layer that is NOT beat-gated. Small, dim, slow
           //     floating sparks that drift outward + rise continuously so the scene stays
@@ -783,21 +785,21 @@
           "  float efade = sin(eage * 3.14159);\n" + // smooth fade in -> peak -> out
           "  float esize = 0.0015 + 0.0010 * a2;\n" + // smaller than the burst sparks
           "  float espark = (esize * esize) / (ed * ed + esize * esize);\n" +
-          "  float esi = espark * espark * efade * (0.45 + 0.45 * vol_att);\n" +
-          "  col += mix(vec3(0.80, 0.40, 1.0), vec3(0.32, 0.04, 0.85), eage) * esi * 0.55;\n" + // dim purple, cools out
+          "  float esi = espark * espark * efade * (0.6 + 0.5 * vol_att);\n" +
+          "  col += mix(vec3(1.0, 0.58, 0.14), vec3(0.5, 0.05, 0.0), eage) * esi * 0.85;\n" + // orange ember, cools to deep red
           "}\n" +
           // central CORE glow: a soft radial energy source that pulses with the bass,
           // anchoring the particle emissions in the middle of the frame
           "float cr = length(p);\n" +
           "float core = exp(-cr * cr * 30.0) * (0.08 + 0.30 * bass_att);\n" + // smaller + dimmer pulse
-          "col += vec3(0.72, 0.22, 1.0) * core;\n" +
-          // fill the two hollow 'eyes': a bass-pulsing purple glow at each circle center
+          "col += vec3(1.0, 0.45, 0.10) * core;\n" + // warm orange furnace core
+          // fill the two hollow 'eyes': a bass-pulsing EMBER glow at each circle center (burning vents)
           // (q1,q2)/(q3,q4) -> centers feel dense + reactive instead of empty
           "vec2 cA = vec2((q1 - 0.5) * resolution.x / resolution.y, q2 - 0.5);\n" +
           "vec2 cB = vec2((q3 - 0.5) * resolution.x / resolution.y, q4 - 0.5);\n" +
           "float dA = length(p - cA);\n" +
           "float dB = length(p - cB);\n" +
-          "col += vec3(0.55, 0.12, 0.95) * (exp(-dA * dA * 60.0) + exp(-dB * dB * 60.0)) * (0.16 + 0.32 * bass_att);\n" + // bright PURPLE, not white
+          "col += vec3(1.0, 0.5, 0.12) * (exp(-dA * dA * 60.0) + exp(-dB * dB * 60.0)) * (0.16 + 0.32 * bass_att);\n" + // warm ember vents, not white
           "ret = col;\n" +
           "}\n",
       }
