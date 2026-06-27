@@ -417,32 +417,37 @@
           "shader_body {\n" +
           "vec2 p = uv - 0.5;\n" +
           "p.x *= resolution.x / resolution.y;\n" + // aspect-correct
-          "vec2 po = p; po.y *= 1.35;\n" + // OVAL body: wider than tall
-          "float pr = length(po);\n" +
-          "float pang = atan(po.y, po.x) + time * 0.14;\n" + // continuous spoke rotation
-          "float jit = fbm(vec2(pang * 3.0, time * 0.05));\n" +
-          "float spokes = 0.5 + 0.5 * sin(pang * 90.0 + jit * 8.0);\n" + // many fine irregular spokes
-          "spokes = pow(spokes, 1.6);\n" +
-          // the blue CENTRE slowly GROWS to fill the pane then collapses to a small flower
-          // (a big size pulse, ~13s) + a mild bass swell.
-          "float grow = 0.5 + 0.5 * sin(time * 0.5);\n" +
-          "float fall = exp(-pr * pr * (mix(7.0, 1.7, grow) - 0.6 * bass));\n" + // disc size pulses big<->small
-          "float core = exp(-pr * pr * mix(85.0, 16.0, grow));\n" + // bright centre pinch grows too
-          "float burst = fall * (0.30 + 0.70 * spokes);\n" +
-          "float rim = smoothstep(0.62, 0.32, pr) * (0.22 + 0.25 * fbm(vec2(pang * 2.0, pr * 4.0 - time * 0.1)));\n" + // feathery cloud rim
-          "float v = burst + 0.4 * rim;\n" +
-          // colour: navy field, cornflower spokes, small white centre pinch (FIXED blue)
-          "vec3 navy = vec3(0.04, 0.06, 0.17);\n" +
-          "vec3 corn = vec3(0.42, 0.52, 0.88);\n" +
-          "vec3 col = navy + corn * v * 1.25;\n" +
-          "col = mix(col, vec3(0.90, 0.93, 1.0), smoothstep(0.55, 1.0, core));\n" + // small soft white pinch
-          // the two white waveform lines (from the feedback buffer)
-          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float lines = max(src.r, max(src.g, src.b));\n" +
-          "col = mix(col, vec3(0.90, 0.94, 1.0), smoothstep(0.30, 0.80, lines));\n" +
-          "col *= 1.0 - 0.55 * dot(p, p);\n" + // vignette -> near-black corners
-          "col = col / (col + 0.6);\n" + // Reinhard tone-map
-          "col *= 1.5;\n" +
+          "float pr = length(p);\n" +
+          "float pang = atan(p.y, p.x);\n" +
+          "float grow = 0.5 + 0.5 * sin(time * 0.45);\n" + // the disc grows & collapses (~14s)
+          "float arot = time * 0.13;\n" + // continuous rotation
+          // SUNBURST: fine soft radial RAYS broken up by fbm so they read as organic volumetric
+          // light-shafts (NOT a mechanical sine fan), with per-ray brightness variation.
+          "float rayJit = fbm(vec2(pang * 3.0 + arot, time * 0.05));\n" +
+          "float rays = 0.5 + 0.5 * sin((pang + arot) * 58.0 + 7.0 * rayJit);\n" +
+          "rays = pow(rays, 2.0) * (0.4 + 0.6 * fbm(vec2(pang * 12.0, pr * 5.0 - time * 0.2)));\n" +
+          "float fall = exp(-pr * pr * mix(6.5, 1.8, grow));\n" + // disc size pulses big<->small
+          "float burst = fall * (0.30 + 0.85 * rays);\n" +
+          "float core = exp(-pr * pr * mix(70.0, 14.0, grow));\n" + // soft bright centre, grows too
+          // FEATHERY CLOUD bands billowing across the TOP & BOTTOM (the rich smoky fringe that
+          // the cheap version was missing) — domain-warped fbm, masked toward the edges.
+          "vec2 cuv = vec2(uv.x * 2.6 + time * 0.02, uv.y * 2.6 - time * 0.015);\n" +
+          "float cloud = pow(fbm(cuv + fbm(cuv * 0.6 + 4.0)), 1.4);\n" +
+          "float feather = cloud * smoothstep(0.16, 0.44, abs(p.y));\n" +
+          // COLOUR: rich ROYAL blue (measured ~rgb 0.10,0.15,0.53 centre / 0.15,0.21,0.60 spokes)
+          "vec3 deep = vec3(0.05, 0.09, 0.32);\n" +
+          "vec3 royal = vec3(0.22, 0.32, 0.82);\n" +
+          "vec3 corn = vec3(0.50, 0.62, 1.0);\n" +
+          "vec3 col = deep + royal * burst * 1.15 + corn * feather * 0.9;\n" +
+          "col = mix(col, vec3(0.55, 0.70, 1.0), smoothstep(0.5, 1.0, core));\n" + // blue-white centre bloom
+          "col += vec3(0.82, 0.88, 1.0) * feather * feather * 0.55;\n" + // whiten the billowing cloud crests
+          // 2 BOLD white jagged waveform lines — isolate via the feedback RED channel (the blue
+          // sunburst has low red, the lines are drawn white) so they punch clean & bold.
+          "float lines = texture2D(sampler_main, uv).r;\n" +
+          "col = mix(col, vec3(1.0), smoothstep(0.5, 0.82, lines));\n" +
+          "col += vec3(0.7, 0.8, 1.0) * smoothstep(0.4, 0.72, lines) * 0.5;\n" + // line glow halo
+          "col *= 1.0 - 0.42 * dot(p, p);\n" + // gentle vignette
+          "col = col / (col + 0.75) * 1.5;\n" + // Reinhard tone-map
           "ret = col;\n" +
           "}\n",
       }
@@ -458,10 +463,10 @@
           usedots: 0,
           scaling: 1,
           smoothing: 0.3,
-          a: 0.95,
-          thick: 1,
-          r: 0.92,
-          g: 0.95,
+          a: 1.0,
+          thick: 3,
+          r: 1.0,
+          g: 1.0,
           b: 1.0,
         }),
         init_eqs: passthrough,
@@ -469,10 +474,10 @@
         point_eqs: function (a) {
           var s = a.sample * 2.0 - 1.0; // -1..1 edge to edge
           var amp = a.q6 || 0.05;
-          a.x = 0.5 + s * 0.56;
+          a.x = 0.5 + s * 0.62;
           a.y = yc + a.value1 * amp; // perpendicular displacement = real waveform
-          a.r = 0.92;
-          a.g = 0.95;
+          a.r = 1.0;
+          a.g = 1.0;
           a.b = 1.0;
           return a;
         },
