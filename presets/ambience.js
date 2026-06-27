@@ -652,9 +652,11 @@
       },
       {
         frame: function (t) {
-          var treb = t.treb_att || t.treb || 1;
-          t.q6 = 0.03 + 0.025 * Math.min(treb, 1.6); // waveform amplitude (small, capped)
-          t.decay = 0.82;
+          var bass = t.bass_att || t.bass || 1;
+          // PULSE: the waveform swing is bass-driven so it visibly crackles WIDER on the
+          // beat (was a tiny treble-capped amp that hardly moved — user feedback).
+          t.q6 = 0.04 + 0.11 * Math.min(bass, 1.8);
+          t.decay = 0.85; // a touch longer trail so the pulsing crackle leaves a soft glow
           return t;
         },
         warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb - 0.03;\n}\n",
@@ -680,7 +682,7 @@
           // jagged WHITE horizontal waveform crackle through the waist (from feedback)
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
           "float beam = max(src.r, max(src.g, src.b));\n" +
-          "v += 0.7 * beam;\n" +
+          "v += (0.9 + 0.5 * bass) * beam;\n" + // the pulsing white waveform crackle pops on the beat
           "ret = amber_ramp(v);\n" + // black wedges -> amber lobes -> white-hot waist
           "}\n",
       }
