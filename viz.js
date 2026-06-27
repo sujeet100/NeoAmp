@@ -606,6 +606,14 @@
   }
 
   window.addEventListener("message", function (e) {
+    // Only accept messages from our embedding window (the content script posts via
+    // vizFrame.contentWindow.postMessage, and we reply via parent.postMessage — so `parent`
+    // is the only legitimate peer; in the self-render harness viz.html is top-level so
+    // parent === window and this still passes). This blocks other-frame/popup injectors.
+    // CAVEAT: in the live extension the content script shares the host page's window, so a
+    // same-window page script isn't fully excluded by source alone — the robust isolation is a
+    // private MessageChannel (follow-up). Impact here is visualizer-only (no storage/capture).
+    if (e.source !== parent) return;
     var m = e.data || {};
     if (!m.__wmp) return;
     if (m.type === "audio" && m.data) latest.set(m.data);
