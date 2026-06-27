@@ -856,7 +856,9 @@
       {
         frame: function (t) {
           var tr = t.treb_att || t.treb || 1;
-          t.q6 = 0.04 + 0.05 * Math.min(tr, 1.6); // waveform line amplitude (small, capped)
+          var b = t.bass_att || t.bass || 1;
+          // MORE music reaction: the line swing tracks bass+treble with a bigger range.
+          t.q6 = 0.05 + 0.09 * Math.min(0.45 * tr + 0.55 * b, 1.9);
           return t;
         },
         // Hard fade: the procedural cloud (also output) must NOT accumulate, and the two
@@ -878,7 +880,7 @@
           // horizontal-ish filament bands via scrolling fbm (two octaves)
           "float bands = fbm(vec2(q.x * 3.0 + time * 0.10, q.y * 6.0 - time * 0.15));\n" +
           "float bands2 = fbm(vec2(q.x * 7.0 - time * 0.08, q.y * 11.0 + time * 0.10));\n" +
-          "float v = (0.4 + 0.5 * bands + 0.3 * bands2) * (0.95 + 0.15 * bass);\n" +
+          "float v = (0.4 + 0.5 * bands + 0.3 * bands2) * (0.82 + 0.4 * bass);\n" + // cloud brightness pulses with the beat
           // colour CYCLES magenta <-> cyan (~16s) — measured drift over the window; bright
           // filament edges stay near-white in both phases.
           "float ph = 0.5 + 0.5 * sin(time * 0.38);\n" + // 0 = cyan phase, 1 = magenta phase
@@ -889,7 +891,7 @@
           // the TWO jagged WHITE waveform lines (read from the feedback buffer) punched on top
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
           "float beam = max(src.r, max(src.g, src.b));\n" +
-          "col = mix(col, vec3(0.93, 0.98, 1.0), smoothstep(0.55, 0.92, beam));\n" +
+          "col = mix(col, vec3(0.93, 0.98, 1.0), smoothstep(0.4, 0.85, beam));\n" + // thicker, bolder lines
           "ret = col;\n" +
           "}\n",
       }
@@ -906,7 +908,7 @@
           scaling: 1,
           smoothing: 0.4,
           a: 0.9,
-          thick: 1,
+          thick: 3,
           r: 1.0,
           g: 1.0,
           b: 1.0,
