@@ -111,8 +111,14 @@ core vibe is what the nostalgia audience actually responds to.
 **B. Ship after a focused refinement pass (the research-favourite presets):**
 - **Battery:** relatively calm, strawberryaid, my tornado is resting, kaleidovision, chemicalnova,
   cominatcha, brightsphere, event horizon, lotus, the world.
-- **Ambience:** Warp, Anon, Niagara, Down the Drain, Snell + **ADD "Random"** (most-loved-by-name)
-  and **"Swirl"** (missing).
+- **Ambience:** Warp, Anon, Niagara, Down the Drain, Snell + **ADD "Swirl"** (missing).
+- **Ambience "Random" is NOT new art — it's a shuffle/auto-cycle SEQUENCER** over the other
+  Ambience presets (WMP auto-drifted between Swirl/Warp/Water/… every ~30s). It's the experience
+  people loved ("relax/meditate"). Build it as a small auto-cycler: an "Ambience (Random)" entry
+  that, while active, loads a random *Ambience-only* preset every ~25–35s with a ~4s crossfade
+  (`viz.loadPreset(preset, blendTime)` + a shuffle bag — both already exist in `viz.js`). So
+  refining the Ambience set is the real work; Random is just wiring on top. *(Contrast: Alchemy
+  "Random" is a single self-sequencing preset — one file — not a shuffle.)*
 
 **C. Strongly consider ADDING for recognition (low effort, high recognition):**
 - **Bars and Waves** (Bars, Scope, Ocean Mist, Fire Storm) — the universal WMP default; trivial in
