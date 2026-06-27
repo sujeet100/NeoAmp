@@ -93,7 +93,7 @@
     },
     { label: "Dance of the Freaky Circles (Fire)", wmp: "Dance of the Freaky Circles (Fire)" },
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
-    { label: "Ambience Water", wmp: "Ambience Water" },
+    { label: "Ambience Water", wmp: "Ambience Water", featured: true },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },
     { label: "Ambience Swirl", wmp: "Ambience Swirl" },
     { label: "Ambience Warp", wmp: "Ambience Warp" },
@@ -108,11 +108,11 @@
     // Only the 7 REFINED Battery presets are listed (the rest stay defined in presets/battery.js
     // but are hidden from the picker until they're refined — the planned Battery build-out).
     { label: "Battery relatively calm", wmp: "Battery relatively calm" },
-    { label: "Battery strawberryaid", wmp: "Battery strawberryaid" },
-    { label: "Battery elektrination", wmp: "Battery elektrination" },
+    { label: "Battery strawberryaid", wmp: "Battery strawberryaid", featured: true },
+    { label: "Battery elektrination", wmp: "Battery elektrination", featured: true },
     { label: "Battery sleepyspray", wmp: "Battery sleepyspray" },
     { label: "Battery smoke or water?", wmp: "Battery smoke or water?" },
-    { label: "Battery sepiaswirl", wmp: "Battery sepiaswirl" },
+    { label: "Battery sepiaswirl", wmp: "Battery sepiaswirl", featured: true },
     { label: "Battery the world", wmp: "Battery the world" },
   ];
 
@@ -448,12 +448,16 @@
     });
     var groups = { Featured: [], Ambience: [], Battery: [] };
     FAVORITES.forEach(function (f) {
-      var g = /^Ambience/.test(f.label)
+      var fam = /^Ambience/.test(f.label)
         ? "Ambience"
         : /^Battery/.test(f.label)
           ? "Battery"
           : "Featured";
-      groups[g].push([f.wmp, f.label]);
+      groups[fam].push([f.wmp, f.label]);
+      // `featured: true` entries are ALSO surfaced at the top under Featured (a quick-access
+      // shortcut) while staying in their family group + Random-cycler pool. Alchemy/Dance are
+      // Featured by default (fam === "Featured"), so only promote family entries here.
+      if (f.featured && fam !== "Featured") groups.Featured.push([f.wmp, f.label]);
     });
     addGroup("◢◤ NeoAmp — Featured", groups.Featured);
     // "🎲 Ambience (Random)" leads the Ambience group: a shuffle auto-cycler that crossfades
