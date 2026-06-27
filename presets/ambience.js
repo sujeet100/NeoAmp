@@ -158,60 +158,114 @@
   })();
 
   // ── Ambience Water ────────────────────────────────────────────────────────
-  // Soft yellow pool caustics: layered sine ripples, no rotation, luminous.
-  P["Ambience Water"] = build(
-    {
-      wave_mode: 0,
-      wave_smoothing: 0.95,
-      wave_scale: 0.35,
-      additivewave: 1,
-      wave_r: 1.0,
-      wave_g: 0.9,
-      wave_b: 0.35,
-      wave_a: 0.22,
-      decay: 0.95,
-      gammaadj: 1.6,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.12,
-      warpscale: 2.2,
-      warpanimspeed: 0.5,
-      cx: 0.5,
-      cy: 0.5,
-      wrap: 1,
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        var treb = t.treb_att || t.treb || 1;
-        t.warp = 0.1 + 0.05 * bass;
-        t.warpanimspeed = 0.4 + 0.3 * treb;
-        t.zoom = 1.0 + 0.005 * Math.sin(t.time * 0.4);
-        t.decay = 0.95;
-        return t;
+  // A lit WATER SURFACE (re-derived from the 480p reference + WMP mechanics). Two STATIC
+  // light sources: a central GLARE orb (hot white core) and a HORIZONTAL REFLECTION STREAK
+  // (a long stretched lens-flare whose ends BLUR/widen toward the L/R edges). The canvas is
+  // distorted by a per-pixel RADIAL ripple. ★ The MUSIC GENERATES RIPPLES: a bass hit DROPS
+  // a new ring at the centre that travels slowly OUTWARD (a stone in a pond). It does NOT
+  // zoom or flash — the glare, streak and overall brightness are CONSTANT. A gentle ambient
+  // ripple is always emitted so the surface lives when quiet. Monochromatic, slow vivid hue
+  // cycle; cores stay blown white. ONE procedural comp shader (no custom waves, no feedback)
+  // => calm and fully controllable.
+  P["Ambience Water"] = (function () {
+    // Beat state (closure): a bass transient injects a new outward-travelling ripple into one
+    // of 4 ring slots; those ripples PUSH the radial splatter outward.
+    var avgBass = 0.4,
+      lastBeat = -10,
+      slot = 0;
+    var ringT = [-10, -10, -10, -10]; // birth time of each ring
+    var ringS = [0, 0, 0, 0]; // strength of each ring
+    var LIFE = 4.5; // seconds a ripple lives while it travels out
+    return build(
+      {
+        wave_a: 0, // nothing drawn to feedback; the comp shader paints everything
+        decay: 0.9, // irrelevant (comp ignores the feedback buffer)
+        gammaadj: 1.4,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        wrap: 0,
       },
-      warp:
-        "shader_body {\n" +
-        "vec2 p = uv - 0.5;\n" +
-        "float r = length(p);\n" +
-        "vec2 w = uv;\n" +
-        "w.x += 0.012 * sin(uv.y*14.0 + time*1.1) + 0.008 * sin(r*22.0 - time*0.9);\n" +
-        "w.y += 0.012 * cos(uv.x*14.0 + time*0.9) + 0.008 * cos(r*22.0 - time*0.7);\n" +
-        "ret = texture2D(sampler_main, w).rgb;\n" +
-        "ret -= 0.002;\n" +
-        "}\n",
-      comp:
-        AMBER_RAMP +
-        "shader_body {\n" +
-        "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-        "float v = dot(src, vec3(0.33));\n" +
-        "v = 0.35 + 0.7 * v;\n" +
-        "v += 0.06 * sin(uv.x*10.0 + time*0.8) * sin(uv.y*10.0 - time*0.6);\n" +
-        "v *= (1.0 + 0.25*bass);\n" +
-        "ret = amber_ramp(v);\n" +
-        "}\n",
-    }
-  );
+      {
+        frame: function (t) {
+          var bassI = t.bass !== undefined ? t.bass : t.bass_att || 0;
+          avgBass = avgBass * 0.93 + bassI * 0.07; // slow running baseline
+          // bass transient -> drop a ripple into the next slot (refractory so it can't spam)
+          if (bassI > avgBass * 1.28 + 0.12 && t.time - lastBeat > 0.16) {
+            lastBeat = t.time;
+            ringT[slot] = t.time;
+            ringS[slot] = Math.min(bassI / Math.max(avgBass, 0.2), 2.2);
+            slot = (slot + 1) % 4;
+          }
+          // hand each ripple's AGE (q3,q5,q7,q9) + STRENGTH (q4,q6,q8,q10) to the shader
+          for (var i = 0; i < 4; i++) {
+            var age = t.time - ringT[i];
+            t["q" + (3 + i * 2)] = age;
+            t["q" + (4 + i * 2)] = age < LIFE ? ringS[i] : 0.0;
+          }
+          return t;
+        },
+        // COMP: the whole water surface, procedurally. fbm (NOISE_GLSL) = liquid irregularity;
+        // hueCol() = slow monochromatic hue cycle.
+        comp:
+          NOISE_GLSL +
+          "vec3 hueCol(float h, float s){\n" +
+          "  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (h + vec3(0.0, 0.33, 0.67)));\n" +
+          "  return mix(vec3(1.0), rb, s);\n" + // s->0 white, s->1 full hue
+          "}\n" +
+          // one music-spawned ripple: a gaussian shell at radius age*speed, fading as it ages.
+          "float ringDisp(float pr, float age, float s){\n" +
+          "  float front = age * 0.18;\n" +
+          "  float local = pr - front;\n" +
+          "  float env = exp(-(local * local) / (2.0 * 0.11 * 0.11));\n" +
+          "  return s * exp(-age * 0.5) * env * sin(local * 30.0 - age * 2.0);\n" +
+          "}\n" +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" + // aspect-correct -> circular ripples
+          "float pr = length(p);\n" + // radius (NOT 'rad' — reserved builtin)
+          "float pang = atan(p.y, p.x);\n" + // angle (NOT 'ang' — reserved builtin)
+          "float wob = fbm(vec2(pang * 1.3 + 3.0, pr * 2.0 - time * 0.04)) - 0.5;\n" +
+          // music-spawned beat ripples + a faint ambient pulse — these PUSH the splatter outward
+          "float beats = ringDisp(pr,q3,q4) + ringDisp(pr,q5,q6) + ringDisp(pr,q7,q8) + ringDisp(pr,q9,q10);\n" +
+          "float ripple = 0.25 * sin(pr * 16.0 - time * 1.0) + 2.4 * beats;\n" +
+          // RADIAL paint-splatter (not concentric): fbm on a CIRCLE (cos,sin)*scale (seamless in
+          // angle) shifted outward by radius+time -> streaks RADIATE from the centre, flow out,
+          // and break into splatter; the ripples push the splatter further out.
+          "float radPhase = pr * 3.5 - time * 0.5 - 0.8 * ripple;\n" +
+          "vec2 nc = vec2(cos(pang) * 2.6 + radPhase, sin(pang) * 2.6);\n" +
+          "float c1 = pow(1.0 - abs(2.0 * fbm(nc) - 1.0), 3.0);\n" +
+          "vec2 nc2 = vec2(cos(pang) * 5.5 + radPhase * 1.6 + 4.0, sin(pang) * 5.5);\n" +
+          "float c2 = pow(1.0 - abs(2.0 * fbm(nc2) - 1.0), 4.0);\n" +
+          "float caustic = max(c1, 0.6 * c2);\n" +
+          // LIGHTING: central glare lights the surface (caustics brightest near centre, fading
+          // out into a lit pool); a hot white core reflection; the horizontal reflection streak
+          // (sharp at the centre, fanning into a WIDER soft decay toward the L/R ends).
+          "float lit = exp(-pr * pr * 3.5);\n" +
+          "float core = exp(-pr * pr * 42.0);\n" +
+          "float streakWob = 0.022 * sin(p.x * 7.0 - time * 1.0 + wob * 2.0) + 0.011 * sin(p.x * 13.0 + time * 0.6);\n" +
+          "float yd = p.y + streakWob;\n" +
+          "float kY = 1700.0 / (1.0 + 20.0 * abs(p.x));\n" + // sharp centre -> much wider ends
+          "float streak = exp(-yd * yd * kY) * (0.45 + 0.55 * exp(-p.x * p.x * 0.6));\n" +
+          // COMPOSE: the lit, rippling caustic water surface + hot core + reflection streak.
+          "float surf = caustic * lit * 1.9;\n" +
+          "float white = surf + core * 1.4 + streak * 1.0;\n" + // the bright (white) parts
+          "float lum = white + 0.05;\n" + // + a dim floor so it's never pure black
+          // COLOUR: monochromatic, slow vivid hue cycle (~40s); bright caustic ridges + core +
+          // streak blow to WHITE (crisp white water highlights), dim surface takes the hue.
+          "float hphase = time * 0.025;\n" +
+          "vec3 hue = hueCol(hphase, 0.82);\n" +
+          "vec3 col = hue * lum;\n" +
+          "col = mix(col, vec3(1.0), smoothstep(0.5, 1.1, white));\n" +
+          "col = col / (col + 0.5);\n" + // Reinhard tone-map -> soft highlights
+          "col *= 1.5;\n" +
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+  })();
 
   // ── Ambience Down the Drain ────────────────────────────────────────────────
   // Yellow caustics spiralling into a dark central hole: zoom-in + rotate.
