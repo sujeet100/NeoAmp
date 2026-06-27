@@ -466,71 +466,60 @@
   })();
 
   // ── Ambience Warp ───────────────────────────────────────────────────────────
-  // A warping amber tunnel: feedback zoomed outward each frame so trails of the
-  // live waveform rush from the center as concentric rings, with a slow swirl.
-  P["Ambience Warp"] = (function () {
-    var preset = build(
-      {
-        wave_mode: 0,
-        wave_smoothing: 0.88,
-        wave_scale: 0.55,
-        additivewave: 1,
-        wave_r: 1.0,
-        wave_g: 0.82,
-        wave_b: 0.28,
-        wave_a: 0.4,
-        decay: 0.95,
-        gammaadj: 1.9,
-        zoom: 1.04,
-        rot: 0.02,
-        warp: 0.05,
-        warpscale: 1.2,
-        warpanimspeed: 0.6,
-        cx: 0.5,
-        cy: 0.5,
-        darken_center: 0,
-        wrap: 0,
+  // Re-derived from the reference (window ~46-56): a soft billowing CLOUD/fog field
+  // that FILLS the frame, radiating outward from a dark central HOLE the cloud parts
+  // around (it gently breathes), with a tiny white-hot speck flaring at the centre.
+  // The whole field cycles blue <-> yellow (~18s there-and-back), both extremes
+  // genuinely coloured, crossing through a near-neutral grey-green midpoint. Calm,
+  // continuous, time-driven billow — NO tunnel rush, NO beat-pulse. Built PROCEDURALLY
+  // (domain-warped scrolling fbm) — the old wireframe-waveform tunnel was the wrong
+  // model and left the field near-black so the blue half never showed.
+  P["Ambience Warp"] = build(
+    {
+      wave_a: 0,
+      decay: 0.9,
+      gammaadj: 1.5,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.0,
+      cx: 0.5,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 0,
+    },
+    {
+      frame: function (t) {
+        return t; // motion is the time-driven cloud morph in the comp
       },
-      {
-        frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
-          var treb = t.treb_att || t.treb || 1;
-          t.zoom = 1.04 + 0.06 * bass;
-          t.rot = 0.015 + 0.03 * Math.sin(t.time * 0.15);
-          t.warp = 0.04 + 0.03 * treb;
-          t.decay = 0.95;
-          t.wave_a = 0.25 + 0.35 * bass;
-          return t;
-        },
-        warp:
-          "shader_body {\n" +
-          "vec2 d = uv - 0.5;\n" +
-          "float r = length(d);\n" +
-          "float a = atan(d.y, d.x) + 0.06 * sin(time * 0.4);\n" +
-          "r *= 0.985;\n" +
-          "vec2 w = 0.5 + r * vec2(cos(a), sin(a));\n" +
-          "ret = texture2D(sampler_main, w).rgb;\n" +
-          "ret -= 0.003;\n" +
-          "}\n",
-        comp:
-          AMBER_RAMP +
-          "shader_body {\n" +
-          "vec2 d = uv - 0.5;\n" +
-          "d.x *= resolution.x / resolution.y;\n" +
-          "float r = length(d);\n" +
-          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(src, vec3(0.33)) * (1.0 + 0.35 * bass);\n" +
-          "v += 0.10 * sin(r * 26.0 - time * 2.0);\n" +
-          "v *= smoothstep(0.0, 0.12, r);\n" +
-          // WMP Warp slowly cycles blue <-> yellow.
-          "vec3 warm = amber_ramp(v);\n" +
-          "vec3 cool = vec3(0.15, 0.45, 0.95) * v * 1.4;\n" +
-          "ret = mix(cool, warm, 0.5 + 0.5*sin(time*0.05));\n" +
-          "}\n",
-      }
-    );
-    return preset;
-  })();
+      comp:
+        NOISE_GLSL +
+        AMBER_RAMP +
+        "shader_body {\n" +
+        "vec2 p = uv - 0.5;\n" +
+        "p.x *= resolution.x / resolution.y;\n" +
+        "float pr = length(p);\n" +
+        "vec2 dir = p / (pr + 1e-3);\n" + // outward direction
+        // domain-warped scrolling fbm clouds that flow slowly OUTWARD from the hole
+        "float wn = fbm(p * 1.4 + vec2(time * 0.05, 5.0 - time * 0.04));\n" +
+        "float cloud = fbm(p * 2.6 - dir * time * 0.22 + wn * 1.6);\n" +
+        "cloud = pow(cloud, 1.3);\n" +
+        // central breathing HOLE the cloud parts around
+        "float holeR = 0.12 + 0.03 * sin(time * 0.4) + 0.04 * bass;\n" +
+        "float mask = smoothstep(holeR, holeR + 0.15, pr);\n" + // 0 inside the hole -> dark eye
+        "cloud *= mask;\n" +
+        "float v = (0.10 + 0.9 * cloud) * mask * (0.9 + 0.25 * bass);\n" + // lit field; the masked floor keeps the hole BLACK
+        // blue <-> yellow cycle (~18s), both extremes saturated, grey-green midpoint
+        "vec3 warm = amber_ramp(v);\n" +
+        "vec3 cool = mix(vec3(0.03, 0.06, 0.20), vec3(0.55, 0.72, 1.0), v);\n" + // indigo -> light blue
+        "vec3 col = mix(cool, warm, 0.5 + 0.5 * sin(time * 0.35));\n" +
+        "float speck = exp(-pr * pr * 700.0) * max(0.0, bass - 1.15) * 0.9;\n" + // tiny white-hot speck, ONLY on strong hits
+        "col += vec3(1.0) * speck;\n" +
+        "col = col / (col + 0.5);\n" + // Reinhard tone-map
+        "col *= 1.4;\n" +
+        "ret = col;\n" +
+        "}\n",
+    }
+  );
 
   // ── Ambience Anon ───────────────────────────────────────────────────────────
   // Anonymous slow-morphing amber cloud: a soft fbm mass that breathes, with a
