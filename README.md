@@ -2,6 +2,10 @@
 
 **A Winamp-style player + Windows Media Player / MilkDrop visualizations, overlaid on the music you stream in your browser.**
 
+[![CI](https://github.com/sujeet100/NeoAmp/actions/workflows/ci.yml/badge.svg)](https://github.com/sujeet100/NeoAmp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/sujeet100/NeoAmp/actions/workflows/codeql.yml/badge.svg)](https://github.com/sujeet100/NeoAmp/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sujeet100/NeoAmp/badge)](https://scorecard.dev/viewer/?uri=github.com/sujeet100/NeoAmp)
+
 NeoAmp is a **Manifest V3** Chrome / Arc / Edge extension that drops a floating,
 skinnable **Winamp-style player** onto streaming sites (YouTube Music and Spotify
 today) and renders **MilkDrop visualizations** — via
@@ -113,6 +117,18 @@ Three deliberate, load-bearing design choices (full rationale in
 | `tools/` | Headless self-render harnesses (CDP) for iterating on visuals without the browser. |
 | `docs/` | Design notes, reverse-engineering analysis, handoffs. |
 | `CLAUDE.md` | Deep architecture notes + the preset-authoring guide. |
+
+## Security
+
+NeoAmp runs on pages you're logged into and captures tab audio, so security matters. We
+don't claim it's vulnerability-free — we run a process: **CodeQL**, a security-focused
+**ESLint** (`no-unsanitized` + `security`), **retire.js** (for the vendored Butterchurn),
+**gitleaks**, and **Dependabot** on every change, plus periodic adversarial review. As of
+the last review there are **no known vulnerabilities**.
+
+Found one? **Don't open a public issue** — report it privately via the repo's
+[Security tab → Report a vulnerability](https://github.com/sujeet100/NeoAmp/security).
+Full policy: **[SECURITY.md](./SECURITY.md)**.
 
 ## Contributing
 
