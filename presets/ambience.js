@@ -976,15 +976,20 @@
   })();
 
   // ── Ambience Blender ────────────────────────────────────────────────────────
-  // A blender vortex: like Dizzy but more churning — the swirl is perturbed by fbm
-  // so everything tumbles as it is blended into the center; amber.
+  // Re-derived from the reference (window ~156-163): a BRIGHT glowing whirlpool of soft
+  // swirling caustic bands filling the pane (only the corners vignette dark), with a
+  // near-white central bloom, cycling BLUE -> periwinkle/lavender -> MAGENTA/pink over the
+  // window. The DOMINANT foreground element is a single jagged WHITE horizontal audio-
+  // waveform 'lightning line' spanning the full width through the centre (the WMP signature,
+  // like Thingus/Dance). Calm smooth CCW churn. (Was a dark purple drain-tunnel with a thin
+  // pink CIRCULAR ring — wrong primary element, too dark, no blue phase, no white line.)
   P["Ambience Blender"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.95,
+        decay: 0.965, // hold the bright wash (the swirled line-trail forms the whirlpool)
         gammaadj: 1.8,
-        zoom: 1.03,
+        zoom: 1.005, // barely outward — was 1.03 which sucked the field into a dark centre
         rot: 0.04,
         warp: 0.12,
         warpscale: 1.6,
@@ -996,11 +1001,12 @@
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           var m = t.mid || 1;
-          t.zoom = 1.02 + 0.03 * b;
+          var tr = t.treb_att || t.treb || 1;
+          t.zoom = 1.0 + 0.012 * b;
           t.rot = 0.03 + 0.06 * m;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.13 + 0.07 * b;
+          t.q5 = 0.78; // line half-width (spans the pane)
+          t.q6 = 0.1 + 0.1 * Math.min(tr, 1.6); // line jaggedness amplitude
+          t.q7 = 0.06; // gentle S-bend so the line isn't ruler-straight
           return t;
         },
         warp:
@@ -1008,28 +1014,71 @@
           "shader_body {\n" +
           "vec2 d = uv - vec2(0.5);\n" +
           "float turb = fbm(d * 6.0 + time * 0.4) - 0.5;\n" +
-          "float a = 0.55 / (length(d) + 0.16) + turb * (0.8 + 1.5 * bass);\n" +
+          // looser swirl eye (0.40/(len+0.22)) + gentler bass turbulence -> organic churn,
+          // not a crisp mathematical drain.
+          "float a = 0.40 / (length(d) + 0.22) + turb * (0.3 + 0.5 * bass);\n" +
           "float s = sin(a + time * 0.5), c = cos(a + time * 0.5);\n" +
           "vec2 sw = vec2(d.x * c - d.y * s, d.x * s + d.y * c);\n" +
-          "ret = texture2D(sampler_main, vec2(0.5) + sw * 0.985).rgb;\n" +
-          "ret -= 0.004;\n" +
+          "ret = texture2D(sampler_main, vec2(0.5) + sw * 0.99).rgb;\n" +
+          "ret -= 0.003;\n" +
           "}\n",
         comp:
-          // WMP Blender cycles blue <-> purple/pink as it churns.
+          // BRIGHT glowing wash that cycles blue <-> magenta/pink; the white line punches
+          // through near-white on top of the hued wash.
           "shader_body {\n" +
           "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(c, vec3(0.42));\n" +
-          "vec3 tint = mix(vec3(0.20,0.30,0.95), vec3(0.70,0.25,0.95), 0.5+0.5*sin(time*0.07));\n" +
-          "ret = tint * v * 1.7;\n" +
+          "float lc = max(c.r, max(c.g, c.b));\n" +
+          "float v = 0.18 + 1.0 * dot(c, vec3(0.45));\n" + // lifted floor -> never goes black
+          "vec3 tint = mix(vec3(0.18,0.34,0.98), vec3(0.92,0.32,0.88), 0.5+0.5*sin(time*0.07));\n" +
+          "vec3 col = tint * v * 1.15;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
-          "ret += tint * exp(-dd * dd * 9.0) * (0.08 + 0.30 * bass);\n" +
+          "col += tint * exp(-dd * dd * 2.2) * 0.38;\n" + // wide bright central bloom
+          "col += vec3(1.0) * smoothstep(0.62, 0.95, lc) * 1.6;\n" + // hot line blows WHITE, isolated above the wash
+          "ret = col / (col + 0.85) * 1.3;\n" + // tone-map so the bloom stays luminous, not blown
           "}\n",
       }
     );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.6;
-    preset.waves[0].baseVals.g = 0.6;
-    preset.waves[0].baseVals.b = 1.0;
+    // The WMP signature: a single jagged WHITE horizontal audio-waveform line through the
+    // centre (Thingus crossLine at angle 0). Drawn white + additive; the comp lets its hot
+    // feedback punch through to white while the swirled trail tints into the wash.
+    function hLine(useV2) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.6,
+          a: 1.0,
+          thick: 3,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0; // -1 .. +1 across the pane
+          var len = a.q5 || 0.78;
+          var amp = a.q6 || 0.12;
+          var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var bend = (a.q7 || 0.06) * Math.sin(s * Math.PI);
+          // jagged across the FULL width (incl. centre, like the ref) — taper only the
+          // extreme ends so the strands don't fly off-pane.
+          var taper = s < -0.7 ? (s + 1.0) / 0.3 : s > 0.7 ? (1.0 - s) / 0.3 : 1.0;
+          a.x = 0.5 + s * len;
+          a.y = 0.5 + bend + samp * amp * taper; // perpendicular (vertical) jaggedness
+          a.r = 1.0;
+          a.g = 1.0;
+          a.b = 1.0;
+          return a;
+        },
+      };
+    }
+    preset.waves[0] = hLine(false);
+    preset.waves[1] = hLine(true); // faint 2nd strand on value2 for thickness
+    preset.waves[1].baseVals.a = 0.5;
     return preset;
   })();
 
