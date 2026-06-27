@@ -132,6 +132,7 @@
   ];
 
   var DIRECTOR_KEY = "__director__"; // sentinel picker value that engages the auto-sequencer
+  var AMBIENCE_RANDOM_KEY = "__ambience_random__"; // sentinel: engage the Director scoped to the Ambience family
   var viz = null,
     presets = {},
     names = [],
@@ -139,6 +140,7 @@
     rafId = 0;
   var presetSel = null;
   var userFavs = new Set();
+  var ambienceRandomOn = false; // the "🎲 Ambience (Random)" auto-cycler is engaged
   var latest = new Uint8Array(FFT_SIZE);
   var audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
 
@@ -395,6 +397,10 @@
       setDirector(true);
       return;
     }
+    if (name === AMBIENCE_RANDOM_KEY) {
+      setAmbienceRandom(true);
+      return;
+    }
     if (Director.isEnabled()) setDirector(false);
     loadByName(name);
     showBar();
@@ -429,7 +435,8 @@
       var og = document.createElement("optgroup");
       og.label = label;
       entries.forEach(function (e) {
-        if (!presets[e[0]]) return;
+        // allow sentinel entries (e.g. "__ambience_random__") through; they have no preset
+        if (e[0].indexOf("__") !== 0 && !presets[e[0]]) return;
         var o = document.createElement("option");
         o.value = e[0];
         o.textContent = e[1];
@@ -463,7 +470,12 @@
       groups[g].push([f.wmp, f.label]);
     });
     addGroup("◢◤ NeoAmp — Featured", groups.Featured);
-    addGroup("◢◤ NeoAmp — Ambience", groups.Ambience);
+    // "🎲 Ambience (Random)" leads the Ambience group: a shuffle auto-cycler that crossfades
+    // through the whole Ambience family (the WMP "Random" mode), engaged via the sentinel.
+    addGroup(
+      "◢◤ NeoAmp — Ambience",
+      [[AMBIENCE_RANDOM_KEY, "🎲 Ambience (Random)"]].concat(groups.Ambience)
+    );
     addGroup("◢◤ NeoAmp — Battery", groups.Battery);
 
     var milkdrop = names
@@ -500,7 +512,11 @@
   }
 
   function syncSelect(name) {
-    if (presetSel) presetSel.value = name && presets[name] ? name : "";
+    if (!presetSel) return;
+    // while the cycler runs, keep the picker on "🎲 Ambience (Random)" (the bar/toast shows
+    // the actual scene); otherwise reflect the loaded preset.
+    if (ambienceRandomOn) presetSel.value = AMBIENCE_RANDOM_KEY;
+    else presetSel.value = name && presets[name] ? name : "";
   }
   function updateStar() {
     var on = userFavs.has(names[idx]);
@@ -614,15 +630,54 @@
     else if (m.type === "preset:random") randomPreset();
     else if (m.type === "director:toggle") setDirector(!Director.isEnabled());
     else if (m.type === "director:set") setDirector(!!m.enabled);
+    else if (m.type === "ambienceRandom:toggle") setAmbienceRandom(!ambienceRandomOn);
+    else if (m.type === "ambienceRandom:set") setAmbienceRandom(!!m.enabled);
   });
 
   function setDirector(on) {
+    ambienceRandomOn = false; // plain Director (or disengage) is not Ambience-random
     Director.setEnabled(on, nowMs());
     if (on) Director.kick(); // jump to a fresh era immediately so engaging gives instant feedback
     console.log(
       "[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras"
     );
     post({ type: "director", enabled: Director.isEnabled(), eras: Director.eraCount() });
+    showBar();
+  }
+
+  // The Ambience family preset names, in the FAVORITES order, that actually loaded.
+  function ambienceEraList() {
+    return FAVORITES.filter(function (f) {
+      return /^Ambience/.test(f.label) && presets[f.wmp];
+    }).map(function (f) {
+      return f.wmp;
+    });
+  }
+
+  // "🎲 Ambience (Random)": reuse the Director engine (shuffle bag + energy-paced, beat-aligned
+  // crossfades) scoped to the Ambience family, with LONG dwell (~24-35s) + gentle ~4s fades so
+  // each scene plays out and transitions read as WMP-style cross-dissolves.
+  function setAmbienceRandom(on) {
+    ambienceRandomOn = !!on;
+    if (on) {
+      Director.setEras(ambienceEraList());
+      Director.cfg.dwellCalmMs = 35000;
+      Director.cfg.dwellLoudMs = 24000;
+      Director.cfg.blendCalmS = 4.5;
+      Director.cfg.blendLoudS = 3.5;
+    }
+    Director.setEnabled(on, nowMs());
+    if (on) Director.kick(); // jump to a fresh Ambience scene immediately
+    console.log(
+      "[WMP-viz] Ambience Random " + (on ? "ON — " + Director.eraCount() + " scenes" : "off")
+    );
+    if (presetSel)
+      presetSel.value = on
+        ? AMBIENCE_RANDOM_KEY
+        : names[idx] && presets[names[idx]]
+          ? names[idx]
+          : "";
+    post({ type: "ambienceRandom", enabled: ambienceRandomOn, scenes: Director.eraCount() });
     showBar();
   }
 
