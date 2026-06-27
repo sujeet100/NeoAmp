@@ -649,11 +649,12 @@
           t.q11 = t.time - lastBurst; // seconds since burst (burst age)
           t.q12 = burstStr; // burst strength
           t.q13 = burstSeed; // per-burst seed
-          // BEAT PUNCH: a fast-decaying flinch right after each burst -> the rings expand
-          // and flash on the kick (so the whole shape reacts, not just the particles)
+          // BEAT PUNCH: GUTTED to match the original Dance's calm — the rings used to snap
+          // outward + flash hard on every kick, which read as too much pulsing. Now only a
+          // faint flicker remains; the rings hold a steady size and just ease with the envelope.
           var punch = burstStr * Math.exp(-(t.time - lastBurst) * 7.0);
-          t.q6 += 0.045 * punch; // rings snap outward on the hit
-          t.q10 = Math.min(t.q10 + 0.55 * punch, 1.8); // and flash brighter
+          t.q6 += 0.01 * punch; // barely any size snap on the hit
+          t.q10 = Math.min(t.q10 + 0.18 * punch, 1.4); // gentle flicker, not a hard flash
           return t;
         },
         // WARP: trail control + MOTION BLUR. The default warp only does `ret -= 0.004`
