@@ -8,17 +8,19 @@
 
   // ── Ambience Thingus ─────────────────────────────────────────────────────
   // Re-derived frame-by-frame from "YouTube Ambience Thingus 480p.mp4":
-  //   • Exactly TWO jagged WHITE lightning lines crossing through dead center
-  //     (= 4 arms radiating) — the live audio waveform, displaced perpendicular
-  //     to each line. They cross cleanly at a single sharp centre (NO spiral eye).
-  //   • Slow rotation + long decay smears the lines' trails into 4 soft, broad
-  //     fluid arms behind them. Pure rotation only — no angular swirl (which
-  //     produced extra vortex eyes). The bolt + its fresh trail glow white,
-  //     fading out to the hue.
+  //   • A swirling PINWHEEL of curved spiral arms around ONE strong central eye,
+  //     with a jagged near-white oscilloscope BOLT (the live audio waveform,
+  //     displaced perpendicular to two crossing lines) riding on top. The arms
+  //     are the bolt's fading trail, curled by a single centered feedback SWIRL
+  //     (warp: polar rotate + gentle zoom-out). (An earlier build dropped the
+  //     swirl fearing "extra vortex eyes", giving a straight 4-arm X — wrong; the
+  //     reference clearly swirls around one eye.)
   //   • The whole frame is filled with a single GLOBAL hue that jumps to a RANDOM
   //     new hue every few seconds (crossfaded). Vivid monochrome (NOT amber),
   //     fading to a dark hue when the music drops.
-  //   • Bass "breathes" the zoom slightly; rotation is slow CCW.
+  //   • Bass "breathes" the zoom slightly; the bolt rotates slowly CCW.
+  //   NOTE: under SYNTHETIC audio the arms look scratchy/fine; real music has a
+  //   smoother waveform → broader, cleaner arms. Tune texture from live feedback.
   P["Ambience Thingus"] = (function () {
     var preset = build(
       {
@@ -47,18 +49,28 @@
           t.q6 = 0.1 + 0.3 * Math.min(0.6 * treb + 0.4 * mid, 2.4); // waveform amplitude (the jaggedness)
           t.q7 = 0.06 + 0.04 * bass; // gentle S-bend depth
           t.q10 = Math.min(0.6 + 0.7 * bass, 1.5); // bolt brightness PULSES with bass
-          // The LINES rotate (q1); the feedback/background is NOT rotated (rot=0)
-          // so it doesn't spin under them — matches the original.
+          // The bolt rotates (q1); a single centered SWIRL in the warp curls its fading
+          // trail into the pinwheel arms (rot=0 so the spin lives in the warp, not a
+          // rigid background spin).
           t.rot = 0.0;
           t.zoom = 1.0 + 0.035 * (bass - 1.0); // beat zoom breathe (back by request)
-          t.decay = 0.9; // faster fade -> deeper void, less fuzzy mesh
+          t.decay = 0.94; // longer trails so the swirl smears strokes into smooth curved arms
           return t;
         },
-        // Just a gentle feedback fade (rotation handles the smear). No angular
-        // swirl or jitter — those broke the single radial centre into many eyes.
+        // A single centered SWIRL (polar rotate + gentle zoom-out): each frame the
+        // feedback is rotated tangentially and pushed outward, so the bolt's fading
+        // trail smears into curved spiral ARMS — the reference pinwheel. (We earlier
+        // feared "extra vortex eyes" and dropped the swirl, but the 480p reference
+        // clearly has ONE strong swirl eye, so a single centered swirl is correct.)
         warp:
           "shader_body {\n" +
-          "ret = texture2D(sampler_main, uv).rgb;\n" +
+          "vec2 d = uv - 0.5;\n" +
+          "float pr = length(d);\n" +
+          "float pang = atan(d.y, d.x);\n" +
+          "pang += 0.16 * (0.55 + 0.45 * (1.0 - pr));\n" + // swirl stronger near center
+          "pr *= 0.992;\n" + // arms spiral slowly outward
+          "vec2 w = vec2(0.5) + pr * vec2(cos(pang), sin(pang));\n" +
+          "ret = texture2D(sampler_main, w).rgb;\n" +
           "ret -= 0.005;\n" +
           "}\n",
         // THICK lines: dilate the bright feedback by taking the max luminance over
@@ -73,11 +85,11 @@
           PAL_GLSL +
           "shader_body {\n" +
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float R = 9.0 + 20.0 * bass;\n" + // line thickness (px), pulses hard w/ bass
+          "float R = 4.0 + 8.0 * bass;\n" + // line thickness (px) — thin/crisp; the swirl makes the arms, not dilation
           "vec2 ips = vec2(1.0 / resolution.x, 1.0 / resolution.y);\n" +
           "float lum = lc(src);\n" +
-          // Two rings (R and 0.5R) x 8 directions -> a SOLID fat band, not sparse.
-          "for (int ri = 0; ri < 2; ri++) {\n" +
+          // ONE ring x 8 directions -> thicken the bolt a little without balling it into blobs.
+          "for (int ri = 0; ri < 1; ri++) {\n" +
           "  float rr = R * (ri == 0 ? 1.0 : 0.5);\n" +
           "  vec2 ex = vec2(rr, 0.0) * ips;\n" +
           "  vec2 ey = vec2(0.0, rr) * ips;\n" +
@@ -120,7 +132,7 @@
           additive: 1,
           usedots: 0,
           scaling: 1,
-          smoothing: 0.0,
+          smoothing: 0.5, // adjacent samples blend -> the bolt reads as a smooth band, not a grille
           a: 1.0,
           thick: 1,
           r: 1.0,
