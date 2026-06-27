@@ -760,59 +760,56 @@
   );
 
   // ── Ambience Dizzy ──────────────────────────────────────────────────────────
-  // Dizzying spiral: fast rotation plus a center-pulling swirl warp; amber glow on
-  // black, driven by a real circular waveform whose radius pulses with the bass.
-  P["Ambience Dizzy"] = (function () {
-    var preset = build(
-      {
-        wave_a: 0,
-        decay: 0.96,
-        gammaadj: 1.8,
-        zoom: 1.02,
-        rot: 0.06,
-        warp: 0.1,
-        warpscale: 1.4,
-        warpanimspeed: 1.2,
-        darken_center: 0,
-        wrap: 0,
+  // Re-derived from the reference (window ~114-125): a frame-FILLING tumbling cloud/
+  // smoke field — soft wispy filament BANDS that curve, fold and swirl ('dizzy'), with
+  // bright white-cyan filament EDGES and darker teal gaps. NO centred ring, NO empty
+  // hole — content fills the whole pane. Bright PALE cyan (hue ~180), luminous not
+  // dusty. Smooth continuous swirl, mostly time-driven. Built procedurally (a slow
+  // radius-dependent swirl of a scrolling fbm band field). (Was a clean cyan ring with
+  // a dark hollow centre on near-black — wrong.)
+  P["Ambience Dizzy"] = build(
+    {
+      wave_a: 0,
+      decay: 0.9,
+      gammaadj: 2.0,
+      zoom: 1.0,
+      rot: 0.0,
+      warp: 0.0,
+      cx: 0.5,
+      cy: 0.5,
+      darken_center: 0,
+      wrap: 0,
+    },
+    {
+      frame: function (t) {
+        return t; // continuous time-driven swirl, painted in the comp
       },
-      {
-        frame: function (t) {
-          var b = t.bass_att || t.bass || 1;
-          var tr = t.treb_att || t.treb || 1;
-          t.rot = 0.05 + 0.1 * b;
-          t.zoom = 1.01 + 0.02 * b;
-          t.q1 = 0.5;
-          t.q2 = 0.5;
-          t.q5 = 0.14 + 0.07 * b + 0.02 * tr;
-          return t;
-        },
-        warp:
-          "shader_body {\n" +
-          "vec2 d = uv - vec2(0.5);\n" +
-          "float a = 0.45 / (length(d) + 0.18);\n" +
-          "float s = sin(a + time * 0.6), c = cos(a + time * 0.6);\n" +
-          "vec2 sw = vec2(d.x * c - d.y * s, d.x * s + d.y * c);\n" +
-          "ret = texture2D(sampler_main, vec2(0.5) + sw * 0.992).rgb;\n" +
-          "ret -= 0.003;\n" +
-          "}\n",
-        comp:
-          // WMP Dizzy is a cyan/teal swirl (not the amber Ambience theme).
-          "shader_body {\n" +
-          "vec3 c = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(c, vec3(0.4));\n" +
-          "ret = vec3(0.10, 0.82, 0.85) * v * 1.7;\n" +
-          "float dd = distance(uv, vec2(0.5));\n" +
-          "ret += vec3(0.20, 0.95, 0.90) * exp(-dd * dd * 7.0) * (0.06 + 0.25 * bass);\n" +
-          "}\n",
-      }
-    );
-    preset.waves[0] = circleWave("q1", "q2");
-    preset.waves[0].baseVals.r = 0.4;
-    preset.waves[0].baseVals.g = 0.95;
-    preset.waves[0].baseVals.b = 1.0;
-    return preset;
-  })();
+      comp:
+        NOISE_GLSL +
+        "shader_body {\n" +
+        "vec2 p = uv - 0.5;\n" +
+        "p.x *= resolution.x / resolution.y;\n" +
+        "float pr = length(p);\n" +
+        // SWIRL: rotate the domain by an angle that grows toward the centre + drifts in
+        // time, so the bands tumble/fold like a slow vortex.
+        "float a = time * 0.25 + 1.6 * (0.55 - pr) + 0.4 * sin(time * 0.1);\n" +
+        "mat2 rot = mat2(cos(a), -sin(a), sin(a), cos(a));\n" +
+        "vec2 q = rot * p;\n" +
+        // horizontal-ish filament bands via scrolling fbm (two octaves)
+        "float bands = fbm(vec2(q.x * 3.0 + time * 0.10, q.y * 6.0 - time * 0.15));\n" +
+        "float bands2 = fbm(vec2(q.x * 7.0 - time * 0.08, q.y * 11.0 + time * 0.10));\n" +
+        "float v = (0.4 + 0.5 * bands + 0.3 * bands2) * (0.95 + 0.15 * bass);\n" +
+        // colour CYCLES magenta <-> cyan (~16s) — measured drift over the window; bright
+        // filament edges stay near-white in both phases.
+        "float ph = 0.5 + 0.5 * sin(time * 0.38);\n" + // 0 = cyan phase, 1 = magenta phase
+        "vec3 darkC = mix(vec3(0.05, 0.30, 0.32), vec3(0.20, 0.04, 0.22), ph);\n" + // dark teal <-> dark magenta
+        "vec3 litC = mix(vec3(0.55, 0.95, 0.95), vec3(0.95, 0.55, 0.95), ph);\n" + // cyan <-> magenta-pink
+        "vec3 col = mix(darkC, litC, smoothstep(0.30, 0.92, v));\n" +
+        "col = mix(col, vec3(0.90, 0.96, 1.0), smoothstep(0.82, 1.05, v));\n" + // white filament edges
+        "ret = col;\n" +
+        "}\n",
+    }
+  );
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
   // Four real-audio spokes (an 8-armed blade set) rotating about the center over a
