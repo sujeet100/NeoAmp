@@ -358,68 +358,110 @@
   // circleWave/spokeLine, so the pulsing elements beat with the music.
   // ════════════════════════════════════════════════════════════════════════
 
-  // ── Ambience Snell ──────────────────────────────────────────────────────────
-  // Refraction (Snell's law): the live circular waveform bent through a rippling
-  // amber "interface"; a warp displaces uv along a travelling lens so straight
-  // light bands shimmer and bend with the audio. Fixed amber.
-  P["Ambience Snell"] = (function () {
+  // ── Ambience Swirl ────────────────────────────────────────────────────────
+  // The REAL WMP Ambience "Swirl" (window ~38-46; this slot used to hold the
+  // invented "Snell", which does not exist in WMP). Re-derived from the reference:
+  //   • A central RADIAL SUNBURST — many fine spokes from a bright centre pinch,
+  //     filling a soft-edged OVAL (wider than tall), wrapped in a feathery cloud rim.
+  //   • TWO near-white jagged oscilloscope WAVEFORM lines crossing edge-to-edge,
+  //     one through the upper third, one through the lower third (the WMP signature).
+  //   • Muted DUSTY BLUES: navy field, cornflower/periwinkle spokes, near-white
+  //     centre + lines, near-black corners. FIXED blue (no hue cycle).
+  //   • Calm/smooth: the spokes slowly rotate/shimmer, the oval gently breathes; the
+  //     two lines wiggle with the live audio.
+  // The sunburst + oval + cloud rim are PROCEDURAL in the comp; the two lines are
+  // custom real-audio waves whose feedback the comp overlays as white.
+  P["Ambience Swirl"] = (function () {
     var preset = build(
       {
-        wave_mode: 0,
-        wave_smoothing: 0.9,
-        wave_scale: 0.5,
-        additivewave: 1,
-        wave_r: 1.0,
-        wave_g: 0.85,
-        wave_b: 0.3,
-        wave_a: 0.45,
-        decay: 0.96,
-        gammaadj: 1.8,
+        wave_a: 0,
+        decay: 0.8, // short trail -> crisp oscilloscope lines (redrawn each frame)
+        gammaadj: 1.5,
         zoom: 1.0,
         rot: 0.0,
-        warp: 0.12,
-        warpscale: 1.8,
-        warpanimspeed: 0.6,
+        warp: 0.0,
         cx: 0.5,
         cy: 0.5,
         darken_center: 0,
-        wrap: 1,
+        wrap: 0,
       },
       {
         frame: function (t) {
-          var bass = t.bass_att || t.bass || 1;
           var treb = t.treb_att || t.treb || 1;
-          t.warp = 0.1 + 0.06 * bass;
-          t.warpanimspeed = 0.5 + 0.4 * treb;
-          t.zoom = 1.0 + 0.004 * Math.sin(t.time * 0.3);
-          t.rot = 0.01 * Math.sin(t.time * 0.2);
-          t.decay = 0.96;
-          t.wave_a = 0.3 + 0.3 * bass;
-          t.wave_g = 0.82 + 0.1 * bass;
+          // line amplitude — SMALL and CAPPED so loud beats don't fan the 512 samples
+          // into a mess (the original keeps clean wiggly lines).
+          t.q6 = 0.035 + 0.03 * Math.min(treb, 1.6);
+          t.decay = 0.8;
           return t;
         },
-        warp:
-          "shader_body {\n" +
-          "vec2 w = uv;\n" +
-          "float n = sin(uv.y * 9.0 + time * 0.7) + 0.6 * sin(uv.y * 17.0 - time * 0.5);\n" +
-          "float m = cos(uv.x * 7.0 - time * 0.6) + 0.6 * cos(uv.x * 15.0 + time * 0.4);\n" +
-          "w.x += 0.016 * n;\n" +
-          "w.y += 0.010 * m;\n" +
-          "ret = texture2D(sampler_main, w).rgb;\n" +
-          "ret -= 0.003;\n" +
-          "}\n",
+        // The lines are drawn fresh each frame; the warp just fades the feedback fast
+        // so they stay crisp with only a hair of trail.
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb - 0.04;\n}\n",
         comp:
-          AMBER_RAMP +
+          NOISE_GLSL +
           "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" + // aspect-correct
+          "vec2 po = p; po.y *= 1.35;\n" + // OVAL body: wider than tall
+          "float pr = length(po);\n" +
+          "float pang = atan(po.y, po.x) + time * 0.06;\n" + // slow spoke rotation/shimmer
+          "float jit = fbm(vec2(pang * 3.0, time * 0.05));\n" +
+          "float spokes = 0.5 + 0.5 * sin(pang * 90.0 + jit * 8.0);\n" + // many fine irregular spokes
+          "spokes = pow(spokes, 1.6);\n" +
+          "float fall = exp(-pr * pr * (3.2 - 0.6 * bass));\n" + // oval falloff, breathes with loudness
+          "float core = exp(-pr * pr * 60.0);\n" + // small bright centre pinch
+          "float burst = fall * (0.30 + 0.70 * spokes);\n" +
+          "float rim = smoothstep(0.62, 0.32, pr) * (0.22 + 0.25 * fbm(vec2(pang * 2.0, pr * 4.0 - time * 0.1)));\n" + // feathery cloud rim
+          "float v = burst + 0.4 * rim;\n" +
+          // colour: navy field, cornflower spokes, small white centre pinch (FIXED blue)
+          "vec3 navy = vec3(0.04, 0.06, 0.17);\n" +
+          "vec3 corn = vec3(0.42, 0.52, 0.88);\n" +
+          "vec3 col = navy + corn * v * 1.25;\n" +
+          "col = mix(col, vec3(0.90, 0.93, 1.0), smoothstep(0.55, 1.0, core));\n" + // small soft white pinch
+          // the two white waveform lines (from the feedback buffer)
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float v = dot(src, vec3(0.33));\n" +
-          "v = 0.28 + 0.85 * v;\n" +
-          "v += 0.07 * sin(uv.y * 12.0 + time * 0.8);\n" +
-          "v *= (1.0 + 0.30 * bass);\n" +
-          "ret = amber_ramp(v);\n" +
+          "float lines = max(src.r, max(src.g, src.b));\n" +
+          "col = mix(col, vec3(0.90, 0.94, 1.0), smoothstep(0.30, 0.80, lines));\n" +
+          "col *= 1.0 - 0.55 * dot(p, p);\n" + // vignette -> near-black corners
+          "col = col / (col + 0.6);\n" + // Reinhard tone-map
+          "col *= 1.5;\n" +
+          "ret = col;\n" +
           "}\n",
       }
     );
+    // Two horizontal real-audio oscilloscope lines (upper + lower third), near-white,
+    // additive; vertical displacement = the live waveform sample (small, capped amp).
+    function hLine(yc) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.3,
+          a: 0.95,
+          thick: 1,
+          r: 0.92,
+          g: 0.95,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0; // -1..1 edge to edge
+          var amp = a.q6 || 0.05;
+          a.x = 0.5 + s * 0.56;
+          a.y = yc + a.value1 * amp; // perpendicular displacement = real waveform
+          a.r = 0.92;
+          a.g = 0.95;
+          a.b = 1.0;
+          return a;
+        },
+      };
+    }
+    preset.waves[0] = hLine(0.3);
+    preset.waves[1] = hLine(0.7);
     return preset;
   })();
 

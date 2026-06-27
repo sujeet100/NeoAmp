@@ -95,7 +95,7 @@
     { label: "Ambience Thingus", wmp: "Ambience Thingus" },
     { label: "Ambience Water", wmp: "Ambience Water" },
     { label: "Ambience Down the Drain", wmp: "Ambience Down the Drain" },
-    { label: "Ambience Snell", wmp: "Ambience Snell" },
+    { label: "Ambience Swirl", wmp: "Ambience Swirl" },
     { label: "Ambience Warp", wmp: "Ambience Warp" },
     { label: "Ambience Anon", wmp: "Ambience Anon" },
     { label: "Ambience Falloff", wmp: "Ambience Falloff" },
