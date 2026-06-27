@@ -90,9 +90,9 @@
         // COMP: the dense soft-blurred MOSAIC FILL that fills the space (reverse-engineered from
         // the reference: cells ~32-42px, soft edges, continuous haze between them, center bright
         // dissolving softly to black, muted violet, never white-hot).
-        //  - CELL read: sample the feedback buffer at a coord QUANTIZED to a ~32-cell grid
-        //    (aspect-corrected square cells), then 8-tap blur ACROSS each cell so the blocks have
-        //    SOFT edges, not hard pixels.
+        //  - CELL read: sample the feedback buffer at a coord QUANTIZED to a ~23-cell grid
+        //    (aspect-corrected square cells — chunky blocks, matched to the reference's scale),
+        //    then 8-tap blur ACROSS each cell so the blocks have SOFT edges, not hard pixels.
         //  - HAZE read: a wider blur of the same buffer = the continuous purple glow that fills
         //    BETWEEN cells, so the mosaic reads as ONE mass (not isolated blocks on black).
         //  - mix(haze, cell, 0.58) = soft blocks embedded in haze. A radial falloff makes the
@@ -104,7 +104,7 @@
           NOISE_GLSL +
           "shader_body {\n" +
           "vec2 px = 1.0 / resolution;\n" +
-          "float GRID = resolution.x / 40.0;\n" +
+          "float GRID = resolution.x / 56.0;\n" +
           "float asp = resolution.x / resolution.y;\n" +
           "vec2 g = vec2(GRID, GRID / asp);\n" +
           "vec2 cuv = (floor(uv * g) + 0.5) / g;\n" +
@@ -352,20 +352,30 @@
           t.q9 = rnd < 0.32 && ph < 0.4 ? 0 : 1;
           return t;
         },
+        // WARP: identical dense-mosaic-fill diffusion as (Nebula) — wide 9-tap blur + high fade
+        // (0.978) so the waveform traces accumulate into a filled mass. (No inward zoom: it streaks
+        // bright lines into radial spokes.) See (Nebula) above for the full rationale.
         warp:
           "shader_body {\n" +
           "vec2 wp = 1.0 / resolution;\n" +
-          "float br = 1.5;\n" +
-          "vec3 acc = texture2D(sampler_main, uv).rgb * 0.5;\n" +
-          "acc += texture2D(sampler_main, uv + vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv - vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv + vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv - vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
-          "ret = acc * 0.95;\n" +
+          "float br = 2.5;\n" +
+          "vec2 suv = uv;\n" +
+          "vec3 acc = texture2D(sampler_main, suv).rgb * 0.36;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, 0.0)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(wp.x * br, 0.0)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(0.0, wp.y * br)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(0.0, wp.y * br)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(-wp.x * br, wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, -wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(-wp.x * br, -wp.y * br)).rgb * 0.046;\n" +
+          "ret = acc * 0.978;\n" +
           "}\n",
-        // COMP: hue-cycling palette (WMP HueShift). hueCol() rotates through the wheel and
-        // desaturates toward grey when s is low. NO green clamp (the hue may legitimately
-        // be green/cyan during the cycle).
+        // COMP: the SAME dense soft-mosaic FILL as (Nebula) (~23-cell chunky blocks + haze +
+        // radial falloff + Reinhard tone-map), but recoloured through the hue-cycling palette
+        // (WMP HueShift): hueCol() rotates the whole mass through the colour wheel over ~50s and
+        // periodically desaturates toward grey. NO green clamp — the hue legitimately passes
+        // through green/cyan during the cycle.
         comp:
           NOISE_GLSL +
           "vec3 hueCol(float h, float s, float v) {\n" +
@@ -373,20 +383,44 @@
           "  return mix(vec3(0.5), rb, s) * v;\n" +
           "}\n" +
           "shader_body {\n" +
-          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" +
-          "float n = fbm(nuv); n = n * n;\n" +
-          "float vig = 1.0 - smoothstep(0.20, 0.92, length(uv - 0.5));\n" +
+          "vec2 px = 1.0 / resolution;\n" +
+          "float GRID = resolution.x / 56.0;\n" +
+          "float asp = resolution.x / resolution.y;\n" +
+          "vec2 g = vec2(GRID, GRID / asp);\n" +
+          "vec2 cuv = (floor(uv * g) + 0.5) / g;\n" +
+          "float bc = 0.7;\n" +
+          "vec3 cell = texture2D(sampler_main, cuv).rgb * 0.28;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x, 0.0)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x, 0.0)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(0.0,  bc / g.y)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(0.0, -bc / g.y)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x,  bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x,  bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x, -bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x, -bc / g.y)).rgb * 0.08;\n" +
+          "vec3 haze = texture2D(sampler_main, uv).rgb * 0.5;\n" +
+          "haze += texture2D(sampler_main, uv + vec2(px.x * 3.0, 0.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv - vec2(px.x * 3.0, 0.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv + vec2(0.0, px.y * 3.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv - vec2(0.0, px.y * 3.0)).rgb * 0.125;\n" +
+          "vec3 mass = mix(haze, cell, 0.58);\n" +
+          "float rfall = 1.0 - smoothstep(0.15, 0.85, length(uv - 0.5));\n" +
+          "mass *= rfall;\n" +
+          "float sl = max(mass.r, max(mass.g, mass.b));\n" +
           "float hb = time * 0.02;\n" + // ~50s full hue rotation
           "float S = clamp(0.55 + 0.55 * sin(time * 0.045), 0.0, 1.0);\n" + // periodic grey phase
+          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" +
+          "float n = fbm(nuv); n = n * n;\n" +
           "vec3 nebCol = hueCol(hb + 0.5, S * 0.85, 1.0);\n" + // complementary bg hue
-          "vec3 neb = mix(vec3(0.02, 0.02, 0.03), nebCol * 0.5, n) * (0.14 + 0.11 * bass) * vig;\n" +
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" +
-          "float sl = max(sharp.r, max(sharp.g, sharp.b));\n" +
+          "vec3 neb = mix(vec3(0.015, 0.015, 0.02), nebCol * 0.35, n) * (0.10 + 0.08 * bass) * rfall;\n" +
           "vec3 base = hueCol(hb, S, 1.0);\n" +
-          "vec3 lc = base * mix(0.45, 1.0, smoothstep(0.10, 0.60, sl));\n" +
-          "lc = mix(lc, vec3(1.0), smoothstep(0.80, 1.30, sl) * 0.55);\n" + // hot white cores
-          "vec3 line = lc * sl;\n" +
-          "ret = neb + line;\n" +
+          "vec3 lc = base * mix(0.4, 1.0, smoothstep(0.06, 0.45, sl));\n" +
+          "lc = mix(lc, mix(base, vec3(1.0), 0.6), smoothstep(0.55, 1.10, sl));\n" + // bright cores brighten but keep hue
+          "vec3 body = lc * sl;\n" +
+          "vec3 outc = neb + body;\n" +
+          "outc = outc / (outc + vec3(0.85));\n" + // Reinhard tone-map (no flat white)
+          "outc *= 1.45;\n" +
+          "ret = outc;\n" +
           "}\n",
       }
     );
