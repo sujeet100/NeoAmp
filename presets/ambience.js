@@ -263,25 +263,23 @@
   })();
 
   // ── Ambience Down the Drain ────────────────────────────────────────────────
-  // Re-derived from the reference (window ~178-194): a LARGE centered glowing
-  // anemone — a soft volumetric cloud with a dark pinched "drain" core, feathery
-  // RADIAL spokes fanning out, and crisp WHITE waveform-crackle filaments tracing
-  // the rim (real audio = the lightning). It churns/drains in a continuous smooth
-  // swirl, and the colour DRIFTS warm: pink/salmon -> amber/gold -> vivid yellow,
-  // cores white, on PURE BLACK. ONE circular real-waveform ring feeds it: each
-  // frame's ring is swirled + pulled inward + angular-blurred, so its fading trail
-  // fills the disc with feathery spokes (the body glow) while the fresh jagged ring
-  // is the white rim crackle. (Was a small off-center wireframe spirograph on
-  // brown — wrong model, wrong colour, wrong scale.)
+  // Re-derived from the reference + user note (window ~178-194): the WMP "2-waveform"
+  // mechanism. TWO jagged WHITE audio-waveform lines, PARALLEL to each other, that
+  // oscillate APART <-> together (meeting at the centre) and ROTATE continuously about
+  // the centre, leaving a colored DIFFUSE trail. Their swept feedback fills a glowing
+  // fan-striated DISC that drains inward; the crisp jagged white lines ride the leading
+  // edge. Warm colour drifts pink/salmon -> vivid YELLOW, cores white, on PURE BLACK.
+  // (Was a procedural anemone + a single circular crackle ring — missed the 2-line
+  // rotating/converging mechanism the user flagged.)
   P["Ambience Down the Drain"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.86, // short trail -> the crackle ring leaves only a brief swirling streak
+        decay: 0.94, // long trail -> the rotating lines sweep a filled, diffuse disc
         gammaadj: 1.6,
         zoom: 1.0,
         rot: 0.0,
-        warp: 0.02,
+        warp: 0.0,
         cx: 0.5,
         cy: 0.5,
         darken_center: 0,
@@ -290,68 +288,82 @@
       {
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1;
-          t.q2 = 0.5; // crackle-ring center x
-          t.q3 = 0.5; // crackle-ring center y
-          t.q5 = 0.33 + 0.06 * (bass - 1.0); // rim radius blooms gently with loudness
-          t.decay = 0.86;
+          var treb = t.treb_att || t.treb || 1;
+          t.q1 = t.time * 0.5; // continuous rotation angle of the parallel pair
+          t.q3 = 0.1 * (0.5 + 0.5 * Math.sin(t.time * 0.45)); // separation oscillates 0..0.10 (meets at centre)
+          t.q5 = 0.5; // line half-length (full diameters -> fill centre-to-edge)
+          t.q6 = 0.04 + 0.05 * Math.min(treb, 1.6); // jaggedness amplitude (small, capped)
           return t;
         },
-        // Gentle swirl + fast fade: the live-audio crackle ring (drawn on top) leaves a
-        // short rotating streak — the lightning sweeping the rim. The BODY is procedural
-        // in the comp, so the feedback only carries the crackle. (pang/pr — NOT the
-        // reserved ang/rad builtins.)
+        // Gentle continuous rotation of the trail ONLY (no inward shrink — that carved a
+        // dark hole and broke the fan into concentric rings). Diametric lines sweeping +
+        // a long trail fill a solid radial-striated fan, bright at the centre.
         warp:
           "shader_body {\n" +
           "vec2 d = uv - 0.5;\n" +
           "float pr = length(d);\n" +
-          "float pang = atan(d.y, d.x) + 0.10;\n" + // gentle rim rotation of the crackle streak
+          "float pang = atan(d.y, d.x) + 0.04;\n" + // gentle continuous rotation of the trail
           "vec2 w = vec2(0.5) + pr * vec2(cos(pang), sin(pang));\n" +
-          "ret = texture2D(sampler_main, w).rgb - 0.02;\n" +
+          "ret = texture2D(sampler_main, w).rgb - 0.004;\n" +
           "}\n",
-        // Procedural BODY: a filled radial glow disc with feathery fbm RADIAL spokes,
-        // a rotating two-lobe (bowtie/yin-yang) pinch, and a dark central drain hole —
-        // the whole thing draining/churning continuously. Warm colour DRIFTS pink ->
-        // amber -> vivid yellow (~22s), cores white-hot, on pure black. Then the live
-        // white waveform crackle (from the feedback) is added on the rim.
+        // The swept trail (feedback) is the diffuse YELLOW body; the hottest fresh lines
+        // punch WHITE. Warm pink<->yellow drift, tone-mapped, on black.
         comp:
-          NOISE_GLSL +
-          AMBER_RAMP +
           "shader_body {\n" +
           "vec2 p = uv - 0.5;\n" +
-          "p.x *= resolution.x / resolution.y;\n" + // aspect-correct -> round drain
-          "float pr = length(p);\n" +
-          "float pang = atan(p.y, p.x);\n" +
-          "float swirl = time * 0.45;\n" + // continuous draining churn
-          "float spk = fbm(vec2(pang * 3.5 + swirl, pr * 4.5 - time * 0.6));\n" + // broad feathery spokes
-          "float spk2 = fbm(vec2(pang * 7.0 - swirl * 0.7, pr * 9.0 - time * 0.4));\n" + // fine striations
-          "float fil = 0.45 + 0.45 * spk + 0.2 * spk2;\n" +
-          "float lobe = 0.4 + 0.6 * (0.5 + 0.5 * cos(2.0 * (pang - swirl * 0.5)));\n" + // rotating bowtie (pronounced)
-          "float body = exp(-pr * pr * (4.2 - 1.6 * bass));\n" + // filled disc (large), blooms with loudness
-          "float v = body * fil * lobe;\n" +
-          "v *= smoothstep(0.035, 0.12, pr);\n" + // dark central drain hole
-          "float ph = 0.5 + 0.5 * sin(time * 0.045);\n" + // warm temperature drift
-          "vec3 base = amber_ramp(v);\n" +
-          "vec3 col = mix(base * vec3(1.18, 0.82, 0.90), base * vec3(1.0, 1.0, 0.50), ph);\n" +
-          "vec3 src = texture2D(sampler_main, uv).rgb;\n" + // feedback = the white crackle ring + streak
-          "float crackle = max(src.r, max(src.g, src.b));\n" +
-          "col += vec3(1.0) * smoothstep(0.35, 0.85, crackle) * smoothstep(0.10, 0.20, pr);\n" + // crackle on the rim
-          "col = mix(col, vec3(1.0), smoothstep(0.82, 1.0, v));\n" + // white-hot pinch core
-          "col = col / (col + 0.55);\n" + // Reinhard tone-map -> soft, not blown neon
-          "col *= 1.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float lum = max(src.r, max(src.g, src.b));\n" +
+          "float ph = 0.5 + 0.5 * sin(time * 0.05);\n" + // warm temperature drift
+          "vec3 warm = mix(vec3(1.0, 0.62, 0.72), vec3(1.0, 0.92, 0.18), ph);\n" + // pink/salmon <-> vivid yellow
+          "vec3 col = warm * lum * 1.35;\n" +
+          "col += vec3(1.0) * smoothstep(0.6, 1.0, lum) * 0.7;\n" + // fresh white jagged lines punch through
+          "col = col / (col + 0.6) * 1.4;\n" + // tone-map -> glowing, bounded, black outside the disc
           "ret = col;\n" +
           "}\n",
       }
     );
-    // The rim crackle = a circular real-audio waveform: jagged (low smoothing) so the
-    // edge reads as WHITE lightning filaments; additive; near-white. The comp samples
-    // its feedback for the rim crackle; the body is procedural.
-    preset.waves[0] = circleWave("q2", "q3");
-    preset.waves[0].baseVals.r = 1.0;
-    preset.waves[0].baseVals.g = 1.0;
-    preset.waves[0].baseVals.b = 1.0;
-    preset.waves[0].baseVals.a = 0.9;
-    preset.waves[0].baseVals.smoothing = 0.15; // jagged -> crackle lightning (real waveform)
-    preset.waves[0].baseVals.thick = 0;
+    // Two PARALLEL real-audio waveform lines (white, additive). They run along a rotating
+    // axis (q1) and are offset perpendicular by +/- the oscillating separation q3 (so they
+    // meet at the centre when q3->0); the live sample adds the jaggedness q6.
+    function dRope(k, useV2) {
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.3,
+          a: 0.85,
+          thick: 1,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var th = a.q1 || 0;
+          var ct = Math.cos(th),
+            st = Math.sin(th);
+          var s = a.sample * 2.0 - 1.0; // -1 .. +1 along the rotating axis
+          var len = a.q5 || 0.46;
+          var sep = a.q3 || 0.0;
+          var amp = a.q6 || 0.05;
+          var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var perp = k * sep + samp * amp; // perpendicular offset: separation + jaggedness
+          a.x = 0.5 + s * len * ct - perp * st;
+          a.y = 0.5 + s * len * st + perp * ct;
+          a.r = 1.0;
+          a.g = 1.0;
+          a.b = 1.0;
+          return a;
+        },
+      };
+    }
+    preset.waves[0] = dRope(1, false);
+    preset.waves[1] = dRope(-1, true);
     return preset;
   })();
 
