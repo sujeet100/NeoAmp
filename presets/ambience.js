@@ -46,15 +46,19 @@
           var treb = t.treb_att || t.treb || 1;
           t.q1 = t.time * 0.28; // the CROSS visibly rotates CCW
           t.q5 = 0.72; // half-length (reaches the edges)
-          t.q6 = 0.1 + 0.3 * Math.min(0.6 * treb + 0.4 * mid, 2.4); // waveform amplitude (the jaggedness)
-          t.q7 = 0.06 + 0.04 * bass; // gentle S-bend depth
+          // Waveform amplitude (the jaggedness). KEPT SMALL and CAPPED: each of the 512
+          // samples is its own strand, so a big amplitude fans the bolt into a chaotic
+          // dandelion on loud beats (the original keeps a few broad arms). Small + capped
+          // -> the strands collapse toward one clean wavy bolt; the swirl makes the arms.
+          t.q6 = 0.03 + 0.045 * Math.min(0.5 * treb + 0.5 * mid, 1.2);
+          t.q7 = 0.06 + 0.04 * bass; // gentle S-bend depth (the broad arc, not the jaggedness)
           t.q10 = Math.min(0.6 + 0.7 * bass, 1.5); // bolt brightness PULSES with bass
           // The bolt rotates (q1); a single centered SWIRL in the warp curls its fading
           // trail into the pinwheel arms (rot=0 so the spin lives in the warp, not a
           // rigid background spin).
           t.rot = 0.0;
           t.zoom = 1.0 + 0.035 * (bass - 1.0); // beat zoom breathe (back by request)
-          t.decay = 0.94; // longer trails so the swirl smears strokes into smooth curved arms
+          t.decay = 0.9; // shorter trails -> fewer accumulated strands (less mess on loud beats)
           return t;
         },
         // A single centered SWIRL (polar rotate + gentle zoom-out): each frame the
@@ -132,7 +136,7 @@
           additive: 1,
           usedots: 0,
           scaling: 1,
-          smoothing: 0.5, // adjacent samples blend -> the bolt reads as a smooth band, not a grille
+          smoothing: 0.75, // strongly blend adjacent samples -> one smooth wavy bolt, not 512 strands
           a: 1.0,
           thick: 1,
           r: 1.0,
