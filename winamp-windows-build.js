@@ -277,8 +277,24 @@ function ensureNowPlaying() {
   }
   // like / dislike the current track (the main window has no such control).
   // Crisp inline-SVG icons (heart / thumbs-down) so they stay sharp + monochrome.
+  // Heart carries an amber gradient + LED-scanline PATTERN in <defs>; when liked, the CSS
+  // fills the path with url(#likeScan) (a lit amber-LED-display look) instead of a flat colour.
+  // Off-state inherits the translucent key-fg from .wa-rate-btn svg (path has no own fill).
   var HEART_SVG =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    "<defs>" +
+    '<radialGradient id="likeAmberGrad" cx="50%" cy="34%" r="72%">' +
+    '<stop offset="0%" stop-color="#ffe39c"/>' +
+    '<stop offset="50%" stop-color="#f4a92f"/>' +
+    '<stop offset="100%" stop-color="#bf7011"/>' +
+    "</radialGradient>" +
+    '<pattern id="likeScan" width="4" height="3.4" patternUnits="userSpaceOnUse">' +
+    '<rect width="4" height="3.4" fill="url(#likeAmberGrad)"/>' +
+    '<rect width="4" height="1.1" fill="rgba(40,20,0,0.5)"/>' +
+    "</pattern>" +
+    "</defs>" +
+    '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>' +
+    "</svg>";
   var THUMBDOWN_SVG =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path transform="rotate(180 12 12)" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>';
   function rateBtn(svg, title, kind) {

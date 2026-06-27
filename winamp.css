@@ -855,9 +855,14 @@
   fill: color-mix(in srgb, var(--wa-key-fg, #3a3a44) 50%, transparent);
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
 }
+/* liked = lit AMBER LED: fill the heart with the scanline pattern (baked into HEART_SVG's
+   <defs>) for a retro lit-display texture, + a soft amber bloom so it reads as "selected" on
+   any skin (warm amber is the complement to the cool metal keys). Fixed colour, not skin-LED,
+   because the auto LED was too low-contrast on some skins. */
 .wa-rate-btn.wa-like.on svg {
-  fill: var(--wa-led-on, #7d5cff); /* skin's LED colour; on-theme violet fallback (never red) */
-  filter: drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.5)) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+  fill: url(#likeScan);
+  filter: drop-shadow(0 0 2px rgba(242, 165, 46, 0.95))
+    drop-shadow(0 -1px 0 rgba(255, 235, 190, 0.5)) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 .wa-rate-btn.wa-dislike.on svg {
   fill: #4da6ff;
