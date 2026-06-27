@@ -932,48 +932,116 @@
   // central object, NO spokes, NO radial structure, NO hot core. FIXED cyan (hue 180),
   // luminous-but-clean. Built procedurally (no custom waves). (Was 4 rotating real-audio
   // spokes + a center bloom — the literal "windmill blades" misread; wrong.)
-  P["Ambience Windmill"] = build(
-    {
-      wave_a: 0,
-      decay: 0.9,
-      gammaadj: 1.6,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.0,
-      cx: 0.5,
-      cy: 0.5,
-      darken_center: 0,
-      wrap: 0,
-    },
-    {
-      frame: function (t) {
-        return t; // continuous time-driven diagonal flow, painted in the comp
+  // ...with TWO parallel DIAGONAL jagged WHITE waveform lines threaded through it, and the
+  // whole field TRAVELLING along the diagonal so it feels like flying through space (user
+  // note: it had no waveforms). The lines are carried in the feedback RED channel (the cyan
+  // caustic has low red-vs-green, so reading red-minus-green isolates the white lines
+  // cleanly); a diagonal advection warp streams their trail = the travel.
+  P["Ambience Windmill"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.92,
+        gammaadj: 1.6,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      comp:
-        NOISE_GLSL +
-        "shader_body {\n" +
-        "vec2 p = uv;\n" +
-        "p.x *= resolution.x / resolution.y;\n" +
-        // diagonal advection (LL -> UR) + rotate/elongate the domain so ridges run diagonally
-        "vec2 flow = vec2(0.06, -0.05) * time;\n" +
-        "vec2 q = p * 4.0 + flow;\n" +
-        "q = mat2(0.707, -0.707, 0.707, 0.707) * q;\n" + // rotate 45deg
-        "q.y *= 0.5;\n" + // elongate features along the diagonal
-        "float n = fbm(q + 0.6 * fbm(q * 0.7 - flow * 0.5));\n" + // domain-warped base body
-        "float ridge = pow(1.0 - abs(2.0 * fbm(q * 1.6 + n) - 1.0), 3.0);\n" + // frothy inverted-ridge crests
-        "float ridge2 = pow(1.0 - abs(2.0 * fbm(q * 3.0 - n * 1.2 + flow) - 1.0), 4.0);\n" +
-        "float crest = max(ridge, 0.7 * ridge2);\n" +
-        "float body = 0.5 + 0.5 * n;\n" + // higher floor -> luminous, few dark troughs
-        "body *= (0.95 + 0.15 * bass);\n" +
-        // fixed BRIGHT cyan (measured ~rgb 0.53,0.90,0.90): only mild teal troughs, white crests
-        "vec3 col = mix(vec3(0.12, 0.48, 0.50), vec3(0.55, 0.95, 0.95), smoothstep(0.2, 0.85, body));\n" +
-        "col = mix(col, vec3(0.92, 1.0, 1.0), smoothstep(0.5, 1.0, crest));\n" +
-        "col = col / (col + 0.7);\n" + // gentler tone-map -> stays bright
-        "col *= 1.7;\n" +
-        "ret = col;\n" +
-        "}\n",
+      {
+        frame: function (t) {
+          var treb = t.treb_att || t.treb || 1;
+          t.q3 = 0.13; // perpendicular separation of the 2 parallel lines
+          t.q5 = 0.62; // line half-length (spans the diagonal)
+          t.q6 = 0.03 + 0.04 * Math.min(treb, 1.6); // jaggedness amplitude
+          return t;
+        },
+        // diagonal advection -> the lines' red trail STREAMS up-right = camera travelling
+        // through space; fade red so the trail has finite length (the cyan body is
+        // recomputed fresh in the comp, so it never accumulates).
+        warp:
+          "shader_body {\n" +
+          "vec2 w = uv + vec2(-0.005, 0.004);\n" + // sample down-left -> content streams up-right
+          "vec3 c = texture2D(sampler_main, w).rgb;\n" +
+          "c.r *= 0.82;\n" +
+          "ret = c;\n" +
+          "}\n",
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "vec2 p = uv;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          // diagonal advection (LL -> UR) + rotate/elongate the domain so ridges run diagonally
+          "vec2 flow = vec2(0.06, -0.05) * time;\n" +
+          "vec2 q = p * 4.0 + flow;\n" +
+          "q = mat2(0.707, -0.707, 0.707, 0.707) * q;\n" + // rotate 45deg
+          "q.y *= 0.5;\n" + // elongate features along the diagonal
+          "float n = fbm(q + 0.6 * fbm(q * 0.7 - flow * 0.5));\n" + // domain-warped base body
+          "float ridge = pow(1.0 - abs(2.0 * fbm(q * 1.6 + n) - 1.0), 3.0);\n" + // frothy inverted-ridge crests
+          "float ridge2 = pow(1.0 - abs(2.0 * fbm(q * 3.0 - n * 1.2 + flow) - 1.0), 4.0);\n" +
+          "float crest = max(ridge, 0.7 * ridge2);\n" +
+          "float body = 0.5 + 0.5 * n;\n" + // higher floor -> luminous, few dark troughs
+          "body *= (0.95 + 0.15 * bass);\n" +
+          // fixed BRIGHT cyan (measured ~rgb 0.53,0.90,0.90): only mild teal troughs, white crests
+          "vec3 col = mix(vec3(0.12, 0.48, 0.50), vec3(0.50, 0.90, 0.92), smoothstep(0.2, 0.85, body));\n" +
+          "col = mix(col, vec3(0.82, 0.96, 0.96), smoothstep(0.65, 1.05, crest));\n" + // fewer white crests so the lines dominate
+          // the 2 travelling white waveform lines: red-minus-green isolates them from cyan
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float beam = max(0.0, src.r - 0.6 * src.g);\n" +
+          "col = mix(col, vec3(1.0), smoothstep(0.1, 0.32, beam));\n" + // bold WHITE travelling lines
+          "col += vec3(0.8, 1.0, 1.0) * smoothstep(0.18, 0.45, beam) * 0.5;\n" + // line glow halo
+          "col = max(col, vec3(0.0));\n" +
+          "col = col / (col + 0.7);\n" + // gentler tone-map -> stays bright
+          "col *= 1.7;\n" +
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+    // Two PARALLEL diagonal (45deg) real-audio waveform lines, offset perpendicular by +/-
+    // the separation q3, jaggedness q6. Drawn WHITE (high red) so the comp's red-minus-green
+    // test isolates them from the cyan body; the warp advects their trail = the travel.
+    function wRope(k, useV2) {
+      var ct = 0.707,
+        st = 0.707; // 45deg diagonal axis
+      return {
+        baseVals: Object.assign({}, WAVE_BASE, {
+          enabled: 1,
+          samples: 512,
+          additive: 1,
+          usedots: 0,
+          scaling: 1,
+          smoothing: 0.3,
+          a: 1.0,
+          thick: 3,
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+        }),
+        init_eqs: passthrough,
+        frame_eqs: passthrough,
+        point_eqs: function (a) {
+          var s = a.sample * 2.0 - 1.0;
+          var len = a.q5 || 0.62;
+          var sep = a.q3 || 0.12;
+          var amp = a.q6 || 0.05;
+          var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
+          var perp = k * sep + samp * amp;
+          a.x = 0.5 + s * len * ct - perp * st;
+          a.y = 0.5 + s * len * st + perp * ct;
+          a.r = 1.0;
+          a.g = 1.0;
+          a.b = 1.0;
+          return a;
+        },
+      };
     }
-  );
+    preset.waves[0] = wRope(1, false);
+    preset.waves[1] = wRope(-1, true);
+    return preset;
+  })();
 
   // ── Ambience Niagara ──────────────────────────────────────────────────────
   // Re-derived from the reference (window ~141-155): a vertical luminous FLUID-COLUMN /
