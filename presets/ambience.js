@@ -522,63 +522,93 @@
   );
 
   // ── Ambience Anon ───────────────────────────────────────────────────────────
-  // Anonymous slow-morphing amber cloud: a soft fbm mass that breathes, with a
-  // faint waveform heartbeat fed in. Deliberately minimal, very smooth.
-  P["Ambience Anon"] = build(
-    {
-      wave_mode: 0,
-      wave_smoothing: 0.95,
-      wave_scale: 0.3,
-      additivewave: 1,
-      wave_r: 1.0,
-      wave_g: 0.86,
-      wave_b: 0.32,
-      wave_a: 0.18,
-      decay: 0.97,
-      gammaadj: 1.7,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.05,
-      warpscale: 1.6,
-      warpanimspeed: 0.2,
-      cx: 0.5,
-      cy: 0.5,
-      darken_center: 0,
-      wrap: 1,
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        t.warp = 0.04 + 0.03 * bass;
-        t.warpanimspeed = 0.18;
-        t.zoom = 1.0 + 0.003 * Math.sin(t.time * 0.2);
-        t.decay = 0.97;
-        t.wave_a = 0.12 + 0.18 * bass;
-        t.wave_g = 0.84 + 0.06 * Math.sin(t.time * 0.15);
-        return t;
+  // Re-derived from the reference (window ~57-68): an EDGE-TO-EDGE bright VIVID-yellow
+  // cloud field (no black, no vignette — an Ambience exception to "stay muted"), with a
+  // centered radial sunflower of thin filament SPOKES and a strong HORIZONTAL crackling
+  // lens-flare BEAM through the centre, cores blooming near-white. Calm smooth radial
+  // flow. The bright filled cloud + spokes are procedural; the beam is one real-audio
+  // horizontal waveform line (its long feedback smear = the lens-flare glow + crackle).
+  // (Was a too-dark amber wash with an off-centre drifting ring.)
+  P["Ambience Anon"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.9, // moderate trail -> the beam line smears into a soft horizontal glow
+        gammaadj: 1.3,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      warp:
-        "shader_body {\n" +
-        "vec2 w = uv + 0.006 * vec2(sin(uv.y * 5.0 + time * 0.25), cos(uv.x * 5.0 + time * 0.2));\n" +
-        "ret = texture2D(sampler_main, w).rgb;\n" +
-        "ret -= 0.002;\n" +
-        "}\n",
-      comp:
-        NOISE_GLSL +
-        AMBER_RAMP +
-        "shader_body {\n" +
-        "vec2 p = uv * 2.2;\n" +
-        "p += vec2(time * 0.04, -time * 0.03);\n" +
-        "float cloud = fbm(p + fbm(p + time * 0.05));\n" +
-        "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-        "float v = 0.55 * cloud + 0.55 * dot(src, vec3(0.33));\n" +
-        "float d = distance(uv, vec2(0.5));\n" +
-        "v *= smoothstep(0.85, 0.15, d);\n" +
-        "v *= (1.0 + 0.25 * bass);\n" +
-        "ret = amber_ramp(v);\n" +
-        "}\n",
-    }
-  );
+      {
+        frame: function (t) {
+          var treb = t.treb_att || t.treb || 1;
+          t.q6 = 0.03 + 0.025 * Math.min(treb, 1.6); // beam crackle amplitude (small, capped)
+          t.decay = 0.9;
+          return t;
+        },
+        // Fast fade so the horizontal beam line stays a crisp jagged crackle with a soft
+        // horizontal smear; the cloud + spokes are painted procedurally in the comp.
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb - 0.02;\n}\n",
+        comp:
+          NOISE_GLSL +
+          AMBER_RAMP +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          "float pr = length(p);\n" +
+          "float pang = atan(p.y, p.x);\n" +
+          // bright billowing yellow cloud base (filled edge-to-edge)
+          "vec2 cp = uv * 2.2 + vec2(time * 0.04, -time * 0.03);\n" +
+          "float cloud = fbm(cp + fbm(cp + time * 0.05));\n" +
+          // centered radial filament spokes, slowly rotating, brightest near centre
+          "float spokes = 0.5 + 0.5 * sin((pang + time * 0.05) * 48.0 + 9.0 * fbm(vec2(pang * 3.0, time * 0.05)));\n" +
+          "spokes = pow(spokes, 1.8) * exp(-pr * pr * 4.0);\n" + // concentrated near centre, fade out into cloud
+          "float v = 0.42 + 0.45 * cloud + 0.32 * spokes;\n" + // bright filled field; cloud billows show through
+          "v *= (0.95 + 0.2 * bass);\n" +
+          // the horizontal crackle/lens-flare beam (real-audio line in the feedback)
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float beam = max(src.r, max(src.g, src.b));\n" +
+          "v += 0.5 * beam;\n" +
+          "vec3 col = amber_ramp(v);\n" + // black->amber->yellow->white-hot
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+    // The horizontal beam = a real-audio waveform line through centre (y=0.5), near-white,
+    // additive; small capped vertical displacement so loud beats stay clean.
+    preset.waves[0] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 1,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.35,
+        a: 0.9,
+        thick: 1,
+        r: 1.0,
+        g: 0.98,
+        b: 0.85,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var s = a.sample * 2.0 - 1.0;
+        var amp = a.q6 || 0.04;
+        a.x = 0.5 + s * 0.56;
+        a.y = 0.5 + a.value1 * amp;
+        a.r = 1.0;
+        a.g = 0.98;
+        a.b = 0.85;
+        return a;
+      },
+    };
+    return preset;
+  })();
 
   // ── Ambience Falloff ────────────────────────────────────────────────────────
   // Light cascading downward: feedback drifts down each frame so the live waveform
