@@ -625,10 +625,10 @@
           var trebA = t.treb_att !== undefined ? t.treb_att : t.treb || 0;
           var gate = Math.max(0, Math.min((0.5 * (midA + trebA) - 0.55) * 1.8, 1.3));
           t.q10 = gate; // ring brightness/alpha (0 = gone)
-          t.q6 = 0.07 + 0.13 * gate; // radius contracts when quiet, expands when active
+          t.q6 = 0.08 + 0.08 * gate; // CALMER radius swing (was 0.07 + 0.13) — flows, not pumps
           // MODERATE amplitude from the SMOOTHED _att vars -> jagged spikes that bite but
           // can't explode; peaks AND troughs are also hard-clamped in waveRing point_eqs.
-          t.q8 = 0.03 + 0.08 * Math.min(0.6 * trebA + 0.4 * midA, 2.0);
+          t.q8 = 0.025 + 0.05 * Math.min(0.6 * trebA + 0.4 * midA, 2.0); // CALMER spikes (was 0.03 + 0.08)
           var slot = Math.floor(t.time / 0.55);
           var rnd = Math.sin(slot * 12.9898) * 43758.5453;
           rnd = rnd - Math.floor(rnd);
@@ -850,7 +850,7 @@
           additive: 1,
           usedots: 0,
           scaling: 1,
-          smoothing: 0.0,
+          smoothing: 0.3,
           a: 0.85,
           thick: 1,
           r: 0.8,
