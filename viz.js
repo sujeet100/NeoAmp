@@ -605,17 +605,11 @@
     post({ type: "ready", presets: names.length });
   }
 
-  window.addEventListener("message", function (e) {
-    // Only accept messages from our embedding window (the content script posts via
-    // vizFrame.contentWindow.postMessage, and we reply via parent.postMessage — so `parent`
-    // is the only legitimate peer; in the self-render harness viz.html is top-level so
-    // parent === window and this still passes). This blocks other-frame/popup injectors.
-    // CAVEAT: in the live extension the content script shares the host page's window, so a
-    // same-window page script isn't fully excluded by source alone — the robust isolation is a
-    // private MessageChannel (follow-up). Impact here is visualizer-only (no storage/capture).
-    if (e.source !== parent) return;
-    var m = e.data || {};
-    if (!m.__wmp) return;
+  var cmdPort = null; // private MessageChannel port from the embedder (extension mode)
+
+  // Dispatch a validated {__wmp:...} command. Reached either via the private port (embedded
+  // extension) or via window 'message' in standalone / self-render-harness mode.
+  function handleWmp(m) {
     if (m.type === "audio" && m.data) latest.set(m.data);
     else if (m.type === "favorites:init") {
       userFavs.clear();
@@ -637,6 +631,30 @@
     else if (m.type === "batteryRandom:toggle")
       setFamilyRandom(autoRandomKey === BATTERY_RANDOM_KEY ? "" : BATTERY_RANDOM_KEY);
     else if (m.type === "batteryRandom:set") setFamilyRandom(m.enabled ? BATTERY_RANDOM_KEY : "");
+  }
+
+  window.addEventListener("message", function (e) {
+    // Only our embedding window is a legitimate peer (the content script posts here; we reply
+    // via parent.postMessage). In the self-render harness viz.html is top-level so parent ===
+    // window and this still passes. This alone blocks other-frame/popup injectors.
+    if (e.source !== parent) return;
+    var m = e.data || {};
+    if (!m.__wmp) return;
+    // Handshake: the extension content script transfers a PRIVATE MessageChannel port (only it
+    // and we can reach it). Because the content script shares the host page's window, window-
+    // posted commands are forgeable by a malicious page — so once the port is established we
+    // trust ONLY it and ignore window commands. Standalone/harness: no embedder sends a port,
+    // so cmdPort stays null and window messages are handled as before (dev tooling unaffected).
+    if (m.__port && e.ports && e.ports[0]) {
+      cmdPort = e.ports[0];
+      cmdPort.onmessage = function (ev) {
+        var pm = ev.data || {};
+        if (pm.__wmp) handleWmp(pm);
+      };
+      return;
+    }
+    if (cmdPort) return; // embedded + private port established -> window commands no longer trusted
+    handleWmp(m);
   });
 
   function setDirector(on) {

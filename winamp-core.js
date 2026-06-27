@@ -88,7 +88,8 @@ var root = null,
 var wins = {}; // id -> { el, body, titlebar }
 
 var vizFrame = null,
-  vizBuilt = false;
+  vizBuilt = false,
+  vizPort = null; // private MessageChannel port to the sandboxed iframe (set on the viz "ready")
 
 var zTop = 20;
 
@@ -217,9 +218,19 @@ function mixWhite(rgb, t) {
 // iframe bridge (audio in, presets/favorites round-trip)
 // =========================================================================
 function postViz(m) {
+  var msg = Object.assign({ __wmp: true }, m);
+  // Prefer the PRIVATE port once the handshake (on viz "ready") established it — a malicious
+  // host-page script can't see/forge that channel. Before the port exists (briefly, pre-ready)
+  // fall back to the window post so early messages still arrive.
+  if (vizPort) {
+    try {
+      vizPort.postMessage(msg);
+    } catch (_) {}
+    return;
+  }
   if (!vizFrame || !vizFrame.contentWindow) return;
   try {
-    vizFrame.contentWindow.postMessage(Object.assign({ __wmp: true }, m), "*");
+    vizFrame.contentWindow.postMessage(msg, "*");
   } catch (_) {}
 }
 

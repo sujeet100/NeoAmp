@@ -184,6 +184,20 @@ if (NA && !window.__neoampUiLoaded) {
     var m = e.data || {};
     if (!m.__wmp) return;
     if (m.type === "ready") {
+      // Establish a PRIVATE command channel to the sandboxed iframe. The 'ready' message is
+      // source-verified (e.source === vizFrame.contentWindow above — a page script can't forge
+      // that), so this handshake is trustworthy. The transferred port is reachable only by the
+      // iframe + us, so a malicious host-page script (which shares our window) can no longer
+      // forge visualizer commands via window.postMessage. postViz() switches to vizPort.
+      try {
+        if (window.MessageChannel && vizFrame && vizFrame.contentWindow) {
+          var ch = new MessageChannel();
+          vizFrame.contentWindow.postMessage({ __wmp: true, __port: 1 }, "*", [ch.port2]);
+          vizPort = ch.port1;
+        }
+      } catch (_) {
+        vizPort = null;
+      }
       NA.storage.get("neoampFavorites", function (names) {
         postViz({ type: "favorites:init", names: names || [] });
       });
