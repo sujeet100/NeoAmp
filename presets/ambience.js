@@ -746,8 +746,9 @@
         frame: function (t) {
           var bass = t.bass_att || t.bass || 1;
           var treb = t.treb_att || t.treb || 1;
-          // the radial waveform RING expands out from the centre toward the rim on the beat
-          t.q5 = 0.05 + 0.34 * Math.max(0, Math.min(1, (bass - 0.95) / 0.55));
+          // the jagged waveform RING expands CONTINUOUSLY centre->rim (a steady RIPPLE, NOT a
+          // beat pulse — user note); a new ripple is reborn at the centre each cycle.
+          t.q5 = 0.03 + 0.37 * ((t.time * 0.22) % 1.0);
           t.q6 = 0.015 + 0.03 * Math.min(treb, 1.6); // ring jaggedness
           return t;
         },
@@ -780,11 +781,17 @@
           "vec3 pale = mix(vec3(1.0), tint, 0.5);\n" + // white-biased -> muted/pale
           "vec3 col = pale * v;\n" +
           "col += vec3(0.5, 0.0, 0.42) * rim * (0.3 + 0.3 * sin(ph * 6.2832));\n" + // magenta rim fringe (phased)
-          // the real-audio waveform RING (feedback) — a jagged ring that pulses out from the
-          // centre to the rim on the beat; punched white, clipped to inside the bubble disc.
+          // continuous concentric RIPPLES emanating centre->rim (pond-like, TIME-driven, NOT
+          // beat-synced); many rings born at the centre travel outward and fade at the rim.
+          "float rjag = 0.5 * fbm(vec2(pang * 5.0, time * 0.4));\n" + // gentle organic wobble of the rings
+          "float rip = 0.5 + 0.5 * sin(pr * 46.0 - time * 5.0 + rjag * 6.0);\n" +
+          "rip = pow(rip, 2.5) * smoothstep(0.03, 0.10, pr) * disc;\n" + // within the bubble, fade at the very centre
+          "col += vec3(0.92, 0.96, 1.0) * rip * (0.22 + 0.10 * treb);\n" + // milky ripple rings, faint treble shimmer
+          // the real-audio jagged ring (feedback) rides the ripples as the leading wavefront,
+          // expanding continuously centre->rim; punched white, clipped to inside the disc.
           "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
           "float wave = max(src.r, max(src.g, src.b));\n" +
-          "col += vec3(1.0, 0.97, 0.9) * smoothstep(0.4, 0.85, wave) * smoothstep(R + 0.02, R - 0.02, prw) * 0.85;\n" +
+          "col += vec3(1.0, 0.97, 0.9) * smoothstep(0.4, 0.85, wave) * smoothstep(R + 0.02, R - 0.02, prw) * 0.7;\n" +
           "col = col / (col + 0.5);\n" + // Reinhard tone-map
           "col *= 1.5;\n" +
           "ret = col;\n" +
