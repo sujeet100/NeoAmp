@@ -963,19 +963,22 @@
       {
         frame: function (t) {
           var treb = t.treb_att || t.treb || 1;
+          t.q1 = 0.785 + t.time * 0.06; // diagonal axis SLOWLY ROTATES (the reference tilts over time)
           t.q3 = 0.13; // perpendicular separation of the 2 parallel lines
           t.q5 = 0.62; // line half-length (spans the diagonal)
-          t.q6 = 0.03 + 0.04 * Math.min(treb, 1.6); // jaggedness amplitude
+          t.q6 = 0.03 + 0.05 * Math.min(treb, 1.6); // jaggedness amplitude
           return t;
         },
-        // diagonal advection -> the lines' red trail STREAMS up-right = camera travelling
-        // through space; fade red so the trail has finite length (the cyan body is
-        // recomputed fresh in the comp, so it never accumulates).
+        // PARALLAX / FALLING-THROUGH-SPACE: content rushes OUTWARD from a vanishing point we
+        // fly toward (zoom-out feedback) + a slight diagonal drift, so the cyan clouds and the
+        // waveform lines stream past and GROW as if we are falling through infinite space.
+        // Only the red channel (the lines) is faded; the cyan body is recomputed fresh.
         warp:
           "shader_body {\n" +
-          "vec2 w = uv + vec2(-0.005, 0.004);\n" + // sample down-left -> content streams up-right
+          "vec2 vp = vec2(0.60, 0.42);\n" + // vanishing point we travel toward
+          "vec2 w = vp + (uv - vp) * 0.975 + vec2(-0.003, 0.003);\n" + // content grows out from vp = fly-through
           "vec3 c = texture2D(sampler_main, w).rgb;\n" +
-          "c.r *= 0.82;\n" +
+          "c.r *= 0.84;\n" +
           "ret = c;\n" +
           "}\n",
         comp:
@@ -997,11 +1000,20 @@
           // fixed BRIGHT cyan (measured ~rgb 0.53,0.90,0.90): only mild teal troughs, white crests
           "vec3 col = mix(vec3(0.12, 0.48, 0.50), vec3(0.50, 0.90, 0.92), smoothstep(0.2, 0.85, body));\n" +
           "col = mix(col, vec3(0.82, 0.96, 0.96), smoothstep(0.65, 1.05, crest));\n" + // fewer white crests so the lines dominate
-          // the 2 travelling white waveform lines: red-minus-green isolates them from cyan
-          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-          "float beam = max(0.0, src.r - 0.6 * src.g);\n" +
-          "col = mix(col, vec3(1.0), smoothstep(0.1, 0.32, beam));\n" + // bold WHITE travelling lines
-          "col += vec3(0.8, 1.0, 1.0) * smoothstep(0.18, 0.45, beam) * 0.5;\n" + // line glow halo
+          // the 2 travelling white waveform lines: red-minus-green isolates them from cyan.
+          // Dilate over a few taps so the lines read as BOLD thick bolts, not hairlines.
+          "vec3 s0 = texture2D(sampler_main, uv).rgb;\n" +
+          "float beam = max(0.0, s0.r - 0.6 * s0.g);\n" +
+          "vec3 sa = texture2D(sampler_main, uv + vec2(0.008, 0.0)).rgb;\n" +
+          "vec3 sb = texture2D(sampler_main, uv - vec2(0.008, 0.0)).rgb;\n" +
+          "vec3 sc = texture2D(sampler_main, uv + vec2(0.0, 0.012)).rgb;\n" +
+          "vec3 sd = texture2D(sampler_main, uv - vec2(0.0, 0.012)).rgb;\n" +
+          "beam = max(beam, 0.85 * max(0.0, sa.r - 0.6 * sa.g));\n" +
+          "beam = max(beam, 0.85 * max(0.0, sb.r - 0.6 * sb.g));\n" +
+          "beam = max(beam, 0.85 * max(0.0, sc.r - 0.6 * sc.g));\n" +
+          "beam = max(beam, 0.85 * max(0.0, sd.r - 0.6 * sd.g));\n" +
+          "col = mix(col, vec3(1.0), smoothstep(0.08, 0.28, beam));\n" + // bold WHITE travelling lines
+          "col += vec3(0.8, 1.0, 1.0) * smoothstep(0.14, 0.4, beam) * 0.55;\n" + // line glow halo
           "col = max(col, vec3(0.0));\n" +
           "col = col / (col + 0.7);\n" + // gentler tone-map -> stays bright
           "col *= 1.7;\n" +
@@ -1013,8 +1025,6 @@
     // the separation q3, jaggedness q6. Drawn WHITE (high red) so the comp's red-minus-green
     // test isolates them from the cyan body; the warp advects their trail = the travel.
     function wRope(k, useV2) {
-      var ct = 0.707,
-        st = 0.707; // 45deg diagonal axis
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
           enabled: 1,
@@ -1024,7 +1034,7 @@
           scaling: 1,
           smoothing: 0.3,
           a: 1.0,
-          thick: 3,
+          thick: 5, // thicker waveform (user note)
           r: 1.0,
           g: 1.0,
           b: 1.0,
@@ -1032,6 +1042,9 @@
         init_eqs: passthrough,
         frame_eqs: passthrough,
         point_eqs: function (a) {
+          var th = a.q1 || 0.785; // SLOWLY ROTATING diagonal axis
+          var ct = Math.cos(th),
+            st = Math.sin(th);
           var s = a.sample * 2.0 - 1.0;
           var len = a.q5 || 0.62;
           var sep = a.q3 || 0.12;
