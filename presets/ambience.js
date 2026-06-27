@@ -1191,7 +1191,7 @@
           var m = t.mid || 1;
           var tr = t.treb_att || t.treb || 1;
           t.zoom = 1.0 + 0.012 * b;
-          t.rot = 0.03 + 0.06 * m;
+          t.rot = 0.008 + 0.015 * m; // gentle field spin (was 0.03+0.06*m — too fast)
           t.q5 = 0.78; // line half-width (spans the pane)
           t.q6 = 0.1 + 0.1 * Math.min(tr, 1.6); // line jaggedness amplitude
           t.q7 = 0.06; // gentle S-bend so the line isn't ruler-straight
@@ -1205,7 +1205,7 @@
           // looser swirl eye (0.40/(len+0.22)) + gentler bass turbulence -> organic churn,
           // not a crisp mathematical drain.
           "float a = 0.40 / (length(d) + 0.22) + turb * (0.3 + 0.5 * bass);\n" +
-          "float s = sin(a + time * 0.5), c = cos(a + time * 0.5);\n" +
+          "float s = sin(a + time * 0.22), c = cos(a + time * 0.22);\n" + // slower swirl (was time*0.5 — too fast)
           "vec2 sw = vec2(d.x * c - d.y * s, d.x * s + d.y * c);\n" +
           "ret = texture2D(sampler_main, vec2(0.5) + sw * 0.99).rgb;\n" +
           "ret -= 0.003;\n" +
@@ -1220,8 +1220,10 @@
           "vec3 tint = mix(vec3(0.18,0.34,0.98), vec3(0.92,0.32,0.88), 0.5+0.5*sin(time*0.07));\n" +
           "vec3 col = tint * v * 1.15;\n" +
           "float dd = distance(uv, vec2(0.5));\n" +
-          "col += tint * exp(-dd * dd * 2.2) * 0.38;\n" + // wide bright central bloom
-          "col += vec3(1.0) * smoothstep(0.62, 0.95, lc) * 1.6;\n" + // hot line blows WHITE, isolated above the wash
+          "col += tint * exp(-dd * dd * 2.2) * 0.30;\n" + // central bloom (trimmed so the centre doesn't wash white)
+          // the hot line blows WHITE, kept SELECTIVE (high threshold) so the bright wash
+          // itself doesn't go white; thickness comes from the wave's thick=5, not the threshold.
+          "col += vec3(1.0) * smoothstep(0.62, 0.95, lc) * 1.6;\n" +
           "ret = col / (col + 0.85) * 1.3;\n" + // tone-map so the bloom stays luminous, not blown
           "}\n",
       }
@@ -1239,7 +1241,7 @@
           scaling: 1,
           smoothing: 0.6,
           a: 1.0,
-          thick: 3,
+          thick: 5,
           r: 1.0,
           g: 1.0,
           b: 1.0,
