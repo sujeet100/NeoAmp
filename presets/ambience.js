@@ -260,61 +260,97 @@
   })();
 
   // ── Ambience Down the Drain ────────────────────────────────────────────────
-  // Yellow caustics spiralling into a dark central hole: zoom-in + rotate.
-  P["Ambience Down the Drain"] = build(
-    {
-      wave_mode: 0,
-      wave_smoothing: 0.9,
-      wave_scale: 0.5,
-      additivewave: 1,
-      wave_r: 1.0,
-      wave_g: 0.82,
-      wave_b: 0.25,
-      wave_a: 0.8,
-      decay: 0.965,
-      gammaadj: 1.9,
-      zoom: 0.99,
-      rot: 0.1,
-      warp: 0.06,
-      warpscale: 1.2,
-      cx: 0.55,
-      cy: 0.5,
-      darken_center: 0,
-      wrap: 0,
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        var treb = t.treb || 1;
-        t.zoom = 0.99 - 0.008 * bass; // gentle inward pull (was collapsing)
-        t.rot = 0.08 + 0.06 * Math.sin(t.time * 0.2) + 0.02 * bass;
-        t.cx = 0.55 + 0.01 * Math.sin(t.time * 0.3);
-        t.decay = 0.965;
-        t.wave_g = 0.78 + 0.12 * treb;
-        return t;
+  // Re-derived from the reference (window ~178-194): a LARGE centered glowing
+  // anemone — a soft volumetric cloud with a dark pinched "drain" core, feathery
+  // RADIAL spokes fanning out, and crisp WHITE waveform-crackle filaments tracing
+  // the rim (real audio = the lightning). It churns/drains in a continuous smooth
+  // swirl, and the colour DRIFTS warm: pink/salmon -> amber/gold -> vivid yellow,
+  // cores white, on PURE BLACK. ONE circular real-waveform ring feeds it: each
+  // frame's ring is swirled + pulled inward + angular-blurred, so its fading trail
+  // fills the disc with feathery spokes (the body glow) while the fresh jagged ring
+  // is the white rim crackle. (Was a small off-center wireframe spirograph on
+  // brown — wrong model, wrong colour, wrong scale.)
+  P["Ambience Down the Drain"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.86, // short trail -> the crackle ring leaves only a brief swirling streak
+        gammaadj: 1.6,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.02,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      warp:
-        "shader_body {\n" +
-        "vec2 p = uv - vec2(0.55, 0.5);\n" +
-        "float a = atan(p.y, p.x);\n" +
-        "float r = length(p);\n" +
-        "a += 0.10 * (1.0 - r);\n" +
-        "vec2 w = vec2(0.55,0.5) + r * vec2(cos(a), sin(a));\n" +
-        "ret = texture2D(sampler_main, w).rgb;\n" +
-        "ret -= 0.004;\n" +
-        "}\n",
-      comp:
-        AMBER_RAMP +
-        "shader_body {\n" +
-        "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-        "float v = dot(src, vec3(0.33)) * (1.0 + 0.3*bass);\n" +
-        "v = 0.18 + 0.9 * v;\n" + // base so the field stays visible
-        "float r = length(uv - vec2(0.55, 0.5));\n" +
-        "v *= smoothstep(0.02, 0.11, r);\n" + // smaller drain hole
-        "ret = amber_ramp(v);\n" +
-        "}\n",
-    }
-  );
+      {
+        frame: function (t) {
+          var bass = t.bass_att || t.bass || 1;
+          t.q2 = 0.5; // crackle-ring center x
+          t.q3 = 0.5; // crackle-ring center y
+          t.q5 = 0.33 + 0.06 * (bass - 1.0); // rim radius blooms gently with loudness
+          t.decay = 0.86;
+          return t;
+        },
+        // Gentle swirl + fast fade: the live-audio crackle ring (drawn on top) leaves a
+        // short rotating streak — the lightning sweeping the rim. The BODY is procedural
+        // in the comp, so the feedback only carries the crackle. (pang/pr — NOT the
+        // reserved ang/rad builtins.)
+        warp:
+          "shader_body {\n" +
+          "vec2 d = uv - 0.5;\n" +
+          "float pr = length(d);\n" +
+          "float pang = atan(d.y, d.x) + 0.10;\n" + // gentle rim rotation of the crackle streak
+          "vec2 w = vec2(0.5) + pr * vec2(cos(pang), sin(pang));\n" +
+          "ret = texture2D(sampler_main, w).rgb - 0.02;\n" +
+          "}\n",
+        // Procedural BODY: a filled radial glow disc with feathery fbm RADIAL spokes,
+        // a rotating two-lobe (bowtie/yin-yang) pinch, and a dark central drain hole —
+        // the whole thing draining/churning continuously. Warm colour DRIFTS pink ->
+        // amber -> vivid yellow (~22s), cores white-hot, on pure black. Then the live
+        // white waveform crackle (from the feedback) is added on the rim.
+        comp:
+          NOISE_GLSL +
+          AMBER_RAMP +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" + // aspect-correct -> round drain
+          "float pr = length(p);\n" +
+          "float pang = atan(p.y, p.x);\n" +
+          "float swirl = time * 0.45;\n" + // continuous draining churn
+          "float spk = fbm(vec2(pang * 3.5 + swirl, pr * 4.5 - time * 0.6));\n" + // broad feathery spokes
+          "float spk2 = fbm(vec2(pang * 7.0 - swirl * 0.7, pr * 9.0 - time * 0.4));\n" + // fine striations
+          "float fil = 0.45 + 0.45 * spk + 0.2 * spk2;\n" +
+          "float lobe = 0.4 + 0.6 * (0.5 + 0.5 * cos(2.0 * (pang - swirl * 0.5)));\n" + // rotating bowtie (pronounced)
+          "float body = exp(-pr * pr * (4.2 - 1.6 * bass));\n" + // filled disc (large), blooms with loudness
+          "float v = body * fil * lobe;\n" +
+          "v *= smoothstep(0.035, 0.12, pr);\n" + // dark central drain hole
+          "float ph = 0.5 + 0.5 * sin(time * 0.045);\n" + // warm temperature drift
+          "vec3 base = amber_ramp(v);\n" +
+          "vec3 col = mix(base * vec3(1.18, 0.82, 0.90), base * vec3(1.0, 1.0, 0.50), ph);\n" +
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" + // feedback = the white crackle ring + streak
+          "float crackle = max(src.r, max(src.g, src.b));\n" +
+          "col += vec3(1.0) * smoothstep(0.35, 0.85, crackle) * smoothstep(0.10, 0.20, pr);\n" + // crackle on the rim
+          "col = mix(col, vec3(1.0), smoothstep(0.82, 1.0, v));\n" + // white-hot pinch core
+          "col = col / (col + 0.55);\n" + // Reinhard tone-map -> soft, not blown neon
+          "col *= 1.5;\n" +
+          "ret = col;\n" +
+          "}\n",
+      }
+    );
+    // The rim crackle = a circular real-audio waveform: jagged (low smoothing) so the
+    // edge reads as WHITE lightning filaments; additive; near-white. The comp samples
+    // its feedback for the rim crackle; the body is procedural.
+    preset.waves[0] = circleWave("q2", "q3");
+    preset.waves[0].baseVals.r = 1.0;
+    preset.waves[0].baseVals.g = 1.0;
+    preset.waves[0].baseVals.b = 1.0;
+    preset.waves[0].baseVals.a = 0.9;
+    preset.waves[0].baseVals.smoothing = 0.15; // jagged -> crackle lightning (real waveform)
+    preset.waves[0].baseVals.thick = 0;
+    return preset;
+  })();
 
   // ════════════════════════════════════════════════════════════════════════
   // AMBIENCE family (amber/yellow fluid light; Niagara cycles yellow<->teal).
