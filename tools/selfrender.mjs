@@ -10,15 +10,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const REPO = "/Users/sujitk/projects/personal/ytmusic-wmp-visualizer";
+// REPO/OUTDIR/PORT are env-overridable so several renders can run in PARALLEL without
+// colliding (e.g. one per git-worktree, each with its own Chrome port + output dir).
+const REPO = process.env.REPO || "/Users/sujitk/projects/personal/ytmusic-wmp-visualizer";
 // Full Chrome with new-headless has solid software-WebGL (SwiftShader via ANGLE); the standalone
 // chrome-headless-shell's WebGL is flaky (returns a null GL context). Default to full Chrome.
 const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const HEADLESS = process.env.HEADLESS || "new"; // "new" for full Chrome; "shell" = headless-shell (omit flag)
 const PRESET = process.argv[2] || ""; // "" = use viz.js boot default
 const SHOTS = (process.argv[3] || "3.0,7.0,11.0").split(",").map(Number);
-const OUTDIR = "/tmp/alc-render";
-const PORT = 9344;
+const OUTDIR = process.env.OUTDIR || "/tmp/alc-render";
+const PORT = Number(process.env.PORT) || 9344;
 const URL = "file://" + REPO + "/viz.html";
 
 fs.mkdirSync(OUTDIR, { recursive: true });
