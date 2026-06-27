@@ -64,45 +64,79 @@
           t.q9 = rnd < 0.32 && ph < 0.4 ? 0 : 1; // 0 = rings hidden (breather), 1 = on
           return t;
         },
-        // WARP: trail control + soft PHOSPHOR blur. Each frame the feedback is lightly
-        // blurred (5-tap) and faded, so the decay traces soften into glowing light as they
-        // age, while the live waveform (drawn after warp) stays sharp. Fade keeps it short.
+        // WARP: WIDE diffusion + slow fade — this is what builds the dense MOSAIC FILL the
+        // original WMP look depends on. The waveform lines are thin; a 9-tap blur (radius 2.5px,
+        // axial + diagonal) spreads them into a continuous cloud, and the HIGH fade multiplier
+        // (0.978 — NOT the `decay` baseVal, which is inert in this build) makes the traces PERSIST
+        // ~1-2s so they accumulate into a filled mass instead of fading to an empty void.
+        // NO inward zoom on purpose: a <1 scale here smears bright additive lines into radial
+        // spokes/lens-flare beams on loud passages. Fill comes from the blur, not a zoom.
         warp:
           "shader_body {\n" +
           "vec2 wp = 1.0 / resolution;\n" +
-          "float br = 1.5;\n" + // blur -> motion smears into a soft fill
-          "vec3 acc = texture2D(sampler_main, uv).rgb * 0.5;\n" +
-          "acc += texture2D(sampler_main, uv + vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv - vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv + vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
-          "acc += texture2D(sampler_main, uv - vec2(0.0, wp.y * br)).rgb * 0.125;\n" +
-          "ret = acc * 0.95;\n" + // longer-lasting motion blur (trails linger)
+          "float br = 2.5;\n" +
+          "vec2 suv = uv;\n" +
+          "vec3 acc = texture2D(sampler_main, suv).rgb * 0.36;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, 0.0)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(wp.x * br, 0.0)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(0.0, wp.y * br)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv - vec2(0.0, wp.y * br)).rgb * 0.115;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(-wp.x * br, wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(wp.x * br, -wp.y * br)).rgb * 0.046;\n" +
+          "acc += texture2D(sampler_main, suv + vec2(-wp.x * br, -wp.y * br)).rgb * 0.046;\n" +
+          "ret = acc * 0.978;\n" +
           "}\n",
-        // COMP: DEEP NEBULA wash (mosaic dropped) + the vivid circles/waveform on top.
-        //  - BACKGROUND: a slow-drifting fbm cloud, kept very dim (~5-12%) and darkened
-        //    toward the edges (vignette) so it adds depth without competing with the
-        //    circles. No grid, no shapes, no feedback -> can't accumulate or interfere.
-        //    Brightens gently with bass so the void "breathes".
-        //  - LINES: the circles + waveform (from the feedback buffer) are recoloured to
-        //    vivid magenta and added on top; residual green is clamped out.
+        // COMP: the dense soft-blurred MOSAIC FILL that fills the space (reverse-engineered from
+        // the reference: cells ~32-42px, soft edges, continuous haze between them, center bright
+        // dissolving softly to black, muted violet, never white-hot).
+        //  - CELL read: sample the feedback buffer at a coord QUANTIZED to a ~32-cell grid
+        //    (aspect-corrected square cells), then 8-tap blur ACROSS each cell so the blocks have
+        //    SOFT edges, not hard pixels.
+        //  - HAZE read: a wider blur of the same buffer = the continuous purple glow that fills
+        //    BETWEEN cells, so the mosaic reads as ONE mass (not isolated blocks on black).
+        //  - mix(haze, cell, 0.58) = soft blocks embedded in haze. A radial falloff makes the
+        //    center brighter and dissolves the rim into black (no hard outer edge). Recolour
+        //    through a deep-violet->magenta ramp; Reinhard tone-map so bright cells/eyes flare
+        //    soft magenta and NEVER blow to flat white. A dim drifting fbm floor keeps the void
+        //    from pure black.
         comp:
           NOISE_GLSL +
           "shader_body {\n" +
-          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" + // slow drift
-          "float n = fbm(nuv); n = n * n;\n" + // deepen -> dark with soft wisps
-          "float vig = 1.0 - smoothstep(0.20, 0.92, length(uv - 0.5));\n" +
-          // COOL bluish-purple smoke behind the WARM magenta waveform (cool/warm depth).
-          // Floor keeps an ambient, slowly-drifting cloud alive even when the bass drops.
-          "vec3 neb = mix(vec3(0.02, 0.012, 0.07), vec3(0.18, 0.07, 0.52), n) * (0.14 + 0.11 * bass) * vig;\n" +
-          "vec3 sharp = texture2D(sampler_main, uv).rgb;\n" + // circles + waveform (+ trails)
-          "float sl = max(sharp.r, max(sharp.g, sharp.b));\n" +
-          // multi-shade ramp, all in the PURPLE family (no blue/green dip) so dim trails
-          // stay deep purple and only the bright cores flare hot pink -> dramatic but cohesive
-          "vec3 lc = mix(vec3(0.42, 0.05, 0.66), vec3(0.92, 0.18, 1.0), smoothstep(0.10, 0.60, sl));\n" +
-          "lc = mix(lc, vec3(1.0, 0.60, 1.0), smoothstep(0.72, 1.25, sl));\n" +
-          "vec3 line = lc * sl * 0.95;\n" +
-          "vec3 outc = neb + line;\n" +
-          "outc.g = min(outc.g, 0.5 * max(outc.r, outc.b));\n" + // clamp residual green
+          "vec2 px = 1.0 / resolution;\n" +
+          "float GRID = resolution.x / 40.0;\n" +
+          "float asp = resolution.x / resolution.y;\n" +
+          "vec2 g = vec2(GRID, GRID / asp);\n" +
+          "vec2 cuv = (floor(uv * g) + 0.5) / g;\n" +
+          "float bc = 0.7;\n" +
+          "vec3 cell = texture2D(sampler_main, cuv).rgb * 0.28;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x, 0.0)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x, 0.0)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(0.0,  bc / g.y)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(0.0, -bc / g.y)).rgb * 0.10;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x,  bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x,  bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2( bc / g.x, -bc / g.y)).rgb * 0.08;\n" +
+          "cell += texture2D(sampler_main, cuv + vec2(-bc / g.x, -bc / g.y)).rgb * 0.08;\n" +
+          "vec3 haze = texture2D(sampler_main, uv).rgb * 0.5;\n" +
+          "haze += texture2D(sampler_main, uv + vec2(px.x * 3.0, 0.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv - vec2(px.x * 3.0, 0.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv + vec2(0.0, px.y * 3.0)).rgb * 0.125;\n" +
+          "haze += texture2D(sampler_main, uv - vec2(0.0, px.y * 3.0)).rgb * 0.125;\n" +
+          "vec3 mass = mix(haze, cell, 0.58);\n" +
+          "float rfall = 1.0 - smoothstep(0.15, 0.85, length(uv - 0.5));\n" +
+          "mass *= rfall;\n" +
+          "vec2 nuv = uv * 2.4 + vec2(time * 0.015, time * 0.010);\n" +
+          "float n = fbm(nuv); n = n * n;\n" +
+          "vec3 neb = mix(vec3(0.015, 0.008, 0.05), vec3(0.10, 0.04, 0.30), n) * (0.10 + 0.08 * bass) * rfall;\n" +
+          "float sl = max(mass.r, max(mass.g, mass.b));\n" +
+          "vec3 lc = mix(vec3(0.30, 0.05, 0.52), vec3(0.78, 0.16, 0.98), smoothstep(0.06, 0.45, sl));\n" +
+          "lc = mix(lc, vec3(0.98, 0.42, 1.0), smoothstep(0.55, 1.10, sl));\n" +
+          "vec3 body = lc * sl;\n" +
+          "vec3 outc = neb + body;\n" +
+          "outc.g = min(outc.g, 0.6 * max(outc.r, outc.b));\n" +
+          "outc = outc / (outc + vec3(0.85));\n" +
+          "outc *= 1.45;\n" +
           "ret = outc;\n" +
           "}\n",
       }
