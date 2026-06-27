@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint # security-focused ESLint (no-unsanitized + security); eval-class = error
+      - run: npm test # node --check every source file + build all presets + run frame_eqs
+
+  deps:
+    name: Vendored-lib scan (retire.js)
+    runs-on: ubuntu-latest
+    # npm audit (+ Dependabot) covers devDependencies; Butterchurn ships VENDORED as
+    # vendor/*.min.js (not via npm), so retire.js is what catches known-vuln versions there.
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx --yes retire --path . --severity high
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans full history
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # npm devDependencies (eslint + plugins, prettier). The extension ships NO npm
+  # runtime deps — Butterchurn is vendored, so retire.js (in CI) covers that side.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+
+  # Keep the GitHub Actions themselves patched (checkout, setup-node, codeql, gitleaks…).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]

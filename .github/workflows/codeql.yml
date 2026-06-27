@@ -1,0 +1,32 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write # upload results to the Security tab
+
+jobs:
+  analyze:
+    name: Analyze (JavaScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended # DOM-XSS / taint dataflow + the standard security suite
+          # Don't analyze vendored minified bundles (noise + parse cost).
+          config: |
+            paths-ignore:
+              - vendor
+              - dist
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
