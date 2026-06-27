@@ -482,76 +482,136 @@
   })();
 
   // ── Battery elektrination ───────────────────────────────────────────────────
-  // A sharp, dynamic, audio-reactive WAVEFORM mirrored ~12x into a jagged STAR with a dark void
-  // eye at the exact centre — PALE silvery green-grey on a dark ground (ethereal/metallic, NOT
-  // dark olive). The star rotates clockwise and PULSES/zooms on the beat; scattered white
-  // particles drift outward like snow. (Short decay keeps the folded waveform CRISP, not a
-  // smeared tiled mandala.)
+  // FRESH REBUILD (2026-06-22), driven by measured analysis of "battery - eletriarnation.mp4":
+  //   • VISCOSITY (Q1): the original's gross motion has an inter-frame pixel-diff of only ~4/255
+  //     — i.e. each frame is ~96% the previous one. That sludgy/heavy-lava ooze is HIGH-DECAY
+  //     FEEDBACK (~0.96), NOT a crisp short trail. So the engine is mostly persistence; only a
+  //     thin sliver of new content enters each frame. A slow fbm domain-warp adds the fluid wobble.
+  //   • CENTRAL ROTATING WAVEFORM LINE (Q2): a jagged real-audio oscilloscope LINE through centre
+  //     (the strawberryaid waveLine), whose angle rotates SLOWLY & CONTINUOUSLY about the centre
+  //     (NOT bass-driven, NOT stepped). The freshest stroke reads as the bright central line; its
+  //     high-decay trails at earlier angles fan out behind it.
+  //   • KALEIDOSCOPE (Q3): a QUAD (V+H bilateral) mirror fold. A single rotating diameter line,
+  //     quad-folded, is a rotating cross; the decay-trails of earlier angles become the dense
+  //     ~12-arm jagged STAR (arms come from rotational TRAILS, not a high fold count — that is the
+  //     key that lets the central line stay visible while the star still reads as many-armed).
+  //   • COLOUR ARC: bright BLUE/CYAN ignition (~first 3s) settling to a desaturated SAGE GREEN-GREY
+  //     (measured: hue ~50deg, SAT ~7-8 — nearly monochrome). + outward-drifting twinkling dust.
   P["Battery elektrination"] = (function () {
+    var intro = alcIntroRamp(3.2); // one-shot cyan ignition -> sage-green settle
+    var FADE = 0.974; // feedback persistence done explicitly in warp -> the VISCOSITY knob
+    // (high => fronds streak all the way to the edges and the whole field stays lit)
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.88, // medium trail: the small ring streaks OUTWARD into radial fronds
-        gammaadj: 1.9,
-        zoom: 1.04, // outward feedback -> the rotating centre waveform is pushed out as fronds
+        decay: 0.99, // near-1; the real fade is the warp's *FADE (so the knob is in one place)
+        gammaadj: 1.8,
+        zoom: 1.0, // NO outward push -> avoids the high-decay white-wash; arms come from rotation trails
         rot: 0,
-        warp: 0.02,
+        warp: 0,
         wrap: 0,
-        darken_center: 1,
+        darken_center: 0,
         additivewave: 1,
       },
       {
         frame: function (t) {
           var ba = t.bass_att || t.bass || 1;
+          t.q1 = t.time * 0.085; // central LINE rotates slowly & continuously about centre
           t.q2 = 0.5;
-          t.q3 = 0.5;
-          t.q5 = 0.08 + 0.04 * (ba - 1); // small centre ring; the outward zoom streaks it into fronds
-          t.q9 = t.time * 0.35; // the core waveform rotates
-          t.decay = 0.88;
+          t.q3 = 0.5; // line + burst centred
+          t.q9 = t.time * 0.085; // radial frond-burst spins with the line (whole star turns)
+          t.q5 = 0.07 + 0.03 * (ba - 1); // frond-burst inner radius (gently bass-lifted)
+          t.q20 = intro(t); // 0->1 cyan -> sage settle
+          t.decay = 0.99;
           return t;
         },
-        comp:
+        // WARP = the viscous engine AND the kaleidoscope. Folding the FEEDBACK here (not in comp)
+        // accumulates the rotating line's trails into a symmetric, frame-filling jagged STAR, while
+        // a slight OUTWARD push streaks the waveform's jaggedness into radial filament arms. The
+        // live line is drawn AFTER this pass, so comp leaves it un-folded and visible on top.
+        warp:
           NOISE_GLSL +
           ALC_KALEIDOQUAD_GLSL +
           "shader_body {\n" +
           "  vec2 dd = uv - 0.5; dd.x *= resolution.x/resolution.y;\n" +
-          "  float pulse = 1.0/(1.0 + 0.4*max(bass-1.0, 0.0));\n" + // bass zooms the star OUT (beat pulse)
-          "  float rt = time*0.16;\n" + // continuous clockwise rotation
-          "  float cr = cos(rt), sr = sin(rt);\n" +
-          "  vec2 d = vec2(dd.x*cr - dd.y*sr, dd.x*sr + dd.y*cr) * pulse;\n" +
-          "  vec2 fold = alcKaleidoQuad(d, 3.0);\n" + // 3 wedges/quadrant -> ~12-arm mirror star
+          "  dd *= 0.985;\n" + // sample inward => feedback streaks OUTWARD, filling the frame
+          "  float fx = fbm(dd*2.3 + vec2(time*0.05, -time*0.038)) - 0.5;\n" + // slow fluid undulation
+          "  float fy = fbm(dd*2.3 + vec2(5.3,1.7) - time*0.043) - 0.5;\n" +
+          "  vec2 fold = alcKaleidoQuad(dd, 3.0);\n" + // QUAD mirror + 3 wedges/quadrant => dense ~12-arm star
           "  fold.x /= resolution.x/resolution.y;\n" +
-          "  float lum = dot(texture2D(sampler_main, fold + 0.5).rgb, vec3(0.4));\n" + // fronds (zoom-streaked) mirrored by the fold
-          "  vec3 sage = mix(vec3(0.13,0.18,0.11), vec3(0.68,0.80,0.52), smoothstep(0.0,0.6,lum));\n" + // pale-ish sage GREEN (not silvery-white)
-          "  vec3 col = sage * (0.5 + 1.3*lum) + vec3(0.05,0.09,0.04);\n" + // faint green ground so it never reads black
+          // ooze offset => organic filaments rather than clean geometric petals/rings (kept modest
+          // to preserve the jagged detail; real music's noisy waveform breaks the residual symmetry)
+          "  ret = texture2D(sampler_main, fold + 0.5 + vec2(fx,fy)*0.015).rgb;\n" +
+          "  ret *= " +
+          FADE.toFixed(3) +
+          ";\n" + // <- the heavy-trace persistence (viscosity)
+          "}\n",
+        // COMP = colour arc + outward dust + tone-map. NO fold here -> the freshly-drawn rotating
+        // line stays visible on top of the folded feedback star.
+        comp:
+          NOISE_GLSL +
+          "shader_body {\n" +
+          "  vec3 fb = texture2D(sampler_main, uv).rgb;\n" +
+          "  float lum = dot(fb, vec3(0.4));\n" +
+          "  vec2 dd = uv - 0.5; dd.x *= resolution.x/resolution.y;\n" +
+          "  vec3 cyan = vec3(0.26,0.58,0.74);\n" + // ignition blue-cyan
+          "  vec3 sage = vec3(0.50,0.60,0.44);\n" + // settled desaturated sage green-grey
+          "  vec3 hue = mix(cyan, sage, clamp(q20,0.0,1.0));\n" +
+          "  vec3 col = hue * (0.30 + 1.45*lum);\n" + // muted luminance ramp (never neon)
           "  float rr = length(dd);\n" +
-          "  col *= smoothstep(0.015, 0.07, rr);\n" + // dark void eye at the exact centre
-          "  float pang = atan(dd.y, dd.x);\n" + // scattered white particles radiating outward
-          "  float lane = floor((pang+3.14159)/6.2832*22.0);\n" +
-          "  float life = fract(time*0.22 + hash21(vec2(lane,1.7)));\n" +
-          "  float prad = 0.05 + life*0.62;\n" +
-          "  float laneAng = (lane+0.5)/22.0*6.2832 - 3.14159;\n" +
-          "  vec2 ppos = vec2(cos(laneAng), sin(laneAng))*prad;\n" +
-          "  col += vec3(0.82,0.90,0.78) * smoothstep(0.012, 0.0, length(dd - ppos)) * (1.0-life);\n" +
+          "  col *= 0.55 + 0.45*smoothstep(0.006, 0.045, rr);\n" + // subtle dark core dot (not a big void eye)
+          // outward-drifting twinkling DUST (radial lanes; brighter during the cyan ignition)
+          "  float pang = atan(dd.y, dd.x);\n" +
+          "  float NL = 58.0;\n" +
+          "  float lane = floor((pang+3.14159)/6.2832*NL);\n" +
+          "  float seed = hash21(vec2(lane,3.3));\n" +
+          "  float life = fract(time*0.16 + seed);\n" +
+          "  float prad = 0.04 + life*0.62;\n" +
+          "  float laneA = (lane+0.5)/NL*6.2832 - 3.14159 + (hash21(vec2(lane,7.1))-0.5)*0.10;\n" +
+          "  vec2 ppos = vec2(cos(laneA), sin(laneA))*prad;\n" +
+          "  float spark = smoothstep(0.010, 0.0, length(dd - ppos)) * (1.0-life);\n" +
+          "  col += vec3(0.80,0.90,0.84) * spark * (0.35 + 0.7*treb) * (0.6 + 0.7*(1.0-clamp(q20,0.0,1.0)));\n" +
           "  ret = col;\n" +
-          alcVignette(0.35) +
-          "  ret = ret/(ret + vec3(0.5));\n" + // gentle Reinhard
+          alcVignette(0.28) +
+          "  ret = ret/(ret + vec3(0.52));\n" + // Reinhard: highlights compress to soft colour, not white
           "}\n",
       }
     );
-    // sharp jagged real-audio waveform -> mirrored into the star through the fold
-    preset.waves[0] = circleWave("q2", "q3");
-    preset.waves[0].baseVals.r = 0.8;
-    preset.waves[0].baseVals.g = 0.9;
-    preset.waves[0].baseVals.b = 0.82;
-    preset.waves[0].baseVals.a = 0.9;
-    preset.waves[0].baseVals.additive = 1;
-    preset.waves[0].baseVals.smoothing = 0.02; // very jagged
+    // wave[0] — the HERO: a jagged real-audio diameter LINE through centre (strawberryaid-style)
+    // that rotates slowly about the centre axis. Drawn after the warp fold => visible un-folded on
+    // top of the star. Colour is irrelevant (comp recolours from luminance) — keep it bright/neutral.
+    preset.waves[0] = waveLine();
+    preset.waves[0].baseVals.smoothing = 0.04; // jagged
+    preset.waves[0].baseVals.a = 0.85;
     preset.waves[0].point_eqs = function (a) {
-      var ang = a.sample * 6.2832 + (a.q9 || 0); // rotating waveform
-      var rad = (a.q5 || 0.13) + 0.17 * a.value1; // big sharp bass-scaled spikes
+      var th = a.q1 || 0.0;
+      var s = a.sample * 2.0 - 1.0; // -1..1 along the line
+      var ct = Math.cos(th),
+        st = Math.sin(th);
+      var cx = a.q2 !== undefined ? a.q2 : 0.5;
+      var cy = a.q3 !== undefined ? a.q3 : 0.5;
+      a.x = cx + s * 0.58 * ct - a.value1 * 0.2 * st; // diameter + perpendicular waveform displacement
+      a.y = cy + s * 0.58 * st + a.value1 * 0.2 * ct;
+      a.r = 0.85;
+      a.g = 0.92;
+      a.b = 0.88; // pale neutral -> bright luminance deposit
+      return a;
+    };
+    // wave[1] — the frame-filling STAR seed: a jagged radial waveform whose big spikes reach the
+    // edges; the warp fold (3 wedges/quadrant) mirrors it into the dense ~12-arm frond-star, and the
+    // high-decay feedback smears it into viscous fronds. Spins with the line so the whole star turns.
+    preset.waves[1] = circleWave("q2", "q3");
+    preset.waves[1].baseVals.smoothing = 0.03; // very jagged
+    preset.waves[1].baseVals.a = 0.55;
+    preset.waves[1].baseVals.additive = 1;
+    preset.waves[1].point_eqs = function (a) {
+      var ang = a.sample * 6.2832 + (a.q9 || 0); // rotating radial burst
+      var rad = (a.q5 || 0.08) + 0.62 * a.value1; // big spikes -> arms reach the edges/corners
       a.x = (a.q2 || 0.5) + rad * Math.cos(ang);
       a.y = (a.q3 || 0.5) + rad * Math.sin(ang);
+      a.r = 0.8;
+      a.g = 0.9;
+      a.b = 0.84;
       return a;
     };
     return preset;
