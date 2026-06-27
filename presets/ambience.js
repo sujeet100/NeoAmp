@@ -419,12 +419,15 @@
           "p.x *= resolution.x / resolution.y;\n" + // aspect-correct
           "vec2 po = p; po.y *= 1.35;\n" + // OVAL body: wider than tall
           "float pr = length(po);\n" +
-          "float pang = atan(po.y, po.x) + time * 0.06;\n" + // slow spoke rotation/shimmer
+          "float pang = atan(po.y, po.x) + time * 0.14;\n" + // continuous spoke rotation
           "float jit = fbm(vec2(pang * 3.0, time * 0.05));\n" +
           "float spokes = 0.5 + 0.5 * sin(pang * 90.0 + jit * 8.0);\n" + // many fine irregular spokes
           "spokes = pow(spokes, 1.6);\n" +
-          "float fall = exp(-pr * pr * (3.2 - 0.6 * bass));\n" + // oval falloff, breathes with loudness
-          "float core = exp(-pr * pr * 60.0);\n" + // small bright centre pinch
+          // the blue CENTRE slowly GROWS to fill the pane then collapses to a small flower
+          // (a big size pulse, ~13s) + a mild bass swell.
+          "float grow = 0.5 + 0.5 * sin(time * 0.5);\n" +
+          "float fall = exp(-pr * pr * (mix(7.0, 1.7, grow) - 0.6 * bass));\n" + // disc size pulses big<->small
+          "float core = exp(-pr * pr * mix(85.0, 16.0, grow));\n" + // bright centre pinch grows too
           "float burst = fall * (0.30 + 0.70 * spokes);\n" +
           "float rim = smoothstep(0.62, 0.32, pr) * (0.22 + 0.25 * fbm(vec2(pang * 2.0, pr * 4.0 - time * 0.1)));\n" + // feathery cloud rim
           "float v = burst + 0.4 * rim;\n" +
