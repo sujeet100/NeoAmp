@@ -611,65 +611,94 @@
   })();
 
   // ── Ambience Falloff ────────────────────────────────────────────────────────
-  // Light cascading downward: feedback drifts down each frame so the live waveform
-  // leaves amber streaks raining toward the bottom, with a faint sideways sway.
-  P["Ambience Falloff"] = build(
-    {
-      wave_mode: 0,
-      wave_smoothing: 0.9,
-      wave_scale: 0.5,
-      additivewave: 1,
-      wave_r: 1.0,
-      wave_g: 0.84,
-      wave_b: 0.3,
-      wave_a: 0.4,
-      decay: 0.955,
-      gammaadj: 1.85,
-      zoom: 1.0,
-      rot: 0.0,
-      warp: 0.04,
-      warpscale: 1.6,
-      warpanimspeed: 0.5,
-      cx: 0.5,
-      cy: 0.3,
-      dx: 0.0,
-      dy: 0.012,
-      darken_center: 0,
-      wrap: 1,
-    },
-    {
-      frame: function (t) {
-        var bass = t.bass_att || t.bass || 1;
-        var treb = t.treb_att || t.treb || 1;
-        t.dy = 0.01 + 0.006 * bass;
-        t.dx = 0.002 * Math.sin(t.time * 0.4);
-        t.warp = 0.04 + 0.03 * treb;
-        t.zoom = 1.0;
-        t.decay = 0.955;
-        t.wave_a = 0.25 + 0.3 * bass;
-        t.cy = 0.3 + 0.04 * Math.sin(t.time * 0.2);
-        return t;
+  // Re-derived from the reference (window ~69-80): a near-full-frame BRIGHT YELLOW
+  // field with a dark 4-fold-symmetric HOURGLASS/bowtie carved out of it — dark
+  // concave wedges descending from top-centre and rising from bottom-centre, pinched
+  // to a sharp WAIST at dead centre, with two big bright-yellow LOBES bulging left and
+  // right. A near-white inner glow rings the waist; a jagged WHITE audio-waveform line
+  // runs HORIZONTALLY through it. Vivid saturated yellow (an Ambience exception), quad-
+  // mirror symmetric, CALM breathing (the waist gently pulses; no rain/drift/rotation).
+  // (Was a dark vertical ring-spine raining downward — wrong model, far too dark.)
+  P["Ambience Falloff"] = (function () {
+    var preset = build(
+      {
+        wave_a: 0,
+        decay: 0.82, // short trail -> crisp horizontal waveform crackle
+        gammaadj: 1.3,
+        zoom: 1.0,
+        rot: 0.0,
+        warp: 0.0,
+        cx: 0.5,
+        cy: 0.5,
+        darken_center: 0,
+        wrap: 0,
       },
-      warp:
-        "shader_body {\n" +
-        "vec2 w = uv;\n" +
-        "w.y -= 0.010;\n" +
-        "w.x += 0.006 * sin(uv.y * 12.0 + time * 1.0);\n" +
-        "ret = texture2D(sampler_main, w).rgb;\n" +
-        "ret -= 0.003;\n" +
-        "}\n",
-      comp:
-        AMBER_RAMP +
-        "shader_body {\n" +
-        "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
-        "float v = dot(src, vec3(0.33)) * (1.0 + 0.30 * bass);\n" +
-        "v = 0.10 + 0.95 * v;\n" +
-        "v += 0.05 * sin(uv.x * 30.0 + time * 1.5) * smoothstep(0.0, 0.5, uv.y);\n" +
-        "v *= smoothstep(0.0, 0.18, 1.0 - uv.y) + 0.4;\n" +
-        "ret = amber_ramp(v);\n" +
-        "}\n",
-    }
-  );
+      {
+        frame: function (t) {
+          var treb = t.treb_att || t.treb || 1;
+          t.q6 = 0.03 + 0.025 * Math.min(treb, 1.6); // waveform amplitude (small, capped)
+          t.decay = 0.82;
+          return t;
+        },
+        warp: "shader_body {\nret = texture2D(sampler_main, uv).rgb - 0.03;\n}\n",
+        comp:
+          NOISE_GLSL +
+          AMBER_RAMP +
+          "shader_body {\n" +
+          "vec2 p = uv - 0.5;\n" +
+          "p.x *= resolution.x / resolution.y;\n" +
+          "float ax = abs(p.x), ay = abs(p.y);\n" +
+          // the bowtie/hourglass: bright LOBES where ax*k > ay (left/right), dark wedges
+          // (top/bottom) where ax*k < ay; k breathes so the waist pulses thicker/thinner.
+          "float k = 1.45 + 0.12 * sin(time * 0.5) + 0.15 * bass;\n" +
+          "float edge = ax * k - ay + 0.9 * ax * ay;\n" + // +curve term -> concave wedges / bulging lobes
+          "float bright = smoothstep(-0.04, 0.06, edge);\n" +
+          // bright yellow field (soft cloud texture) confined to the lobes
+          "vec2 cp = uv * 2.0 + vec2(time * 0.03, -time * 0.025);\n" +
+          "float cloud = fbm(cp + fbm(cp + time * 0.04));\n" +
+          "float v = (0.55 + 0.4 * cloud) * bright;\n" +
+          // near-white inner glow ringing the centre waist (bright horizontal sliver)
+          "float waist = exp(-(ay * ay * 42.0 + ax * ax * 5.0));\n" +
+          "v += 0.6 * waist;\n" +
+          // jagged WHITE horizontal waveform crackle through the waist (from feedback)
+          "vec3 src = texture2D(sampler_main, uv).rgb;\n" +
+          "float beam = max(src.r, max(src.g, src.b));\n" +
+          "v += 0.7 * beam;\n" +
+          "ret = amber_ramp(v);\n" + // black wedges -> amber lobes -> white-hot waist
+          "}\n",
+      }
+    );
+    // The horizontal waveform crackle through the waist: real-audio line at y=0.5,
+    // near-white, additive, small capped vertical displacement.
+    preset.waves[0] = {
+      baseVals: Object.assign({}, WAVE_BASE, {
+        enabled: 1,
+        samples: 512,
+        additive: 1,
+        usedots: 0,
+        scaling: 1,
+        smoothing: 0.3,
+        a: 0.9,
+        thick: 1,
+        r: 1.0,
+        g: 0.98,
+        b: 0.85,
+      }),
+      init_eqs: passthrough,
+      frame_eqs: passthrough,
+      point_eqs: function (a) {
+        var s = a.sample * 2.0 - 1.0;
+        var amp = a.q6 || 0.04;
+        a.x = 0.5 + s * 0.56;
+        a.y = 0.5 + a.value1 * amp;
+        a.r = 1.0;
+        a.g = 0.98;
+        a.b = 0.85;
+        return a;
+      },
+    };
+    return preset;
+  })();
 
   // ── Ambience Bubble ─────────────────────────────────────────────────────────
   // Round amber bubbles floating up: four soft glowing metaball circles drift and
