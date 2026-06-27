@@ -105,34 +105,20 @@
     { label: "Ambience Niagara", wmp: "Ambience Niagara" },
     { label: "Ambience Blender", wmp: "Ambience Blender" },
     { label: "Ambience X Marks the Spot", wmp: "Ambience X Marks the Spot" },
+    // Only the 7 REFINED Battery presets are listed (the rest stay defined in presets/battery.js
+    // but are hidden from the picker until they're refined — the planned Battery build-out).
     { label: "Battery relatively calm", wmp: "Battery relatively calm" },
     { label: "Battery strawberryaid", wmp: "Battery strawberryaid" },
-    { label: "Battery my tornado", wmp: "Battery my tornado is resting" },
-    { label: "Battery brightsphere", wmp: "Battery brightsphere" },
-    { label: "Battery cominatcha", wmp: "Battery cominatcha" },
-    { label: "Battery cottonstar", wmp: "Battery cottonstar" },
-    { label: "Battery dandelion", wmp: "Battery dandelion" },
-    { label: "Battery drinkdeep", wmp: "Battery drinkdeep" },
     { label: "Battery elektrination", wmp: "Battery elektrination" },
-    { label: "Battery event horizon", wmp: "Battery event horizon" },
-    { label: "Battery hzodge", wmp: "Battery hzodge" },
-    { label: "Battery sepalvel", wmp: "Battery sepalvel" },
-    { label: "Battery illuminator", wmp: "Battery illuminator" },
-    { label: "Battery i learned the truth", wmp: "Battery i learned the truth" },
-    { label: "Battery kaleidovision", wmp: "Battery kaleidovision" },
-    { label: "Battery chemicalnova", wmp: "Battery chemicalnova" },
-    { label: "Battery lotus", wmp: "Battery lotus" },
-    { label: "Battery green is not your enemy", wmp: "Battery green is not your enemy" },
     { label: "Battery sleepyspray", wmp: "Battery sleepyspray" },
     { label: "Battery smoke or water?", wmp: "Battery smoke or water?" },
     { label: "Battery sepiaswirl", wmp: "Battery sepiaswirl" },
-    { label: "Battery spider's last moment", wmp: "Battery spider's last moment" },
     { label: "Battery the world", wmp: "Battery the world" },
-    { label: "Battery back to the groove", wmp: "Battery back to the groove" },
   ];
 
   var DIRECTOR_KEY = "__director__"; // sentinel picker value that engages the auto-sequencer
   var AMBIENCE_RANDOM_KEY = "__ambience_random__"; // sentinel: engage the Director scoped to the Ambience family
+  var BATTERY_RANDOM_KEY = "__battery_random__"; // sentinel: engage the Director scoped to the Battery family
   var viz = null,
     presets = {},
     names = [],
@@ -140,7 +126,7 @@
     rafId = 0;
   var presetSel = null;
   var userFavs = new Set();
-  var ambienceRandomOn = false; // the "🎲 Ambience (Random)" auto-cycler is engaged
+  var autoRandomKey = ""; // "" off, else AMBIENCE_RANDOM_KEY / BATTERY_RANDOM_KEY (which family cycler is engaged)
   var latest = new Uint8Array(FFT_SIZE);
   var audioLevels = { timeByteArray: latest, timeByteArrayL: latest, timeByteArrayR: latest };
 
@@ -397,8 +383,8 @@
       setDirector(true);
       return;
     }
-    if (name === AMBIENCE_RANDOM_KEY) {
-      setAmbienceRandom(true);
+    if (name === AMBIENCE_RANDOM_KEY || name === BATTERY_RANDOM_KEY) {
+      setFamilyRandom(name);
       return;
     }
     if (Director.isEnabled()) setDirector(false);
@@ -476,7 +462,10 @@
       "◢◤ NeoAmp — Ambience",
       [[AMBIENCE_RANDOM_KEY, "🎲 Ambience (Random)"]].concat(groups.Ambience)
     );
-    addGroup("◢◤ NeoAmp — Battery", groups.Battery);
+    addGroup(
+      "◢◤ NeoAmp — Battery",
+      [[BATTERY_RANDOM_KEY, "🎲 Battery (Random)"]].concat(groups.Battery)
+    );
 
     var milkdrop = names
       .filter(function (n) {
@@ -513,9 +502,9 @@
 
   function syncSelect(name) {
     if (!presetSel) return;
-    // while the cycler runs, keep the picker on "🎲 Ambience (Random)" (the bar/toast shows
+    // while a family cycler runs, keep the picker on its "🎲 … (Random)" entry (the bar shows
     // the actual scene); otherwise reflect the loaded preset.
-    if (ambienceRandomOn) presetSel.value = AMBIENCE_RANDOM_KEY;
+    if (autoRandomKey) presetSel.value = autoRandomKey;
     else presetSel.value = name && presets[name] ? name : "";
   }
   function updateStar() {
@@ -630,12 +619,16 @@
     else if (m.type === "preset:random") randomPreset();
     else if (m.type === "director:toggle") setDirector(!Director.isEnabled());
     else if (m.type === "director:set") setDirector(!!m.enabled);
-    else if (m.type === "ambienceRandom:toggle") setAmbienceRandom(!ambienceRandomOn);
-    else if (m.type === "ambienceRandom:set") setAmbienceRandom(!!m.enabled);
+    else if (m.type === "ambienceRandom:toggle")
+      setFamilyRandom(autoRandomKey === AMBIENCE_RANDOM_KEY ? "" : AMBIENCE_RANDOM_KEY);
+    else if (m.type === "ambienceRandom:set") setFamilyRandom(m.enabled ? AMBIENCE_RANDOM_KEY : "");
+    else if (m.type === "batteryRandom:toggle")
+      setFamilyRandom(autoRandomKey === BATTERY_RANDOM_KEY ? "" : BATTERY_RANDOM_KEY);
+    else if (m.type === "batteryRandom:set") setFamilyRandom(m.enabled ? BATTERY_RANDOM_KEY : "");
   });
 
   function setDirector(on) {
-    ambienceRandomOn = false; // plain Director (or disengage) is not Ambience-random
+    autoRandomKey = ""; // plain Director (or disengage) is not a family-random mode
     Director.setEnabled(on, nowMs());
     if (on) Director.kick(); // jump to a fresh era immediately so engaging gives instant feedback
     console.log(
@@ -645,39 +638,39 @@
     showBar();
   }
 
-  // The Ambience family preset names, in the FAVORITES order, that actually loaded.
-  function ambienceEraList() {
+  // The listed (FAVORITES) presets of a family that actually loaded — the cycler's scene pool.
+  function familyEraList(prefixRe) {
     return FAVORITES.filter(function (f) {
-      return /^Ambience/.test(f.label) && presets[f.wmp];
+      return prefixRe.test(f.label) && presets[f.wmp];
     }).map(function (f) {
       return f.wmp;
     });
   }
 
-  // "🎲 Ambience (Random)": reuse the Director engine (shuffle bag + energy-paced, beat-aligned
-  // crossfades) scoped to the Ambience family, with LONG dwell (~24-35s) + gentle ~4s fades so
-  // each scene plays out and transitions read as WMP-style cross-dissolves.
-  function setAmbienceRandom(on) {
-    ambienceRandomOn = !!on;
-    if (on) {
-      Director.setEras(ambienceEraList());
+  // "🎲 Ambience/Battery (Random)": reuse the Director engine (shuffle bag + energy-paced, beat-
+  // aligned crossfades) scoped to ONE family, with LONG dwell (~24-35s) + gentle ~4s fades so
+  // each scene plays out and transitions read as WMP-style cross-dissolves. key === "" disengages.
+  function setFamilyRandom(key) {
+    autoRandomKey = key || "";
+    if (autoRandomKey) {
+      Director.setEras(
+        familyEraList(autoRandomKey === BATTERY_RANDOM_KEY ? /^Battery/ : /^Ambience/)
+      );
       Director.cfg.dwellCalmMs = 35000;
       Director.cfg.dwellLoudMs = 24000;
       Director.cfg.blendCalmS = 4.5;
       Director.cfg.blendLoudS = 3.5;
     }
-    Director.setEnabled(on, nowMs());
-    if (on) Director.kick(); // jump to a fresh Ambience scene immediately
+    Director.setEnabled(!!autoRandomKey, nowMs());
+    if (autoRandomKey) Director.kick(); // jump to a fresh scene immediately
+    var fam = autoRandomKey === BATTERY_RANDOM_KEY ? "Battery" : "Ambience";
     console.log(
-      "[WMP-viz] Ambience Random " + (on ? "ON — " + Director.eraCount() + " scenes" : "off")
+      "[WMP-viz] " +
+        (autoRandomKey ? fam + " Random ON — " + Director.eraCount() + " scenes" : "Random off")
     );
     if (presetSel)
-      presetSel.value = on
-        ? AMBIENCE_RANDOM_KEY
-        : names[idx] && presets[names[idx]]
-          ? names[idx]
-          : "";
-    post({ type: "ambienceRandom", enabled: ambienceRandomOn, scenes: Director.eraCount() });
+      presetSel.value = autoRandomKey || (names[idx] && presets[names[idx]] ? names[idx] : "");
+    post({ type: "familyRandom", key: autoRandomKey, scenes: Director.eraCount() });
     showBar();
   }
 
