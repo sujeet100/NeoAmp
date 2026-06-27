@@ -755,7 +755,7 @@
           "    float flick = 0.65 + 0.35 * sin(age * 34.0 + fi * 2.0);\n" + // fire flicker
           // size/brightness FLARE with loudness (vol/treb) instead of changing the count:
           // loud -> thick blinding sparks, quiet -> tiny dim embers (keeps dynamic range)
-          "    float size = (0.0042 + 0.0050 * heat) * (1.0 + 1.2 * vol_att + 0.6 * treb);\n" + // bigger -> embers read
+          "    float size = (0.0034 + 0.0040 * heat) * (1.0 + 0.9 * vol_att + 0.5 * treb);\n" + // trimmed: the beat-flare sparks were too big on loud audio
           "    float spark = (size * size) / (d * d + size * size);\n" +
           "    float si = spark * spark * heat * flick;\n" +
           // colour TEMPERATURE by distance: blinding white-yellow HOT at the core ->
@@ -786,7 +786,7 @@
           "  vec2 epp = edir * er + eperp * ewob + vec2(0.0, 0.30 * eage - 0.10 * eage * eage);\n" + // stronger rise
           "  float ed = length(p - epp);\n" +
           "  float efade = sin(eage * 3.14159);\n" + // smooth fade in -> peak -> out
-          "  float esize = 0.0020 + 0.0012 * a2;\n" + // visible but not blobby (trimmed from 0.0028 — was too big)
+          "  float esize = 0.0028 + 0.0018 * a2;\n" + // ambient embers stay visible (these were NOT the too-big ones)
           "  float espark = (esize * esize) / (ed * ed + esize * esize);\n" +
           "  float esi = espark * espark * efade * (0.6 + 0.5 * vol_att);\n" +
           "  col += mix(vec3(1.0, 0.58, 0.14), vec3(0.5, 0.05, 0.0), eage) * esi * 0.85;\n" + // orange ember, cools to deep red
