@@ -1070,10 +1070,11 @@
         frame: function (t) {
           var b = t.bass_att || t.bass || 1;
           var tr = t.treb_att || t.treb || 1;
-          // ONE column at rest -> SPLITS into 2-3 ropes only on a strong beat (q1 = separation)
-          t.q1 = 0.14 * Math.max(0, b - 1.05);
+          // ONE column at rest -> SPLITS into 2-3 ropes on a beat, spreading FURTHER from
+          // centre on stronger hits (q1 = separation; reaches wider than before).
+          t.q1 = 0.22 * Math.max(0, b - 1.02);
           // braided jaggedness (small + capped so loud beats stay ropes, not a fan of mush)
-          t.q6 = 0.012 + 0.018 * Math.min(0.5 * tr + 0.5 * b, 1.6);
+          t.q6 = 0.014 + 0.02 * Math.min(0.5 * tr + 0.5 * b, 1.6);
           return t;
         },
         // FOUNTAIN warp: the trail RISES and fans slightly OUTWARD, leaving the curved
@@ -1105,11 +1106,17 @@
           // water = red-channel feedback, widened by two horizontal taps so the rope reads
           // as a fluid column with soft edges rather than a hairline.
           "float beam = texture2D(sampler_main, uv).r;\n" +
-          "beam = max(beam, texture2D(sampler_main, uv + vec2(0.011, 0.0)).r * 0.6);\n" +
-          "beam = max(beam, texture2D(sampler_main, uv - vec2(0.011, 0.0)).r * 0.6);\n" +
-          "vec3 col = ground + beam * vec3(0.66, 0.92, 1.0);\n" + // white-cyan water over teal ground
+          // MILKIER/THICKER columns: a wider soft glow built from several horizontal taps so
+          // the rope reads as a thick milky fluid column, not a hairline.
+          "beam = max(beam, texture2D(sampler_main, uv + vec2(0.012, 0.0)).r * 0.85);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv - vec2(0.012, 0.0)).r * 0.85);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv + vec2(0.026, 0.0)).r * 0.6);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv - vec2(0.026, 0.0)).r * 0.6);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv + vec2(0.042, 0.0)).r * 0.38);\n" +
+          "beam = max(beam, texture2D(sampler_main, uv - vec2(0.042, 0.0)).r * 0.38);\n" +
+          "vec3 col = ground + beam * vec3(0.82, 0.94, 1.0);\n" + // MILKY white-cyan water over teal ground
           "float lum = max(col.r, max(col.g, col.b));\n" +
-          "col = mix(col, vec3(0.92, 1.0, 1.0), smoothstep(0.5, 1.0, lum));\n" + // hot white column cores
+          "col = mix(col, vec3(0.95, 0.99, 1.0), smoothstep(0.38, 0.9, lum));\n" + // milky-white column cores (lower threshold)
           "col = col / (col + 0.8) * 1.4;\n" + // Reinhard tone-map
           "ret = col;\n" +
           "}\n",
@@ -1127,9 +1134,9 @@
           additive: 1,
           usedots: 0,
           scaling: 1,
-          smoothing: 0.3,
+          smoothing: 0.4,
           a: 0.85,
-          thick: 1,
+          thick: 2,
           r: 1.0,
           g: 1.0,
           b: 1.0,
