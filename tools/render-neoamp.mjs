@@ -151,6 +151,29 @@ const evalJs = (send, expr) =>
   await send("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/tools/neoamp-preview.html` });
   await sleep(3000);
 
+  // Optionally load a real .wsz skin (env WSZ_PATH = repo-relative path, served by our HTTP
+  // server) via the same code path the file-picker uses, so every shot below renders in it.
+  if (process.env.WSZ_PATH) {
+    const url = "http://127.0.0.1:" + HTTP_PORT + "/" + process.env.WSZ_PATH.replace(/^\/+/, "");
+    const res = await send("Runtime.evaluate", {
+      awaitPromise: true,
+      returnByValue: true,
+      expression: `(async()=>{ try{
+        const buf = await (await fetch(${JSON.stringify(url)})).arrayBuffer();
+        const skin = await window.NeoAmpClassic.loadSkinFromArrayBuffer(buf);
+        if(!skin||!skin.sheets||!skin.sheets.MAIN) return 'NO_MAIN';
+        const id='custom-showcase';
+        const b64=(typeof bufToB64==='function')?bufToB64(buf):'';
+        if(!CLASSIC_SKINS.some(function(s){return s.id===id;})) CLASSIC_SKINS.push({id:id,name:${JSON.stringify(process.env.WSZ_NAME || "Custom Skin")},b64:b64,custom:true});
+        if(typeof refreshSkinOptions==='function') refreshSkinOptions();
+        enableClassic(id); activeSkinValue='wsz:'+id;
+        return 'APPLIED';
+      }catch(e){ return 'ERR '+((e&&e.message)||e); } })()`,
+    });
+    console.log("WSZ LOAD:", res.result && res.result.value);
+    await sleep(1800); // let the BMP sheets decode + the classic window repaint
+  }
+
   // sanity: which windows mounted + any obvious layout problems
   const probe = await evalJs(
     send,

@@ -107,6 +107,13 @@ parsed as JSON and used to pick DOM selectors, never executed.
 4. `04-equalizer.png` — the real 10-band equalizer.
 5. `05-playlist-search.png` — playlist mirror + in-app search/library.
 
+**Real-skin variant** (`screenshots/classified/`): the same shots rendered in the real
+**Winamp 5.5 Classified** `.wsz` skin — `01-hero.png` (player over the visualizer),
+`02-player.png` (full main window + now-playing + playlist), `03-equalizer.png` (skinned EQ).
+Use these if you want to lead with the authentic Winamp look / advertise real `.wsz` support.
+(The skin file itself is the author's artwork and is NOT committed — load your own `.wsz` to
+re-render via `WSZ_PATH=<repo-relative.wsz> WSZ_NAME="…" node tools/render-neoamp.mjs`.)
+
 **Promo tiles** (`promo/`):
 - `promo-small-440x280.png` — small promo tile.
 - `promo-marquee-1400x560.png` — marquee promo tile (optional; for featuring).
