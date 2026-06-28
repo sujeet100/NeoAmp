@@ -20,7 +20,7 @@ sections below into the Developer Dashboard fields of the same name.
 **Item name** (45 char max)
 
 ```
-NeoAmp — Music Visualizer
+NeoAmp — Music Player & Visualizer
 ```
 
 **Summary / short description** (132 char max)
