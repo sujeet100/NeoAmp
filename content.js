@@ -289,7 +289,7 @@
     return null; // different track / never loaded → empty-state
   }
   function readTrack() {
-    var v = q("video") || q("audio");
+    var v = mediaEl();
     var titleEl = q("ytmusic-player-bar .title");
     var bylineEl = q("ytmusic-player-bar .byline");
     var artEl = q("ytmusic-player-bar img.image") || q("ytmusic-player-bar img");
@@ -299,17 +299,10 @@
     // back to YTM's DOM scrape for fields MediaSession doesn't carry (album/year/plays/
     // likes) and for the brief window before the first snapshot arrives.
     var ms = mediaMeta || {};
-    // position: the media element when it exposes a real duration, else the provider's DOM
-    // position text (e.g. Spotify has no media element we can read) so the seek bar moves.
-    var cur = 0,
-      dur = 0;
-    if (v && isFinite(v.duration) && v.duration > 0) {
-      cur = v.currentTime || 0;
-      dur = v.duration;
-    } else if (PROVIDER.posElapsed || PROVIDER.posDuration) {
-      dur = parseTime(textOf(PROVIDER.posDuration));
-      cur = parseTime(textOf(PROVIDER.posElapsed));
-    }
+    // per-track position (provider UI first — the media element is a gapless timeline on YTM)
+    var pos = readPosition(v);
+    var cur = pos.cur,
+      dur = pos.dur;
     var title = ms.title || clean(titleEl && titleEl.textContent);
     var artist = ms.artist || by.artist;
     return {
@@ -763,6 +756,10 @@
         "[aria-label*='Repeat' i]",
       ],
       searchBox: ["ytmusic-search-box input#input", "ytmusic-search-box input", "input.search"],
+      // YTM plays gaplessly: <video>.currentTime is a continuous cross-track timeline, so read the
+      // per-track position from the player bar's "current / duration" text (the progress slider's
+      // aria-value* are PERCENTAGES, not seconds). The .time-info element holds e.g. "2:54 / 4:33".
+      posBar: ["ytmusic-player-bar .time-info", "ytmusic-player-bar"],
       // lyrics: the Lyrics tab fills a description shelf — ONE element, \n-separated lines
       // (live-verified: 57 newlines, no <br>). Present only while the Lyrics tab is open.
       lyricsTab: ["tp-yt-paper-tab"],
@@ -887,6 +884,30 @@
 
   function mediaEl() {
     return q("video") || q("audio");
+  }
+  // Per-track position. YTM plays GAPLESSLY (MSE): its single <video>.currentTime is a CONTINUOUS
+  // timeline that does NOT reset between tracks (measured: it climbs 381→382→383… across a track
+  // change while the song restarts at 0:00), so the element time is wrong for the per-track clock
+  // and seek bar. Read the provider's own UI instead. Order: a combined "cur / dur" text (YTM's
+  // player-bar .time-info), then separate elapsed/duration text (Spotify), then the media element
+  // (providers whose element exposes a real per-track timeline).
+  function readPosition(v) {
+    if (PROVIDER.posBar) {
+      var el = qa(PROVIDER.posBar);
+      var m = el && el.textContent && el.textContent.match(/(\d+):(\d{2})\s*\/\s*(\d+):(\d{2})/);
+      if (m) {
+        var d = +m[3] * 60 + +m[4];
+        if (d > 0) return { cur: +m[1] * 60 + +m[2], dur: d };
+      }
+    }
+    if (PROVIDER.posElapsed || PROVIDER.posDuration) {
+      var dd = parseTime(textOf(PROVIDER.posDuration)),
+        cc = parseTime(textOf(PROVIDER.posElapsed));
+      if (dd > 0) return { cur: cc, dur: dd };
+    }
+    if (v && isFinite(v.duration) && v.duration > 0)
+      return { cur: v.currentTime || 0, dur: v.duration };
+    return { cur: 0, dur: 0 };
   }
   function clickSel(list) {
     var b = list && qa(list);
@@ -1045,18 +1066,23 @@
       var v = mediaEl();
       if (v) {
         try {
-          v.currentTime = 0;
+          // seek to the CURRENT track's start, not absolute 0 (which on YTM's gapless timeline
+          // would land in an earlier track). offset = element-time − per-track-time = track start.
+          v.currentTime = Math.max(0, (v.currentTime || 0) - readPosition(v).cur);
         } catch (_) {}
       }
       sendTrack();
     },
-    // seek to absolute seconds: media element when it has a real timeline, else the
+    // seek to absolute (per-track) seconds: media element when it has a real timeline, else the
     // provider's own seek slider (Spotify — its <video> can't be seeked by us).
     seek: function (t) {
       var v = mediaEl();
       if (v && isFinite(v.duration) && v.duration > 0) {
         if (isFinite(t)) {
-          v.currentTime = t;
+          // map the per-track target onto the element's (possibly gapless) timeline: add the
+          // track-start offset so seeking to 1:00 lands at 1:00 of THIS track, not the stream.
+          var offset = (v.currentTime || 0) - readPosition(v).cur;
+          v.currentTime = Math.max(0, offset + t);
           sendTrack();
         }
         return;
