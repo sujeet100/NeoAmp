@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      /* On-brand pixel fonts (the project's vendored faces). drawtext/freetype can't load
+         these in our ffmpeg build, but the browser renders them perfectly — hence HTML+CDP. */
+      @font-face {
+        font-family: "Silkscreen";
+        src: url("../fonts/Silkscreen-Bold.ttf") format("truetype");
+        font-weight: bold;
+      }
+      @font-face {
+        font-family: "VT323";
+        src: url("../fonts/VT323-Regular.ttf") format("truetype");
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #06121f;
+      }
+      .stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        /* live visualizer behind the wordmark */
+        background-image: var(--viz);
+        background-size: cover;
+        background-position: center;
+      }
+      /* darken + vignette so the wordmark reads on any frame */
+      .stage::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            120% 90% at 50% 45%,
+            rgba(4, 12, 24, 0.15) 0%,
+            rgba(4, 12, 24, 0.78) 100%
+          ),
+          linear-gradient(180deg, rgba(4, 12, 24, 0.25), rgba(4, 12, 24, 0.55));
+      }
+      .wrap {
+        position: relative;
+        text-align: center;
+        line-height: 1;
+      }
+      .mark {
+        font-family: "Silkscreen", monospace;
+        font-weight: bold;
+        color: #fff;
+        letter-spacing: 0.02em;
+        font-size: 13vmin;
+        text-shadow:
+          0 0 2vmin rgba(120, 200, 255, 0.55),
+          0.5vmin 0.5vmin 0 rgba(0, 0, 0, 0.6);
+      }
+      .bolt {
+        color: #f2c14e;
+        text-shadow: 0 0 2vmin rgba(242, 193, 78, 0.6);
+      }
+      .tag {
+        font-family: "VT323", monospace;
+        color: #cfe8ff;
+        font-size: 5.2vmin;
+        margin-top: 2.5vmin;
+        letter-spacing: 0.04em;
+        text-shadow: 0.3vmin 0.3vmin 0 rgba(0, 0, 0, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="wrap">
+        <div class="mark"><span class="bolt">◢◤</span> NeoAmp</div>
+        <div class="tag">Winamp player + WMP / MilkDrop visualizers</div>
+      </div>
+    </div>
+  </body>
+</html>
