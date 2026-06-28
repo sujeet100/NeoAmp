@@ -237,14 +237,20 @@ const evalJs = (send, expr) =>
   // optional: switch to a named skin (env SKIN="TopazAmp") and screenshot it
   const SKIN = process.env.SKIN;
   if (SKIN) {
-    await evalJs(
-      send,
-      `(function(){var b=document.querySelector('.wa-np-btns .wa-skinsel-btn'); if(b)b.click(); return !!b;})()`
-    );
-    await sleep(200);
+    // Switch skin via the real selectSkin() path (SKIN env = skin id like "amber" OR display
+    // name like "Amber Monochrome"). The old approach drove the picker DOM (.wa-skinsel-btn /
+    // .wa-skinsel-item), whose selectors went stale — it silently rendered the default skin.
     const picked = await evalJs(
       send,
-      `(function(){var it=[].slice.call(document.querySelectorAll('.wa-skinsel-item')).filter(function(i){return new RegExp(${JSON.stringify(SKIN)},'i').test(i.textContent);})[0]; if(it){it.click();return it.textContent;} return 'NOT FOUND';})()`
+      `(function(){
+        var want = ${JSON.stringify(SKIN)};
+        var skins = (window.NeoAmpSkins && window.NeoAmpSkins.list) || [];
+        var m = skins.filter(function(s){ return s.id === want || new RegExp(want, 'i').test(s.name); })[0];
+        if (!m) return 'NOT FOUND';
+        if (typeof selectSkin === 'function') { selectSkin(m.id); return m.name; }
+        if (window.NeoAmpSkins) { window.NeoAmpSkins.apply(document, m.id); return m.name + ' (apply)'; }
+        return 'NO API';
+      })()`
     );
     console.log("SKIN SWITCH:", picked);
     await sleep(2800);
