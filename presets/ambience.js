@@ -939,24 +939,23 @@
   })();
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
-  // RE-MEASURED frame-by-frame from "YouTube Windmill Ambience 480p.mp4" (the prior
-  // "flat fixed-cyan caustic" build had no 3D/motion). The real mechanism is a
-  // FEEDBACK FLY-THROUGH, not a procedural caustic:
-  //   • TWO real-audio waveform lines (jagged oscilloscope traces) cross diagonally
-  //     (~45deg) THROUGH the centre, roughly parallel, offset perpendicular. They
-  //     span most of the screen and are drawn WHITE.
-  //   • The diagonal axis slowly WOBBLES (~25..60deg) — a lazy rock, not a full spin.
-  //   • Each frame the feedback buffer is ZOOMED OUT FROM CENTRE (q2<1) and BLURRED,
-  //     so every fresh jagged line smears + GROWS radially outward as it fades. That
-  //     expanding-from-centre feedback IS the "3D space" — colored ripples erupt at
-  //     centre on a beat (bass deepens the zoom-out = a burst) and stream outward to
-  //     fill the frame = fly-through depth. A slight diagonal drift = travel.
-  //   • "Milky traces": decay (q4 ~0.95) + multi-tap blur turn the sharp fresh zigzag
-  //     into soft milky bands over ~1s; whiteness (min-of-RGB) isolates the traces
-  //     from the colored body regardless of hue.
-  //   • Colour CYCLES slowly across the FULL spectrum (~75s; measured green->teal->
-  //     blue->yellow drift), NOT fixed cyan. The dark/light rolling caustic body gives
-  //     the depth between the traces; only the trace cores blow to milky white.
+  // RE-MEASURED frame-by-frame from "YouTube Windmill Ambience 480p.mp4" (3 rounds with the
+  // user). The mechanism is a slowly ROTATING field — the "windmill":
+  //   • The WHOLE field rotates around the centre at ~0.13 rad/s (~7.5deg/s, ~50s per
+  //     revolution). Measured: the bright band swept ~30deg -> 80deg over 7s. The line angle
+  //     (q1) and the feedback warp rotate in lock-step so foam + traces sweep together.
+  //   • Background = BRIGHT ORGANIC MARBLED FOAM, generated fresh in the comp from a
+  //     domain-warped fbm sampled in a frame ROTATED by q1 (so the foam spins WITH the
+  //     windmill) and flowing along that rotating axis. Dark troughs give the depth; the
+  //     rotation + flow give the "3D space" illusion. NOT concentric rings, NOT beat-driven.
+  //   • TWO real-audio waveform lines (jagged oscilloscope traces) cross the centre on the
+  //     rotating axis, offset perpendicular, drawn WHITE. The comp isolates them from the
+  //     SATURATED foam by whiteness = min(RGB) and dilates them into thick milky bands; a
+  //     small rotating feedback (q4) gives the milky trail.
+  //   • Colour CYCLES slowly (~77s) but CONFINED to the measured gamut
+  //     yellow(0.17) -> green -> cyan -> blue(0.67) — never red/magenta.
+  // (Rejected earlier builds — see git history: a beat-zoom feedback "fly-through" and
+  //  procedural ripples-from-centre both read as a static, beat-pulsing ripple-tank.)
   P["Ambience Windmill"] = (function () {
     var preset = build(
       {
@@ -1044,10 +1043,10 @@
           "}\n",
       }
     );
-    // Two real-audio waveform lines crossing the centre diagonally (axis q1, which wobbles),
-    // offset perpendicular by +/- the separation q3, jaggedness q6 from the live samples.
-    // Drawn WHITE so the comp's whiteness test isolates them; the warp expands+blurs their
-    // trail into milky ripples. Kept sharp (low smoothing) so fresh beats read as jagged.
+    // Two real-audio waveform lines crossing the centre on the ROTATING axis q1 (the windmill),
+    // offset perpendicular by +/- the separation q3, jaggedness q6 driven by the live samples.
+    // Drawn WHITE so the comp's whiteness test isolates them from the saturated foam; the warp
+    // rotates + blurs their trail into a milky band. Low smoothing so fresh beats read jagged.
     function wRope(k, useV2) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
@@ -1066,7 +1065,7 @@
         init_eqs: passthrough,
         frame_eqs: passthrough,
         point_eqs: function (a) {
-          var th = a.q1 || 0.785; // wobbling diagonal axis
+          var th = a.q1 || 0.785; // rotating windmill axis (set each frame in frame_eqs)
           var ct = Math.cos(th),
             st = Math.sin(th);
           var s = a.sample * 2.0 - 1.0;
