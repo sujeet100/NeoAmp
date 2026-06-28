@@ -12,14 +12,14 @@ today) and renders **MilkDrop visualizations** — via
 [Butterchurn](https://github.com/jberg/butterchurn) — driven by the **live audio of
 the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
 **hand-authored presets that recreate the classic Windows Media Player visualizers**
-— the *Alchemy*, *Battery*, and *Ambience* families.
+— the _Alchemy_, _Battery_, and _Ambience_ families.
 
 > Nostalgic for Winamp's MilkDrop and WMP's swirling Alchemy flower? NeoAmp brings
 > that look — and a real, audio-shaping graphic EQ — back to the music you stream today.
 
 <p align="center">
   <img src="store-assets/screenshots/01-hero.png" width="900"
-       alt="NeoAmp's windowed player docked beside a live Alchemy visualizer, running on YouTube Music in the Winamp 5.5 Classified skin">
+       alt="NeoAmp's windowed player and 10-band equalizer beside a live Alchemy kaleidoscope visualizer, running on YouTube Music">
 </p>
 
 ---
@@ -29,7 +29,7 @@ the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
 - 🪟 **Floating Winamp-style player UI** — draggable windows (main / equalizer /
   playlist / library), classic LCD readout, transport controls, volume/balance.
 - 🎚️ **A real 10-band graphic EQ** — audio is captured with `chrome.tabCapture`
-  in an offscreen document, so the EQ actually *shapes what you hear*, not just the
+  in an offscreen document, so the EQ actually _shapes what you hear_, not just the
   visuals.
 - 🌀 **MilkDrop visuals** reacting to the live track, including **hand-authored WMP
   recreations** — notably **Alchemy Random**, a self-sequencing engine (two-orb
@@ -53,10 +53,10 @@ the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
 > Captured live on YouTube Music, in the real **Winamp 5.5 Classified** `.wsz` skin
 > (visualizer frames driven by the live audio).
 
-|  |  |
-| :--: | :--: |
-| <img src="store-assets/screenshots/02-player-eq.png" width="430" alt="The windowed player and the real 10-band equalizer with its preset menu open"><br>**The player + a real 10-band EQ** | <img src="store-assets/screenshots/06-visualizations.png" width="430" alt="Montage of six hand-authored WMP/MilkDrop visualizers"><br>**Hand-authored WMP visualizers** |
-| <img src="store-assets/screenshots/05-skins.png" width="430" alt="Five real Winamp .wsz skins shown side by side"><br>**Real Winamp `.wsz` skins** | <img src="store-assets/screenshots/03-viz-flower.png" width="430" alt="The Alchemy Pastel visualizer's green and magenta flower"><br>**Alchemy (Pastel)** — a WMP recreation |
+|                                                                                                                                                                                            |                                                                                                                                                                              |
+| :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| <img src="store-assets/screenshots/02-player-eq.png" width="430" alt="The windowed player and the real 10-band equalizer with its preset menu open"><br>**The player + a real 10-band EQ** |   <img src="store-assets/screenshots/06-visualizations.png" width="430" alt="Montage of six hand-authored WMP/MilkDrop visualizers"><br>**Hand-authored WMP visualizers**    |
+|                     <img src="store-assets/screenshots/05-skins.png" width="430" alt="Five real Winamp .wsz skins shown side by side"><br>**Real Winamp `.wsz` skins**                     | <img src="store-assets/screenshots/03-viz-flower.png" width="430" alt="The Alchemy Pastel visualizer's green and magenta flower"><br>**Alchemy (Pastel)** — a WMP recreation |
 
 ## Install (load unpacked)
 
@@ -113,23 +113,23 @@ Three deliberate, load-bearing design choices (full rationale in
 
 ## Repo layout
 
-| Path | Role |
-| --- | --- |
-| `manifest.json` | MV3 manifest (content scripts, sandbox page, CSP, offscreen, web-accessible resources). |
-| `content.js` | UI injection, provider registry, transport wiring, audio-capture trigger. |
-| `sw.js` / `offscreen.html` / `offscreen.js` | Service worker + offscreen tab-capture + EQ + FFT. |
-| `mediasession.js` | `world:MAIN` script that reads `navigator.mediaSession` metadata. |
-| `winamp.js` / `winamp.css` | The floating Winamp-style player UI. |
-| `wsz.js` / `skins.js` | `.wsz` skin parser/renderer (Webamp-derived) + CSS-variable skin registry. |
-| `selectors.json` | Per-provider selectors, fetched at runtime for hot-fixing. |
-| `viz.html` / `viz.js` | Sandboxed renderer: Butterchurn init, canvas sizing, controls, render loop. |
-| `presets/*.js` | Hand-authored WMP-style presets (`kit.js` shared kit + family files). |
-| `vendor/*.min.js` | Vendored Butterchurn core + preset packs (MV3 bans remote code). |
-| `vendor/skins/base-2.91.wsz` | The one bundled default skin; others load at runtime — see [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins). |
-| `fonts/` | Bundled bitmap fonts (VT323, Silkscreen) — both SIL OFL. |
-| `tools/` | Headless self-render harnesses (CDP) for iterating on visuals without the browser. |
-| `docs/` | Design notes, reverse-engineering analysis, handoffs. |
-| `CLAUDE.md` | Deep architecture notes + the preset-authoring guide. |
+| Path                                        | Role                                                                                                                    |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `manifest.json`                             | MV3 manifest (content scripts, sandbox page, CSP, offscreen, web-accessible resources).                                 |
+| `content.js`                                | UI injection, provider registry, transport wiring, audio-capture trigger.                                               |
+| `sw.js` / `offscreen.html` / `offscreen.js` | Service worker + offscreen tab-capture + EQ + FFT.                                                                      |
+| `mediasession.js`                           | `world:MAIN` script that reads `navigator.mediaSession` metadata.                                                       |
+| `winamp.js` / `winamp.css`                  | The floating Winamp-style player UI.                                                                                    |
+| `wsz.js` / `skins.js`                       | `.wsz` skin parser/renderer (Webamp-derived) + CSS-variable skin registry.                                              |
+| `selectors.json`                            | Per-provider selectors, fetched at runtime for hot-fixing.                                                              |
+| `viz.html` / `viz.js`                       | Sandboxed renderer: Butterchurn init, canvas sizing, controls, render loop.                                             |
+| `presets/*.js`                              | Hand-authored WMP-style presets (`kit.js` shared kit + family files).                                                   |
+| `vendor/*.min.js`                           | Vendored Butterchurn core + preset packs (MV3 bans remote code).                                                        |
+| `vendor/skins/base-2.91.wsz`                | The one bundled default skin; others load at runtime — see [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins). |
+| `fonts/`                                    | Bundled bitmap fonts (VT323, Silkscreen) — both SIL OFL.                                                                |
+| `tools/`                                    | Headless self-render harnesses (CDP) for iterating on visuals without the browser.                                      |
+| `docs/`                                     | Design notes, reverse-engineering analysis, handoffs.                                                                   |
+| `CLAUDE.md`                                 | Deep architecture notes + the preset-authoring guide.                                                                   |
 
 ## Security
 
@@ -180,9 +180,9 @@ in **[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)**.
   does not redistribute community skins; see the
   [skins note](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins)).
 
-> **Trademarks.** *Winamp*, *Nullsoft*, *Windows Media Player*, *MilkDrop*,
-> *YouTube Music*, and *Spotify* are trademarks of their respective owners. NeoAmp is
-> an independent, unaffiliated fan project. It reproduces the *visual character* of
+> **Trademarks.** _Winamp_, _Nullsoft_, _Windows Media Player_, _MilkDrop_,
+> _YouTube Music_, and _Spotify_ are trademarks of their respective owners. NeoAmp is
+> an independent, unaffiliated fan project. It reproduces the _visual character_ of
 > these tools — color, motion, symmetry, audio-reactivity — not their proprietary
 > code.
 

@@ -111,8 +111,8 @@ below: the first three are captured **live on music.youtube.com** in the real **
 Classified** `.wsz` skin (the strongest leads — real player + real audio-driven visuals); the
 last two are labelled montages that show breadth.
 
-1. `01-hero.png` — the full NeoAmp window stack (player · playlist · media library) docked
-   beside a live Alchemy radial-burst visualizer, over YouTube Music. **[live]**
+1. `01-hero.png` — the NeoAmp player + the real 10-band EQ docked beside a live Alchemy
+   kaleidoscope visualizer, over YouTube Music. **[live]**
 2. `02-player-eq.png` — close-up of the main window + the **real 10-band equalizer** with its
    preset menu open (Flat, Bass Boost, Rock, Classical, …). **[live]**
 3. `03-viz-flower.png` — the **Alchemy (Pastel)** WMP recreation: the green/magenta anemone
