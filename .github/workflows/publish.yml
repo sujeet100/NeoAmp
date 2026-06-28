@@ -8,7 +8,8 @@ name: Publish to Chrome Web Store
 #   2. commit, then:  git tag v<version> && git push origin v<version>
 #
 # …which fires this workflow: it lints + tests, packages dist/neoamp-<version>.zip, and
-# uploads + publishes it via the Chrome Web Store API.
+# uploads it as a DRAFT via the Chrome Web Store API. You then review + click "Publish"
+# in the dashboard (set --auto-publish in the upload step to fully automate instead).
 #
 # Required repo secrets (Settings → Secrets and variables → Actions). One-time setup — see
 # store-assets/STORE-LISTING.md → "Automated publishing (CD)":
@@ -60,13 +61,12 @@ jobs:
             exit 1
           fi
           ZIP="$(ls dist/neoamp-*.zip)"
-          echo "Publishing $ZIP"
-          # --auto-publish submits the upload for review and publishes once approved.
-          # Drop that flag to upload as a DRAFT and click "Publish" manually in the dashboard.
+          echo "Uploading $ZIP as a draft"
+          # Uploads the new package as a DRAFT only — review it and click "Publish" in the
+          # dashboard to go live. Append `--auto-publish` here to submit + publish automatically.
           npx --yes chrome-webstore-upload-cli@3 upload \
             --source "$ZIP" \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \
             --client-secret "$CWS_CLIENT_SECRET" \
-            --refresh-token "$CWS_REFRESH_TOKEN" \
-            --auto-publish
+            --refresh-token "$CWS_REFRESH_TOKEN"

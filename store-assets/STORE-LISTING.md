@@ -192,8 +192,9 @@ git commit -am "release vX.Y.Z"
 git tag vX.Y.Z && git push origin vX.Y.Z   # → workflow lints+tests, packages, uploads, publishes
 ```
 
-It can also be run manually from the **Actions** tab (`workflow_dispatch`). Drop the
-`--auto-publish` flag in the workflow to upload as a **draft** and click Publish by hand instead.
+It can also be run manually from the **Actions** tab (`workflow_dispatch`). It uploads the new
+package as a **draft** — review it and click **Publish** in the dashboard to go live. (Add
+`--auto-publish` to the upload step if you ever want it to submit + publish automatically.)
 
 **One-time secrets** (repo → Settings → Secrets and variables → Actions):
 

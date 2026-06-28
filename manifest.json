@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NeoAmp — Music Visualizer",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "NeoAmp overlays a Winamp-style player + MilkDrop (Butterchurn) visualizations on YouTube Music, including hand-authored recreations of classic Windows Media Player visualizers (Alchemy / Battery / Ambience).",
   "permissions": ["storage", "tabCapture", "offscreen", "activeTab", "contextMenus", "alarms"],
   "host_permissions": [
