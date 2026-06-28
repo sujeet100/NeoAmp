@@ -17,7 +17,10 @@ the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
 > Nostalgic for Winamp's MilkDrop and WMP's swirling Alchemy flower? NeoAmp brings
 > that look — and a real, audio-shaping graphic EQ — back to the music you stream today.
 
-<!-- TODO: add a screenshot / GIF here — it's the single biggest thing a README can do. -->
+<p align="center">
+  <img src="store-assets/screenshots/01-hero.png" width="900"
+       alt="NeoAmp's windowed player docked beside a live Alchemy visualizer, running on YouTube Music in the Winamp 5.5 Classified skin">
+</p>
 
 ---
 
@@ -44,6 +47,16 @@ the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
 - 🔒 **Local & private** — no analytics, no tracking, no remote code. The only
   network call is fetching `selectors.json` for hot-fixable site selectors (see
   [PRIVACY.md](./PRIVACY.md)).
+
+## Screenshots
+
+> Captured live on YouTube Music, in the real **Winamp 5.5 Classified** `.wsz` skin
+> (visualizer frames driven by the live audio).
+
+|  |  |
+| :--: | :--: |
+| <img src="store-assets/screenshots/02-player-eq.png" width="430" alt="The windowed player and the real 10-band equalizer with its preset menu open"><br>**The player + a real 10-band EQ** | <img src="store-assets/screenshots/06-visualizations.png" width="430" alt="Montage of six hand-authored WMP/MilkDrop visualizers"><br>**Hand-authored WMP visualizers** |
+| <img src="store-assets/screenshots/05-skins.png" width="430" alt="Five real Winamp .wsz skins shown side by side"><br>**Real Winamp `.wsz` skins** | <img src="store-assets/screenshots/03-viz-flower.png" width="430" alt="The Alchemy Pastel visualizer's green and magenta flower"><br>**Alchemy (Pastel)** — a WMP recreation |
 
 ## Install (load unpacked)
 

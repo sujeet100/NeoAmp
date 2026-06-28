@@ -170,7 +170,7 @@ const evalJs = (send, expr) =>
         return 'APPLIED';
       }catch(e){ return 'ERR '+((e&&e.message)||e); } })()`,
     });
-    console.log("WSZ LOAD:", res.result && res.result.value);
+    console.log("WSZ LOAD:", res.result && res.result.result && res.result.result.value);
     await sleep(1800); // let the BMP sheets decode + the classic window repaint
   }
 

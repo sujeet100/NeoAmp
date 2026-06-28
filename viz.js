@@ -608,11 +608,25 @@
     // Boot straight into "Alchemy (Pastel)" — the shipped default (the accurate muted/dusty WMP colour).
     // It self-sequences in frame_eqs (no cross-preset Director crossfade). The Director (viz.js) stays
     // dormant; reachable only via the postMessage debug toggle.
-    var bootName = presets["Alchemy (Pastel)"]
-      ? "Alchemy (Pastel)"
-      : presets["Alchemy (Vivid)"]
-        ? "Alchemy (Vivid)"
-        : names[0];
+    // The self-render harness may request a different boot preset via `#preset=<name>` so it renders
+    // that preset from frame 0 — otherwise Alchemy renders first and bleeds through the feedback buffer
+    // for seconds. The extension never sets a hash, so the default below stands in normal use.
+    var bootOverride = (function () {
+      try {
+        var m = /[#&?]preset=([^&]+)/.exec((location.hash || "") + (location.search || ""));
+        var n = m && decodeURIComponent(m[1]);
+        return n && presets[n] ? n : null;
+      } catch (_) {
+        return null;
+      }
+    })();
+    var bootName =
+      bootOverride ||
+      (presets["Alchemy (Pastel)"]
+        ? "Alchemy (Pastel)"
+        : presets["Alchemy (Vivid)"]
+          ? "Alchemy (Vivid)"
+          : names[0]);
     loadByName(bootName);
     renderLoop();
     post({ type: "ready", presets: names.length });

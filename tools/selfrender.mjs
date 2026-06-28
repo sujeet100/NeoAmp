@@ -120,7 +120,11 @@ function cdpClient(ws) {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await send("Page.navigate", { url: URL });
+  // Boot the page STRAIGHT into the target preset via #preset= (viz.js reads it). This way the
+  // preset renders from frame 0 and Alchemy (the normal default) never seeds the feedback buffer —
+  // otherwise its diamonds/rays/orbs bleed through for many seconds. See viz.js init().
+  const navUrl = PRESET ? URL + "#preset=" + encodeURIComponent(PRESET) : URL;
+  await send("Page.navigate", { url: navUrl });
   await sleep(2500); // let scripts load + init() + first frames
 
   // Pump synthetic audio (128-centred time-domain waveform: bass+mid+treb sines × a ~2Hz beat).
@@ -142,11 +146,8 @@ function cdpClient(ws) {
   const pumpRes = await send("Runtime.evaluate", { expression: pump, returnByValue: true });
   console.log("presets loaded in page:", pumpRes.result && pumpRes.result.value);
 
-  if (PRESET) {
-    await send("Runtime.evaluate", {
-      expression: `window.postMessage({__wmp:true,type:'preset:load',name:${JSON.stringify(PRESET)}},'*')`,
-    });
-  }
+  // NOTE: no preset:load postMessage here — the preset is now booted via #preset= above, so it
+  // renders cleanly from frame 0 with no Alchemy-to-target crossfade/feedback bleed.
   // probe: is the WebGL canvas actually non-black? sample a few pixels after a moment.
   await sleep(800);
 
