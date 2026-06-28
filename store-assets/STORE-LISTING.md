@@ -158,3 +158,50 @@ than the live shots):
 - [ ] Confirm no `console` debug spam (info logs are gated behind a debug flag).
 - [ ] If the remote `selectors.json` channel is desired, the GitHub repo must be public
       (otherwise it silently falls back to bundled defaults — harmless).
+
+---
+
+## First publish (manual — one time)
+
+The Chrome Web Store API can only **update** an existing item, so the first listing must be
+created by hand. After this, updates can be automated (next section).
+
+1. **Developer account.** Sign in at <https://chrome.google.com/webstore/devconsole>; pay the
+   one-time **US$5** registration fee if you haven't.
+2. **Build the package.** `npm run release` → `dist/neoamp-<version>.zip` (already validated +
+   dev-file-free).
+3. **Create item** → upload the zip.
+4. **Store listing tab** — paste the fields from the top of this file (name, summary, detailed
+   description, category Entertainment, English). Upload the **5 screenshots** from
+   `screenshots/` (1280×800) + the **promo tiles** from `promo/`. The 128px icon is already in
+   the package.
+5. **Privacy practices tab** — set the single purpose, paste each permission/host justification
+   from the tables above, tick the data-usage disclosures (collects nothing), and set the
+   **privacy policy URL** to the hosted `PRIVACY.md`
+   (e.g. `https://github.com/sujeet100/NeoAmp/blob/main/PRIVACY.md`). Declare **no remote code**.
+6. **Submit for review.** First reviews typically take a few days.
+7. **Grab the extension ID** from the item's dashboard URL — you need it for CD below.
+
+## Automated publishing (CD)
+
+`.github/workflows/publish.yml` publishes **updates** on a version tag. Flow:
+
+```bash
+# bump version in BOTH manifest.json and package.json (the Store rejects a re-used version), then:
+git commit -am "release vX.Y.Z"
+git tag vX.Y.Z && git push origin vX.Y.Z   # → workflow lints+tests, packages, uploads, publishes
+```
+
+It can also be run manually from the **Actions** tab (`workflow_dispatch`). Drop the
+`--auto-publish` flag in the workflow to upload as a **draft** and click Publish by hand instead.
+
+**One-time secrets** (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Where it comes from |
+| --- | --- |
+| `CWS_EXTENSION_ID` | the item's dashboard URL (step 7 above). |
+| `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` | Google Cloud Console → enable the **Chrome Web Store API** → create an **OAuth 2.0 client ID** (Desktop app). |
+| `CWS_REFRESH_TOKEN` | generate once from that client (the [`chrome-webstore-upload` keys guide](https://github.com/fregante/chrome-webstore-upload-keys) walks through the OAuth consent → token exchange). |
+
+The workflow fails fast with a clear message if the secrets are missing, so a tag pushed before
+setup is harmless (it builds + tests but publishes nothing).

@@ -1,0 +1,72 @@
+name: Publish to Chrome Web Store
+
+# Continuous deployment for the extension. This UPDATES an existing Web Store item — the
+# FIRST submission must be done by hand in the dashboard (the API needs an extension ID that
+# only exists once the listing is created). After that, publishing an UPDATE is:
+#
+#   1. bump "version" in manifest.json AND package.json (Web Store rejects a re-used version)
+#   2. commit, then:  git tag v<version> && git push origin v<version>
+#
+# …which fires this workflow: it lints + tests, packages dist/neoamp-<version>.zip, and
+# uploads + publishes it via the Chrome Web Store API.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions). One-time setup — see
+# store-assets/STORE-LISTING.md → "Automated publishing (CD)":
+#   CWS_EXTENSION_ID · CWS_CLIENT_ID · CWS_CLIENT_SECRET · CWS_REFRESH_TOKEN
+
+on:
+  push:
+    tags: ["v*"] # e.g. v1.0.0
+  workflow_dispatch: # manual run from the Actions tab (publishes the manifest version on the default branch)
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build & publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # Guard: a version tag must match manifest.json (catches "tagged but forgot to bump").
+      - name: Verify tag matches manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          MV="$(node -p "require('./manifest.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$MV" != "$TAG" ]; then
+            echo "::error::Tag v$TAG does not match manifest.json version $MV — bump manifest.json + package.json, commit, then re-tag."
+            exit 1
+          fi
+
+      # Lints + tests (npm run check) THEN packages dist/neoamp-<version>.zip.
+      - run: npm run release
+
+      - name: Upload + publish to the Chrome Web Store
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$CWS_EXTENSION_ID" ] || [ -z "$CWS_REFRESH_TOKEN" ]; then
+            echo "::error::Chrome Web Store secrets are not set. Add CWS_EXTENSION_ID / CWS_CLIENT_ID / CWS_CLIENT_SECRET / CWS_REFRESH_TOKEN (see STORE-LISTING.md)."
+            exit 1
+          fi
+          ZIP="$(ls dist/neoamp-*.zip)"
+          echo "Publishing $ZIP"
+          # --auto-publish submits the upload for review and publishes once approved.
+          # Drop that flag to upload as a DRAFT and click "Publish" manually in the dashboard.
+          npx --yes chrome-webstore-upload-cli@3 upload \
+            --source "$ZIP" \
+            --extension-id "$CWS_EXTENSION_ID" \
+            --client-id "$CWS_CLIENT_ID" \
+            --client-secret "$CWS_CLIENT_SECRET" \
+            --refresh-token "$CWS_REFRESH_TOKEN" \
+            --auto-publish

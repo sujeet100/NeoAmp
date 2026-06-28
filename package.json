@@ -5,6 +5,9 @@
   "description": "Winamp-style player + WMP/MilkDrop visualizations overlaid on YouTube Music & Spotify (MV3 extension).",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node tools/test.mjs",
     "lint": "eslint .",
