@@ -939,24 +939,30 @@
   })();
 
   // ── Ambience Windmill ─────────────────────────────────────────────────────
-  // Re-derived from the reference (window ~126-140): a full-frame flowing CAUSTIC/smoke
-  // field — bright white-cyan frothy filament RIDGES (inverted-ridge fbm crests) over a
-  // mid-teal body with darker teal troughs, the ridge axis running DIAGONALLY lower-left
-  // to upper-right and the whole field churning/translating along that diagonal. NO
-  // central object, NO spokes, NO radial structure, NO hot core. FIXED cyan (hue 180),
-  // luminous-but-clean. Built procedurally (no custom waves). (Was 4 rotating real-audio
-  // spokes + a center bloom — the literal "windmill blades" misread; wrong.)
-  // ...with TWO parallel DIAGONAL jagged WHITE waveform lines threaded through it, and the
-  // whole field TRAVELLING along the diagonal so it feels like flying through space (user
-  // note: it had no waveforms). The lines are carried in the feedback RED channel (the cyan
-  // caustic has low red-vs-green, so reading red-minus-green isolates the white lines
-  // cleanly); a diagonal advection warp streams their trail = the travel.
+  // RE-MEASURED frame-by-frame from "YouTube Windmill Ambience 480p.mp4" (the prior
+  // "flat fixed-cyan caustic" build had no 3D/motion). The real mechanism is a
+  // FEEDBACK FLY-THROUGH, not a procedural caustic:
+  //   • TWO real-audio waveform lines (jagged oscilloscope traces) cross diagonally
+  //     (~45deg) THROUGH the centre, roughly parallel, offset perpendicular. They
+  //     span most of the screen and are drawn WHITE.
+  //   • The diagonal axis slowly WOBBLES (~25..60deg) — a lazy rock, not a full spin.
+  //   • Each frame the feedback buffer is ZOOMED OUT FROM CENTRE (q2<1) and BLURRED,
+  //     so every fresh jagged line smears + GROWS radially outward as it fades. That
+  //     expanding-from-centre feedback IS the "3D space" — colored ripples erupt at
+  //     centre on a beat (bass deepens the zoom-out = a burst) and stream outward to
+  //     fill the frame = fly-through depth. A slight diagonal drift = travel.
+  //   • "Milky traces": decay (q4 ~0.95) + multi-tap blur turn the sharp fresh zigzag
+  //     into soft milky bands over ~1s; whiteness (min-of-RGB) isolates the traces
+  //     from the colored body regardless of hue.
+  //   • Colour CYCLES slowly across the FULL spectrum (~75s; measured green->teal->
+  //     blue->yellow drift), NOT fixed cyan. The dark/light rolling caustic body gives
+  //     the depth between the traces; only the trace cores blow to milky white.
   P["Ambience Windmill"] = (function () {
     var preset = build(
       {
         wave_a: 0,
-        decay: 0.92,
-        gammaadj: 1.6,
+        decay: 1.0, // trail fade is done in the warp shader (q4), not the engine
+        gammaadj: 1.5,
         zoom: 1.0,
         rot: 0.0,
         warp: 0.0,
@@ -968,67 +974,80 @@
       {
         frame: function (t) {
           var treb = t.treb_att || t.treb || 1;
-          t.q1 = 0.785 + t.time * 0.06; // diagonal axis SLOWLY ROTATES (the reference tilts over time)
-          t.q3 = 0.13; // perpendicular separation of the 2 parallel lines
-          t.q5 = 0.62; // line half-length (spans the diagonal)
-          t.q6 = 0.03 + 0.05 * Math.min(treb, 1.6); // jaggedness amplitude
+          // WINDMILL: the measured reference ROTATES the whole field slowly around centre
+          // (~7deg/s, ~50s per revolution). The feedback warp rotates in lock-step, so the
+          // waveform lines and the milky foam sweep around together = the windmill + 3D space.
+          t.q1 = 0.6 + t.time * 0.13; // line angle (rad), continuous rotation around centre
+          t.q3 = 0.14; // perpendicular separation of the 2 lines
+          t.q4 = 0.93; // feedback fade for the milky TRACE trail (the bright foam is generated fresh in comp)
+          t.q5 = 0.6; // line half-length
+          t.q6 = 0.05 + 0.1 * Math.min(treb, 1.6); // jaggedness amplitude (treble)
+          t.q7 = t.time * 0.013; // SLOW hue cycle (~77s), confined gamut
           return t;
         },
-        // PARALLAX / FALLING-THROUGH-SPACE: content rushes OUTWARD from a vanishing point we
-        // fly toward (zoom-out feedback) + a slight diagonal drift, so the cyan clouds and the
-        // waveform lines stream past and GROW as if we are falling through infinite space.
-        // Only the red channel (the lines) is faded; the cyan body is recomputed fresh.
+        // WINDMILL FEEDBACK (for the milky TRACE trail only — the bright foam body is generated
+        // fresh in the comp): ROTATE the previous frame a hair around centre IN LOCK-STEP with
+        // the line/foam rotation (~0.13 rad/s) so the trace trail sweeps with the windmill, plus
+        // a small blur, then fade by q4. NO zoom (a beat-pulsed zoom read as "static + zooming").
+        // fps keeps the spin frame-rate-independent.
         warp:
           "shader_body {\n" +
-          "vec2 vp = vec2(0.60, 0.42);\n" + // vanishing point we travel toward
-          "vec2 w = vp + (uv - vp) * 0.975 + vec2(-0.003, 0.003);\n" + // content grows out from vp = fly-through
-          "vec3 c = texture2D(sampler_main, w).rgb;\n" +
-          "c.r *= 0.84;\n" +
-          "ret = c;\n" +
+          "float asp = resolution.x / resolution.y;\n" +
+          "float fp = max(fps, 20.0);\n" +
+          "float a = 0.13 / fp;\n" + // rotation per frame -> ~0.13 rad/s windmill spin
+          "vec2 c = vec2(0.5, 0.5);\n" +
+          "vec2 p = uv - c; p.x *= asp;\n" +
+          "p = mat2(cos(a), -sin(a), sin(a), cos(a)) * p;\n" + // spin the feedback in lock-step
+          "p.x /= asp; vec2 w = p + c;\n" +
+          "float bx = 0.0026; float by = 0.0026 * asp;\n" +
+          "vec3 col = texture2D(sampler_main, w).rgb * 0.4;\n" + // 5-tap blur = milky smear
+          "col += texture2D(sampler_main, w + vec2(bx, 0.0)).rgb * 0.15;\n" +
+          "col += texture2D(sampler_main, w - vec2(bx, 0.0)).rgb * 0.15;\n" +
+          "col += texture2D(sampler_main, w + vec2(0.0, by)).rgb * 0.15;\n" +
+          "col += texture2D(sampler_main, w - vec2(0.0, by)).rgb * 0.15;\n" +
+          "ret = col * q4;\n" + // trail fade
           "}\n",
         comp:
           NOISE_GLSL +
+          // HSV->RGB so the hue can be confined to the measured gamut (see below).
+          "vec3 hsv2rgb(vec3 c){ vec3 r = clamp(abs(mod(c.x*6.0 + vec3(0.0,4.0,2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); return c.z * mix(vec3(1.0), r, c.y); }\n" +
           "shader_body {\n" +
-          "vec2 p = uv;\n" +
-          "p.x *= resolution.x / resolution.y;\n" +
-          // diagonal advection (LL -> UR) + rotate/elongate the domain so ridges run diagonally
-          "vec2 flow = vec2(0.06, -0.05) * time;\n" +
-          "vec2 q = p * 4.0 + flow;\n" +
-          "q = mat2(0.707, -0.707, 0.707, 0.707) * q;\n" + // rotate 45deg
-          "q.y *= 0.5;\n" + // elongate features along the diagonal
-          "float n = fbm(q + 0.6 * fbm(q * 0.7 - flow * 0.5));\n" + // domain-warped base body
-          "float ridge = pow(1.0 - abs(2.0 * fbm(q * 1.6 + n) - 1.0), 3.0);\n" + // frothy inverted-ridge crests
-          "float ridge2 = pow(1.0 - abs(2.0 * fbm(q * 3.0 - n * 1.2 + flow) - 1.0), 4.0);\n" +
-          "float crest = max(ridge, 0.7 * ridge2);\n" +
-          "float body = 0.5 + 0.5 * n;\n" + // higher floor -> luminous, few dark troughs
-          "body *= (0.95 + 0.15 * bass);\n" +
-          // fixed BRIGHT cyan (measured ~rgb 0.53,0.90,0.90): only mild teal troughs, white crests
-          "vec3 col = mix(vec3(0.12, 0.48, 0.50), vec3(0.50, 0.90, 0.92), smoothstep(0.2, 0.85, body));\n" +
-          "col = mix(col, vec3(0.82, 0.96, 0.96), smoothstep(0.65, 1.05, crest));\n" + // fewer white crests so the lines dominate
-          // the 2 travelling white waveform lines: red-minus-green isolates them from cyan.
-          // Dilate over a few taps so the lines read as BOLD thick bolts, not hairlines.
+          "float asp = resolution.x / resolution.y;\n" +
+          // Hue CYCLES but CONFINED to the reference gamut yellow(0.17)->green->cyan->blue(0.67)
+          // (the full rainbow cosine wrongly hits red/magenta, which never appear in the ref).
+          "float hue = 0.42 + 0.20 * sin(6.2832 * q7) + 0.05 * sin(6.2832 * q7 * 2.7);\n" +
+          "vec3 tint = hsv2rgb(vec3(hue, 0.82, 1.0));\n" + // SATURATED so foam never reads as a white trace
+          // BRIGHT organic marbled foam (the fill + the rotating 3D space): sample a domain-warped
+          // fbm in a frame ROTATED by q1 (so the foam spins WITH the windmill) and flowing along
+          // that rotating axis. NOT concentric rings, NOT beat-driven. Generated fresh each frame
+          // (always bright + fills), so it doesn't depend on the sparse feedback.
+          "vec2 e = uv - vec2(0.5); e.x *= asp;\n" +
+          "vec2 fq = mat2(cos(q1), -sin(q1), sin(q1), cos(q1)) * e;\n" +
+          "vec2 flow = vec2(0.0, -0.05) * time;\n" +
+          "float f = fbm(fq * 3.2 + flow + 0.7 * fbm(fq * 1.4 - flow * 0.5));\n" +
+          "float crest = pow(1.0 - abs(2.0 * f - 1.0), 2.2);\n" + // frothy crests
+          "vec3 col = mix(tint * 0.16, tint * 0.95, smoothstep(0.18, 0.82, f));\n" + // bright foam + dark troughs (depth)
+          "col = mix(col, tint * 1.5, crest * 0.6);\n" + // bright (still SATURATED) crests
+          // BOLD WHITE waveform traces: foam is saturated-colored, so WHITENESS = min(RGB) cleanly
+          // isolates the white waves + their faded feedback trail from the foam. Dilate over taps.
+          "float bx = 0.0055; float byy = 0.0055 * asp;\n" +
           "vec3 s0 = texture2D(sampler_main, uv).rgb;\n" +
-          "float beam = max(0.0, s0.r - 0.6 * s0.g);\n" +
-          "vec3 sa = texture2D(sampler_main, uv + vec2(0.008, 0.0)).rgb;\n" +
-          "vec3 sb = texture2D(sampler_main, uv - vec2(0.008, 0.0)).rgb;\n" +
-          "vec3 sc = texture2D(sampler_main, uv + vec2(0.0, 0.012)).rgb;\n" +
-          "vec3 sd = texture2D(sampler_main, uv - vec2(0.0, 0.012)).rgb;\n" +
-          "beam = max(beam, 0.85 * max(0.0, sa.r - 0.6 * sa.g));\n" +
-          "beam = max(beam, 0.85 * max(0.0, sb.r - 0.6 * sb.g));\n" +
-          "beam = max(beam, 0.85 * max(0.0, sc.r - 0.6 * sc.g));\n" +
-          "beam = max(beam, 0.85 * max(0.0, sd.r - 0.6 * sd.g));\n" +
-          "col = mix(col, vec3(1.0), smoothstep(0.08, 0.28, beam));\n" + // bold WHITE travelling lines
-          "col += vec3(0.8, 1.0, 1.0) * smoothstep(0.14, 0.4, beam) * 0.55;\n" + // line glow halo
-          "col = max(col, vec3(0.0));\n" +
-          "col = col / (col + 0.7);\n" + // gentler tone-map -> stays bright
-          "col *= 1.7;\n" +
+          "float wht = min(s0.r, min(s0.g, s0.b));\n" +
+          "vec3 sa = texture2D(sampler_main, uv + vec2(bx, 0.0)).rgb; wht = max(wht, min(sa.r, min(sa.g, sa.b)));\n" +
+          "vec3 sb = texture2D(sampler_main, uv - vec2(bx, 0.0)).rgb; wht = max(wht, min(sb.r, min(sb.g, sb.b)));\n" +
+          "vec3 sc = texture2D(sampler_main, uv + vec2(0.0, byy)).rgb; wht = max(wht, min(sc.r, min(sc.g, sc.b)));\n" +
+          "vec3 sd = texture2D(sampler_main, uv - vec2(0.0, byy)).rgb; wht = max(wht, min(sd.r, min(sd.g, sd.b)));\n" +
+          "col = mix(col, vec3(1.0), smoothstep(0.34, 0.62, wht));\n" + // bold milky-white traces
+          "col += vec3(0.85, 0.95, 1.0) * smoothstep(0.5, 0.85, wht) * 0.35;\n" + // soft halo
+          "col = clamp(col, 0.0, 1.0);\n" +
           "ret = col;\n" +
           "}\n",
       }
     );
-    // Two PARALLEL diagonal (45deg) real-audio waveform lines, offset perpendicular by +/-
-    // the separation q3, jaggedness q6. Drawn WHITE (high red) so the comp's red-minus-green
-    // test isolates them from the cyan body; the warp advects their trail = the travel.
+    // Two real-audio waveform lines crossing the centre diagonally (axis q1, which wobbles),
+    // offset perpendicular by +/- the separation q3, jaggedness q6 from the live samples.
+    // Drawn WHITE so the comp's whiteness test isolates them; the warp expands+blurs their
+    // trail into milky ripples. Kept sharp (low smoothing) so fresh beats read as jagged.
     function wRope(k, useV2) {
       return {
         baseVals: Object.assign({}, WAVE_BASE, {
@@ -1037,9 +1056,9 @@
           additive: 1,
           usedots: 0,
           scaling: 1,
-          smoothing: 0.3,
+          smoothing: 0.2,
           a: 1.0,
-          thick: 5, // thicker waveform (user note)
+          thick: 7, // bold lines (user: lines were too thin); blur + persistence thickens further
           r: 1.0,
           g: 1.0,
           b: 1.0,
@@ -1047,12 +1066,12 @@
         init_eqs: passthrough,
         frame_eqs: passthrough,
         point_eqs: function (a) {
-          var th = a.q1 || 0.785; // SLOWLY ROTATING diagonal axis
+          var th = a.q1 || 0.785; // wobbling diagonal axis
           var ct = Math.cos(th),
             st = Math.sin(th);
           var s = a.sample * 2.0 - 1.0;
           var len = a.q5 || 0.62;
-          var sep = a.q3 || 0.12;
+          var sep = a.q3 || 0.14;
           var amp = a.q6 || 0.05;
           var samp = useV2 ? (a.value2 !== undefined ? a.value2 : a.value1) : a.value1;
           var perp = k * sep + samp * amp;
