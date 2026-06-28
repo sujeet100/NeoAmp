@@ -15,6 +15,19 @@
 (function () {
   "use strict";
 
+  // Debug logging: silent by default (clean console for the shipped extension). Enable at
+  // runtime with `localStorage.neoamp_debug = "1"` (then reload) or flip DEBUG. Errors/warns
+  // always log.
+  var DEBUG = false;
+  try {
+    DEBUG =
+      DEBUG ||
+      (typeof localStorage !== "undefined" && localStorage.getItem("neoamp_debug") === "1");
+  } catch (e) {}
+  function dbg() {
+    if (DEBUG) console.log.apply(console, arguments);
+  }
+
   var FREQS = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
   var Q = 1.0;
 
@@ -156,7 +169,7 @@
           .sendMessage({ target: "sw", type: "audioInfo", sampleRate: ctx.sampleRate })
           .catch(function () {});
       } catch (_) {}
-      console.log("[NeoAmp offscreen] capturing + playing EQ'd audio; ctx", ctx.state);
+      dbg("[NeoAmp offscreen] capturing + playing EQ'd audio; ctx", ctx.state);
     } catch (e) {
       reportError(e);
     }

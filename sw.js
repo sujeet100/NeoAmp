@@ -18,6 +18,14 @@
 // capture with a DRAMATIC test curve so the EQ effect is unmistakable; clicking again
 // stops. UI wiring + FFT-to-visualizer come next.
 
+// Debug logging: silent by default so the shipped extension keeps a clean console. The
+// service worker has no localStorage, so flip DEBUG to true to trace capture lifecycle here.
+// console.error/console.warn always log (real problems).
+let DEBUG = false;
+function dbg() {
+  if (DEBUG) console.log.apply(console, arguments);
+}
+
 let capturing = false;
 let capturedTabId = null;
 
@@ -52,7 +60,7 @@ async function toggleCapture(tab) {
       lifecycle(capturedTabId, "stopped");
       capturing = false;
       capturedTabId = null;
-      console.log("[NeoAmp sw] capture stopped");
+      dbg("[NeoAmp sw] capture stopped");
       return;
     }
     if (tabId == null) {
@@ -67,7 +75,7 @@ async function toggleCapture(tab) {
     capturing = true;
     capturedTabId = tabId;
     lifecycle(tabId, "started"); // content raises the player + EQ window
-    console.log("[NeoAmp sw] capture started for tab", tabId);
+    dbg("[NeoAmp sw] capture started for tab", tabId);
   } catch (e) {
     console.error("[NeoAmp sw] start failed", e);
     notify(tabId, "NeoAmp couldn't start: " + ((e && e.message) || e));
@@ -124,7 +132,7 @@ async function fetchSelectors() {
     if (cfg && cfg.providers && typeof cfg.providers === "object") {
       cfg._fetchedAt = Date.now();
       chrome.storage.local.set({ neoampSelectors: cfg });
-      console.log("[NeoAmp sw] selector config v" + (cfg.version || "?") + " cached");
+      dbg("[NeoAmp sw] selector config v" + (cfg.version || "?") + " cached");
     }
   } catch (e) {
     /* keep cached / bundled defaults */
@@ -160,7 +168,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
       chrome.runtime.sendMessage({ target: "offscreen", type: "stop" }).catch(() => {});
       capturing = false;
       capturedTabId = null;
-      console.log("[NeoAmp sw] captured tab reloaded — reset to idle");
+      dbg("[NeoAmp sw] captured tab reloaded — reset to idle");
     }
   } else if (msg.type === "relay-eq") {
     // EQ window faders → offscreen graph (live)

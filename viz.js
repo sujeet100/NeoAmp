@@ -6,6 +6,19 @@
 (function () {
   "use strict";
 
+  // Debug logging: silent by default so the shipped extension keeps a clean console.
+  // Enable at runtime in DevTools with `localStorage.neoamp_debug = "1"` (then reload), or
+  // flip DEBUG to true. console.error/console.warn always log (real problems).
+  var DEBUG = false;
+  try {
+    DEBUG =
+      DEBUG ||
+      (typeof localStorage !== "undefined" && localStorage.getItem("neoamp_debug") === "1");
+  } catch (e) {}
+  function dbg() {
+    if (DEBUG) console.log.apply(console, arguments);
+  }
+
   // --- GLSL compile/link diagnostics ---------------------------------------
   // Butterchurn swallows the GL info log, so a bad preset shader only surfaces
   // as the opaque "program not linked" warning. Wrap compileShader/linkProgram
@@ -661,7 +674,7 @@
     autoRandomKey = ""; // plain Director (or disengage) is not a family-random mode
     Director.setEnabled(on, nowMs());
     if (on) Director.kick(); // jump to a fresh era immediately so engaging gives instant feedback
-    console.log(
+    dbg(
       "[WMP-viz] Director " + (on ? "ON" : "off") + " — sequencing " + Director.eraCount() + " eras"
     );
     post({ type: "director", enabled: Director.isEnabled(), eras: Director.eraCount() });
@@ -694,7 +707,7 @@
     Director.setEnabled(!!autoRandomKey, nowMs());
     if (autoRandomKey) Director.kick(); // jump to a fresh scene immediately
     var fam = autoRandomKey === BATTERY_RANDOM_KEY ? "Battery" : "Ambience";
-    console.log(
+    dbg(
       "[WMP-viz] " +
         (autoRandomKey ? fam + " Random ON — " + Director.eraCount() + " scenes" : "Random off")
     );
