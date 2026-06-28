@@ -23,9 +23,8 @@ NeoAmp is a client-only MV3 extension. Things worth scrutiny:
 - **The sandboxed iframe** runs Butterchurn with `unsafe-eval`. Preset equations are
   compiled with `new Function`; presets are bundled (no remote code), but
   contributions that add presets are effectively code and should be reviewed as such.
-- **`selectors.json`** is fetched from GitHub raw at runtime. It contains only CSS
-  selectors and is used to query the DOM, never `eval`'d. A bundled copy is the
-  fallback.
+- **No network requests** — NeoAmp makes no outbound requests; all code and assets are
+  bundled. Per-provider DOM selectors ship in the `PROVIDERS` registry in `content.js`.
 - **No remote code execution paths** — MV3 forbids remote code, and NeoAmp vendors
   all libraries locally. Keep it that way.
 - **The sandboxed iframe** receives commands over a **private `MessageChannel`**

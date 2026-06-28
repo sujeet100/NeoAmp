@@ -20,9 +20,8 @@ be reported). To help us reproduce it fast, please include:
 
 - **The player or controls stopped working after the site updated its layout.** YouTube Music /
   Spotify occasionally change their markup. NeoAmp reads most state from web standards
-  (`navigator.mediaSession`, the media element), and the few site-specific selectors are
-  **hot-fixable** by editing [`selectors.json`](./selectors.json) — no extension release needed.
-  Please file an issue with the affected control so we can push a fix.
+  (`navigator.mediaSession`, the media element), so this is rare — but if a transport control
+  breaks, please file an issue naming the affected control and we'll ship a fix in the next update.
 - **No audio / frozen visuals.** The visualizer and EQ need the tab's audio; make sure you
   started playback and granted capture when prompted.
 - **Feature requests** are welcome as issues — note that every player-UI feature must work on

@@ -112,42 +112,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "neoamp-toggle-eq") toggleCapture(tab);
 });
 
-// --- remote selector config (hot-fix transport selectors without an extension release) ---
-// Fetch a small JSON of per-provider selectors from this repo (jsDelivr CDN over GitHub)
-// and cache it for the content script, which layers it over its bundled defaults. Fetching
-// HERE (service worker), not the content script, sidesteps the page's CSP; it's DATA not
-// code, so it's MV3-compliant. Silently falls back to the bundled defaults if the repo is
-// private/unreachable. See docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md.
-// Maintained as plain selectors.json on this repo's main branch — edit + push and it's
-// live. raw.githubusercontent has only a ~5-min cache, so changes propagate almost
-// immediately with NO deploy/purge step. No CDN needed: the result is cached in
-// chrome.storage AND the extension ships bundled defaults, so a rare/failed fetch never
-// breaks anything (and at our ~6h fetch cadence raw's 60-req/hr/IP limit is irrelevant).
-const SELECTORS_URL = "https://raw.githubusercontent.com/sujeet100/NeoAmp/main/selectors.json";
-async function fetchSelectors() {
-  try {
-    const res = await fetch(SELECTORS_URL, { cache: "no-store" });
-    if (!res.ok) return;
-    const cfg = await res.json();
-    if (cfg && cfg.providers && typeof cfg.providers === "object") {
-      cfg._fetchedAt = Date.now();
-      chrome.storage.local.set({ neoampSelectors: cfg });
-      dbg("[NeoAmp sw] selector config v" + (cfg.version || "?") + " cached");
-    }
-  } catch (e) {
-    /* keep cached / bundled defaults */
-  }
-}
-chrome.runtime.onInstalled.addListener(() => {
-  fetchSelectors();
-  chrome.alarms.create("neoamp-selectors", { periodInMinutes: 360 });
-});
-chrome.runtime.onStartup.addListener(() => {
-  fetchSelectors();
-});
-chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === "neoamp-selectors") fetchSelectors();
-});
+// Per-provider transport selectors ship bundled in content.js (the PROVIDERS registry) — the
+// extension makes NO outbound network requests, so there's nothing to fetch or refresh here.
 
 // tell the content script capture has begun/ended so it raises/hides the player
 function lifecycle(tabId, state) {

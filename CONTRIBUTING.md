@@ -7,8 +7,7 @@ provider support, skins, and fixes are all welcome. By participating you agree t
 ## Ways to contribute
 
 1. **Author / tune visualizer presets** (`presets/*.js`) — the bulk of the work.
-2. **Add or fix a streaming provider** (`content.js` `PROVIDERS` registry +
-   `selectors.json`).
+2. **Add or fix a streaming provider** (the `PROVIDERS` registry in `content.js`).
 3. **Add a skin** — a CSS-variable theme in `skins.js` (fully ours, easiest) or a
    `.wsz` skin **that you own or that is freely licensed** (see
    [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md#bundled-winamp-skins)).

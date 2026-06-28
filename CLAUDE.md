@@ -42,7 +42,7 @@ principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
    add a player-UI feature (lyrics, search, mute, …), implement AND live-verify it for
    *every* provider we support (YouTube Music **and** Spotify today), not just one. The UI
    half is provider-agnostic; the provider-coupled half is per-provider DATA in the
-   `PROVIDERS` registry + `selectors.json` (see principle 2). A feature that only works on
+   `PROVIDERS` registry in `content.js` (see principle 2). A feature that only works on
    one provider is **not done**. If a provider genuinely can't support it, gate it via that
    provider's `capabilities` flag (so the UI hides it there) and say so explicitly — don't
    silently ship it half-covered.
@@ -64,14 +64,18 @@ principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
    (transport / like / seek / queue / volume / **in-app search results** / **lyrics** — all
    live-verified). **Lyrics** work on both (YTM description-shelf + Spotify lyrics-line, with
    auto-open). Full status + roadmap: `MULTI-PROVIDER-DESIGN.md`.
-2. **Per-provider selectors are DATA, not code, and live in config.** The site-specific
-   bits that remain (transport buttons, search box, like, position) are declared per
-   provider in the `PROVIDERS` registry in `content.js`, **mirrored in `selectors.json`**.
-   `selectors.json` is fetched at runtime from this repo (GitHub raw) so a broken selector
-   is **hot-fixed by editing + pushing that one file — no extension release**. Each
-   provider also declares `capabilities` so the UI hides controls a site lacks (e.g.
-   Spotify has no dislike / queue / library-search). Adding a provider = a registry entry
-   + manifest `matches`, not new control logic.
+2. **Per-provider selectors are DATA, not code — bundled in the `PROVIDERS` registry.** The
+   site-specific bits that remain (transport buttons, search box, like, position) are declared
+   per provider in the `PROVIDERS` registry in `content.js`. Each provider also declares
+   `capabilities` so the UI hides controls a site lacks (e.g. Spotify has no dislike / queue /
+   library-search). Adding a provider = a registry entry + manifest `matches`, not new control
+   logic. **★ NOTE (removed 2026-06-28 for the Web Store launch):** the old runtime selector
+   hot-fix channel — `selectors.json` fetched from `raw.githubusercontent.com` in `sw.js`, layered
+   over the bundled defaults — was **removed** for least-privilege (it dropped the `alarms`
+   permission + the `raw.githubusercontent.com` host permission + the only outbound network
+   request). Selectors now ship bundled-only; a broken selector is fixed by an extension update
+   (the CD pipeline in `.github/workflows/publish.yml`). Do NOT re-add the remote channel without
+   a deliberate decision — it reintroduces a network dependency reviewers scrutinize.
 
 ## How to run / test (manual — there is no automated UI test)
 

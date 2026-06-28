@@ -17,12 +17,8 @@ and no accounts.
 
 ## Network requests
 
-NeoAmp makes **one** outbound request: it fetches `selectors.json` from this project's
-public GitHub repository (`raw.githubusercontent.com`). This file contains only the
-CSS selectors NeoAmp uses to find a site's transport controls, and lets us hot-fix a
-broken selector without shipping an extension update. The request sends no personal
-data and is a plain public-file download. NeoAmp ships a bundled copy and works offline
-if the fetch fails.
+**None.** NeoAmp makes no outbound network requests. All code and assets are bundled in the
+extension, and nothing is fetched from or sent to any server.
 
 ## Permissions
 
@@ -31,12 +27,11 @@ if the fetch fails.
 | `tabCapture` | Capture the tab's audio for the EQ + visualizer. |
 | `offscreen` | Run the audio graph in an offscreen document (MV3 requirement). |
 | `storage` | Save your settings locally. |
-| `activeTab` / `contextMenus` / `alarms` | UI interactions and lifecycle. |
+| `activeTab` / `contextMenus` | UI interactions and lifecycle. |
 | Host access to `music.youtube.com`, `open.spotify.com` | Inject the player UI on supported sites. |
-| Host access to `raw.githubusercontent.com` | Fetch the hot-fixable `selectors.json`. |
 
 ## Contact
 
 Questions about privacy? Open an issue on the project's GitHub repository.
 
-_Last updated: 2026-06-20._
+_Last updated: 2026-06-28._

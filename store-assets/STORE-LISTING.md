@@ -81,18 +81,17 @@ on supported streaming sites (YouTube Music, Spotify).
 | `storage`      | Persist user preferences locally: chosen skin, window layout, EQ settings, volume/mute, zoom. No data leaves the device.                                                                                                                                    |
 | `activeTab`    | Act on the tab where the user invoked NeoAmp (raise the player, read now-playing).                                                                                                                                                                          |
 | `contextMenus` | Add a right-click "Open NeoAmp player" entry — a reliable user-gesture entry point that `tabCapture` requires (a page button can't carry the gesture).                                                                                                      |
-| `alarms`       | Periodically (~6h) refresh the small selector-config file so a site markup change can be hot-fixed without an extension update.                                                                                                                             |
 
 **Host permission justifications**
 
-| Host                                                        | Justification                                                                                                                                                              |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://music.youtube.com/*`, `https://open.spotify.com/*` | The supported streaming sites NeoAmp overlays its player/EQ/visualizer on.                                                                                                 |
-| `https://raw.githubusercontent.com/*`                       | Fetch a small JSON **config of CSS selectors** (`selectors.json`) so a site DOM change can be hot-fixed without a new release. It is **data, not code** — never evaluated. |
+| Host                                                        | Justification                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `https://music.youtube.com/*`, `https://open.spotify.com/*` | The supported streaming sites NeoAmp overlays its player/EQ/visualizer on. |
 
 **Remote code:** **No.** All libraries (Butterchurn + preset packs) are vendored in the
-package. The only network fetch is the read-only `selectors.json` data file above; it is
-parsed as JSON and used to pick DOM selectors, never executed.
+package, and NeoAmp makes **no outbound network requests** — nothing is fetched or executed
+from any server. (The `unsafe-eval` in the sandbox CSP is Butterchurn compiling its bundled
+MilkDrop preset equations with `new Function`; that code ships in the package, not remotely.)
 
 **Data usage disclosures** (check these in the dashboard)
 
@@ -156,8 +155,8 @@ than the live shots):
 - [ ] Bump `version` in `manifest.json` (and `package.json`) for each upload.
 - [ ] Host `PRIVACY.md` at a public URL and link it in the listing.
 - [ ] Confirm no `console` debug spam (info logs are gated behind a debug flag).
-- [ ] If the remote `selectors.json` channel is desired, the GitHub repo must be public
-      (otherwise it silently falls back to bundled defaults — harmless).
+- [ ] On the Privacy tab, answer **"does not use remote code"** — all code is bundled and the
+      extension makes no network requests.
 
 ---
 

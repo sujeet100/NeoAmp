@@ -44,9 +44,8 @@ the tab**. On top of Butterchurn's bundled MilkDrop presets, NeoAmp ships
   transport / seek / like / queue / volume / in-app search / **synced lyrics**.
   New providers are a data entry, not new code (see below).
 - 📝 **Lyrics**, in-app **search**, **mute**, and keyboard shortcuts.
-- 🔒 **Local & private** — no analytics, no tracking, no remote code. The only
-  network call is fetching `selectors.json` for hot-fixable site selectors (see
-  [PRIVACY.md](./PRIVACY.md)).
+- 🔒 **Local & private** — no analytics, no tracking, no remote code, and **no network
+  requests at all**; everything runs in your browser (see [PRIVACY.md](./PRIVACY.md)).
 
 ## Screenshots
 
@@ -87,7 +86,7 @@ There is no Chrome Web Store listing yet — install from source:
  content.js     (music.youtube.com / open.spotify.com — provider-coupled) │
    • injects the Winamp-style UI (winamp.js / winamp.css / wsz.js / skins.js)
    • reads now-playing from navigator.mediaSession (mediasession.js, world:MAIN)
-   • drives transport via per-provider selectors (PROVIDERS registry + selectors.json)
+   • drives transport via per-provider selectors (bundled PROVIDERS registry)
                                               │
  viz.html  (sandboxed extension page, fullscreen iframe)                  ▼
    Butterchurn (WebGL, needs unsafe-eval)  ◄──────── postMessage (FFT bytes) ◄┘
@@ -105,11 +104,11 @@ Three deliberate, load-bearing design choices (full rationale in
   tainting), and content scripts can't keep an `AudioContext` alive across the SPA.
   Capturing the tab in an offscreen doc keeps audio audible **and** lets the EQ
   reshape it before it reaches the speakers.
-- **Provider logic is data, not code.** The site-specific selectors live in a
-  `PROVIDERS` registry mirrored in [`selectors.json`](./selectors.json), fetched at
-  runtime — so a broken selector is hot-fixed by editing one file, no extension
-  release. Now-playing comes from the web-standard `navigator.mediaSession`, not
-  CSS scraping. Adding a provider = a registry entry + a manifest `matches` line.
+- **Provider logic is data, not code.** The site-specific selectors live in a bundled
+  `PROVIDERS` registry in `content.js`; now-playing comes from the web-standard
+  `navigator.mediaSession`, not CSS scraping. Adding a provider = a registry entry + a
+  manifest `matches` line. (NeoAmp makes no network requests — the selectors ship in the
+  package.)
 
 ## Repo layout
 
@@ -121,7 +120,6 @@ Three deliberate, load-bearing design choices (full rationale in
 | `mediasession.js`                           | `world:MAIN` script that reads `navigator.mediaSession` metadata.                                                       |
 | `winamp.js` / `winamp.css`                  | The floating Winamp-style player UI.                                                                                    |
 | `wsz.js` / `skins.js`                       | `.wsz` skin parser/renderer (Webamp-derived) + CSS-variable skin registry.                                              |
-| `selectors.json`                            | Per-provider selectors, fetched at runtime for hot-fixing.                                                              |
 | `viz.html` / `viz.js`                       | Sandboxed renderer: Butterchurn init, canvas sizing, controls, render loop.                                             |
 | `presets/*.js`                              | Hand-authored WMP-style presets (`kit.js` shared kit + family files).                                                   |
 | `vendor/*.min.js`                           | Vendored Butterchurn core + preset packs (MV3 bans remote code).                                                        |
@@ -148,7 +146,7 @@ Full policy: **[SECURITY.md](./SECURITY.md)**.
 See **[CONTRIBUTING.md](./CONTRIBUTING.md)**. The short version: most of the work is
 **authoring presets** in `presets/` (a preset is a Butterchurn "converted" object —
 equations are JS functions, shaders are GLSL strings) and **wiring providers** in
-`content.js` / `selectors.json`. There's a Node-based validate-before-reload workflow
+`content.js` (the `PROVIDERS` registry). There's a Node-based validate-before-reload workflow
 (including a headless ANGLE shader-compile check — GLSL can't be validated by Node
 alone) documented in `CLAUDE.md`. This project follows the
 [Contributor Covenant](./CODE_OF_CONDUCT.md).

@@ -41,7 +41,6 @@ const INCLUDE = [
   "wsz.js",
   "skins.js",
   "overlay.css",
-  "selectors.json",
   "viz.html",
   "viz.js",
   "presets",
