@@ -1179,17 +1179,19 @@
           return a;
         }
         // ACCESSORY BEADS — marching bead row / caterpillar chain (the original's recurring
-        // escorts; beads flow along their rail on their own clock). 80 samples → 10 beads,
-        // each a RING of 8 dots (~0.011 radius) so they read as the original's small ringed
-        // orbs, not tiny sparks (user: "looks very tiny").
-        if (accDots === 0) {
+        // escorts; beads flow along their rail on their own clock). 80 samples → 8 beads,
+        // each a FILLED cluster (centre dot + 3-dot inner ring + 6-dot outer ring) so a bead
+        // reads as one small SOLID glowing orb like the original's — 8 sparse ring-dots
+        // decomposed into "arrays of dots" when dim (user screenshots 6.49/6.50), which the
+        // WMP original never shows. Also HARD-gated while fading (no dusty half state).
+        if (accDots === 0 || accVis < 0.45) {
           a.a = 0;
           return a;
         }
-        var B = 10,
+        var B = 8,
           fkb = (a.sample || 0) * B,
           bi = Math.floor(fkb),
-          di = fkb - bi; // position within this bead's ring of dots
+          di = Math.floor((fkb - bi) * 10); // 10 dots per bead: 0 centre · 1-3 inner · 4-9 outer
         var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
         var bxc, byc;
         if (accDots === 1) {
@@ -1203,16 +1205,19 @@
         var pop =
           Math.max(0, (a.q32 || 1) - 1.1) *
           (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
-        var ringR = 0.011 * (1 + 0.6 * pop);
-        var ringA = di * 6.2832;
+        var lyr = di === 0 ? 0 : di < 4 ? 1 : 2, // cluster layer of this dot
+          lyrR = lyr === 0 ? 0 : lyr === 1 ? 0.0045 : 0.009,
+          lyrA = lyr === 1 ? (di - 1) / 3 : (di - 4) / 6;
+        var ringR = lyrR * (1 + 0.5 * pop);
+        var ringA = lyrA * 6.2832 + bi * 0.7;
         a.x = bxc + Math.cos(ringA) * ringR;
-        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the rings read round
+        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the beads read round
         var hb2 = (a.q8 || 0) + accDotsHue;
-        var bri2 = (0.7 + 0.6 * pop) * accVis;
+        var bri2 = (0.8 + 0.5 * pop) * accVis * (lyr === 2 ? 0.75 : 1); // soft rim, hot core
         a.r = Math.min(1, orbCol(hb2, 0) * bri2);
         a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
         a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
-        a.a = 0.8 * accVis;
+        a.a = 0.85 * accVis;
         return a;
       },
     };
