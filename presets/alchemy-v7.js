@@ -416,13 +416,16 @@
       u = fk - seg,
       s = u * 2 - 1;
     var th = seg * (3.14159 / N) + (a.q9 || 0) * 0.5;
-    var len = (a.q5 || 0.4) * 1.5;
+    // shrunk 1.5->0.9 (user screenshot: edge-to-edge hairline blizzard; the WMP stars stay
+    // ~40-60% of frame with countable rays)
+    var len = (a.q5 || 0.4) * 0.9;
     var jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.2;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
     a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
-    var h = (a.q8 || 0) + 0.18;
+    // chromatic doubling (the ref draws its stars twice in offset hues): alternate rays duo
+    var h = (a.q8 || 0) + 0.18 + (seg & 1 ? 0.35 : 0);
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -521,7 +524,7 @@
       u = fk - line;
     var t = (line / (N - 1)) * 2.0 - 1.0; // strand offset across the sheet, -1..1
     var p = u * 2.0 - 1.0; // position along the strand, -1..1
-    var R = (a.q5 || 0.4) * 1.15;
+    var R = (a.q5 || 0.4) * 0.85; // a SWATH with ground around it, not a full-frame mesh
     // per-strand BOW: a quadratic arc whose amplitude/phase drift slowly — the "bent sheaves"
     var hsh = 0.5 + 0.5 * Math.sin(line * 12.9898 + half * 78.233);
     var bow = (0.1 + 0.2 * hsh) * R * Math.sin((a.q9 || 0) * 0.35 + line * 1.7 + half * 2.4);
@@ -549,7 +552,8 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + gx;
     a.y = cy + gy;
-    var h = (a.q8 || 0) + 0.12;
+    // the two crossing families carry DISTINCT hues (ref 0:28: white-green sheaf x gold sheaf)
+    var h = (a.q8 || 0) + 0.12 + (half ? 0.22 : 0);
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -622,7 +626,7 @@
     var sp = (a.q9 || 0) * 0.12; // SOFTENED: barely rotate (was 0.4) → no rotational smear-into-a-gear-web
     var aa0 = (i0 / P) * 6.2832 + sp,
       aa1 = (i1 / P) * 6.2832 + sp;
-    var R = (a.q5 || 0.4) * 1.3;
+    var R = (a.q5 || 0.4) * 0.85; // shrunk (was near-full-frame; ref ~40-60%)
     var x0 = Math.cos(aa0) * R,
       y0 = Math.sin(aa0) * R,
       x1 = Math.cos(aa1) * R,
@@ -639,7 +643,7 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + px;
     a.y = cy + py;
-    var h = (a.q8 || 0) + 0.1;
+    var h = (a.q8 || 0) + 0.1 + (seg & 1 ? 0.35 : 0); // chromatic doubling like the ref's red/blue star copies
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -821,7 +825,7 @@
   var MODE_ALPHA = [
     // jelly (9) 0.6→0.34: the furry-disc rework packs 64 filaments into a compact disc —
     // at the old alpha the additive pileup blew the core to white
-    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.34, 0.72, 0.82, 0.72, 0.5, 0.66, 0.66, 0.36,
+    0.5, 0.6, 0.54, 0.7, 0.74, 0.74, 0.7, 0.45, 0.5, 0.34, 0.62, 0.82, 0.72, 0.5, 0.66, 0.66, 0.36,
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
