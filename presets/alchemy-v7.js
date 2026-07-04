@@ -1085,16 +1085,8 @@
     }
     accLineY += accLineDrift * dt; // the bundle drifts on its own axis
     if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
-    if (time >= accDotsNext) {
-      var rd = Math.random();
-      // none / marching bead row / caterpillar / SNAKE COLUMN (the 480p 1:00-1:12 + 19s clip
-      // sea-plant stalks: a swaying vertical stack of rings marching upward)
-      accDots = rd < 0.35 ? 0 : rd < 0.58 ? 1 : rd < 0.78 ? 2 : 3;
-      accDotsNext = time + 6 + Math.random() * 7;
-      accDotsDir = Math.random() < 0.5 ? -1 : 1;
-      accDotsY = 0.22 + Math.random() * 0.56; // row rail y — or the snake column's base X
-      accDotsHue = 0.1 + Math.random() * 0.4;
-    }
+    // bead-row/caterpillar/snake accessory REMOVED (see waves[3] note) — accDots stays 0
+    accDots = 0;
     accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail
     // two competing busy layers read as clutter (user, 6.33.07 screenshot: tangle + bundle) —
     // the original never stacks two sprawling organics; fade the bundle under net/vortex/tangle
@@ -1295,14 +1287,17 @@
     // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
     // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
     preset.waves[3] = {
-      // LINE mode (usedots was a dead end: a dot renders as a fixed ~2px point at any
-      // resolution, so beads could never read solid — user flagged "tiny" three times).
-      // Every bead is now a small RING OUTLINE traced by consecutive samples.
+      // ★ BEAD-ROW ACCESSORY REMOVED (2026-07-04): the original's marching bead rows are NOT
+      // implementable well in this slot — dots render as fixed ~2px points (too tiny at any
+      // size), and ring outlines re-stamp into ugly tube/slinky scrolls as they march (user:
+      // "remove them if you can't fix it properly"). All 4 solid-shape slots are taken by the
+      // orbs+halos, so a small FILLED glowing bead simply has no renderer in budget. wave3 is
+      // back to its original role: the corridor ring-dot row only.
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1,
         samples: 80,
         additive: 1,
-        usedots: 0,
+        usedots: 1,
         scaling: 1,
         smoothing: 0.0,
         thick: 1,
@@ -1311,79 +1306,24 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q29 || 0) - 3) < 0.5) {
-          // CORRIDOR ring row — 8 rings receding to the VP (line-mode: each bead is a small
-          // circle traced by 10 samples; radius + alpha fade with depth)
-          var K = 8,
-            fkc = (a.sample || 0) * K,
-            ki = Math.floor(fkc),
-            ku = fkc - ki;
-          var idx = ki / (K - 1); // 0 near .. 1 far
-          var d = Math.pow(idx, 1.5); // foreshorten toward the vanishing point
-          var nearX = 0.16,
-            nearY = 0.52,
-            vpx = 0.82,
-            vpy = 0.49;
-          var rr3 = 0.02 * (1 - 0.62 * idx); // ring shrinks with depth
-          var ra3 = ku * 6.2832;
-          a.x = nearX + (vpx - nearX) * d + Math.cos(ra3) * rr3;
-          a.y =
-            nearY +
-            (vpy - nearY) * d +
-            0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0) +
-            Math.sin(ra3) * rr3 * 1.6;
-          var h = a.q8 || 0;
-          a.r = orbCol(h, 0);
-          a.g = orbCol(h, 0.33);
-          a.b = orbCol(h, 0.67);
-          a.a = ku < 0.1 ? 0 : 0.9 * (1 - idx * 0.72); // hide ring-to-ring connector; recede
-          return a;
-        }
-        // ACCESSORY BEADS — marching bead row / caterpillar chain (the original's recurring
-        // escorts; beads flow along their rail on their own clock). 80 samples → 8 beads,
-        // each a FILLED cluster (centre dot + 3-dot inner ring + 6-dot outer ring) so a bead
-        // reads as one small SOLID glowing orb like the original's — 8 sparse ring-dots
-        // decomposed into "arrays of dots" when dim (user screenshots 6.49/6.50), which the
-        // WMP original never shows. Also HARD-gated while fading (no dusty half state).
-        if (accDots === 0 || accVis < 0.45) {
+        if (Math.abs((a.q29 || 0) - 3) > 0.5) {
           a.a = 0;
           return a;
         }
-        var B = 6,
-          fkb = (a.sample || 0) * B,
-          bi = Math.floor(fkb),
-          du = fkb - bi; // position around this bead's RING (13 samples trace the circle)
-        var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
-        var bxc, byc;
-        if (accDots === 1) {
-          bxc = bt * 1.14 - 0.07; // straight full-width row, gently tilted
-          byc = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
-        } else if (accDots === 2) {
-          bxc = bt * 1.14 - 0.07; // caterpillar: beads along a slow sine arc
-          byc = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
-        } else {
-          // SNAKE COLUMN (480p 1:00-1:12 / the 19s clip): a swaying vertical sea-plant stalk
-          // of stacked rings marching upward; accDotsY doubles as the column's base X
-          byc = 0.92 - bt * 0.84; // rings march upward (bt grows → y climbs)
-          bxc =
-            accDotsY +
-            0.055 * Math.sin(byc * 6.5 + accDotsPhase * 4.0) +
-            0.022 * Math.sin(byc * 13.0 + accDotsPhase * 7.0);
-        }
-        // per-bead beat pop (the ref's coloured bead flare-pops) — popped beads also swell
-        var pop =
-          Math.max(0, (a.q32 || 1) - 1.1) *
-          (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
-        var ringR = 0.016 * (1 + 0.5 * pop); // ≈1/3 orb radius (user: beads read far too small)
-        var ringA = du * 6.2832;
-        a.x = bxc + Math.cos(ringA) * ringR;
-        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the rings read round
-        var hb2 = (a.q8 || 0) + accDotsHue;
-        var bri2 = (0.85 + 0.5 * pop) * accVis;
-        a.r = Math.min(1, orbCol(hb2, 0) * bri2);
-        a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
-        a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
-        a.a = du < 0.1 ? 0 : 0.95 * accVis; // hide bead-to-bead connector
+        var K = 10,
+          idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+        var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
+        var nearX = 0.16,
+          nearY = 0.52,
+          vpx = 0.82,
+          vpy = 0.49;
+        a.x = nearX + (vpx - nearX) * d;
+        a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+        var h = a.q8 || 0;
+        a.r = orbCol(h, 0);
+        a.g = orbCol(h, 0.33);
+        a.b = orbCol(h, 0.67);
+        a.a = 0.9 * (1 - idx * 0.72); // fade with depth -> recede
         return a;
       },
     };
