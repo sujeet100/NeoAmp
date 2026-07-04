@@ -105,6 +105,9 @@
       "  vec2 suv = uv;\n" +
       "  if (m > 0.5 && m < 1.5) {\n" +
       "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * q13); kc.x *= asp;\n" +
+      // the reference wallpaper FLOWS — a slow lattice scroll + a leaning shear, never frozen
+      "    kc += vec2(time * 0.12, -time * 0.08);\n" +
+      "    kc.x += kc.y * 0.22 * sin(time * 0.15);\n" +
       "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
       "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
       "  }\n" +
@@ -363,19 +366,25 @@
       return out;
     };
   }
-  // ABRUPT-SNAP direction generator (the 2:24-2:31 camera): holds a random angle for [minS,maxS]s, then
-  // SNAPS to a new one (no easing) — the long trail buffer drags the new way, revealing earlier renders.
-  function makeSnapDir(minS, maxS) {
-    var ang = Math.random() * 6.2832,
-      next = 0;
-    return function (time) {
-      if (time >= next) {
-        ang = Math.random() * 6.2832;
-        next = time + minS + Math.random() * (maxS - minS);
-      }
-      return ang;
-    };
-  }
+  // ── CAMERA REGIMES (MEASURED 2026-07-04, phase-correlation traces of BOTH reference videos).
+  // The original's camera is not a constant wander — it lives in discrete regimes:
+  //   DRIFT  a gentle ever-present baseline (~0.08 UV/s, mostly vertical) — the calm-scene creep;
+  //   PAN    sustained straight pans 0.16-0.27 UV/s HELD 5-12s (t=131-143 of the 1080p: one heading
+  //          for 12 straight seconds at high confidence) — the scene genuinely travels;
+  //   REST   near-still 4-10s decay beats (the 480p's settling phases, energy ~1-3);
+  //   TRAVEL rare violent bursts ~0.5+ UV/s for 8-15s (t=152-168) — flying past scenery;
+  //   OSC    left-right flip-flop pans, heading reverses every ~1s (t=122-130).
+  // Direction still SNAPS (no easing) at regime changes — the buffer drags the new way.
+  // mag = buffer-pan speed (UV/frame @60fps); follow = what fraction of it the GEOMETRY rides
+  // (the emitters travel WITH the camera; the trail streams past faster = the ref's parallax slip).
+  var CAM_REG = [
+    { mag: 0.0022, follow: 0.42, hold: [6, 14] }, // 0 DRIFT (dominant baseline)
+    { mag: 0.0045, follow: 0.42, hold: [5, 12] }, // 1 PAN (sustained straight)
+    { mag: 0.0006, follow: 0.3, hold: [4, 10] }, // 2 REST (near-still settle)
+    { mag: 0.011, follow: 0.5, hold: [8, 15] }, // 3 TRAVEL (violent, audio-gated)
+    { mag: 0.0045, follow: 0.42, hold: [6, 9] }, // 4 OSC (~1s flip-flop)
+  ];
+  var CAM_BAG = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 3];
 
   // ── central-motif modes (curated to the reference's vocabulary). Each = a point fn for one wave. ──
   // ANEMONE — soft 10-arm flower with a hollow centre (matches the reference's flower, A_95). The kit
@@ -787,17 +796,28 @@
     hueStep = 0,
     lastBgMode = -1,
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
-    panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
     valleyAmt = 0; // motif 12 → the green valley corridor (forward dolly into the vanishing point)
+  // camera-regime state: the accumulated WORLD offset is what makes the whole scene (motif +
+  // orbs + trails) travel together — before this the pan only dragged the trail buffer while
+  // every emitter stayed pinned, which measured as dx=dy≈0 (a static composition).
+  var camIdx = 0,
+    camNext = -1,
+    camAng = Math.random() * 6.2832,
+    camMag = 0,
+    camFlipNext = 0,
+    worldX = 0,
+    worldY = 0,
+    wrapT = -9, // wrap fade-in timer (masks the re-entry teleport)
+    growT = -9, // motif bloom-growth timer (the ref's 2s dandelion eruption)
+    lastMotif = -1;
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
   var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET/vortex/jelly/12-star/bead-chain/valley/organic-TANGLE(×2)/mountains
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
-  var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
 
   function frame(t) {
     var time = t.time || 0;
@@ -839,11 +859,51 @@
     t.q16 = 0.01 * Math.sin(time * 0.06); // gentle sign-oscillating roll (no constant spin)
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
-    // ── CAMERA PAN — abrupt-snap direction dragging the trail buffer (the 2:24-2:31 parallax). ──
-    panMag += (0.0045 - panMag) * Math.min(1, dt * 0.8);
-    var pdir = panDir(time);
-    t.q18 = panMag * Math.cos(pdir);
-    t.q19 = panMag * Math.sin(pdir) - 0.0012; // a touch of constant upward drift (scene "moves up")
+    // ── CAMERA REGIME DIRECTOR — see CAM_REG. Direction SNAPS at regime changes (no easing). ──
+    if (time >= camNext) {
+      var ci = CAM_BAG[(Math.random() * CAM_BAG.length) | 0];
+      if (ci === 3 && energy < 1.05) ci = 1; // violent TRAVEL only when the music pushes
+      camIdx = ci;
+      var rg = CAM_REG[camIdx];
+      camNext = time + rg.hold[0] + Math.random() * (rg.hold[1] - rg.hold[0]);
+      camAng = Math.random() * 6.2832;
+      // DRIFT keeps the measured near-vertical baseline heading
+      if (camIdx === 0)
+        camAng = 1.5708 + (Math.random() < 0.5 ? 0 : 3.14159) + 0.7 * (Math.random() - 0.5);
+      // strayed far off-centre → head the new leg back toward centre (with jitter)
+      if (Math.hypot(worldX, worldY) > 0.25)
+        camAng = Math.atan2(-worldY, -worldX) + 0.6 * (Math.random() - 0.5);
+      camFlipNext = time + 0.9;
+    }
+    if (camIdx === 4 && time >= camFlipNext) {
+      camAng += 3.14159; // OSC: heading reverses every ~1s (measured flip-flop)
+      camFlipNext = time + 0.7 + Math.random() * 0.8;
+    }
+    camMag += (CAM_REG[camIdx].mag - camMag) * Math.min(1, dt * 2.0);
+    // geometry (wave-coord, y-up) velocity for this heading; buffer pan derived from it via the
+    // EMPIRICAL sign map (+q18 streams buffer content LEFT, +q19 streams it UP, q3 up = screen up):
+    var gvx = camMag * Math.cos(camAng),
+      gvy = camMag * Math.sin(camAng);
+    t.q18 = -gvx;
+    t.q19 = gvy - 0.0012; // keep the original gentle constant vertical drift on the buffer
+    // the WORLD (all emitters) rides the camera at CAM_REG.follow × the buffer speed — the trail
+    // streams past the motif = the reference's parallax slip; ghost deposits trail the motion.
+    var camFollow = CAM_REG[camIdx].follow;
+    worldX += -t.q18 * camFollow;
+    worldY += t.q19 * camFollow;
+    // gentle recentering spring + WRAP: a hard travel carries the scene off one side and it
+    // re-enters the other (reads as "new content arriving", like the ref's traveling segments)
+    var wsp = Math.min(1, dt / 14);
+    worldX -= worldX * wsp;
+    worldY -= worldY * wsp;
+    if (Math.abs(worldX) > 0.55 || Math.abs(worldY) > 0.55) {
+      if (worldX > 0.55) worldX -= 1.1;
+      else if (worldX < -0.55) worldX += 1.1;
+      if (worldY > 0.55) worldY -= 1.1;
+      else if (worldY < -0.55) worldY += 1.1;
+      wrapT = time; // fade the emitters back in over ~1.2s to mask the teleport
+    }
+    var wrapFade = Math.min(1, (time - wrapT) / 1.2);
 
     // ── OFF-CENTRE drifting pivot on an elliptical path → asymmetric parallax (edges sweep faster). ──
     var vpAng = time * 0.045,
@@ -873,7 +933,15 @@
     // original's roaming flower. Small amplitude so it stays the central object.
     t.q2 = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
-    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // breathing + smoothed beat pop
+    // BLOOM-GROWTH — a fresh motif ERUPTS from small to full size over ~2.4s with a slight
+    // overshoot (the reference's dandelion bloom at 2:55), instead of popping in at full scale.
+    if (mCur !== lastMotif) {
+      growT = time;
+      lastMotif = mCur;
+    }
+    var ge = Math.min(1, (time - growT) / 2.4);
+    var grow = ge * ge * (3 - 2 * ge) * (1 + 0.22 * Math.sin(ge * 3.14159));
+    t.q5 = scaleFor(mCur) * (0.24 + 0.76 * grow) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // bloom + breathing + smoothed beat pop
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
@@ -929,6 +997,24 @@
       t.q15 += (0.012 - t.q15) * va; // q15>0 magnifies the old buffer → forward DOLLY into the VP
       t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
       t.q16 *= 1 - va; // no roll (a clean dive down the valley)
+    }
+
+    // ── WORLD OFFSET — every emitter rides the camera (rigid whole-scene travel; the corridor
+    //    is its own tuned scene, so its anchors blend the offset out). Applied LAST so the
+    //    corridor/valley target blends above keep their tuned values. ──
+    var wfx = worldX * (1 - corridorAmt),
+      wfy = worldY * (1 - corridorAmt);
+    t.q2 += wfx;
+    t.q3 += wfy;
+    t.q21 += wfx;
+    t.q22 += wfy;
+    t.q23 += wfx;
+    t.q24 += wfy;
+    if (camIdx === 2) t.q26 *= 0.5; // REST regime — the tether settles with the camera
+    if (wrapFade < 1) {
+      t.q4 *= 0.15 + 0.85 * wrapFade;
+      t.q25 *= wrapFade;
+      t.q14 *= wrapFade;
     }
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
