@@ -155,7 +155,9 @@
       "  }\n" +
       // 6 HORIZONTAL colour BANDS (2:28-2:39): smooth horizontal stripes, slow vertical drift.
       "  else if (m > 5.5 && m < 6.5) {\n" +
-      "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
+      // bands must MOVE, not recolour in place (user: ours look static; the original's bands
+      // sweep so the colour change reads as motion) — drift raised 0.06→0.32
+      "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.32;\n" +
       "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
       "    ground *= 0.14;\n" +
@@ -170,7 +172,7 @@
       // streaks; the band colours ride the beat-snapped hue clock hard. Deliberately the
       // BRIGHTEST ground regime (the 19s clip proves the original goes this bold in places).
       "  else if (m > 7.5) {\n" +
-      "    float band = smoothstep(-0.3, 0.3, sin(uv.y * 6.2832 * 1.6 + time * 0.07));\n" +
+      "    float band = smoothstep(-0.3, 0.3, sin(uv.y * 6.2832 * 1.6 + time * 0.5));\n" +
       "    vec3 bandCol = mix(pal(hb), pal(hb + 0.38), band);\n" +
       "    float cst = 0.5 + 0.5 * sin(uv.x * 60.0 + sin(uv.y * 7.0 + time * 0.6) * 2.2 + time * 0.35);\n" +
       "    cst = cst * cst;\n" +
