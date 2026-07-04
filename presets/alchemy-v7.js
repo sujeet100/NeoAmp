@@ -562,30 +562,35 @@
     if (u < 0.03) a.a = 0;
     return a;
   }
-  // JELLYFISH / EYE DISC (survey gap, 0:48): an oblate filament RING with a waveform fringe that TILTS in
-  // 3D — its Y-scale oscillates flat↔edge-on so it reads as a disc rotating in space (distinct from the
-  // flat front-on urchin). The warm core comes from the COMP focus pupil (mode added to the focus set).
+  // JELLYFISH / EYE DISC — reworked 2026-07-04 against the ACTUAL 0:47-0:53 reference frames:
+  // the original is a COMPACT tilted furry disc (~1/3 frame) of short swirling filaments
+  // around a hot core (the COMP focus pupil), ALWAYS clearly oblate. The old version was one
+  // big hollow ellipse OUTLINE whose oscillating-tilt trail stamps accumulated into a giant
+  // arc-stack sprawl — which the user correctly flagged as absent from the original.
   function fJelly(a) {
-    var N = 80,
+    var N = 64,
       fk = (a.sample || 0) * N,
       seg = Math.floor(fk),
       u = fk - seg;
-    var ang = (seg / N) * 6.2832 + (a.q9 || 0);
-    var R = (a.q5 || 0.4) * 0.95;
-    var rr = R * (0.82 + 0.26 * Math.abs(a.value1 || 0)); // ring + live-waveform fringe
+    var R = (a.q5 || 0.4) * 0.55;
+    var h0 = (seg * 2.399) % 6.2832; // golden-angle scatter → even furry coverage
+    var r0 = R * (0.3 + 0.62 * ((seg * 0.617) % 1)); // filament base radius, scattered
+    var len = R * (0.22 + 0.22 * Math.abs(a.value1 || 0)); // short filament, live-audio length
+    var ang = h0 + (a.q9 || 0) + u * 0.9; // curls tangentially along its length (swirl)
+    var rr = r0 + len * u;
     var x = Math.cos(ang) * rr,
       y = Math.sin(ang) * rr;
-    var tilt = 0.32 + 0.68 * (0.5 + 0.5 * Math.sin((a.q9 || 0) * 1.7)); // oscillating Y-squash → 3D tilt
+    var tilt = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin((a.q9 || 0) * 1.7)); // 0.30-0.65: stays a tilted disc
     y *= tilt;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + x;
     a.y = cy + y;
-    var h = a.q8 || 0;
+    var h = (a.q8 || 0) + 0.1 * ((seg * 0.617) % 1); // slight per-filament hue scatter
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+    if (u < 0.04) a.a = 0; // hide filament-to-filament jumps
     return a;
   }
   // 12-POINT STAR MANDALA (survey gap, 1:33): a {12/5} star polygon — finer/higher-order than the 6-arm
@@ -756,7 +761,9 @@
   ];
   // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle) pile up → lower alpha; outlines keep more.
   var MODE_ALPHA = [
-    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.6, 0.72, 0.82, 0.72, 0.5, 0.66,
+    // jelly (9) 0.6→0.34: the furry-disc rework packs 64 filaments into a compact disc —
+    // at the old alpha the additive pileup blew the core to white
+    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.34, 0.72, 0.82, 0.72, 0.5, 0.66,
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
@@ -1094,11 +1101,13 @@
           a.x = accLineX - dy1 * offp + dx1 * (u1 - 0.5) * 1.5;
           a.y = accLineY + dx1 * offp + dy1 * (u1 - 0.5) * 1.5;
           var h1 = (a.q8 || 0) + 0.24;
-          var bri = 0.85 * accLineEnv * accVis;
+          // kept LIGHT: the pivoting sweep stamps ~every frame into the trail, so a bright
+          // curtain accumulates into a solid wall of lines (the ref's sweeps stay thin)
+          var bri = 0.62 * accLineEnv * accVis;
           a.r = orbCol(h1, 0) * bri;
           a.g = orbCol(h1, 0.33) * bri;
           a.b = orbCol(h1, 0.67) * bri;
-          a.a = u1 < 0.03 ? 0 : 0.6 * accLineEnv * accVis;
+          a.a = u1 < 0.03 ? 0 : 0.4 * accLineEnv * accVis;
           return a;
         }
         if (accLine === 2) {
