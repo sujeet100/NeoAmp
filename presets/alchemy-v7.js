@@ -743,7 +743,48 @@
     if (u < 0.02 || u > 0.98) a.a = 0;
     return a;
   }
-  // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains.
+  // TRIANGLE-FLOWER MANDALA (user: "many triangles rotating creating flower-like pattern") —
+  // the kit ALREADY has this as alcTriMandala (9 equilateral triangles rotated about a shared
+  // centre = a flower/mandala); v7 had never hooked it (kit-variants rule). Colour overridden
+  // so alternating triangles take a 2-hue duo drifting with the shared q8 clock.
+  var triMandPts = alcTriMandala(9, null).point_eqs;
+  function fTriMandala(a) {
+    triMandPts(a);
+    var ti = Math.floor((a.sample || 0) * 9);
+    var h = (a.q8 || 0) + 0.06 + (ti & 1 ? 0.45 : 0);
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
+  // DANDELION FLUFF BALL (the 480p 0:28-0:38 flower: a dense furry SPHERE of short curly
+  // filaments on a hot ground, orbs nesting inside) — like the reworked jelly disc but round
+  // (no tilt squash), fuller and tighter-curled.
+  function fFluffBall(a) {
+    var N = 64,
+      fk = (a.sample || 0) * N,
+      seg = Math.floor(fk),
+      u = fk - seg;
+    var R = (a.q5 || 0.4) * 0.62;
+    var h0 = (seg * 2.399) % 6.2832; // golden-angle scatter
+    var r0 = R * (0.1 + 0.8 * ((seg * 0.617) % 1));
+    var len = R * (0.3 + 0.25 * Math.abs(a.value1 || 0));
+    // curl direction alternates per filament -> FUZZY fluff, not a coherent swirl donut
+    var ang = h0 + (a.q9 || 0) * 0.6 + u * 1.0 * (seg & 1 ? 1 : -1);
+    var rr = r0 + len * u;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + Math.cos(ang) * rr;
+    a.y = cy + Math.sin(ang) * rr * 0.92; // near-round ball
+    var h2 = (a.q8 || 0) + 0.08 * ((seg * 0.617) % 1);
+    a.r = orbCol(h2, 0);
+    a.g = orbCol(h2, 0.33);
+    a.b = orbCol(h2, 0.67);
+    if (u < 0.04) a.a = 0;
+    return a;
+  }
+  // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
+  // + tri-mandala (15) + dandelion fluff ball (16).
   // ROSE/ROTLINE removed (user-rejected). fNet is the DELIBERATE woven net. Radial-tunnel DEPTH = q29=2.
   var MODES = [
     fAnem,
@@ -761,12 +802,14 @@
     fValley,
     fTangle,
     fMountains,
+    fTriMandala,
+    fFluffBall,
   ];
-  // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle) pile up → lower alpha; outlines keep more.
+  // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle/fluff) pile up → lower alpha; outlines keep more.
   var MODE_ALPHA = [
     // jelly (9) 0.6→0.34: the furry-disc rework packs 64 filaments into a compact disc —
     // at the old alpha the additive pileup blew the core to white
-    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.34, 0.72, 0.82, 0.72, 0.5, 0.66,
+    0.5, 0.72, 0.54, 0.7, 0.74, 0.74, 0.7, 0.58, 0.5, 0.34, 0.72, 0.82, 0.72, 0.5, 0.66, 0.66, 0.36,
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
@@ -857,7 +900,11 @@
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
-  var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET/vortex/jelly/12-star/bead-chain/valley/organic-TANGLE(×2)/mountains
+  // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
+  // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2
+  var MOTIF_BAG = [
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1,
+  ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
@@ -1263,10 +1310,10 @@
           a.a = 0;
           return a;
         }
-        var B = 8,
+        var B = 6, // fewer, BIGGER beads (user twice: "still tiny") — 13 dots each read solid
           fkb = (a.sample || 0) * B,
           bi = Math.floor(fkb),
-          di = Math.floor((fkb - bi) * 10); // 10 dots per bead: 0 centre · 1-3 inner · 4-9 outer
+          di = Math.floor((fkb - bi) * 13); // 13 dots per bead: 0 centre · 1-4 inner · 5-12 outer
         var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
         var bxc, byc;
         if (accDots === 1) {
@@ -1288,9 +1335,9 @@
         var pop =
           Math.max(0, (a.q32 || 1) - 1.1) *
           (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
-        var lyr = di === 0 ? 0 : di < 4 ? 1 : 2, // cluster layer of this dot
-          lyrR = lyr === 0 ? 0 : lyr === 1 ? 0.0045 : 0.009,
-          lyrA = lyr === 1 ? (di - 1) / 3 : (di - 4) / 6;
+        var lyr = di === 0 ? 0 : di < 5 ? 1 : 2, // cluster layer of this dot
+          lyrR = lyr === 0 ? 0 : lyr === 1 ? 0.004 : 0.008, // tight — layers overlap into a solid orb
+          lyrA = lyr === 1 ? (di - 1) / 4 : (di - 5) / 8;
         var ringR = lyrR * (1 + 0.5 * pop);
         var ringA = lyrA * 6.2832 + bi * 0.7;
         a.x = bxc + Math.cos(ringA) * ringR;
@@ -1300,7 +1347,7 @@
         a.r = Math.min(1, orbCol(hb2, 0) * bri2);
         a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
         a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
-        a.a = 0.85 * accVis;
+        a.a = 0.95 * accVis;
         return a;
       },
     };
