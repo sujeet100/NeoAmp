@@ -492,30 +492,34 @@
     a.sample = saved;
     return a;
   }
-  // WIREFRAME NET (survey gap #1, recurring 0:06-0:12 / 0:33 / 2:08 / 2:42): a clean CROSSHATCH GRID —
-  // N horizontal + N vertical strands, GENTLY foreshortened toward a slow tilt so it reads as a tilted 3D
-  // SHEET (the reference's actual net is a crossing-strand grid, NOT a chaotic star-art spray). Mild
-  // live-waveform jag for the Alchemy texture. (Replaced the old {13/5} star-art version — it read as a
-  // "hideous" chaotic mess; the user rejected it.)
+  // WIREFRAME NET — BENT-WIRE SHEAVES (reworked 2026-07-04 to match the original's 0:28-0:32
+  // scene: two crossing families of parallel CURVED lines, like a bent wire grid). The rigid
+  // full-screen CROSSHATCH read as "does not exist in original" (user screenshot); the even
+  // older {13/5} star-art spray was rejected as chaotic — this is the measured middle: ordered
+  // parallel strands, but each strand BOWS with its own slowly-drifting curvature.
   function fNet(a) {
     var half = (a.sample || 0) < 0.5 ? 0 : 1;
     var ss = half ? ((a.sample || 0) - 0.5) * 2.0 : (a.sample || 0) * 2.0; // 0..1 within each strand set
-    var N = 9,
+    var N = 7,
       fk = ss * N,
       line = Math.floor(fk),
       u = fk - line;
     var t = (line / (N - 1)) * 2.0 - 1.0; // strand offset across the sheet, -1..1
     var p = u * 2.0 - 1.0; // position along the strand, -1..1
-    var R = (a.q5 || 0.4) * 1.4;
+    var R = (a.q5 || 0.4) * 1.15;
+    // per-strand BOW: a quadratic arc whose amplitude/phase drift slowly — the "bent sheaves"
+    var hsh = 0.5 + 0.5 * Math.sin(line * 12.9898 + half * 78.233);
+    var bow = (0.1 + 0.2 * hsh) * R * Math.sin((a.q9 || 0) * 0.35 + line * 1.7 + half * 2.4);
+    var arc = bow * (1.0 - p * p);
     var gx, gy;
     if (half === 0) {
       gx = p * R;
-      gy = t * R;
+      gy = t * R + arc;
     } else {
-      gx = t * R;
+      gx = t * R + arc;
       gy = p * R;
     }
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.2; // SOFTENED: gentler perpendicular jag (cleaner grid)
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.2; // gentle perpendicular live-waveform jag
     if (half === 0) gy += jag;
     else gx += jag;
     // GENTLE perspective foreshorten toward a slow tilt direction → a tilted sheet (not an extreme stretch)
@@ -636,7 +640,9 @@
       by = Math.sin(ang) * t * R;
     var mid = Math.round((B - 1) / 2);
     var be = Math.max(0, (a.q32 || 1) - 1); // beat energy (q32 = smoothed beat carrier)
-    var br = 0.02 * (seg === mid ? 2.3 : 1.0) * (1 + 0.5 * be); // central bead bigger = the eye; beads POP on the beat
+    // smaller + discrete (user: the fat overlapping discs read as a solid caterpillar arc,
+    // unlike the original's small separate beads); the central 'eye' stays modestly larger
+    var br = 0.014 * (seg === mid ? 1.7 : 1.0) * (1 + 0.4 * be);
     var ringAng = u * 6.2832;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
@@ -813,6 +819,7 @@
     accDotsY = 0.5,
     accDotsHue = 0,
     accVis = 1, // accessory visibility (fades out during rests)
+    accBundleVis = 1, // bundle gate: off while a busy sprawling motif is up (net/vortex/tangle)
     resting = false,
     breathNext = -1,
     restAmt = 0;
@@ -965,6 +972,10 @@
       accDotsHue = 0.1 + Math.random() * 0.4;
     }
     accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail
+    // two competing busy layers read as clutter (user, 6.33.07 screenshot: tangle + bundle) —
+    // the original never stacks two sprawling organics; fade the bundle under net/vortex/tangle
+    accBundleVis +=
+      ((mCur === 7 || mCur === 8 || mCur === 13 ? 0 : 1) - accBundleVis) * Math.min(1, dt * 1.5);
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
@@ -1103,7 +1114,7 @@
           a.r = orbCol(h2, 0) * 0.8;
           a.g = orbCol(h2, 0.33) * 0.8;
           a.b = orbCol(h2, 0.67) * 0.8;
-          a.a = (u2 < 0.02 ? 0 : 0.5) * accVis;
+          a.a = (u2 < 0.02 ? 0 : 0.5) * accVis * accBundleVis;
           return a;
         }
         a.a = 0;
@@ -1168,32 +1179,40 @@
           return a;
         }
         // ACCESSORY BEADS — marching bead row / caterpillar chain (the original's recurring
-        // escorts; beads flow along their rail on their own clock). 80 samples → 20 beads
-        // × 4 stacked dots for brightness.
+        // escorts; beads flow along their rail on their own clock). 80 samples → 10 beads,
+        // each a RING of 8 dots (~0.011 radius) so they read as the original's small ringed
+        // orbs, not tiny sparks (user: "looks very tiny").
         if (accDots === 0) {
           a.a = 0;
           return a;
         }
-        var B = 20,
-          bi = Math.floor((a.sample || 0) * B);
+        var B = 10,
+          fkb = (a.sample || 0) * B,
+          bi = Math.floor(fkb),
+          di = fkb - bi; // position within this bead's ring of dots
         var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
+        var bxc, byc;
         if (accDots === 1) {
-          a.x = bt * 1.14 - 0.07; // straight full-width row, gently tilted
-          a.y = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
+          bxc = bt * 1.14 - 0.07; // straight full-width row, gently tilted
+          byc = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
         } else {
-          a.x = bt * 1.14 - 0.07; // caterpillar: beads along a slow sine arc
-          a.y = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
+          bxc = bt * 1.14 - 0.07; // caterpillar: beads along a slow sine arc
+          byc = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
         }
-        var hb2 = (a.q8 || 0) + accDotsHue;
-        // per-bead beat pop (the ref's coloured bead flare-pops)
+        // per-bead beat pop (the ref's coloured bead flare-pops) — popped beads also swell
         var pop =
           Math.max(0, (a.q32 || 1) - 1.1) *
           (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
-        var bri2 = (0.55 + 0.7 * pop) * accVis;
+        var ringR = 0.011 * (1 + 0.6 * pop);
+        var ringA = di * 6.2832;
+        a.x = bxc + Math.cos(ringA) * ringR;
+        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the rings read round
+        var hb2 = (a.q8 || 0) + accDotsHue;
+        var bri2 = (0.7 + 0.6 * pop) * accVis;
         a.r = Math.min(1, orbCol(hb2, 0) * bri2);
         a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
         a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
-        a.a = 0.75 * accVis;
+        a.a = 0.8 * accVis;
         return a;
       },
     };
