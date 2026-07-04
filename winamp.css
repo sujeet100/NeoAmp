@@ -1378,9 +1378,12 @@
   border: 1px solid #000;
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9);
   font-family: var(--wa-lcd-font);
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--pl-normal, var(--wa-lcd));
+  font-size: 18px;
+  line-height: 1.55;
+  /* Readability: the skin's playlist colour, lifted ~25% toward white — full-saturation
+     green/etc. at thin LCD strokes on black strains; the lift keeps the skin's hue but
+     reads like a brighter LCD. Stays themed per skin (base skin → mint-green). */
+  color: color-mix(in srgb, var(--pl-normal, var(--wa-lcd)) 75%, #ffffff 25%);
   text-align: center;
 }
 .wa-lyrics-list.empty {
@@ -1394,15 +1397,15 @@
   font-size: 14px;
   padding: 0 16px;
 }
+/* Inactive lines are CRISP — no per-line glow (the 4px blur fuzzed the thin LCD
+   strokes and was the main readability complaint) and no opacity dimming. Only the
+   ACTIVE line lights up: brighter colour + the soft LCD glow, like a lit segment. */
 .wa-lyrics-line {
-  padding: 1px 0;
-  text-shadow: 0 0 4px var(--wa-lcd-glow);
-  opacity: 0.8;
+  padding: 2px 0;
 }
 .wa-lyrics-line.active {
-  opacity: 1;
   color: var(--pl-current, #fff);
-  text-shadow: 0 0 7px var(--wa-lcd-glow);
+  text-shadow: 0 0 6px var(--wa-lcd-glow);
 }
 .wa-lyrics-status {
   flex: 0 0 auto;
