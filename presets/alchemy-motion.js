@@ -1,6 +1,8 @@
-/* ALCHEMY CLASSIC — a frozen COPY of alchemy-v7.js as of commit 0657cec (2026-07-04, BEFORE the
- * camera/world-motion rework) kept ONLY so the user can A/B the old vs new motion live.
- * Do NOT refine this file; all Alchemy work continues in alchemy-v7.js. Delete when comparison is done. */
+/* ALCHEMY MOTION — EXPERIMENTAL fork (2026-07-04): the camera/world-motion + accessory-layer
+ * rework. The user judged the pre-rework version better, so THAT is the shipped
+ * "Alchemy (Pastel)/(Vivid)" (alchemy-v7.js); this fork is kept only as a variant to
+ * salvage ideas from (scene-coupled camera, accessory bead rows/ray curtains/waveform
+ * bundles, double-stroke tether, reactive bars). Do not make this the default. */
 /* Alchemy V7: Random — ONE seamless self-sequencing preset (single menu entry).
  *
  * REBUILD 2026-06-21 from a FRESH frame-by-frame + COLOUR-MEASURED study of the user's authoritative
@@ -108,6 +110,9 @@
       "  vec2 suv = uv;\n" +
       "  if (m > 0.5 && m < 1.5) {\n" +
       "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * q13); kc.x *= asp;\n" +
+      // the reference wallpaper FLOWS — a slow lattice scroll + a leaning shear, never frozen
+      "    kc += vec2(time * 0.12, -time * 0.08);\n" +
+      "    kc.x += kc.y * 0.22 * sin(time * 0.15);\n" +
       "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
       "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
       "  }\n" +
@@ -148,7 +153,11 @@
       "  else if (m > 3.5 && m < 4.5) {\n" +
       "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
       "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
-      "    ground = barCol * (0.07 + 0.16 * bars);\n" +
+      // the ref's bar wall reads as a mirrored SPECTRUM ANALYZER: brightness flickers with the
+      // beat and a midline band swells with the music (q32 = smoothed beat envelope, 1..~2.3)
+      "    float bflick = 0.72 + 0.45 * (q32 - 1.0);\n" +
+      "    float bmid = exp(-pow((uv.y - 0.5) * 5.0, 2.0));\n" +
+      "    ground = barCol * (0.06 + 0.16 * bars) * bflick + barCol * bmid * 0.22 * (q32 - 1.0);\n" +
       "  }\n" +
       // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
       "  else if (m > 4.5 && m < 5.5) {\n" +
@@ -161,7 +170,10 @@
       "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
       "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
-      "    ground *= 0.14;\n" +
+      // TREADMILL streaks (the ref's strongest counter-parallax): fine texture streaming FAST
+      // along the bands while the camera holds still and the motifs sit on top
+      "    float streak = 0.5 + 0.5 * sin(uv.x * 46.0 - time * 7.0 + sin(uv.y * 9.0) * 1.5);\n" +
+      "    ground *= 0.14 * (0.78 + 0.4 * streak);\n" +
       "  }\n" +
       // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
       "  else if (m > 6.5) {\n" +
@@ -366,19 +378,37 @@
       return out;
     };
   }
-  // ABRUPT-SNAP direction generator (the 2:24-2:31 camera): holds a random angle for [minS,maxS]s, then
-  // SNAPS to a new one (no easing) — the long trail buffer drags the new way, revealing earlier renders.
-  function makeSnapDir(minS, maxS) {
-    var ang = Math.random() * 6.2832,
-      next = 0;
-    return function (time) {
-      if (time >= next) {
-        ang = Math.random() * 6.2832;
-        next = time + minS + Math.random() * (maxS - minS);
-      }
-      return ang;
-    };
-  }
+  // ── CAMERA REGIMES (MEASURED 2026-07-04, phase-correlation traces of BOTH reference videos).
+  // The original's camera is not a constant wander — it lives in discrete regimes:
+  //   DRIFT  a gentle ever-present baseline (~0.08 UV/s, mostly vertical) — the calm-scene creep;
+  //   PAN    sustained straight pans 0.16-0.27 UV/s HELD 5-12s (t=131-143 of the 1080p: one heading
+  //          for 12 straight seconds at high confidence) — the scene genuinely travels;
+  //   REST   near-still 4-10s decay beats (the 480p's settling phases, energy ~1-3);
+  //   TRAVEL rare violent bursts ~0.5+ UV/s for 8-15s (t=152-168) — flying past scenery;
+  //   OSC    left-right flip-flop pans, heading reverses every ~1s (t=122-130).
+  // Direction still SNAPS (no easing) at regime changes — the buffer drags the new way.
+  // mag = buffer-pan speed (UV/frame @60fps); follow = what fraction of it the GEOMETRY rides
+  // (the emitters travel WITH the camera; the trail streams past faster = the ref's parallax slip).
+  var CAM_REG = [
+    { mag: 0.0022, follow: 0.42, hold: [6, 14] }, // 0 DRIFT (dominant baseline)
+    { mag: 0.0045, follow: 0.42, hold: [5, 12] }, // 1 PAN (sustained straight)
+    { mag: 0.0006, follow: 0.3, hold: [4, 10] }, // 2 REST (near-still settle)
+    { mag: 0.011, follow: 0.5, hold: [8, 15] }, // 3 TRAVEL (violent, audio-gated)
+    { mag: 0.0045, follow: 0.42, hold: [6, 9] }, // 4 OSC (~1s flip-flop)
+  ];
+  // ★ The camera is SCENE-COUPLED (measured per-scene, 2026-07-04 labeling pass): wallpaper
+  // scenes (kaleidoscope t=20, bars/bands t=108) hold a near-STILL camera — the pattern flows
+  // internally instead; soft fluid/orb scenes get the gentle one-way drift; sheet/terrain motifs
+  // (crossed-X t=136, mountains t=44, zigzag column t=126) carry the sustained/oscillating pans;
+  // and only the wireframe NET scenes (t=30, t=160) get the violent travel. Applying every
+  // regime to every scene read as layers contradicting each other (screen-space wallpapers
+  // don't translate) — the user called it "weird". Class 0 wallpaper · 1 soft · 2 sheets · 3 nets.
+  var CAM_BAGS = [
+    [2], // wallpaper: REST only — compose statically over the pattern
+    [0, 0, 0, 0, 1, 2, 2], // soft fluid/orbs: drift dominant, occasional pan, real rests
+    [1, 1, 1, 4, 0], // sheets/terrain: sustained pans + the oscillating pan
+    [1, 1, 3, 3, 0], // nets/vortex: pans + the violent travel (audio-gated)
+  ];
 
   // ── central-motif modes (curated to the reference's vocabulary). Each = a point fn for one wave. ──
   // ANEMONE — soft 10-arm flower with a hollow centre (matches the reference's flower, A_95). The kit
@@ -774,13 +804,37 @@
   // TETHER — the jagged waveform line joining the two orbs. The kit bakes a fixed colour; we override so
   // it CYCLES with the shared q8 clock (in the original the line changes colour like everything else —
   // the user noticed ours was stuck amber). Slight offset from the orbs so it reads as its own element.
-  var tetherPts = alcTether("q21", "q22", "q23", "q24", "q26", null).point_eqs;
+  // TETHER — the ref's line (t=58) is a BAND, not a hairline: draw TWO parallel strands
+  // (256 samples each) offset a few px to either side, each with its own decorrelated live-
+  // waveform jag, duo-hue shimmer + hot mid-span core (red line with yellow highlights).
+  // Standalone (not alcTether) because the double-stroke needs to remap a.sample per strand.
   function fTether(a) {
-    tetherPts(a);
-    var h = (a.q8 || 0) + 0.08;
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
+    var ax = a.q21 !== undefined ? a.q21 : 0.4,
+      ay = a.q22 !== undefined ? a.q22 : 0.5;
+    var bx = a.q23 !== undefined ? a.q23 : 0.6,
+      by = a.q24 !== undefined ? a.q24 : 0.5;
+    var dx = bx - ax,
+      dy = by - ay,
+      len = Math.hypot(dx, dy) || 1;
+    var nx = -dy / len,
+      ny = dx / len;
+    var s2 = (a.sample || 0) * 2,
+      strand = s2 < 1 ? 0 : 1,
+      tt = strand ? s2 - 1 : s2;
+    var win = Math.sin(tt * 3.14159); // tips land exactly on the orbs
+    var disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
+    var off = (strand ? 1 : -1) * 0.0042 * win;
+    a.x = ax + tt * dx + nx * (disp + off);
+    a.y = ay + tt * dy + ny * (disp + off);
+    var duo = (((a.sample || 0) * 512) | 0) & 1;
+    var h = (a.q8 || 0) + 0.08 + (duo ? 0.38 : 0);
+    var core = 0.55 + 0.45 * win;
+    a.r = Math.min(1, orbCol(h, 0) * (0.55 + 0.75 * core));
+    a.g = Math.min(1, orbCol(h, 0.33) * (0.55 + 0.75 * core));
+    a.b = Math.min(1, orbCol(h, 0.67) * (0.55 + 0.75 * core));
+    // hide the fly-back segment joining strand 0's end to strand 1's start (set EVERY point —
+    // the point object is reused across samples, so a one-shot 0 would leak to the 2nd strand)
+    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.9;
     return a;
   }
 
@@ -790,17 +844,55 @@
     hueStep = 0,
     lastBgMode = -1,
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
-    panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
     valleyAmt = 0; // motif 12 → the green valley corridor (forward dolly into the vanishing point)
+  // camera-regime state: the accumulated WORLD offset is what makes the whole scene (motif +
+  // orbs + trails) travel together — before this the pan only dragged the trail buffer while
+  // every emitter stayed pinned, which measured as dx=dy≈0 (a static composition).
+  var camIdx = 0,
+    camNext = -1,
+    lastCamClass = -1,
+    camAng = Math.random() * 6.2832,
+    camMag = 0,
+    camFlipNext = 0,
+    worldX = 0,
+    worldY = 0,
+    wrapT = -9, // wrap fade-in timer (masks the re-entry teleport)
+    growT = -9, // motif bloom-growth timer (the ref's 2s dandelion eruption)
+    lastMotif = -1;
+  // ── ACCESSORY LAYERS (full-video survey 2026-07-04): the original typically runs 3-5
+  // simultaneous element classes — motif + tether + a bead row/chain + a sweeping ray curtain —
+  // each on its OWN motion clock and direction ("layer independence"; nothing is parented).
+  // That independence IS the counter-motion the user pointed at: accessories deliberately do
+  // NOT ride the world offset, so they stream against the traveling motif. Two slots:
+  // LINES (wave1: beat-fired ray-curtain sweep / chromatic multi-strand waveform bundle /
+  // the star companion) and DOTS (wave3: marching bead row / caterpillar chain; the corridor
+  // ring-dots keep priority). State lives in the closure — the waves' point fns share this
+  // scope (q-vars are only needed for shaders, and all 32 are taken).
+  var accLine = 0, // 0 none · 1 ray-curtain sweep · 2 multi-strand waveform · 3 star companion
+    accLineNext = -1,
+    accLineT0 = -9, // curtain birth (fires on a beat)
+    accLineArm = false,
+    accLineEnv = 0, // curtain life envelope (computed per frame)
+    accLineRot = 0,
+    accLineAng = 0,
+    accLineX = 0.5,
+    accLineY = 0.5,
+    accLineDrift = 0,
+    accDots = 0, // 0 none · 1 marching bead row · 2 caterpillar chain
+    accDotsNext = -1,
+    accDotsPhase = 0,
+    accDotsDir = 1,
+    accDotsY = 0.5,
+    accDotsHue = 0,
+    accVis = 1; // rest-breathing gate (the composition empties out in rests)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
   var MOTIF_BAG = [0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 1]; // anemone/star DOMINANT; +urchin/cross/tri/square/hexagram/NET/vortex/jelly/12-star/bead-chain/valley/organic-TANGLE(×2)/mountains
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
-  var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
 
   function frame(t) {
     var time = t.time || 0;
@@ -842,11 +934,80 @@
     t.q16 = 0.01 * Math.sin(time * 0.06); // gentle sign-oscillating roll (no constant spin)
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
-    // ── CAMERA PAN — abrupt-snap direction dragging the trail buffer (the 2:24-2:31 parallax). ──
-    panMag += (0.0045 - panMag) * Math.min(1, dt * 0.8);
-    var pdir = panDir(time);
-    t.q18 = panMag * Math.cos(pdir);
-    t.q19 = panMag * Math.sin(pdir) - 0.0012; // a touch of constant upward drift (scene "moves up")
+    // ── CAMERA REGIME DIRECTOR — see CAM_REG/CAM_BAGS. Direction SNAPS at changes (no easing). ──
+    // scene class from the CURRENT bg + the previous frame's motif (lastMotif; 1-frame lag is fine).
+    // CENTER-ANCHORED scenes count as class 0 too: the radial-tunnel bg (2), the vortex (8),
+    // the 12-star-over-bullseye (10) and the valley (12) have a screen-space anchor (VP/iris/
+    // swirl pivot) the motif must stay aligned with — letting the world carry the motif away
+    // from the anchor read as broken ("motifs look weird" feedback).
+    var camAnchored =
+      bgMode === 1 ||
+      bgMode >= 4 ||
+      bgMode === 2 ||
+      lastMotif === 8 ||
+      lastMotif === 10 ||
+      lastMotif === 12;
+    var camClass = camAnchored
+      ? 0
+      : lastMotif === 7
+        ? 3
+        : lastMotif === 3 ||
+            lastMotif === 4 ||
+            lastMotif === 5 ||
+            lastMotif === 6 ||
+            lastMotif === 14
+          ? 2
+          : 1;
+    if (camClass !== lastCamClass) {
+      camNext = time; // scene changed → re-pick the regime immediately (kaleido stills at once)
+      lastCamClass = camClass;
+    }
+    if (time >= camNext) {
+      var bag = CAM_BAGS[camClass];
+      var ci = bag[(Math.random() * bag.length) | 0];
+      if (ci === 3 && energy < 1.05) ci = 1; // violent TRAVEL only when the music pushes
+      camIdx = ci;
+      var rg = CAM_REG[camIdx];
+      camNext = time + rg.hold[0] + Math.random() * (rg.hold[1] - rg.hold[0]);
+      camAng = Math.random() * 6.2832;
+      // DRIFT keeps the measured near-vertical baseline heading
+      if (camIdx === 0)
+        camAng = 1.5708 + (Math.random() < 0.5 ? 0 : 3.14159) + 0.7 * (Math.random() - 0.5);
+      // strayed far off-centre → head the new leg back toward centre (with jitter)
+      if (Math.hypot(worldX, worldY) > 0.25)
+        camAng = Math.atan2(-worldY, -worldX) + 0.6 * (Math.random() - 0.5);
+      camFlipNext = time + 0.9;
+    }
+    if (camIdx === 4 && time >= camFlipNext) {
+      camAng += 3.14159; // OSC: heading reverses every ~1s (measured flip-flop)
+      camFlipNext = time + 0.7 + Math.random() * 0.8;
+    }
+    camMag += (CAM_REG[camIdx].mag - camMag) * Math.min(1, dt * 2.0);
+    // geometry (wave-coord, y-up) velocity for this heading; buffer pan derived from it via the
+    // EMPIRICAL sign map (+q18 streams buffer content LEFT, +q19 streams it UP, q3 up = screen up):
+    var gvx = camMag * Math.cos(camAng),
+      gvy = camMag * Math.sin(camAng);
+    t.q18 = -gvx;
+    t.q19 = gvy - 0.0012; // keep the original gentle constant vertical drift on the buffer
+    // the WORLD (all emitters) rides the camera at CAM_REG.follow × the buffer speed — the trail
+    // streams past the motif = the reference's parallax slip; ghost deposits trail the motion.
+    var camFollow = CAM_REG[camIdx].follow;
+    worldX += -t.q18 * camFollow;
+    worldY += t.q19 * camFollow;
+    // gentle recentering spring + WRAP: a hard travel carries the scene off one side and it
+    // re-enters the other (reads as "new content arriving", like the ref's traveling segments).
+    // Wallpaper scenes recenter fast — the composition settles over the static pattern.
+    var wsp = Math.min(1, dt / (camClass === 0 ? 2.5 : 14));
+    worldX -= worldX * wsp;
+    worldY -= worldY * wsp;
+    if (Math.abs(worldX) > 0.55 || Math.abs(worldY) > 0.55) {
+      if (worldX > 0.55) worldX -= 1.1;
+      else if (worldX < -0.55) worldX += 1.1;
+      if (worldY > 0.55) worldY -= 1.1;
+      else if (worldY < -0.55) worldY += 1.1;
+      wrapT = time; // fade the emitters back in over ~1.2s to mask the teleport
+    }
+    var wrapFade = Math.min(1, (time - wrapT) / 1.2);
 
     // ── OFF-CENTRE drifting pivot on an elliptical path → asymmetric parallax (edges sweep faster). ──
     var vpAng = time * 0.045,
@@ -876,7 +1037,15 @@
     // original's roaming flower. Small amplitude so it stays the central object.
     t.q2 = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
-    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // breathing + smoothed beat pop
+    // BLOOM-GROWTH — a fresh motif ERUPTS from small to full size over ~2.4s with a slight
+    // overshoot (the reference's dandelion bloom at 2:55), instead of popping in at full scale.
+    if (mCur !== lastMotif) {
+      growT = time;
+      lastMotif = mCur;
+    }
+    var ge = Math.min(1, (time - growT) / 2.4);
+    var grow = ge * ge * (3 - 2 * ge) * (1 + 0.22 * Math.sin(ge * 3.14159));
+    t.q5 = scaleFor(mCur) * (0.24 + 0.76 * grow) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // bloom + breathing + smoothed beat pop
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
@@ -893,8 +1062,46 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse); // orb radius (smoothed beat pop)
+    // orb radius (smoothed beat pop) — trimmed 0.06→0.048: measured vs the refs ours read ~1.5-2×
+    // too big (ref anchor orbs ≈3-4% of frame width; beads smaller still)
+    t.q7 = (0.048 + 0.016 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
+
+    // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock (see state
+    //    block). Accessories draw in ABSOLUTE screen space (no world offset) = the original's
+    //    layer independence: they stream against the traveling motif. ──
+    if (time >= accLineNext) {
+      var rl = Math.random();
+      accLine = rl < 0.38 ? 0 : rl < 0.6 ? 1 : 2; // none / ray-curtain / waveform bundle
+      accLineNext = time + 5 + Math.random() * 6;
+      accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
+      accLineAng = Math.random() * 3.14159;
+      accLineX = 0.3 + Math.random() * 0.4;
+      accLineY = 0.3 + Math.random() * 0.4;
+      accLineDrift = (Math.random() < 0.5 ? -1 : 1) * (0.008 + 0.02 * Math.random());
+    }
+    if (mCur === 1) accLine = 3; // the star motif keeps its companion lattice (as before)
+    if (accLineArm && f > 0.6) {
+      accLineArm = false;
+      accLineT0 = time; // beat fires the sweep (survey: curtains land ON hits, live ~1.5s)
+    }
+    var clife = (time - accLineT0) / 1.6;
+    accLineEnv = accLine === 1 ? (clife >= 0 && clife < 1 ? Math.sin(clife * 3.14159) : 0) : 1;
+    accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the fan pivots as it lives
+    accLineY += accLineDrift * dt; // bundle drifts on its own axis (independent clock)
+    if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
+    if (time >= accDotsNext) {
+      var rd = Math.random();
+      accDots = rd < 0.45 ? 0 : rd < 0.75 ? 1 : 2; // none / marching bead row / caterpillar
+      accDotsNext = time + 6 + Math.random() * 7;
+      accDotsDir = Math.random() < 0.5 ? -1 : 1;
+      accDotsY = 0.22 + Math.random() * 0.56;
+      accDotsHue = 0.1 + Math.random() * 0.4;
+    }
+    accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail (internal flow)
+    // rest breathing — the original empties to 1-2 elements every 8-12s; our camera RESTs
+    // double as those beats, so accessories fade out during them
+    accVis += ((camIdx === 2 ? 0.15 : 1) - accVis) * Math.min(1, dt * 1.2);
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
@@ -932,6 +1139,24 @@
       t.q15 += (0.012 - t.q15) * va; // q15>0 magnifies the old buffer → forward DOLLY into the VP
       t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
       t.q16 *= 1 - va; // no roll (a clean dive down the valley)
+    }
+
+    // ── WORLD OFFSET — every emitter rides the camera (rigid whole-scene travel; the corridor
+    //    is its own tuned scene, so its anchors blend the offset out). Applied LAST so the
+    //    corridor/valley target blends above keep their tuned values. ──
+    var wfx = worldX * (1 - corridorAmt),
+      wfy = worldY * (1 - corridorAmt);
+    t.q2 += wfx;
+    t.q3 += wfy;
+    t.q21 += wfx;
+    t.q22 += wfy;
+    t.q23 += wfx;
+    t.q24 += wfy;
+    if (camIdx === 2) t.q26 *= 0.5; // REST regime — the tether settles with the camera
+    if (wrapFade < 1) {
+      t.q4 *= 0.15 + 0.85 * wrapFade;
+      t.q25 *= wrapFade;
+      t.q14 *= wrapFade;
     }
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
@@ -979,27 +1204,68 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q30 || 0) - 1) > 0.5) {
-          a.a = 0;
+        // ACCESSORY LINES slot — mode from the closure (see accessory director):
+        // 3 = star companion (unchanged), 1 = beat-fired ray-curtain sweep, 2 = chromatic
+        // multi-strand waveform bundle, 0 = nothing. Drawn in ABSOLUTE screen space (no world
+        // offset) so it streams against the traveling motif (layer independence).
+        if (accLine === 3) {
+          var N = 6,
+            fk = (a.sample || 0) * N,
+            seg = Math.floor(fk),
+            u = fk - seg,
+            s = u * 2 - 1;
+          var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
+          var len = (a.q5 || 0.4) * 0.85,
+            jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
+          var cx = a.q2 !== undefined ? a.q2 : 0.5,
+            cy = a.q3 !== undefined ? a.q3 : 0.5;
+          a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
+          a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
+          var h = (a.q8 || 0) + 0.18;
+          a.r = orbCol(h, 0);
+          a.g = orbCol(h, 0.33);
+          a.b = orbCol(h, 0.67);
+          a.a = u < 0.02 ? 0 : 0.5;
           return a;
         }
-        var N = 6,
-          fk = (a.sample || 0) * N,
-          seg = Math.floor(fk),
-          u = fk - seg,
-          s = u * 2 - 1;
-        var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
-        var len = (a.q5 || 0.4) * 0.85,
-          jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
-        var cx = a.q2 !== undefined ? a.q2 : 0.5,
-          cy = a.q3 !== undefined ? a.q3 : 0.5;
-        a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
-        a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
-        var h = (a.q8 || 0) + 0.18;
-        a.r = orbCol(h, 0);
-        a.g = orbCol(h, 0.33);
-        a.b = orbCol(h, 0.67);
-        a.a = u < 0.02 ? 0 : 0.5;
+        if (accLine === 1 && accLineEnv > 0.01) {
+          // RAY-CURTAIN: 16 parallel rays × 32 samples, pivoting as a fan while it lives
+          var K = 16,
+            fk1 = (a.sample || 0) * K,
+            k = Math.floor(fk1),
+            u1 = fk1 - k;
+          var dx1 = Math.cos(accLineRot),
+            dy1 = Math.sin(accLineRot);
+          var offp = (k / (K - 1) - 0.5) * 0.85; // perpendicular spread of the curtain
+          a.x = accLineX - dy1 * offp + dx1 * (u1 - 0.5) * 1.5;
+          a.y = accLineY + dx1 * offp + dy1 * (u1 - 0.5) * 1.5;
+          var h1 = (a.q8 || 0) + 0.24;
+          var bri = 0.85 * accLineEnv * accVis;
+          a.r = orbCol(h1, 0) * bri;
+          a.g = orbCol(h1, 0.33) * bri;
+          a.b = orbCol(h1, 0.67) * bri;
+          a.a = u1 < 0.03 ? 0 : 0.6 * accLineEnv * accVis;
+          return a;
+        }
+        if (accLine === 2) {
+          // WAVEFORM BUNDLE: 3 chromatic strands stacked around accLineY, live-audio jag,
+          // drifting on their own axis — the recurring free multi-strand element
+          var S = 3,
+            fk2 = (a.sample || 0) * S,
+            st = Math.floor(fk2),
+            u2 = fk2 - st;
+          var jag2 =
+            (a.value1 || 0) * 0.05 * (0.6 + 0.8 * Math.max(0, (a.bass_att || 1) - 1) + 0.4);
+          a.x = u2 * 1.14 - 0.07;
+          a.y = accLineY + (st - 1) * 0.055 + jag2;
+          var h2 = (a.q8 || 0) + 0.3 + st * 0.13; // chromatic bundle: each strand its own hue
+          a.r = orbCol(h2, 0) * 0.8;
+          a.g = orbCol(h2, 0.33) * 0.8;
+          a.b = orbCol(h2, 0.67) * 0.8;
+          a.a = (u2 < 0.02 ? 0 : 0.5) * accVis;
+          return a;
+        }
+        a.a = 0;
         return a;
       },
     };
@@ -1042,24 +1308,53 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q29 || 0) - 3) > 0.5) {
+        if (Math.abs((a.q29 || 0) - 3) < 0.5) {
+          // CORRIDOR ring-dot row (unchanged) — keeps priority over the accessory beads
+          var K = 10,
+            idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+          var d = Math.pow(idx, 1.5); // foreshorten toward the vanishing point
+          var nearX = 0.16,
+            nearY = 0.52,
+            vpx = 0.82,
+            vpy = 0.49;
+          a.x = nearX + (vpx - nearX) * d;
+          a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+          var h = a.q8 || 0;
+          a.r = orbCol(h, 0);
+          a.g = orbCol(h, 0.33);
+          a.b = orbCol(h, 0.67);
+          a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+          return a;
+        }
+        // ACCESSORY BEADS (survey: bead rows/caterpillar chains recur in every segment, always
+        // marching on their own clock). 80 samples → 20 beads × 4 stacked dots (brightness).
+        // Absolute screen space; beads flow along the rail = the original's internal flow.
+        if (accDots === 0) {
           a.a = 0;
           return a;
         }
-        var K = 10,
-          idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
-        var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
-        var nearX = 0.16,
-          nearY = 0.52,
-          vpx = 0.82,
-          vpy = 0.49;
-        a.x = nearX + (vpx - nearX) * d;
-        a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-        var h = a.q8 || 0;
-        a.r = orbCol(h, 0);
-        a.g = orbCol(h, 0.33);
-        a.b = orbCol(h, 0.67);
-        a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+        var B = 20,
+          bi = Math.floor((a.sample || 0) * B);
+        var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
+        if (accDots === 1) {
+          // straight full-width ROW, gently tilted
+          a.x = bt * 1.14 - 0.07;
+          a.y = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
+        } else {
+          // CATERPILLAR: beads along a slow sine arc
+          a.x = bt * 1.14 - 0.07;
+          a.y = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
+        }
+        var hb2 = (a.q8 || 0) + accDotsHue;
+        // per-bead beat pop: a couple of beads flare on the beat (the ref's coloured bead pops)
+        var pop =
+          Math.max(0, (a.q32 || 1) - 1.1) *
+          (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
+        var bri2 = (0.55 + 0.7 * pop) * accVis;
+        a.r = Math.min(1, orbCol(hb2, 0) * bri2);
+        a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
+        a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
+        a.a = 0.75 * accVis;
         return a;
       },
     };
@@ -1102,6 +1397,6 @@
     tintB: 0.5,
     tintAmt: 0.0,
   };
-  P["Alchemy Classic (Pastel)"] = buildV7(makeComp(PROFILE_PASTEL));
-  P["Alchemy Classic (Vivid)"] = buildV7(makeComp(PROFILE_VIVID));
+  P["Alchemy Motion (Pastel)"] = buildV7(makeComp(PROFILE_PASTEL));
+  P["Alchemy Motion (Vivid)"] = buildV7(makeComp(PROFILE_VIVID));
 })();
