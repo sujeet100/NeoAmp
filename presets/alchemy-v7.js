@@ -148,7 +148,11 @@
       "  else if (m > 3.5 && m < 4.5) {\n" +
       "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
       "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
-      "    ground = barCol * (0.07 + 0.16 * bars);\n" +
+      // the ref's bar wall reads as a mirrored SPECTRUM ANALYZER: brightness flickers with the
+      // beat and a midline band swells with the music (q32 = smoothed beat envelope, 1..~2.3)
+      "    float bflick = 0.72 + 0.45 * (q32 - 1.0);\n" +
+      "    float bmid = exp(-pow((uv.y - 0.5) * 5.0, 2.0));\n" +
+      "    ground = barCol * (0.06 + 0.16 * bars) * bflick + barCol * bmid * 0.22 * (q32 - 1.0);\n" +
       "  }\n" +
       // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
       "  else if (m > 4.5 && m < 5.5) {\n" +
@@ -161,7 +165,10 @@
       "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.06;\n" +
       "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
-      "    ground *= 0.14;\n" +
+      // TREADMILL streaks (the ref's strongest counter-parallax): fine texture streaming FAST
+      // along the bands while the camera holds still and the motifs sit on top
+      "    float streak = 0.5 + 0.5 * sin(uv.x * 46.0 - time * 7.0 + sin(uv.y * 9.0) * 1.5);\n" +
+      "    ground *= 0.14 * (0.78 + 0.4 * streak);\n" +
       "  }\n" +
       // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
       "  else if (m > 6.5) {\n" +
@@ -849,6 +856,32 @@
     wrapT = -9, // wrap fade-in timer (masks the re-entry teleport)
     growT = -9, // motif bloom-growth timer (the ref's 2s dandelion eruption)
     lastMotif = -1;
+  // ── ACCESSORY LAYERS (full-video survey 2026-07-04): the original typically runs 3-5
+  // simultaneous element classes — motif + tether + a bead row/chain + a sweeping ray curtain —
+  // each on its OWN motion clock and direction ("layer independence"; nothing is parented).
+  // That independence IS the counter-motion the user pointed at: accessories deliberately do
+  // NOT ride the world offset, so they stream against the traveling motif. Two slots:
+  // LINES (wave1: beat-fired ray-curtain sweep / chromatic multi-strand waveform bundle /
+  // the star companion) and DOTS (wave3: marching bead row / caterpillar chain; the corridor
+  // ring-dots keep priority). State lives in the closure — the waves' point fns share this
+  // scope (q-vars are only needed for shaders, and all 32 are taken).
+  var accLine = 0, // 0 none · 1 ray-curtain sweep · 2 multi-strand waveform · 3 star companion
+    accLineNext = -1,
+    accLineT0 = -9, // curtain birth (fires on a beat)
+    accLineArm = false,
+    accLineEnv = 0, // curtain life envelope (computed per frame)
+    accLineRot = 0,
+    accLineAng = 0,
+    accLineX = 0.5,
+    accLineY = 0.5,
+    accLineDrift = 0,
+    accDots = 0, // 0 none · 1 marching bead row · 2 caterpillar chain
+    accDotsNext = -1,
+    accDotsPhase = 0,
+    accDotsDir = 1,
+    accDotsY = 0.5,
+    accDotsHue = 0,
+    accVis = 1; // rest-breathing gate (the composition empties out in rests)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
@@ -1029,6 +1062,42 @@
     t.q7 = (0.048 + 0.016 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
 
+    // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock (see state
+    //    block). Accessories draw in ABSOLUTE screen space (no world offset) = the original's
+    //    layer independence: they stream against the traveling motif. ──
+    if (time >= accLineNext) {
+      var rl = Math.random();
+      accLine = rl < 0.38 ? 0 : rl < 0.6 ? 1 : 2; // none / ray-curtain / waveform bundle
+      accLineNext = time + 5 + Math.random() * 6;
+      accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
+      accLineAng = Math.random() * 3.14159;
+      accLineX = 0.3 + Math.random() * 0.4;
+      accLineY = 0.3 + Math.random() * 0.4;
+      accLineDrift = (Math.random() < 0.5 ? -1 : 1) * (0.008 + 0.02 * Math.random());
+    }
+    if (mCur === 1) accLine = 3; // the star motif keeps its companion lattice (as before)
+    if (accLineArm && f > 0.6) {
+      accLineArm = false;
+      accLineT0 = time; // beat fires the sweep (survey: curtains land ON hits, live ~1.5s)
+    }
+    var clife = (time - accLineT0) / 1.6;
+    accLineEnv = accLine === 1 ? (clife >= 0 && clife < 1 ? Math.sin(clife * 3.14159) : 0) : 1;
+    accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the fan pivots as it lives
+    accLineY += accLineDrift * dt; // bundle drifts on its own axis (independent clock)
+    if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
+    if (time >= accDotsNext) {
+      var rd = Math.random();
+      accDots = rd < 0.45 ? 0 : rd < 0.75 ? 1 : 2; // none / marching bead row / caterpillar
+      accDotsNext = time + 6 + Math.random() * 7;
+      accDotsDir = Math.random() < 0.5 ? -1 : 1;
+      accDotsY = 0.22 + Math.random() * 0.56;
+      accDotsHue = 0.1 + Math.random() * 0.4;
+    }
+    accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail (internal flow)
+    // rest breathing — the original empties to 1-2 elements every 8-12s; our camera RESTs
+    // double as those beats, so accessories fade out during them
+    accVis += ((camIdx === 2 ? 0.15 : 1) - accVis) * Math.min(1, dt * 1.2);
+
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
 
@@ -1130,27 +1199,68 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q30 || 0) - 1) > 0.5) {
-          a.a = 0;
+        // ACCESSORY LINES slot — mode from the closure (see accessory director):
+        // 3 = star companion (unchanged), 1 = beat-fired ray-curtain sweep, 2 = chromatic
+        // multi-strand waveform bundle, 0 = nothing. Drawn in ABSOLUTE screen space (no world
+        // offset) so it streams against the traveling motif (layer independence).
+        if (accLine === 3) {
+          var N = 6,
+            fk = (a.sample || 0) * N,
+            seg = Math.floor(fk),
+            u = fk - seg,
+            s = u * 2 - 1;
+          var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
+          var len = (a.q5 || 0.4) * 0.85,
+            jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
+          var cx = a.q2 !== undefined ? a.q2 : 0.5,
+            cy = a.q3 !== undefined ? a.q3 : 0.5;
+          a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
+          a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
+          var h = (a.q8 || 0) + 0.18;
+          a.r = orbCol(h, 0);
+          a.g = orbCol(h, 0.33);
+          a.b = orbCol(h, 0.67);
+          a.a = u < 0.02 ? 0 : 0.5;
           return a;
         }
-        var N = 6,
-          fk = (a.sample || 0) * N,
-          seg = Math.floor(fk),
-          u = fk - seg,
-          s = u * 2 - 1;
-        var th = seg * (3.14159 / N) + 3.14159 / (N * 2) + (a.q9 || 0) * 0.5;
-        var len = (a.q5 || 0.4) * 0.85,
-          jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.0;
-        var cx = a.q2 !== undefined ? a.q2 : 0.5,
-          cy = a.q3 !== undefined ? a.q3 : 0.5;
-        a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
-        a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
-        var h = (a.q8 || 0) + 0.18;
-        a.r = orbCol(h, 0);
-        a.g = orbCol(h, 0.33);
-        a.b = orbCol(h, 0.67);
-        a.a = u < 0.02 ? 0 : 0.5;
+        if (accLine === 1 && accLineEnv > 0.01) {
+          // RAY-CURTAIN: 16 parallel rays × 32 samples, pivoting as a fan while it lives
+          var K = 16,
+            fk1 = (a.sample || 0) * K,
+            k = Math.floor(fk1),
+            u1 = fk1 - k;
+          var dx1 = Math.cos(accLineRot),
+            dy1 = Math.sin(accLineRot);
+          var offp = (k / (K - 1) - 0.5) * 0.85; // perpendicular spread of the curtain
+          a.x = accLineX - dy1 * offp + dx1 * (u1 - 0.5) * 1.5;
+          a.y = accLineY + dx1 * offp + dy1 * (u1 - 0.5) * 1.5;
+          var h1 = (a.q8 || 0) + 0.24;
+          var bri = 0.85 * accLineEnv * accVis;
+          a.r = orbCol(h1, 0) * bri;
+          a.g = orbCol(h1, 0.33) * bri;
+          a.b = orbCol(h1, 0.67) * bri;
+          a.a = u1 < 0.03 ? 0 : 0.6 * accLineEnv * accVis;
+          return a;
+        }
+        if (accLine === 2) {
+          // WAVEFORM BUNDLE: 3 chromatic strands stacked around accLineY, live-audio jag,
+          // drifting on their own axis — the recurring free multi-strand element
+          var S = 3,
+            fk2 = (a.sample || 0) * S,
+            st = Math.floor(fk2),
+            u2 = fk2 - st;
+          var jag2 =
+            (a.value1 || 0) * 0.05 * (0.6 + 0.8 * Math.max(0, (a.bass_att || 1) - 1) + 0.4);
+          a.x = u2 * 1.14 - 0.07;
+          a.y = accLineY + (st - 1) * 0.055 + jag2;
+          var h2 = (a.q8 || 0) + 0.3 + st * 0.13; // chromatic bundle: each strand its own hue
+          a.r = orbCol(h2, 0) * 0.8;
+          a.g = orbCol(h2, 0.33) * 0.8;
+          a.b = orbCol(h2, 0.67) * 0.8;
+          a.a = (u2 < 0.02 ? 0 : 0.5) * accVis;
+          return a;
+        }
+        a.a = 0;
         return a;
       },
     };
@@ -1193,24 +1303,53 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q29 || 0) - 3) > 0.5) {
+        if (Math.abs((a.q29 || 0) - 3) < 0.5) {
+          // CORRIDOR ring-dot row (unchanged) — keeps priority over the accessory beads
+          var K = 10,
+            idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+          var d = Math.pow(idx, 1.5); // foreshorten toward the vanishing point
+          var nearX = 0.16,
+            nearY = 0.52,
+            vpx = 0.82,
+            vpy = 0.49;
+          a.x = nearX + (vpx - nearX) * d;
+          a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+          var h = a.q8 || 0;
+          a.r = orbCol(h, 0);
+          a.g = orbCol(h, 0.33);
+          a.b = orbCol(h, 0.67);
+          a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+          return a;
+        }
+        // ACCESSORY BEADS (survey: bead rows/caterpillar chains recur in every segment, always
+        // marching on their own clock). 80 samples → 20 beads × 4 stacked dots (brightness).
+        // Absolute screen space; beads flow along the rail = the original's internal flow.
+        if (accDots === 0) {
           a.a = 0;
           return a;
         }
-        var K = 10,
-          idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
-        var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
-        var nearX = 0.16,
-          nearY = 0.52,
-          vpx = 0.82,
-          vpy = 0.49;
-        a.x = nearX + (vpx - nearX) * d;
-        a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-        var h = a.q8 || 0;
-        a.r = orbCol(h, 0);
-        a.g = orbCol(h, 0.33);
-        a.b = orbCol(h, 0.67);
-        a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+        var B = 20,
+          bi = Math.floor((a.sample || 0) * B);
+        var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
+        if (accDots === 1) {
+          // straight full-width ROW, gently tilted
+          a.x = bt * 1.14 - 0.07;
+          a.y = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
+        } else {
+          // CATERPILLAR: beads along a slow sine arc
+          a.x = bt * 1.14 - 0.07;
+          a.y = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
+        }
+        var hb2 = (a.q8 || 0) + accDotsHue;
+        // per-bead beat pop: a couple of beads flare on the beat (the ref's coloured bead pops)
+        var pop =
+          Math.max(0, (a.q32 || 1) - 1.1) *
+          (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
+        var bri2 = (0.55 + 0.7 * pop) * accVis;
+        a.r = Math.min(1, orbCol(hb2, 0) * bri2);
+        a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
+        a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
+        a.a = 0.75 * accVis;
         return a;
       },
     };
