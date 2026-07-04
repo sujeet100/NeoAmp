@@ -161,9 +161,21 @@
       "    ground *= 0.14;\n" +
       "  }\n" +
       // 7 CONCENTRIC RINGS / bullseye glow (1:33): a few soft concentric rings, low saturation.
-      "  else if (m > 6.5) {\n" +
+      "  else if (m > 6.5 && m < 7.5) {\n" +
       "    float rng = 0.5 + 0.5 * sin((prad * 7.0 - time * 0.2) * 6.2832);\n" +
       "    ground = mix(pal(hb + 0.02), pal(hb + 0.2), rng) * (0.05 + 0.13 * rng);\n" +
+      "  }\n" +
+      // 8 CAUSTIC BANDS (the 19s reference clip): a BOLD mid-tone field — two-tone horizontal
+      // bands (hot pink over slate at @9, teal at @3) overlaid with rippling vertical caustic
+      // streaks; the band colours ride the beat-snapped hue clock hard. Deliberately the
+      // BRIGHTEST ground regime (the 19s clip proves the original goes this bold in places).
+      "  else if (m > 7.5) {\n" +
+      "    float band = smoothstep(-0.3, 0.3, sin(uv.y * 6.2832 * 1.6 + time * 0.07));\n" +
+      "    vec3 bandCol = mix(pal(hb), pal(hb + 0.38), band);\n" +
+      "    float cst = 0.5 + 0.5 * sin(uv.x * 60.0 + sin(uv.y * 7.0 + time * 0.6) * 2.2 + time * 0.35);\n" +
+      "    cst = cst * cst;\n" +
+      "    bandCol *= 0.4 + 0.22 * cst;\n" +
+      "    float bl = dot(bandCol, vec3(0.333)); ground = mix(vec3(bl), bandCol, 0.75);\n" +
       "  }\n" +
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
@@ -899,7 +911,7 @@
     restAmt = 0;
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
-  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings
+  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2
   var MOTIF_BAG = [
@@ -977,7 +989,7 @@
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
-    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)); // dips at the swap instant
+    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)) * (1 + 0.3 * pulse); // dips at the swap instant; FLASHES on hits (headroom: MODE_ALPHA < 1)
 
     focusAmt +=
       ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 ? 1 : 0) - focusAmt) *
@@ -990,7 +1002,9 @@
     // original's roaming flower. Small amplitude so it stays the central object.
     t.q2 = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
-    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.2 * pulse); // breathing + smoothed beat pop
+    // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
+    // size rides the smoothed beat harder, and q4 below carries a brightness flash
+    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.45 * pulse);
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
