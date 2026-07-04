@@ -276,12 +276,14 @@ function ensureNowPlaying() {
     return b;
   }
   // like / dislike the current track (the main window has no such control).
-  // Crisp inline-SVG icons (heart / thumbs-down) so they stay sharp + monochrome.
+  // PIXEL-ART inline-SVG icons: hard stepped outlines on a coarse 3-unit grid with
+  // shape-rendering="crispEdges", so they match the strip's design language (Silkscreen
+  // labels, square LEDs, pixelated skin sprites) — smooth Material curves read modern.
   // Heart carries an amber gradient + LED-scanline PATTERN in <defs>; when liked, the CSS
   // fills the path with url(#likeScan) (a lit amber-LED-display look) instead of a flat colour.
   // Off-state inherits the translucent key-fg from .wa-rate-btn svg (path has no own fill).
   var HEART_SVG =
-    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">' +
     "<defs>" +
     '<radialGradient id="likeAmberGrad" cx="50%" cy="34%" r="72%">' +
     '<stop offset="0%" stop-color="#ffe39c"/>' +
@@ -293,10 +295,14 @@ function ensureNowPlaying() {
     '<rect width="4" height="1.1" fill="rgba(40,20,0,0.5)"/>' +
     "</pattern>" +
     "</defs>" +
-    '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>' +
+    // the canonical 8x7-cell pixel heart (two bumps, stepped taper to a flat tip)
+    '<path d="M3 1H9V4H15V1H21V4H24V13H21V16H18V19H15V22H9V19H6V16H3V13H0V4H3Z"/>' +
     "</svg>";
+  // stepped thumbs-down: hand slab with a notched cuff on the right, thumb stem
+  // descending left-of-center with a stepped tip (a centered taper read as a funnel).
   var THUMBDOWN_SVG =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path transform="rotate(180 12 12)" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>';
+    '<svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">' +
+    '<path d="M3 2H24V11H22V5H20V11H12V17H9V20H6V11H3Z"/></svg>';
   function rateBtn(svg, title, kind) {
     var b = h("div", {
       class: "wa-np-tog wa-rate-btn " + (kind === "dislike" ? "wa-dislike" : "wa-like"),
@@ -319,11 +325,13 @@ function ensureNowPlaying() {
   ]);
   // MUTE — universal (the procedural main window is hidden on .wsz skins, so the
   // canonical mute lives here). One SVG carries both states; CSS swaps wave↔✕ via .on.
+  // pixel speaker: stepped cone + a stepped ")" sound arc; muted swaps the arc for a
+  // chunky stepped ✕ (5 diagonal cells). All filled rect-steps — no smooth curves.
   var SPEAKER_SVG =
-    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-    '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
-    '<path class="wa-spk-wave" d="M15.5 8.6a5 5 0 010 6.8" fill="none" stroke="currentColor" stroke-width="2"/>' +
-    '<path class="wa-spk-x" d="M16 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+    '<svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">' +
+    '<path d="M2 9H7V7H10V4H13V20H10V17H7V15H2Z"/>' +
+    '<path class="wa-spk-wave" d="M15 6H19V9H15ZM18 9H21V15H18ZM15 15H19V18H15Z"/>' +
+    '<path class="wa-spk-x" d="M15 7H18V10H15ZM21 7H24V10H21ZM18 10H21V13H18ZM15 13H18V16H15ZM21 13H24V16H21Z"/></svg>';
   els.mute = h("div", { class: "wa-np-tog wa-np-mute", title: "Mute (M)", html: SPEAKER_SVG });
   els.mute.addEventListener("mousedown", function (e) {
     e.stopPropagation();
