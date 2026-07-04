@@ -384,7 +384,19 @@
     { mag: 0.011, follow: 0.5, hold: [8, 15] }, // 3 TRAVEL (violent, audio-gated)
     { mag: 0.0045, follow: 0.42, hold: [6, 9] }, // 4 OSC (~1s flip-flop)
   ];
-  var CAM_BAG = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 3];
+  // ★ The camera is SCENE-COUPLED (measured per-scene, 2026-07-04 labeling pass): wallpaper
+  // scenes (kaleidoscope t=20, bars/bands t=108) hold a near-STILL camera — the pattern flows
+  // internally instead; soft fluid/orb scenes get the gentle one-way drift; sheet/terrain motifs
+  // (crossed-X t=136, mountains t=44, zigzag column t=126) carry the sustained/oscillating pans;
+  // and only the wireframe NET scenes (t=30, t=160) get the violent travel. Applying every
+  // regime to every scene read as layers contradicting each other (screen-space wallpapers
+  // don't translate) — the user called it "weird". Class 0 wallpaper · 1 soft · 2 sheets · 3 nets.
+  var CAM_BAGS = [
+    [2], // wallpaper: REST only — compose statically over the pattern
+    [0, 0, 0, 0, 1, 2, 2], // soft fluid/orbs: drift dominant, occasional pan, real rests
+    [1, 1, 1, 4, 0], // sheets/terrain: sustained pans + the oscillating pan
+    [1, 1, 3, 3, 0], // nets/vortex: pans + the violent travel (audio-gated)
+  ];
 
   // ── central-motif modes (curated to the reference's vocabulary). Each = a point fn for one wave. ──
   // ANEMONE — soft 10-arm flower with a hollow centre (matches the reference's flower, A_95). The kit
@@ -783,10 +795,15 @@
   var tetherPts = alcTether("q21", "q22", "q23", "q24", "q26", null).point_eqs;
   function fTether(a) {
     tetherPts(a);
-    var h = (a.q8 || 0) + 0.08;
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
+    // DUO-hue shimmer + hot centre (ref t=58: a hot red line with yellow highlights along it,
+    // brightest mid-span, calmer at the orb tips) — alternate samples take a second hue ~0.38
+    // around the wheel so the segments fringe like the original's chromatic line.
+    var duo = (((a.sample || 0) * 512) | 0) & 1;
+    var h = (a.q8 || 0) + 0.08 + (duo ? 0.38 : 0);
+    var core = 0.55 + 0.45 * Math.sin((a.sample || 0) * 3.14159);
+    a.r = Math.min(1, orbCol(h, 0) * (0.55 + 0.75 * core));
+    a.g = Math.min(1, orbCol(h, 0.33) * (0.55 + 0.75 * core));
+    a.b = Math.min(1, orbCol(h, 0.67) * (0.55 + 0.75 * core));
     return a;
   }
 
@@ -804,6 +821,7 @@
   // every emitter stayed pinned, which measured as dx=dy≈0 (a static composition).
   var camIdx = 0,
     camNext = -1,
+    lastCamClass = -1,
     camAng = Math.random() * 6.2832,
     camMag = 0,
     camFlipNext = 0,
@@ -859,9 +877,27 @@
     t.q16 = 0.01 * Math.sin(time * 0.06); // gentle sign-oscillating roll (no constant spin)
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
-    // ── CAMERA REGIME DIRECTOR — see CAM_REG. Direction SNAPS at regime changes (no easing). ──
+    // ── CAMERA REGIME DIRECTOR — see CAM_REG/CAM_BAGS. Direction SNAPS at changes (no easing). ──
+    // scene class from the CURRENT bg + the previous frame's motif (lastMotif; 1-frame lag is fine)
+    var camWallpaper = bgMode === 1 || bgMode >= 4;
+    var camClass = camWallpaper
+      ? 0
+      : lastMotif === 7 || lastMotif === 8
+        ? 3
+        : lastMotif === 3 ||
+            lastMotif === 4 ||
+            lastMotif === 5 ||
+            lastMotif === 6 ||
+            lastMotif === 14
+          ? 2
+          : 1;
+    if (camClass !== lastCamClass) {
+      camNext = time; // scene changed → re-pick the regime immediately (kaleido stills at once)
+      lastCamClass = camClass;
+    }
     if (time >= camNext) {
-      var ci = CAM_BAG[(Math.random() * CAM_BAG.length) | 0];
+      var bag = CAM_BAGS[camClass];
+      var ci = bag[(Math.random() * bag.length) | 0];
       if (ci === 3 && energy < 1.05) ci = 1; // violent TRAVEL only when the music pushes
       camIdx = ci;
       var rg = CAM_REG[camIdx];
@@ -892,8 +928,9 @@
     worldX += -t.q18 * camFollow;
     worldY += t.q19 * camFollow;
     // gentle recentering spring + WRAP: a hard travel carries the scene off one side and it
-    // re-enters the other (reads as "new content arriving", like the ref's traveling segments)
-    var wsp = Math.min(1, dt / 14);
+    // re-enters the other (reads as "new content arriving", like the ref's traveling segments).
+    // Wallpaper scenes recenter fast — the composition settles over the static pattern.
+    var wsp = Math.min(1, dt / (camClass === 0 ? 2.5 : 14));
     worldX -= worldX * wsp;
     worldY -= worldY * wsp;
     if (Math.abs(worldX) > 0.55 || Math.abs(worldY) > 0.55) {
@@ -958,7 +995,9 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse); // orb radius (smoothed beat pop)
+    // orb radius (smoothed beat pop) — trimmed 0.06→0.048: measured vs the refs ours read ~1.5-2×
+    // too big (ref anchor orbs ≈3-4% of frame width; beads smaller still)
+    t.q7 = (0.048 + 0.016 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
