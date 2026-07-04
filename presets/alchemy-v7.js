@@ -792,18 +792,37 @@
   // TETHER — the jagged waveform line joining the two orbs. The kit bakes a fixed colour; we override so
   // it CYCLES with the shared q8 clock (in the original the line changes colour like everything else —
   // the user noticed ours was stuck amber). Slight offset from the orbs so it reads as its own element.
-  var tetherPts = alcTether("q21", "q22", "q23", "q24", "q26", null).point_eqs;
+  // TETHER — the ref's line (t=58) is a BAND, not a hairline: draw TWO parallel strands
+  // (256 samples each) offset a few px to either side, each with its own decorrelated live-
+  // waveform jag, duo-hue shimmer + hot mid-span core (red line with yellow highlights).
+  // Standalone (not alcTether) because the double-stroke needs to remap a.sample per strand.
   function fTether(a) {
-    tetherPts(a);
-    // DUO-hue shimmer + hot centre (ref t=58: a hot red line with yellow highlights along it,
-    // brightest mid-span, calmer at the orb tips) — alternate samples take a second hue ~0.38
-    // around the wheel so the segments fringe like the original's chromatic line.
+    var ax = a.q21 !== undefined ? a.q21 : 0.4,
+      ay = a.q22 !== undefined ? a.q22 : 0.5;
+    var bx = a.q23 !== undefined ? a.q23 : 0.6,
+      by = a.q24 !== undefined ? a.q24 : 0.5;
+    var dx = bx - ax,
+      dy = by - ay,
+      len = Math.hypot(dx, dy) || 1;
+    var nx = -dy / len,
+      ny = dx / len;
+    var s2 = (a.sample || 0) * 2,
+      strand = s2 < 1 ? 0 : 1,
+      tt = strand ? s2 - 1 : s2;
+    var win = Math.sin(tt * 3.14159); // tips land exactly on the orbs
+    var disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
+    var off = (strand ? 1 : -1) * 0.0042 * win;
+    a.x = ax + tt * dx + nx * (disp + off);
+    a.y = ay + tt * dy + ny * (disp + off);
     var duo = (((a.sample || 0) * 512) | 0) & 1;
     var h = (a.q8 || 0) + 0.08 + (duo ? 0.38 : 0);
-    var core = 0.55 + 0.45 * Math.sin((a.sample || 0) * 3.14159);
+    var core = 0.55 + 0.45 * win;
     a.r = Math.min(1, orbCol(h, 0) * (0.55 + 0.75 * core));
     a.g = Math.min(1, orbCol(h, 0.33) * (0.55 + 0.75 * core));
     a.b = Math.min(1, orbCol(h, 0.67) * (0.55 + 0.75 * core));
+    // hide the fly-back segment joining strand 0's end to strand 1's start (set EVERY point —
+    // the point object is reused across samples, so a one-shot 0 would leak to the 2nd strand)
+    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.9;
     return a;
   }
 
@@ -878,11 +897,21 @@
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
     // ── CAMERA REGIME DIRECTOR — see CAM_REG/CAM_BAGS. Direction SNAPS at changes (no easing). ──
-    // scene class from the CURRENT bg + the previous frame's motif (lastMotif; 1-frame lag is fine)
-    var camWallpaper = bgMode === 1 || bgMode >= 4;
-    var camClass = camWallpaper
+    // scene class from the CURRENT bg + the previous frame's motif (lastMotif; 1-frame lag is fine).
+    // CENTER-ANCHORED scenes count as class 0 too: the radial-tunnel bg (2), the vortex (8),
+    // the 12-star-over-bullseye (10) and the valley (12) have a screen-space anchor (VP/iris/
+    // swirl pivot) the motif must stay aligned with — letting the world carry the motif away
+    // from the anchor read as broken ("motifs look weird" feedback).
+    var camAnchored =
+      bgMode === 1 ||
+      bgMode >= 4 ||
+      bgMode === 2 ||
+      lastMotif === 8 ||
+      lastMotif === 10 ||
+      lastMotif === 12;
+    var camClass = camAnchored
       ? 0
-      : lastMotif === 7 || lastMotif === 8
+      : lastMotif === 7
         ? 3
         : lastMotif === 3 ||
             lastMotif === 4 ||

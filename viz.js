@@ -99,6 +99,9 @@
   var FAVORITES = [
     { label: "Alchemy (Pastel)", wmp: "Alchemy (Pastel)" }, // DEFAULT — accurate muted/dusty WMP colour (480p), validated
     { label: "Alchemy (Vivid)", wmp: "Alchemy (Vivid)" }, // punchier colour variant
+    // frozen pre-motion-rework copies for A/B comparison (alchemy-classic.js) — temporary
+    { label: "Alchemy Classic (Pastel)", wmp: "Alchemy Classic (Pastel)" },
+    { label: "Alchemy Classic (Vivid)", wmp: "Alchemy Classic (Vivid)" },
     { label: "Dance of the Freaky Circles (Nebula)", wmp: "Dance of the Freaky Circles (Nebula)" },
     {
       label: "Dance of the Freaky Circles (Nebula Spectrum)",
