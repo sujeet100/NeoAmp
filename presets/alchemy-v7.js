@@ -299,17 +299,20 @@
         var cx = s[qx] !== undefined ? s[qx] : 0.5,
           cy = s[qy] !== undefined ? s[qy] : 0.5;
         var be = Math.max(0, (s.bass_att || 1) - 1);
-        var hf = (s.q8 || 0) + (hueOff || 0);
+        // hue-OFFSET colour puff (480p 2:35-2:45: the orbs carry fat soft watercolour splats
+        // in a NEIGHBOURING hue that pulse with the music and stain the trail)
+        var hf = (s.q8 || 0) + (hueOff || 0) + 0.12;
         var gr = orbCol(hf, 0),
           gg = orbCol(hf, 0.33),
           gb = orbCol(hf, 0.67);
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be); // wider halo
+        var puls = ((s.q32 || 1) - 1) / 1.3; // smoothed beat envelope (q32 = 1 + 1.3*pulse)
+        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.1 * puls); // the puff SWELLS on hits
         s.r = gr * 0.85;
         s.g = gg * 0.85;
         s.b = Math.min(1, gb * 1.4 + 0.12);
-        s.a = 0.34 * vis;
+        s.a = 0.42 * vis;
         s.r2 = gr * 0.4;
         s.g2 = gg * 0.4;
         s.b2 = gb * 0.5;
@@ -781,16 +784,35 @@
     a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m];
     return a;
   }
-  // TETHER — the jagged waveform line joining the two orbs. The kit bakes a fixed colour; we override so
-  // it CYCLES with the shared q8 clock (in the original the line changes colour like everything else —
-  // the user noticed ours was stuck amber). Slight offset from the orbs so it reads as its own element.
-  var tetherPts = alcTether("q21", "q22", "q23", "q24", "q26", null).point_eqs;
+  // TETHER — the jagged waveform line joining the two orbs; colour cycles with the shared q8
+  // clock. Drawn as a DOUBLE-STROKE band (two parallel strands, each with its own live-waveform
+  // jag): the user confirmed against the WMP video that the original's tether reads thicker and
+  // softer than a crisp hairline. (Standalone, not alcTether — the double-stroke remaps a.sample.)
   function fTether(a) {
-    tetherPts(a);
+    var ax = a.q21 !== undefined ? a.q21 : 0.4,
+      ay = a.q22 !== undefined ? a.q22 : 0.5;
+    var bx = a.q23 !== undefined ? a.q23 : 0.6,
+      by = a.q24 !== undefined ? a.q24 : 0.5;
+    var dx = bx - ax,
+      dy = by - ay,
+      len = Math.hypot(dx, dy) || 1;
+    var nx = -dy / len,
+      ny = dx / len;
+    var s2 = (a.sample || 0) * 2,
+      strand = s2 < 1 ? 0 : 1,
+      tt = strand ? s2 - 1 : s2;
+    var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
+    var disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
+    var off = (strand ? 1 : -1) * 0.0035 * win;
+    a.x = ax + tt * dx + nx * (disp + off);
+    a.y = ay + tt * dy + ny * (disp + off);
     var h = (a.q8 || 0) + 0.08;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
+    // alpha set EVERY point (the reused point object would leak a one-shot 0 across strand 2);
+    // the fly-back segment joining the strands is hidden
+    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.85;
     return a;
   }
 
@@ -819,6 +841,8 @@
     accLineX = 0.5,
     accLineY = 0.5,
     accLineDrift = 0,
+    accLinePickT = 0, // pinwheel rotation reference (steady windmill, 480p 0:39-0:45)
+    lastHueSnapT = -9, // beat-coupled palette snap limiter (480p 2:56-3:10)
     accDots = 0, // wave3 slot: 0 none · 1 marching bead row · 2 caterpillar chain
     accDotsNext = -1,
     accDotsPhase = 0,
@@ -863,6 +887,13 @@
       if (lastBgMode >= 0)
         hueStep += (0.08 + 0.14 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
       lastBgMode = bgMode;
+    }
+    // BEAT-COUPLED palette SNAP (480p 2:56-3:10 + the 19s clip: hues jump within a beat or
+    // two when the music hits — orb/motif/bg all keyed to q8, so the whole palette snaps).
+    // Rate-limited so it reads as musical snaps, not a strobe.
+    if (f > 0.9 && time - lastHueSnapT > 1.2) {
+      hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      lastHueSnapT = time;
     }
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
@@ -925,11 +956,18 @@
     var axis = time * 0.05 + 0.6 * Math.sin(time * 0.017);
     var sep = 0.3 + 0.06 * Math.sin(time * 0.037),
       wob = 0.35 * Math.sin(time * 0.043);
-    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.09);
-    t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081);
-    t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0);
-    t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0);
-    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.35 * pulse); // orb radius (smoothed beat pop)
+    // SNAKING orb paths (user + the 19s clip / 480p 1:00-1:12: orb trails paint S-curves like
+    // sea-plant stalks, never a smooth straight orbit) — faster incommensurate wobble sines on
+    // top of the slow orbit, big enough for the comet trails to visibly snake.
+    var snA = 0.034 * Math.sin(time * 0.57) + 0.018 * Math.sin(time * 1.31 + 0.7);
+    var snB = 0.034 * Math.sin(time * 0.49 + 2.1) + 0.018 * Math.sin(time * 1.17 + 1.4);
+    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.09) + snA;
+    t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081) + snB;
+    t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0) - snB;
+    t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0) + snA;
+    // orb radius: BALLOON pulse (the 19s clip: orbs swell ~2-3x within a second on hits, then
+    // settle — ride the smoothed pulse envelope, gain raised 0.35→0.85)
+    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.85 * pulse);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
 
     // ── REST/BUSY BREATHING — the original empties to 1-2 element classes for a few seconds
@@ -953,13 +991,16 @@
     //    absolute screen space (independent of the motif — the original parents nothing). ──
     if (time >= accLineNext) {
       var rl = Math.random();
-      accLine = rl < 0.4 ? 0 : rl < 0.62 ? 1 : 2; // none / ray-curtain / waveform bundle
+      // none / ray-curtain / waveform bundle / rotating PINWHEEL (the 480p 0:39-0:45 windmill
+      // fan — long lines through an off-centre hub, rotating steadily for the whole dwell)
+      accLine = rl < 0.32 ? 0 : rl < 0.52 ? 1 : rl < 0.74 ? 2 : 4;
       accLineNext = time + 5 + Math.random() * 6;
       accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
       accLineAng = Math.random() * 3.14159;
       accLineX = 0.3 + Math.random() * 0.4;
       accLineY = 0.3 + Math.random() * 0.4;
       accLineDrift = (Math.random() < 0.5 ? -1 : 1) * (0.008 + 0.02 * Math.random());
+      accLinePickT = time;
     }
     if (accLineArm && f > 0.6) {
       accLineArm = false;
@@ -967,15 +1008,22 @@
     }
     var clife = (time - accLineT0) / 1.6;
     accLineEnv = accLine === 1 ? (clife >= 0 && clife < 1 ? Math.sin(clife * 3.14159) : 0) : 1;
-    accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the fan pivots as it lives
+    if (accLine === 4) {
+      // steady windmill rotation (~0.28 rad/s), direction from the drift sign
+      accLineRot = accLineAng + (time - accLinePickT) * 0.28 * (accLineDrift < 0 ? -1 : 1);
+    } else {
+      accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the curtain pivots as it lives
+    }
     accLineY += accLineDrift * dt; // the bundle drifts on its own axis
     if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
     if (time >= accDotsNext) {
       var rd = Math.random();
-      accDots = rd < 0.45 ? 0 : rd < 0.75 ? 1 : 2; // none / marching bead row / caterpillar
+      // none / marching bead row / caterpillar / SNAKE COLUMN (the 480p 1:00-1:12 + 19s clip
+      // sea-plant stalks: a swaying vertical stack of rings marching upward)
+      accDots = rd < 0.35 ? 0 : rd < 0.58 ? 1 : rd < 0.78 ? 2 : 3;
       accDotsNext = time + 6 + Math.random() * 7;
       accDotsDir = Math.random() < 0.5 ? -1 : 1;
-      accDotsY = 0.22 + Math.random() * 0.56;
+      accDotsY = 0.22 + Math.random() * 0.56; // row rail y — or the snake column's base X
       accDotsHue = 0.1 + Math.random() * 0.4;
     }
     accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail
@@ -1089,6 +1137,24 @@
           return a;
         }
         // ACCESSORY LINES (mode from the closure director)
+        if (accLine === 4) {
+          // ROTATING PINWHEEL (480p 0:39-0:45): 8 long thin lines through an off-centre hub,
+          // rotating steadily like a windmill for the whole accessory dwell
+          var Kp = 8,
+            fkp = (a.sample || 0) * Kp,
+            kp = Math.floor(fkp),
+            up = fkp - kp;
+          var pang = accLineRot + kp * (3.14159 / Kp);
+          var pp = (up - 0.5) * 1.7;
+          a.x = accLineX + Math.cos(pang) * pp;
+          a.y = accLineY + Math.sin(pang) * pp;
+          var hp = (a.q8 || 0) + 0.2;
+          a.r = orbCol(hp, 0) * 0.6 * accVis;
+          a.g = orbCol(hp, 0.33) * 0.6 * accVis;
+          a.b = orbCol(hp, 0.67) * 0.6 * accVis;
+          a.a = (up < 0.03 ? 0 : 0.38) * accVis;
+          return a;
+        }
         if (accLine === 1 && accLineEnv > 0.01) {
           // RAY-CURTAIN: 16 parallel rays × 32 samples, pivoting as a fan while it lives
           var K = 16,
@@ -1137,7 +1203,7 @@
         additive: 0,
         usedots: 0,
         scaling: 1,
-        smoothing: 0.0,
+        smoothing: 0.1, // slightly rounded — the WMP tether is softer than a razor polyline
         thick: 1,
         a: 0.9,
       }),
@@ -1206,9 +1272,17 @@
         if (accDots === 1) {
           bxc = bt * 1.14 - 0.07; // straight full-width row, gently tilted
           byc = accDotsY + (bt - 0.5) * 0.12 * accDotsDir;
-        } else {
+        } else if (accDots === 2) {
           bxc = bt * 1.14 - 0.07; // caterpillar: beads along a slow sine arc
           byc = accDotsY + 0.1 * Math.sin(bt * 9.0 + accDotsPhase * 5.0);
+        } else {
+          // SNAKE COLUMN (480p 1:00-1:12 / the 19s clip): a swaying vertical sea-plant stalk
+          // of stacked rings marching upward; accDotsY doubles as the column's base X
+          byc = 0.92 - bt * 0.84; // rings march upward (bt grows → y climbs)
+          bxc =
+            accDotsY +
+            0.055 * Math.sin(byc * 6.5 + accDotsPhase * 4.0) +
+            0.022 * Math.sin(byc * 13.0 + accDotsPhase * 7.0);
         }
         // per-bead beat pop (the ref's coloured bead flare-pops) — popped beads also swell
         var pop =
