@@ -989,7 +989,9 @@
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
-    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)) * (1 + 0.3 * pulse); // dips at the swap instant; FLASHES on hits (headroom: MODE_ALPHA < 1)
+    // dips at the swap instant; FLASHES on hits — but NOT under the kaleidoscope fold, which
+    // tiles the motif across the whole frame and amplifies the flash into a milky washout
+    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)) * (1 + (bgMode === 1 ? 0 : 0.3) * pulse);
 
     focusAmt +=
       ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 ? 1 : 0) - focusAmt) *
@@ -1020,8 +1022,10 @@
     // SNAKING orb paths (user + the 19s clip / 480p 1:00-1:12: orb trails paint S-curves like
     // sea-plant stalks, never a smooth straight orbit) — faster incommensurate wobble sines on
     // top of the slow orbit, big enough for the comet trails to visibly snake.
-    var snA = 0.034 * Math.sin(time * 0.57) + 0.018 * Math.sin(time * 1.31 + 0.7);
-    var snB = 0.034 * Math.sin(time * 0.49 + 2.1) + 0.018 * Math.sin(time * 1.17 + 1.4);
+    // wobble periods ~2.6s/1.5s — fast enough that the ~2-3s comet trail paints visible
+    // S-curves (the first attempt used 11s/5s periods: trails stayed straight, user flagged it)
+    var snA = 0.03 * Math.sin(time * 2.35) + 0.015 * Math.sin(time * 4.1 + 0.7);
+    var snB = 0.03 * Math.sin(time * 2.05 + 2.1) + 0.015 * Math.sin(time * 3.6 + 1.4);
     t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.09) + snA;
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081) + snB;
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0) - snB;
@@ -1207,13 +1211,17 @@
             up = fkp - kp;
           var pang = accLineRot + kp * (3.14159 / Kp);
           var pp = (up - 0.5) * 1.7;
-          a.x = accLineX + Math.cos(pang) * pp;
-          a.y = accLineY + Math.sin(pang) * pp;
+          // hub ANCHORED to the central motif (user, twice: the 480p 0:39-0:45 fan rotates
+          // around the CENTRE MOTIF, not free-floating) + bright enough to actually register
+          var phx = a.q2 !== undefined ? a.q2 : 0.5,
+            phy = a.q3 !== undefined ? a.q3 : 0.5;
+          a.x = phx + Math.cos(pang) * pp;
+          a.y = phy + Math.sin(pang) * pp;
           var hp = (a.q8 || 0) + 0.2;
-          a.r = orbCol(hp, 0) * 0.6 * accVis;
-          a.g = orbCol(hp, 0.33) * 0.6 * accVis;
-          a.b = orbCol(hp, 0.67) * 0.6 * accVis;
-          a.a = (up < 0.03 ? 0 : 0.38) * accVis;
+          a.r = orbCol(hp, 0) * 0.75 * accVis;
+          a.g = orbCol(hp, 0.33) * 0.75 * accVis;
+          a.b = orbCol(hp, 0.67) * 0.75 * accVis;
+          a.a = (up < 0.03 ? 0 : 0.5) * accVis;
           return a;
         }
         if (accLine === 1 && accLineEnv > 0.01) {
@@ -1283,11 +1291,14 @@
     // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
     // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
     preset.waves[3] = {
+      // LINE mode (usedots was a dead end: a dot renders as a fixed ~2px point at any
+      // resolution, so beads could never read solid — user flagged "tiny" three times).
+      // Every bead is now a small RING OUTLINE traced by consecutive samples.
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1,
         samples: 80,
         additive: 1,
-        usedots: 1,
+        usedots: 0,
         scaling: 1,
         smoothing: 0.0,
         thick: 1,
@@ -1297,21 +1308,31 @@
       frame_eqs: passthrough,
       point_eqs: function (a) {
         if (Math.abs((a.q29 || 0) - 3) < 0.5) {
-          // CORRIDOR ring-dot row (unchanged) — keeps priority over the accessory beads
-          var K = 10,
-            idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
+          // CORRIDOR ring row — 8 rings receding to the VP (line-mode: each bead is a small
+          // circle traced by 10 samples; radius + alpha fade with depth)
+          var K = 8,
+            fkc = (a.sample || 0) * K,
+            ki = Math.floor(fkc),
+            ku = fkc - ki;
+          var idx = ki / (K - 1); // 0 near .. 1 far
           var d = Math.pow(idx, 1.5); // foreshorten toward the vanishing point
           var nearX = 0.16,
             nearY = 0.52,
             vpx = 0.82,
             vpy = 0.49;
-          a.x = nearX + (vpx - nearX) * d;
-          a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+          var rr3 = 0.02 * (1 - 0.62 * idx); // ring shrinks with depth
+          var ra3 = ku * 6.2832;
+          a.x = nearX + (vpx - nearX) * d + Math.cos(ra3) * rr3;
+          a.y =
+            nearY +
+            (vpy - nearY) * d +
+            0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0) +
+            Math.sin(ra3) * rr3 * 1.6;
           var h = a.q8 || 0;
           a.r = orbCol(h, 0);
           a.g = orbCol(h, 0.33);
           a.b = orbCol(h, 0.67);
-          a.a = 0.9 * (1 - idx * 0.72); // fade with depth → recede
+          a.a = ku < 0.1 ? 0 : 0.9 * (1 - idx * 0.72); // hide ring-to-ring connector; recede
           return a;
         }
         // ACCESSORY BEADS — marching bead row / caterpillar chain (the original's recurring
@@ -1324,10 +1345,10 @@
           a.a = 0;
           return a;
         }
-        var B = 6, // fewer, BIGGER beads (user twice: "still tiny") — 13 dots each read solid
+        var B = 6,
           fkb = (a.sample || 0) * B,
           bi = Math.floor(fkb),
-          di = Math.floor((fkb - bi) * 13); // 13 dots per bead: 0 centre · 1-4 inner · 5-12 outer
+          du = fkb - bi; // position around this bead's RING (13 samples trace the circle)
         var bt = (bi / B + (accDotsPhase % 1) + 1) % 1; // travel along the rail, wrapping
         var bxc, byc;
         if (accDots === 1) {
@@ -1349,19 +1370,16 @@
         var pop =
           Math.max(0, (a.q32 || 1) - 1.1) *
           (Math.sin(bi * 7.31 + accDotsPhase * 11.0) > 0.72 ? 1 : 0);
-        var lyr = di === 0 ? 0 : di < 5 ? 1 : 2, // cluster layer of this dot
-          lyrR = lyr === 0 ? 0 : lyr === 1 ? 0.004 : 0.008, // tight — layers overlap into a solid orb
-          lyrA = lyr === 1 ? (di - 1) / 4 : (di - 5) / 8;
-        var ringR = lyrR * (1 + 0.5 * pop);
-        var ringA = lyrA * 6.2832 + bi * 0.7;
+        var ringR = 0.016 * (1 + 0.5 * pop); // ≈1/3 orb radius (user: beads read far too small)
+        var ringA = du * 6.2832;
         a.x = bxc + Math.cos(ringA) * ringR;
-        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the beads read round
+        a.y = byc + Math.sin(ringA) * ringR * 1.6; // ≈aspect correction so the rings read round
         var hb2 = (a.q8 || 0) + accDotsHue;
-        var bri2 = (0.8 + 0.5 * pop) * accVis * (lyr === 2 ? 0.75 : 1); // soft rim, hot core
+        var bri2 = (0.85 + 0.5 * pop) * accVis;
         a.r = Math.min(1, orbCol(hb2, 0) * bri2);
         a.g = Math.min(1, orbCol(hb2, 0.33) * bri2);
         a.b = Math.min(1, orbCol(hb2, 0.67) * bri2);
-        a.a = 0.95 * accVis;
+        a.a = du < 0.1 ? 0 : 0.95 * accVis; // hide bead-to-bead connector
         return a;
       },
     };
