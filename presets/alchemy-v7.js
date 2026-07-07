@@ -1181,10 +1181,12 @@
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
-  // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2
+  // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
+  // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
+  // the near-identical ray-star family (1/2/8/10) drops from 6 to 5 shares of the bag.
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1, 17, 17, 18,
-    18,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
+    18, 18,
   ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
