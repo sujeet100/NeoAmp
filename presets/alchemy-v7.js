@@ -412,8 +412,15 @@
   // STAR-NET — crisp straight-line star-polygon mandala (the clean 12-point star, A_95). N diameter
   // lines through centre with a small live-waveform jag → a clean star, folds into a mandala.
   function fStarNet(a) {
+    // TRUE chromatic doubling (D8, doc 14a Step 2): the ref draws the SAME stroke as 2 RGB-offset
+    // copies (red/blue channel split), NOT two adjacent hues on alternating arms. Split the samples
+    // into TWO contiguous half-density passes — each re-traces the FULL star, offset ±δ along the
+    // ray normal — so you get two clean coherent copies (a chromatic fringe), never a serrated weave.
+    var samp = a.sample || 0;
+    var copy = samp < 0.5 ? 0 : 1;
+    var cs = copy ? (samp - 0.5) * 2 : samp * 2; // 0..1 within each copy
     var N = 6,
-      fk = (a.sample || 0) * N,
+      fk = cs * N,
       seg = Math.floor(fk),
       u = fk - seg,
       s = u * 2 - 1;
@@ -424,14 +431,23 @@
     var jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.2;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th);
-    a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th);
-    // chromatic doubling (the ref draws its stars twice in offset hues): alternate rays duo
-    var h = (a.q8 || 0) + 0.18 + (seg & 1 ? 0.35 : 0);
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+    var delta = 0.0022 * (copy ? 1 : -1); // ~3px separation → a chromatic edge, not two stars
+    a.x = cx + s * len * Math.cos(th) - jag * Math.sin(th) + delta * -Math.sin(th);
+    a.y = cy + s * len * Math.sin(th) + jag * Math.cos(th) + delta * Math.cos(th);
+    var h = (a.q8 || 0) + 0.18; // base hue on the shared q8 clock → analogous/muted, not neon
+    var cr = orbCol(h, 0),
+      cg = orbCol(h, 0.33),
+      cb = orbCol(h, 0.67);
+    if (copy) {
+      a.r = cr * 0.6;
+      a.g = cg;
+      a.b = Math.min(1, cb * 1.4); // blue-lean copy
+    } else {
+      a.r = Math.min(1, cr * 1.4);
+      a.g = cg;
+      a.b = cb * 0.6; // red-lean copy
+    }
+    if (u < 0.02 || Math.abs(samp - 0.5) < 0.01) a.a = 0; // hide ray jumps + the copy-to-copy seam
     return a;
   }
   // URCHIN — all 512 live-waveform samples form a spiky rosette whose spike LENGTH is the amplitude.
@@ -617,10 +633,16 @@
   // 12-POINT STAR MANDALA (survey gap, 1:33): a {12/5} star polygon — finer/higher-order than the 6-arm
   // star-net. Pairs with the bullseye bg (q29=7) for the "12-point star over a bullseye iris" look.
   function f12Star(a) {
+    // TRUE chromatic doubling (D8, doc 14a Step 2): two contiguous half-density copies of the SAME
+    // {12/5} star, each offset ±δ along the chord normal, red-lean vs blue-lean — a clean chromatic
+    // fringe, not a serrated per-point weave.
+    var samp = a.sample || 0;
+    var copy = samp < 0.5 ? 0 : 1;
+    var cs = copy ? (samp - 0.5) * 2 : samp * 2;
     var P = 12,
       stride = 5,
       CH = 12,
-      fk = (a.sample || 0) * CH,
+      fk = cs * CH,
       seg = Math.floor(fk),
       u = fk - seg;
     var i0 = (seg * stride) % P,
@@ -641,15 +663,27 @@
     var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.15; // SOFTENED: clean star points (was 0.5 → toothed/gear-like)
     px += (-dyc / ln) * jag;
     py += (dxc / ln) * jag;
+    var nX = -dyc / ln,
+      nY = dxc / ln,
+      delta = 0.0022 * (copy ? 1 : -1); // ~3px separation along the chord normal
+    var h = (a.q8 || 0) + 0.1; // base hue on the shared q8 clock (analogous/muted, not neon)
+    var cr = orbCol(h, 0),
+      cg = orbCol(h, 0.33),
+      cb = orbCol(h, 0.67);
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + px;
-    a.y = cy + py;
-    var h = (a.q8 || 0) + 0.1 + (seg & 1 ? 0.35 : 0); // chromatic doubling like the ref's red/blue star copies
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+    a.x = cx + px + nX * delta;
+    a.y = cy + py + nY * delta;
+    if (copy) {
+      a.r = cr * 0.6;
+      a.g = cg;
+      a.b = Math.min(1, cb * 1.4); // blue-lean copy
+    } else {
+      a.r = Math.min(1, cr * 1.4);
+      a.g = cg;
+      a.b = cb * 0.6; // red-lean copy
+    }
+    if (u < 0.02 || Math.abs(samp - 0.5) < 0.01) a.a = 0; // hide chord jumps + copy-to-copy seam
     return a;
   }
   // BEADED ORB-CHAIN (survey gap, 0:06 / 1:42): a row of DISCRETE small ring-beads along a slowly-rotating
