@@ -450,12 +450,21 @@
     if (u < 0.02 || Math.abs(samp - 0.5) < 0.01) a.a = 0; // hide ray jumps + the copy-to-copy seam
     return a;
   }
+  // D6 filament CRIMP (doc 11a Step 1): a STATIC transverse wavelet (~10-14px, ~10 cycles along a
+  // strand) + LIVE audio jitter concentrated at the TIPS (u^2). Returns an angular offset to add to
+  // `ang` at radius `rr` (transverse offset = rr·dAng ⇒ dAng = dPerp/rr). Static texture is a fixed
+  // sin(arc-length), NOT audio-driven; only the tip jitter is live (alc-waveform-rule-scope).
+  function alcCrimp(u, rr, value1) {
+    var dPerp = 0.005 * Math.sin(u * 62.832) + (value1 || 0) * 0.012 * (u * u);
+    return dPerp / Math.max(rr, 0.05);
+  }
   // URCHIN — all 512 live-waveform samples form a spiky rosette whose spike LENGTH is the amplitude.
   function fUrchin(a) {
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     var sc = a.q5 || 0.4;
     var rad = sc * (0.2 + 0.65 * Math.abs(a.value1 || 0));
+    rad += 0.004 * Math.sin((a.sample || 0) * 70.0); // D6 crimp: fine radial ripple on the contour
     var ang = (a.sample || 0) * 6.2832 + (a.q9 || 0);
     a.x = cx + rad * Math.cos(ang);
     a.y = cy + rad * Math.sin(ang);
@@ -615,6 +624,7 @@
     var len = R * (0.22 + 0.22 * Math.abs(a.value1 || 0)); // short filament, live-audio length
     var ang = h0 + (a.q9 || 0) + u * 0.9; // curls tangentially along its length (swirl)
     var rr = r0 + len * u;
+    ang += alcCrimp(u, rr, a.value1); // D6 crimp/wavelet texture + tip jitter
     var x = Math.cos(ang) * rr,
       y = Math.sin(ang) * rr;
     var tilt = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin((a.q9 || 0) * 1.7)); // 0.30-0.65: stays a tilted disc
@@ -824,6 +834,7 @@
     // curl direction alternates per filament -> FUZZY fluff, not a coherent swirl donut
     var ang = h0 + (a.q9 || 0) * 0.6 + u * 1.0 * (seg & 1 ? 1 : -1);
     var rr = r0 + len * u;
+    ang += alcCrimp(u, rr, a.value1); // D6 crimp/wavelet texture + tip jitter
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + Math.cos(ang) * rr;

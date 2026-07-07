@@ -1696,7 +1696,10 @@ function alcAnemone(spikes, colorize) {
         r = innerR + spikeLen * (1 - u);
         onSide = 1;
       }
-      if (onSide) ang += (samp * jag) / Math.max(r, 0.08); // live waveform makes the slanted EDGES jagged (the "sound wave")
+      // live waveform makes the slanted EDGES jagged (the "sound wave"), PLUS a D6 static crimp
+      // wavelet (doc 11a Step 1): a fixed regular ripple along the edge so filaments read as
+      // crimped wavelets, not smooth spokes (transverse offset ÷r ⇒ angular).
+      if (onSide) ang += (samp * jag + 0.004 * Math.sin(f * 160.0)) / Math.max(r, 0.08);
       ang += twist * (r - innerR); // vortex shear: outer parts lean more
       a.x = hx + r * Math.cos(ang);
       a.y = hy + r * Math.sin(ang);
