@@ -806,22 +806,70 @@
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
   function fSpiro(a) {
     var s = a.sample || 0;
-    var th = s * 6.2832 + spiroRot; // one full sweep = the whole flower
-    var k = spiroK; // 12 in step 1; per-stamp 10-14 later
-    var hole = 0.14; // hollow centre (h1: dark ellipse hole)
-    var petal = Math.abs(Math.sin(th * k * 0.5)); // k rose lobes
+    var k = spiroK; // 10-14 lotus/medallion · 14-16 crown points · 8-10 wheel spokes (per stamp)
     var R = (a.q5 || 0.4) * 0.9;
-    var r = R * (hole + (1 - hole) * petal);
-    r += (a.value1 || 0) * (a.q6 || 0.05) * 0.9; // live wobble re-arranges per frame (p0 PASS)
+    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.9; // live wobble re-arranges per frame (p0 PASS)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var th, r;
+    var hueOff = 0; // per-variant hue offset (only the lotus takes the alternating-petal duo)
+    var kill = false; // hide a single connector seam where a variant splits the sample sweep
+    if (spiroVar === 1) {
+      // 1 LACE-CROWN STAR (p0 35.3): narrow diamond points around a rim; single pale hue —
+      // let the additive stroke + tone-map make it pale, do NOT force white.
+      th = s * 6.2832 + spiroRot;
+      r = R * (0.38 + 0.62 * Math.pow(Math.abs(Math.sin(th * k * 0.5)), 2.6)) + wob; // hole 0.38
+    } else if (spiroVar === 2) {
+      // 2 SUN MEDALLION (p0 49.8): wavy-ray ring (s<0.8) + a small inner star (s>=0.8). The
+      // "dark core star" reads dark by OMISSION — an additive wave can't paint dark, so the small
+      // inner star over the empty annulus + dark ground gives the eye the core.
+      if (s < 0.8) {
+        th = (s / 0.8) * 6.2832 + spiroRot;
+        r = R * (0.78 + 0.14 * Math.sin(th * k + spiroRot * 2)) + wob;
+      } else {
+        th = ((s - 0.8) / 0.2) * 6.2832 + spiroRot;
+        r = R * 0.22 * (0.6 + 0.4 * Math.abs(Math.sin(th * 4))) + wob * 0.4;
+      }
+      if (Math.abs(s - 0.8) < 0.01) kill = true; // hide the ring→inner-star seam
+    } else if (spiroVar === 3) {
+      // 3 WREATH-BALL (h1 M5): overlapping-chord scribble annulus; drifting phases + feedback
+      // ghosts build the overlapping-chord torus (ring ~35%, hole ~12%). No beads (A8).
+      th = s * 6.2832 + spiroRot;
+      r =
+        R *
+          (0.85 +
+            0.13 *
+              (Math.sin(th * 7.3 + spiroRot * 3) + 0.6 * Math.sin(th * 11.7 - spiroRot * 2)) *
+              0.5) +
+        wob;
+    } else if (spiroVar === 4) {
+      // 4 FERRIS WHEEL (p0 54.5): wreath-ish ring (s<0.6) + 9 spokes hub→rim→hub (s>=0.6). The
+      // out-and-back keeps r continuous at the hub (no alpha between spokes); the bright hub is
+      // the FREE additive pileup of 9 spoke-ends — do not add a glow.
+      if (s < 0.6) {
+        th = (s / 0.6) * 6.2832 + spiroRot;
+        r = R * (0.85 + 0.06 * Math.sin(th * 7.3 + spiroRot * 3)) + wob * 0.6; // gentler wobble
+      } else {
+        var u = (s - 0.6) / 0.4;
+        var j = Math.floor(u * 9),
+          v = u * 9 - j;
+        th = (j / 9) * 6.2832 + spiroRot;
+        r = R * (v < 0.5 ? v * 2 : 2 - 2 * v);
+      }
+      if (Math.abs(s - 0.6) < 0.01) kill = true; // hide only the ring→spokes seam
+    } else {
+      // 0 LOTUS LOOPS (default, step 1): k rose lobes from a hollow centre; two-tone petal duo.
+      th = s * 6.2832 + spiroRot;
+      r = R * (0.14 + 0.86 * Math.abs(Math.sin(th * k * 0.5))) + wob;
+      hueOff = Math.floor(s * k) & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
+    }
     a.x = cx + r * Math.cos(th);
     a.y = cy + r * Math.sin(th) * spiroTilt; // 1.0 until step 3
-    var pi2 = Math.floor(s * k); // petal index
-    var h = (a.q8 || 0) + spiroHue + (pi2 & 1 ? 0.38 : 0); // alternating-petal DUO (h1 two-tone)
+    var h = (a.q8 || 0) + spiroHue + hueOff;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
+    if (kill) a.a = 0;
     return a;
   }
   // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
@@ -1066,6 +1114,32 @@
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
     t.q11 = focusAmt; // COMP pupil + anemone squash
+
+    // ── SPIRO per-stamp re-roll (doc 08 A1; p0 burst_54: consecutive stamps alternate
+    //    wreath<->star<->wheel, ~1-2s cadence ~= beat groups; h1: feathery ghosting = slight
+    //    rotation between stamps). Debug gotcha: __ALC_FORCE overrides q30 AFTER frame() (below),
+    //    so honour it here too or a pinned self-render never re-rolls variants. ──
+    var mEff = mCur;
+    if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
+      mEff = Math.floor(window.__ALC_FORCE.q30 + 0.5);
+    if (mEff === 17) {
+      if (spiroNext < 0) spiroNext = time; // first entry: stamp immediately
+      if (time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
+        var pv = spiroVar;
+        while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 5); // always a DIFFERENT one
+        spiroK =
+          spiroVar === 1
+            ? 14 + Math.floor(Math.random() * 3) // crown 14-16 points
+            : spiroVar === 4
+              ? 8 + Math.floor(Math.random() * 3) // wheel 8-10 spokes
+              : 10 + Math.floor(Math.random() * 5); // lotus/medallion 10-14
+        spiroRot += 0.25 + Math.random() * 0.5; // slight rotation between stamps (feathery ghosts)
+        spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
+        spiroNext = time + 1.0 + Math.random() * 1.0; // ~1-2s cadence
+      }
+    } else {
+      spiroNext = -1;
+    }
 
     // ── ORBS + TETHER — wide diagonal pair joined by a jagged waveform line (the Dance signature, A_93/
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──
