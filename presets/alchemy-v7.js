@@ -801,6 +801,29 @@
     if (u < 0.04) a.a = 0;
     return a;
   }
+  // SPIROGRAPH PETAL FLOWER family (480p 27.5-30/35.3/49.8/51-56 · 1080p 83.5-86 · A1):
+  // k petal LOOPS traced as ONE closed stroke from a hollow centre; construction identity
+  // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
+  function fSpiro(a) {
+    var s = a.sample || 0;
+    var th = s * 6.2832 + spiroRot; // one full sweep = the whole flower
+    var k = spiroK; // 12 in step 1; per-stamp 10-14 later
+    var hole = 0.14; // hollow centre (h1: dark ellipse hole)
+    var petal = Math.abs(Math.sin(th * k * 0.5)); // k rose lobes
+    var R = (a.q5 || 0.4) * 0.9;
+    var r = R * (hole + (1 - hole) * petal);
+    r += (a.value1 || 0) * (a.q6 || 0.05) * 0.9; // live wobble re-arranges per frame (p0 PASS)
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + r * Math.cos(th);
+    a.y = cy + r * Math.sin(th) * spiroTilt; // 1.0 until step 3
+    var pi2 = Math.floor(s * k); // petal index
+    var h = (a.q8 || 0) + spiroHue + (pi2 & 1 ? 0.38 : 0); // alternating-petal DUO (h1 two-tone)
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
   // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
   // + tri-mandala (15) + dandelion fluff ball (16).
   // ROSE/ROTLINE removed (user-rejected). fNet is the DELIBERATE woven net. Radial-tunnel DEPTH = q29=2.
@@ -822,12 +845,30 @@
     fMountains,
     fTriMandala,
     fFluffBall,
+    fSpiro, // id 17 (doc 08 A1; first new-motif doc to land → MODES.length was 17)
   ];
   // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle/fluff) pile up → lower alpha; outlines keep more.
   var MODE_ALPHA = [
     // jelly (9) 0.6→0.34: the furry-disc rework packs 64 filaments into a compact disc —
     // at the old alpha the additive pileup blew the core to white
-    0.5, 0.6, 0.54, 0.7, 0.74, 0.74, 0.7, 0.45, 0.5, 0.34, 0.62, 0.82, 0.72, 0.5, 0.66, 0.66, 0.36,
+    0.5,
+    0.6,
+    0.54,
+    0.7,
+    0.74,
+    0.74,
+    0.7,
+    0.45,
+    0.5,
+    0.34,
+    0.62,
+    0.82,
+    0.72,
+    0.5,
+    0.66,
+    0.66,
+    0.36,
+    0.58, // spiro (17): k lobes converge at the hub → additive pileup; below the 12-star's 0.62
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
@@ -915,13 +956,21 @@
     resting = false,
     breathNext = -1,
     restAmt = 0;
+  // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
+  // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
+  var spiroVar = 0, // 0 lotus · 1 crown · 2 medallion · 3 wreath · 4 ferris
+    spiroK = 12, // petal/point/spoke count (per-stamp within a variant's range)
+    spiroRot = 0, // per-stamp rotation snap (feathery ghosting)
+    spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
+    spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
+    spiroNext = -1; // next stamp time (-1 = not entered)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1, 17, 17,
   ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
