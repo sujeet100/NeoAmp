@@ -1366,6 +1366,24 @@
       var F = window.__ALC_FORCE;
       for (var fk in F) t[fk] = F[fk];
     }
+
+    // ── COCOON EYES (doc 09 A2): both orb anchors live INSIDE the cage, ~0.07 UV each side of
+    //    centre. Placed AFTER the __ALC_FORCE hook so it keys off the EFFECTIVE t.q30 — a q30 pin
+    //    exercises the eyes too (couplings keyed off mCur earlier stay dead under a pin). ──
+    var cocEff = Math.floor((t.q30 || 0) + 0.5);
+    cocAmt += ((cocEff === COCOON_ID ? 1 : 0) - cocAmt) * Math.min(1, dt * 0.6);
+    if (cocAmt > 0.01) {
+      var ca = cocAmt * (1 - corridorAmt); // never fight the corridor override
+      var eAng = 0.2 + cocAng * 0.3; // near-horizontal "eyes", per-stamp jitter
+      var ex = 0.07 * Math.cos(eAng),
+        ey = 0.07 * Math.sin(eAng);
+      t.q21 += (t.q2 + ex - t.q21) * ca;
+      t.q22 += (t.q3 + ey - t.q22) * ca;
+      t.q23 += (t.q2 - ex - t.q23) * ca;
+      t.q24 += (t.q3 - ey - t.q24) * ca;
+      t.q25 = Math.max(t.q25, 0.9 * ca); // both eyes present for the ball's life
+      t.q14 = Math.max(t.q14, 0.9 * ca);
+    }
     return t;
   }
 
@@ -1509,7 +1527,9 @@
         var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
         var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // flashes on the beat
         var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
-        a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor);
+        // COCOON (doc 09 A2): suppress the tether while the eyes sit inside the cage — the refs
+        // show no line between the eyes. cocAmt is closure state, readable here like accLine.
+        a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor) * (1 - 0.85 * cocAmt);
         return a;
       },
     };
