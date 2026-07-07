@@ -954,7 +954,7 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    a.a = kill ? 0 : bandA;
+    a.a = kill ? 0 : bandA * (0.45 + 0.55 * cocEnv); // fresh stamp crisp; thins over its ghost
     return a;
   }
   // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
@@ -1372,6 +1372,21 @@
     //    exercises the eyes too (couplings keyed off mCur earlier stay dead under a pin). ──
     var cocEff = Math.floor((t.q30 || 0) + 0.5);
     cocAmt += ((cocEff === COCOON_ID ? 1 : 0) - cocAmt) * Math.min(1, dt * 0.6);
+    // ── STAMP cadence (A2): audio-gated FULL topology re-roll + crisp-over-ghost envelope.
+    //    r0: crisp stamp every ~0.2-0.3s busy; p1: topology stable ~1s calm. ──
+    if (cocEff === COCOON_ID) {
+      var dueMin = time - cocStampT > 0.25; // r0: 0.2-0.3s busy cadence
+      if ((f > 0.6 && dueMin) || time - cocStampT > 1.2) {
+        // p1: topology ~1s calm
+        cocStampT = time;
+        cocSeed = Math.random() * 1000; // full re-randomize (r0)
+        cocAng = (Math.random() - 0.5) * 0.8;
+        cocSizeMul = 0.8 + Math.random() * 0.45; // dia range 25-38%
+        if (Math.random() < 0.4)
+          cocHue += (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.14); // hue step ~1.5-2s
+      }
+      cocEnv = Math.exp(-(time - cocStampT) * 2.2); // fresh crisp → thins to a few live arms
+    }
     if (cocAmt > 0.01) {
       var ca = cocAmt * (1 - corridorAmt); // never fight the corridor override
       var eAng = 0.2 + cocAng * 0.3; // near-horizontal "eyes", per-stamp jitter
