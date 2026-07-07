@@ -872,6 +872,91 @@
     if (kill) a.a = 0;
     return a;
   }
+  // MESH COCOON / NET-BALL / dreamcatcher (480p 8.5-15.5/59.6 · 19s clip 0-8 · p2 157 · A2):
+  // a closed rounded wire CAGE — wobbly RIM + concentric inner rings + spokes + hooked rim spikes —
+  // re-stamped over its own feedback ghost with per-frame node jitter and (step 3+) per-stamp
+  // topology re-roll. DISTINCT from mode 7's open sheet and mode 13's tangle. Two orbs sit inside
+  // like eyes (step 2). Step 4 adds crumple-cocoon + geodesic-sphere flavours.
+  function cocHash(n) {
+    var x = Math.sin(n * 127.1 + cocSeed) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function cocRimR(i, R) {
+    return R * (1 + (cocHash(i) - 0.5) * 0.24); // crumpled rim node radius (cells 8-60px)
+  }
+  function fCocoon(a) {
+    var s = a.sample || 0;
+    var R = (a.q5 || 0.4) * 0.38 * cocSizeMul; // ball radius → dia ~25-38% of frame
+    var rock = (a.q9 || 0) * 0.15 + cocAng; // slow ~5°/s rocking + per-stamp angle (no translation)
+    var live = (a.value1 || 0) * (a.q6 || 0.05) * 0.5; // per-frame LIVE node jitter; topology stable
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var ang = 0,
+      r = 0,
+      hueSel = 0,
+      bandA = 0.85,
+      kill = false;
+    if (s < 0.22) {
+      // RIM — one closed wobbly loop, 14 nodes (pentagon/hex-facet read)
+      var u = s / 0.22,
+        fk = u * 14,
+        i = Math.floor(fk),
+        fr = fk - i;
+      var ra = cocRimR(i, R),
+        rb = cocRimR((i + 1) % 14, R);
+      r = ra + (rb - ra) * fr + live;
+      ang = ((i + fr) / 14) * 6.2832 + rock;
+      hueSel = i & 1;
+    } else if (s < 0.5) {
+      // 2 concentric inner rings (r = 0.62R outer, 0.34R inner), 10 nodes each — the 0.34R ring
+      // leaves the dark "mouth" hole; the hub is never filled.
+      var u2 = (s - 0.22) / 0.28,
+        ringSel = u2 < 0.5 ? 0 : 1;
+      var uu = ringSel ? (u2 - 0.5) * 2 : u2 * 2;
+      var baseR = ringSel ? 0.34 * R : 0.62 * R;
+      var fk2 = uu * 10,
+        j2 = Math.floor(fk2),
+        fr2 = fk2 - j2;
+      var jitA = baseR * (1 + (cocHash(j2 + ringSel * 20) - 0.5) * 0.18);
+      var jitB = baseR * (1 + (cocHash(((j2 + 1) % 10) + ringSel * 20) - 0.5) * 0.18);
+      r = jitA + (jitB - jitA) * fr2 + live;
+      ang = ((j2 + fr2) / 10) * 6.2832 + rock;
+      hueSel = j2 & 1;
+      if (Math.abs(u2 - 0.5) < 0.01) kill = true; // hide the outer→inner ring seam
+    } else if (s < 0.86) {
+      // 12 SPOKES — inner ring (0.34R) out to a rim node (the wagon-wheel read)
+      var u3 = (s - 0.5) / 0.36,
+        fk3 = u3 * 12,
+        k3 = Math.floor(fk3),
+        fr3 = fk3 - k3;
+      var rIn = 0.34 * R,
+        rOut = cocRimR(k3 % 14, R);
+      r = rIn + (rOut - rIn) * fr3 + live;
+      ang = (k3 / 12) * 6.2832 + rock;
+      hueSel = k3 & 1; // alternate spokes take the 2nd strand hue
+      bandA = 0.7;
+      if (fr3 < 0.02) kill = true; // hide the jump between spokes
+    } else {
+      // 12 short hooked SPIKES outward from rim nodes (tip kink ~0.25 rad)
+      var u4 = (s - 0.86) / 0.14,
+        fk4 = u4 * 12,
+        k4 = Math.floor(fk4),
+        fr4 = fk4 - k4;
+      r = cocRimR(k4 % 14, R) + R * 0.18 * fr4 + live;
+      ang = (k4 / 12) * 6.2832 + rock + 0.25 * fr4; // hooked tip
+      hueSel = k4 & 1;
+      bandA = 0.9;
+      if (fr4 < 0.02) kill = true; // hide the jump between spikes
+    }
+    a.x = cx + r * Math.cos(ang);
+    a.y = cy + r * Math.sin(ang);
+    var h = (a.q8 || 0) + cocHue + (hueSel ? 0.3 : 0); // two strand hues at once (r0)
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    a.a = kill ? 0 : bandA;
+    return a;
+  }
   // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
   // + tri-mandala (15) + dandelion fluff ball (16).
   // ROSE/ROTLINE removed (user-rejected). fNet is the DELIBERATE woven net. Radial-tunnel DEPTH = q29=2.
@@ -894,7 +979,11 @@
     fTriMandala,
     fFluffBall,
     fSpiro, // id 17 (doc 08 A1; first new-motif doc to land → MODES.length was 17)
+    fCocoon, // id 18 (doc 09 A2)
   ];
+  // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
+  // below all gate on this id, so it stays correct whatever else appends.
+  var COCOON_ID = MODES.indexOf(fCocoon);
   // ADDITIVE dense modes (anemone/urchin/net/vortex/jelly/tangle/fluff) pile up → lower alpha; outlines keep more.
   var MODE_ALPHA = [
     // jelly (9) 0.6→0.34: the furry-disc rework packs 64 filaments into a compact disc —
@@ -917,6 +1006,7 @@
     0.66,
     0.36,
     0.58, // spiro (17): k lobes converge at the hub → additive pileup; below the 12-star's 0.62
+    0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
@@ -1012,13 +1102,25 @@
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
+  // MESH COCOON per-stamp state (doc 09 A2) — fCocoon + the frame-side eye/stamp blocks read these;
+  // no q-var (all 32 taken; no shader wants cocoon state).
+  var cocSeed = 0, // hash seed → node graph; re-rolled per stamp (step 3)
+    cocStampT = 0, // last stamp time
+    cocEnv = 1, // crisp-over-ghost envelope (step 3; 1 = full crisp)
+    cocAmt = 0, // eye-anchor lerp amount (step 2)
+    cocHue = 0, // strand hue step (step 3)
+    cocAng = 0, // per-stamp rocking-angle offset
+    cocElong = 1, // crumple-cocoon elongation (step 4)
+    cocSizeMul = 1, // per-stamp size (step 3; dia 25-38%)
+    cocFlavour = 0; // 0 dreamcatcher · 1 crumple-cocoon · 2 geodesic sphere (step 4)
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1, 17, 17,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 1, 17, 17, 18,
+    18,
   ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
