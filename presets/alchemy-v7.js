@@ -1135,6 +1135,9 @@
               : 10 + Math.floor(Math.random() * 5); // lotus/medallion 10-14
         spiroRot += 0.25 + Math.random() * 0.5; // slight rotation between stamps (feathery ghosts)
         spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
+        // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
+        // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
+        spiroTilt = Math.random() < 0.6 ? 1.0 : 0.5 + Math.random() * 0.2;
         spiroNext = time + 1.0 + Math.random() * 1.0; // ~1-2s cadence
       }
     } else {
