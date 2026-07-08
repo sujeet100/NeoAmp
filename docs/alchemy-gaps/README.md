@@ -122,6 +122,25 @@ land only after their question is answered; **doc 17 is LAST, behind explicit si
 
 ## Consolidated questions for the user
 
+> **★ ALL ANSWERED (2026-07-08, interactive session — every answer = the recommended option).**
+> No engine step is question-gated any more. The decisions:
+> **1** YES per-scene trail-pan variations (snap-pan stays default) · **2** SKIP terrain re-tint
+> (never recolour the buffer) · **3** YES+YES — landed (tether events + stop/bloom handoff,
+> doc 03 complete 2026-07-08) · **4** YES motif may leave the frame 3–7s in deep rests + YES
+> starvation outro · **5** YES rare hard wipes (~1/20–25s, tether+orbs preserved) · **6** YES
+> one-hot-accent policy (emit-side only) · **7** YES wash-gated 3–6s stains · **8** SKIP
+> pearl-chain tether (bead territory) · **9** YES pin orbs to rail endpoints for the rail's
+> life · **10** RING-ONLY column stacks · **11** REPLACE snake-wobble with parked posts + slow
+> slides (judged live) · **12** YES re-land orb radius 0.048 (own commit, judged live) ·
+> **13** Pastel stays muted during kaleido floods (Vivid pops) · **14** YES fold orbs into the
+> kaleido window + wide tether off during folds · **15** (b) pompom rides the persistent rail ·
+> **16** (a) keep the sweep regime, ADD static-strata+injection as a new regime · **17** OK —
+> flat/wedge grounds read darker/flatter as measured · **18** YES the one crimson moth-fan
+> accent · **19** rose-bullseye via doc 07's waves[3] multiplexer (13 depends on 07) · **20**
+> SKIP floor reflections entirely (settles docs 16+17) · **21** REMOVE the valley dolly, KEEP
+> the decay bump · **22** YES extend foreshortening/VP fans (corridor-precedented) · **23** YES
+> contact-shadow ellipse (low priority). _Latent comet-tail default stands (feedback ghost)._
+
 Deduplicated across all docs; each tagged with its doc(s) and a recommendation where given.
 Answer these before the corresponding step lands — an item that touches previously-rejected
 territory ships **only after** its question is answered.
