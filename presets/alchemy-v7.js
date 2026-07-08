@@ -1242,7 +1242,10 @@
     accLinePickT = 0, // pinwheel rotation reference (steady windmill, 480p 0:39-0:45)
     evNextT = 0, // TYPED BEAT-EVENT SCHEDULER (doc 03 B2): earliest next fire
     evTetherT0 = -9, // tether-spawn event birth
-    evTetherLife = 0, // this spawn's life (0.4-2s)
+    evTetherLife = 0, // this spawn's life: 0.4-2s burst, or a LONG 3.5-10s session (user)
+    evTetherDropT0 = -9, // long sessions FLICKER: brief random dropouts (user, vs the original)
+    evTetherDropLen = 0,
+    evTetherDropNext = 0,
     tetherEnv = 0, // tether event envelope (read by waves[2])
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
@@ -1378,21 +1381,33 @@
         evStarHue = 0.15 + Math.random() * 0.35;
         evStarAnchor = Math.random() < 0.7 ? 0 : 1;
       } else if (evPick === "tether") {
-        // TETHER SPAWN (B2; doc 06 refines the anatomy): the refs spawn the tether as a discrete
-        // event every 1-4s with a 0.4-2s life — punctuation, not an every-beat strobe.
+        // TETHER SPAWN (B2; doc 06 refines the anatomy): most spawns are short 0.4-2s bursts;
+        // ~40% open a LONG SESSION (3.5-10s) — the user confirmed the original often keeps the
+        // tether up for a while, with brief random dropouts (the flicker block below).
         evTetherT0 = time;
-        evTetherLife = 0.4 + Math.random() * 1.6;
+        evTetherLife =
+          Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
+        evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
       }
-      evNextT = time + 0.8 + Math.random() * 2.2;
+      evNextT = time + 0.8 + Math.random() * 1.7; // mean gap ~1.65s (was ~1.9 — user: tether too rare)
     }
-    // p0: the tether spawns fully-formed within a frame; the stop is fast — the buffer keeps the ghost
+    // p0: the tether spawns fully-formed within a frame; the stop is fast — the buffer keeps the
+    // ghost. Long sessions FLICKER: brief 0.15-0.6s dropouts at random 0.8-2.6s intervals (user:
+    // "it stays for long, often disappearing briefly every now and then — this is also random").
+    var tethAlive = time < evTetherT0 + evTetherLife;
+    if (tethAlive && time >= evTetherDropNext) {
+      evTetherDropT0 = time;
+      evTetherDropLen = 0.15 + Math.random() * 0.45;
+      evTetherDropNext = time + evTetherDropLen + 0.8 + Math.random() * 1.8;
+    }
+    var tethDrop = time - evTetherDropT0 < evTetherDropLen ? 0 : 1; // abrupt off/on, like the refs
     tetherEnv =
-      time < evTetherT0 + evTetherLife
+      (tethAlive
         ? Math.min(1, (time - evTetherT0) * 12)
-        : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6);
+        : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6)) * tethDrop;
     evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
