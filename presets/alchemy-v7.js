@@ -1224,7 +1224,8 @@
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
     valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
-    freezeAmt = 0; // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
+    freezeAmt = 0, // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
+    sagAmt = 0; // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1651,6 +1652,16 @@
       t.q18 *= 1 - 0.92 * freezeAmt; // near-still (r0: peaks do NOT translate)
       t.q19 *= 1 - 0.92 * freezeAmt;
       t.q16 *= 1 - 0.8 * freezeAmt; // no roll — frozen peaks must not smear rotationally
+    }
+    // DOWN-SAG (field 2): bars/bands scenes stream the trail gently DOWNWARD (h2: 2-3%/s;
+    // p1 rope cascade/stems; p0 S2 sag), replacing the random snap-dir while active.
+    // Sign map (measured): -q19 streams DOWN. Freeze wins; rests stay still.
+    sagAmt += ((bgMode === 4 || bgMode === 6 ? 1 : 0) - sagAmt) * Math.min(1, dt * 0.6);
+    sagAmt *= 1 - freezeAmt;
+    if (sagAmt > 0.01) {
+      var sagRest = 1 - 0.9 * restAmt;
+      t.q18 += (0.0004 * Math.sin(time * 0.13) * sagRest - t.q18) * sagAmt; // trace of lateral waviness (p2 field d)
+      t.q19 += (-0.0022 * sagRest - t.q19) * sagAmt; // ≈0.13 UV/s downward
     }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
