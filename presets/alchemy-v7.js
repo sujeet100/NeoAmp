@@ -1240,7 +1240,10 @@
     accLineY = 0.5,
     accLineDrift = 0,
     accLinePickT = 0, // pinwheel rotation reference (steady windmill, 480p 0:39-0:45)
-    lastHueSnapT = -9, // beat-coupled palette snap limiter (480p 2:56-3:10)
+    evNextT = 0, // TYPED BEAT-EVENT SCHEDULER (doc 03 B2): earliest next fire
+    evTetherT0 = -9, // tether-spawn event birth
+    evTetherLife = 0, // this spawn's life (0.4-2s)
+    tetherEnv = 0, // tether event envelope (read by waves[2])
     accDots = 0, // wave3 slot: 0 none · 1 marching bead row · 2 caterpillar chain
     accDotsNext = -1,
     accDotsPhase = 0,
@@ -1319,13 +1322,28 @@
         hueStep += (0.08 + 0.14 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
       lastBgMode = bgMode;
     }
-    // BEAT-COUPLED palette SNAP (480p 2:56-3:10 + the 19s clip: hues jump within a beat or
-    // two when the music hits — orb/motif/bg all keyed to q8, so the whole palette snaps).
-    // Rate-limited so it reads as musical snaps, not a strobe.
-    if (f > 0.9 && time - lastHueSnapT > 1.2) {
-      hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
-      lastHueSnapT = time;
+    // ── TYPED BEAT-EVENT SCHEDULER (doc 03 B2): at most ONE typed event fires per qualifying
+    //    hit — min gap 0.8s, mean 1.5-3s in busy phases, SILENT in rests (p2 §3.5: no events
+    //    during rests). The old inline hue snap moved in here (same visual rate, now mutually
+    //    exclusive with other events on the same hit). Later docs register more event types. ──
+    if ((f > 0.75 || (FORCE && FORCE.ev !== undefined)) && time >= evNextT && restAmt < 0.5) {
+      var evPick = FORCE && FORCE.ev !== undefined ? FORCE.ev : Math.random() < 0.55 ? "tether" : "hue";
+      if (evPick === "tether") {
+        // TETHER SPAWN (B2; doc 06 refines the anatomy): the refs spawn the tether as a discrete
+        // event every 1-4s with a 0.4-2s life — punctuation, not an every-beat strobe.
+        evTetherT0 = time;
+        evTetherLife = 0.4 + Math.random() * 1.6;
+      } else {
+        // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
+        hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      }
+      evNextT = time + 0.8 + Math.random() * 2.2;
     }
+    // p0: the tether spawns fully-formed within a frame; the stop is fast — the buffer keeps the ghost
+    tetherEnv =
+      time < evTetherT0 + evTetherLife
+        ? Math.min(1, (time - evTetherT0) * 12)
+        : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6);
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
     t.q31 = 0.92 * (1 + 0.1 * (bassA - 1) + 0.2 * pulse); // exposure — gentle smoothed beat lift
@@ -1439,6 +1457,12 @@
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──
     t.q25 = comeGo(0.3 + 0.6 * Math.sin(time * 0.06 + 0.3) + 0.38 * Math.sin(time * 0.027 + 2.2));
     t.q14 = comeGo(0.6 * Math.sin(time * 0.055 + 1.7) + 0.4 * Math.sin(time * 0.026 + 0.4));
+    // DUMBBELL SUMMON (user: "even I did not see the tether in a long time" — the old gate needed
+    // both orbs to HAPPEN to be up on a beat, and alpha scaled by their visibility ramp; the refs
+    // spawn orb-pair + tether TOGETHER as one event, p1 96.05/112.75): a tether event forces its
+    // endpoints fully visible for its life, so every spawn actually reads.
+    t.q25 = Math.max(t.q25, tetherEnv);
+    t.q14 = Math.max(t.q14, tetherEnv);
     var axis = time * 0.05 + 0.6 * Math.sin(time * 0.017);
     var sep = 0.3 + 0.06 * Math.sin(time * 0.037),
       wob = 0.35 * Math.sin(time * 0.043);
@@ -1737,7 +1761,7 @@
       point_eqs: function (a) {
         fTether(a);
         var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
-        var beatG = Math.max(0, Math.min(1, ((a.q32 || 1) - 1.05) / 0.4)); // flashes on the beat
+        var beatG = tetherEnv; // scheduler-driven spawn event (was: every-beat q32 flash)
         var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
         // COCOON (doc 09 A2): suppress the tether while the eyes sit inside the cage — the refs
         // show no line between the eyes. cocAmt is closure state, readable here like accLine.
