@@ -51,6 +51,11 @@
     "  float pang = q16 + q17 * (0.55 / (pr * 2.4 + 0.35));\n" +
     "  float cs = cos(pang), sn = sin(pang);\n" +
     "  pd = mat2(cs, -sn, sn, cs) * pd;\n" +
+    // RADIAL RIPPLE (doc 01 C8, r0 18.6-19.6): hub-centred concentric chevron bands (λ≈5% frame)
+    // sweep outward for ~1s during the rare starburst finale. q13 belongs to the kaleido fold when
+    // q29==1, so the ripple reads it ONLY outside kaleido (the event writer also never fires there).
+    "  float rip = (abs(q29 - 1.0) < 0.5) ? 0.0 : q13;\n" +
+    "  pd *= 1.0 + rip * 0.018 * sin(pr * 125.6 - time * 30.0);\n" +
     // MAGNIFY: q15>0 shrinks the sample offset → the old buffer appears slightly bigger each frame, so
     // every deposit GROWS as it ages (the "traces grow in size before disappearing" note). Small.
     "  pd *= (1.0 - q15);\n" +
@@ -1234,7 +1239,8 @@
     eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
     eyeY = 0.3,
-    eyeOn = false; // upward-crossing tracker for the re-roll
+    eyeOn = false, // upward-crossing tracker for the re-roll
+    rippleT0 = -99; // C8 radial-ripple finale event birth (rare, cooldown ≥75s)
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1702,6 +1708,22 @@
       t.q27 += (eyeY - t.q27) * 0.7 * eyeAmt;
       t.q18 *= 1 - 0.85 * eyeAmt;
       t.q19 *= 1 - 0.85 * eyeAmt;
+    }
+    // C8 RADIAL RIPPLE finale: a RARE ~1s hub-centred buffer ripple on a hard beat (r0 18.6-19.6 —
+    // observed ONCE in 19s, so cooldown ≥75s + probability ≈ once per few minutes). Never under
+    // kaleido (q13 belongs to the fold there; also never observed there). Runs AFTER the fold
+    // block, so the q13 write overrides its 0 only outside kaleido.
+    if (rippleT0 === -99) rippleT0 = time; // first fire only after a full cooldown (climax, not opener)
+    if (FORCE && FORCE.ripple) {
+      rippleT0 = time + 1.5; // debug pin: fire 1.5s from now (deterministic self-render shots)
+      FORCE.ripple = 0;
+    }
+    if (f > 0.95 && bgMode !== 1 && time - rippleT0 > 75 && Math.random() < 0.25) rippleT0 = time;
+    var ripL = (time - rippleT0) / 1.1;
+    if (ripL >= 0 && ripL < 1 && bgMode !== 1) {
+      t.q13 = 0.9 * Math.sin(ripL * 3.14159); // attack+release inside ~1.1s
+      t.q20 += (t.q2 - t.q20) * 0.8; // hub = the motif centre (r0: hub-centred)
+      t.q27 += (t.q3 - t.q27) * 0.8;
     }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
