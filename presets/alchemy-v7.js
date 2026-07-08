@@ -926,12 +926,13 @@
       // NOT a symmetric diamond/kite). Peak ≈1 near edge≈1/3, normalised by 0.385.
       var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
       var halfW = R * 0.22 * wprof; // curved half-width (fat rounded leaf, ~1.6:1)
-      // LIGHTNING rides INSIDE the width envelope as a TEXTURE (Fable): parity-alternation zigzag,
-      // a.value1 drives the amplitude, kept small vs halfW and windowed by wprof so the curved leaf
-      // silhouette always survives and the tip/base stay clean.
-      var alt = Math.round(s * 511) & 1 ? 1 : -1;
-      var amp = 0.012 * (0.6 + 0.9 * ((a.q32 || 1) - 1)); // beat-coupled, ≤ ~0.5×halfW peak
-      var lat = sideSign * (halfW + (a.value1 || 0) * alt * amp * wprof);
+      // ★ MOVING WAVEFORM edges (user): displace each edge by the REAL live waveform a.value1 —
+      // exactly like the tether (value1*q26) and the anemone (value1*jag/r), so the outline FLOWS
+      // and reshapes every frame instead of a fixed sawtooth that only pulses in amplitude. ~40
+      // samples/edge is plenty for the moving look (the anemone uses ~17). Windowed by wprof so the
+      // base lobe + tip stay anchored (curved leaf survives); strong + beat-coupled so it jags hard.
+      var amp = 0.04 * (0.7 + 0.6 * ((a.q32 || 1) - 1));
+      var lat = sideSign * (halfW + (a.value1 || 0) * amp * wprof);
       lox = d * Math.cos(baseAng) - lat * Math.sin(baseAng);
       loy = d * Math.sin(baseAng) + lat * Math.cos(baseAng);
       direct = true;
