@@ -912,6 +912,14 @@
       // and the outline is a LIVE-WAVEFORM lightning stroke whose jag is comparable to the petal
       // half-width, so the silhouette re-arranges every frame (the earlier wprof² window crushed
       // the jag to a static clip-art leaf — the user's "very static" complaint).
+      // ★ THICK bolt via RIBBON weave (user vs the ref screenshot: the original's bolts are CHUNKY,
+      // several px wide — but WebGL lines are 1px and butterchurn 'thick' only adds ±half-pixel
+      // copies). SAME principle as the tether's double-stroke band (b5d852f): thickness = two tight
+      // rails + the stroke constantly crossing the gap to FILL it. The tether affords two separate
+      // strands because its 512 points are dense on one long line; a petal edge only has ~21 points,
+      // so a strand-split reads as two sparse crisp outlines (verified in a self-render). Instead,
+      // ONE stroke alternates consecutive points across the rails — the weave IS the fill, at full
+      // per-edge resolution.
       var fk = s * k,
         pi = Math.floor(fk),
         pu = fk - pi; // petal index + 0..1 within the petal
@@ -938,7 +946,10 @@
       // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
       var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
       var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
-      var lat = sideSign * halfW + (a.value1 || 0) * amp * jw;
+      // ribbon half-width ~0.7% of R-scaled frame (the ref bolt is ~0.8% of frame wide), tapered
+      // toward base/tip but never to zero; parity of the GLOBAL point index flips the rail
+      var ribbon = ((Math.round(s * 512) & 1) * 2 - 1) * R * 0.014 * (0.35 + 0.65 * wprof);
+      var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
       // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
       // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
       // ref's flame-tips instead of wagging sideways only
@@ -947,7 +958,7 @@
       loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
       direct = true;
       hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
-      a.a = 0.45 + 0.55 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
+      a.a = 0.5 + 0.5 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
       if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
     }
     if (direct) {
