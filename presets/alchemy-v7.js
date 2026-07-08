@@ -853,7 +853,7 @@
     var s = a.sample || 0;
     var k = spiroK; // 10-14 lotus/medallion · 14-16 crown points · 8-10 wheel spokes (per stamp)
     var R = (a.q5 || 0.4) * 0.58; // compact — the ref medallion sits ~30-45% of frame, not edge-to-edge
-    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.5; // small radial breathing (perpendicular lightning below is the main jag)
+    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.85; // live radial wobble (doc 08 spec 0.9; 0.5 read static vs the 480p scribble)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     var th, r;
@@ -906,35 +906,45 @@
       }
       if (Math.abs(s - 0.6) < 0.01) kill = true; // hide only the ring→spokes seam
     } else {
-      // 0 LIGHTNING PETAL-STAR (default; user ref image #12): k DISTINCT leaf-LOOPS radiating from
-      // a dark centre hole — each petal = two LIVE-WAVEFORM lightning edges out to a sharp tip and
-      // back. This is the "n-gon rendered with lightning edges" the user described. Each edge zigzags
-      // with the real audio (a.value1), like the tether.
+      // 0 LIGHTNING PETAL-STAR / DAHLIA (default; user ref image #12 · 1080p 83.5-86): k leaf-LOOPS
+      // radiating from a dark centre hole. Measured from the ref frames (2026-07-08): the flower is
+      // NEVER a rigid star — petal lengths are irregular, each petal sways on its own slow clock,
+      // and the outline is a LIVE-WAVEFORM lightning stroke whose jag is comparable to the petal
+      // half-width, so the silhouette re-arranges every frame (the earlier wprof² window crushed
+      // the jag to a static clip-art leaf — the user's "very static" complaint).
       var fk = s * k,
         pi = Math.floor(fk),
         pu = fk - pi; // petal index + 0..1 within the petal
-      var baseAng = (pi / k) * 6.2832 + spiroRot;
+      // per-petal IDENTITY: hashed irregular length, re-seeded per stamp (spiroRot moves per stamp)
+      var ph = Math.sin((pi + 1) * 12.9898 + spiroRot * 57.0) * 43758.5453;
+      ph -= Math.floor(ph);
+      // independent slow sway per petal (~2.3s via the q9 clock) — undulation with no net spin
+      // (continuous spin + feedback = the rejected gear-smear; sway oscillates, so no smear)
+      var sway = 0.07 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
+      var baseAng = (pi / k) * 6.2832 + spiroRot + sway;
       var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
       var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
       var hole = 0.3 * R; // a REAL dark centre hole (Fable: 0.12R piled into a bright knot)
       // ★ COMPRESS / DECOMPRESS (user): the whole flower BREATHES hard with the beat — petals shoot
       // out on hits and retract between, never static. q32 = 1 + 1.3*pulse (smoothed beat carrier).
       var breathe = Math.max(0.28, 0.5 + 0.85 * ((a.q32 || 1) - 1)); // ~0.5 calm → ~1.6 on a hit
-      var d = hole + (R - hole) * breathe * edge; // petal length pulses with the music
-      // ★ CURVED LEAF (user + Fable): asymmetric width profile — sqrt(edge) rounds the BASE into a
-      // convex lobe, (1-edge) closes to a SHARP tip; sides stay convex the whole way (a real leaf,
-      // NOT a symmetric diamond/kite). Peak ≈1 near edge≈1/3, normalised by 0.385.
+      var plen = 0.72 + 0.5 * ph; // irregular per-petal length (ref petals differ visibly)
+      var d = hole + (R * plen - hole) * breathe * edge; // petal length pulses with the music
+      // CURVED LEAF profile kept but slimmer — the live jag below now carries the width/texture
       var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
-      var halfW = R * 0.22 * wprof; // curved half-width (fat rounded leaf, ~1.6:1)
-      // ★ MOVING WAVEFORM edges (user): displace each edge by the REAL live waveform a.value1 —
-      // exactly like the tether (value1*q26) and the anemone (value1*jag/r), so the outline FLOWS
-      // and reshapes every frame instead of a fixed sawtooth that only pulses in amplitude. ~40
-      // samples/edge is plenty for the moving look (the anemone uses ~17). Windowed by wprof so the
-      // base lobe + tip stay anchored (curved leaf survives); strong + beat-coupled so it jags hard.
-      var amp = 0.04 * (0.7 + 0.6 * ((a.q32 || 1) - 1));
-      var lat = sideSign * (halfW + (a.value1 || 0) * amp * wprof);
-      lox = d * Math.cos(baseAng) - lat * Math.sin(baseAng);
-      loy = d * Math.sin(baseAng) + lat * Math.cos(baseAng);
+      var halfW = R * 0.17 * wprof;
+      // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
+      // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
+      // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
+      var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
+      var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
+      var lat = sideSign * halfW + (a.value1 || 0) * amp * jw;
+      // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
+      // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
+      // ref's flame-tips instead of wagging sideways only
+      var dr = d + (a.value1 || 0) * amp * edge;
+      lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
+      loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
       direct = true;
       hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
       a.a = 0.45 + 0.55 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
@@ -1380,6 +1390,13 @@
       if (time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
         var pv = spiroVar;
         while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 5); // always a DIFFERENT one
+        // debug pin (same gotcha as mEff above): a pinned self-render can hold ONE construction
+        if (
+          typeof window !== "undefined" &&
+          window.__ALC_FORCE &&
+          window.__ALC_FORCE.spiroVar !== undefined
+        )
+          spiroVar = window.__ALC_FORCE.spiroVar;
         spiroK =
           spiroVar === 1
             ? 14 + Math.floor(Math.random() * 3) // crown 14-16 points
@@ -1569,7 +1586,7 @@
         additive: 1,
         usedots: 0,
         scaling: 1,
-        smoothing: 0.25,
+        smoothing: 0.15, // near the tether's 0.1 — 0.25 lowpassed the live jag into rounded wobble (dahlia read static)
         thick: 1,
         a: 0.62,
       }),
