@@ -1223,7 +1223,8 @@
     panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
-    valleyAmt = 0; // motif 12 → the green valley corridor (forward dolly into the vanishing point)
+    valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
+    freezeAmt = 0; // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1632,6 +1633,24 @@
       t.q8 += restStampHue * sketchAmt;
       t.q4 = Math.max(t.q4, 0.7 * sketchAmt); // the page ignores the swap machinery's envelopes
       stampGain = time - restStampT0 < 0.3 ? 1 : 0; // crisp blink, then only the fading ghost
+    }
+
+    // ── PER-SCENE TRAIL-DISPLACEMENT FIELDS (doc 01 C2). The refs schedule the feedback warp
+    //    per scene; v7 ran ONE program always. Each field is an eased scene-gated modulation of
+    //    the EXISTING engine channels — emitters never move, only the trail buffer's motion
+    //    character changes. Placed after the sketchbook block (final mCur, current restAmt) and
+    //    before the tunnel-swirl/corridor/valley couplings, which run later and deliberately WIN.
+    //    Priority: freeze > sag; corridor/valley override everything as today. ──
+    // FREEZE (field 1): terrain stamps hold crisp — blur nearly off, longer decay, pan damped
+    // (r0: peaks persist ≥3.5s, NO translation, "q-gated blur"; h2: stamps freeze where drawn).
+    freezeAmt += ((mCur === 14 ? 1 : 0) - freezeAmt) * Math.min(1, dt * 0.6);
+    if (freezeAmt > 0.01) {
+      t.q28 += (0.08 - t.q28) * freezeAmt; // blur ~off → stamps stay crisp
+      t.q1 += (0.974 - t.q1) * freezeAmt; // ghosts live ~4-8s — NOT 1.0 (must still decay, no pileup)
+      t.q15 += (0.0 - t.q15) * freezeAmt; // no growth
+      t.q18 *= 1 - 0.92 * freezeAmt; // near-still (r0: peaks do NOT translate)
+      t.q19 *= 1 - 0.92 * freezeAmt;
+      t.q16 *= 1 - 0.8 * freezeAmt; // no roll — frozen peaks must not smear rotationally
     }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
