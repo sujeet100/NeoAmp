@@ -1,5 +1,13 @@
 # 08 — Spirograph petal flower / wreath / ferris-wheel family
 
+> **★ CORRECTION (2026-07-08, user-verified against the video — trust this over §1):**
+> the "(c) wavy-ray sun medallion with a dark core star" variant DOES NOT EXIST — the 49.8
+> still is the same ferris wheel. It was implemented, then REMOVED (commit 5a77039). Do not
+> re-add it. Also user-verified: the ferris wheel is NOT an independent ring+spokes build —
+> it is the dahlia petal-star with a transient round-waveform ring that briefly CONNECTS the
+> petal tips, then fades (commit da1db9f). The shipped family is 0 dahlia · 1 crown ·
+> 2 wreath · 3 wheel(=dahlia+ring).
+
 **Matrix items:** A1 · **Priority:** P1 (both captures) · **Risk flags:** none in the matrix (see §5 for adjacent user-rejection history to respect) · **Confirmation needed:** no — all five variants are directly evidenced in the references; no dots, no new wave/shape slots, no camera changes.
 
 This doc is self-contained: all measured evidence is copied in below. Do not re-open the
