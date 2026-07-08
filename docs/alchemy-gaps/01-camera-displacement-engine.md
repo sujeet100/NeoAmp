@@ -1,5 +1,12 @@
 # 01 — Camera model & per-scene trail-displacement engine
 
+> **★ LANDED IN FULL (2026-07-08, 7 commits `fba6b7c`→step-7):** steps 1–7 all implemented, one
+> commit per step, npm-test + pinned-self-render verified per step (rest-pan · freeze@motif-14 ·
+> down-sag@bg-4/6 · radial-out@motif-2/16 · swirl-eye@motif-8 · dormant q12 shear (+q12 freed,
+> squash gate moved to q29) · rare q13 radial ripple w/ lazy first-cooldown + `FORCE.ripple` pin).
+> The confirmation question was pre-answered YES (README Q1). **Awaiting the per-field LIVE looks**
+> — each commit is individually revertible per §5. Optional step 8 remains parked.
+
 **Matrix items:** C1 (camera model: emitters pinned, trail-only streaming — RECONCILED) · C2 (per-scene trail-displacement FIELD programs — the core engine gap) · C8 (radial ripple starburst finale warp)
 **Priority:** C1 P1 · C2 P1 · C8 P3
 **Risk flags:** (4) HARD on all three — warp/motion changes are exactly the class of change the user rejected wholesale (commit `9ba675e` reverted the camera/world-follow rework into `presets/alchemy-motion.js`). Ship ONE field at a time, user-verified live between steps. (6) on the freeze/deposit steps — longer-lived deposits must not accumulate to white; keep the Reinhard headroom, never raise the trail composite gain. (5) is satisfied: every field program below is copied from a measured reference behaviour, nothing invented.
