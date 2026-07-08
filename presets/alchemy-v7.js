@@ -890,85 +890,89 @@
               (Math.sin(th * 7.3 + spiroPhase) + 0.6 * Math.sin(th * 11.7 - spiroPhase * 0.7)) *
               0.5) +
         wob;
-    } else if (spiroVar === 4) {
-      // 4 FERRIS WHEEL (p0 54.5): wreath-ish ring (s<0.6) + 9 spokes hub→rim→hub (s>=0.6). The
-      // out-and-back keeps r continuous at the hub (no alpha between spokes); the bright hub is
-      // the FREE additive pileup of 9 spoke-ends — do not add a glow.
-      if (s < 0.6) {
-        th = (s / 0.6) * 6.2832 + spiroRot;
-        r = R * (0.85 + 0.06 * Math.sin(th * 7.3 + spiroPhase)) + wob * 0.6; // gentler wobble
-      } else {
-        var u = (s - 0.6) / 0.4;
-        var j = Math.floor(u * 9),
-          v = u * 9 - j;
-        th = (j / 9) * 6.2832 + spiroRot;
-        r = R * (v < 0.5 ? v * 2 : 2 - 2 * v);
-      }
-      if (Math.abs(s - 0.6) < 0.01) kill = true; // hide only the ring→spokes seam
     } else {
-      // 0 LIGHTNING PETAL-STAR / DAHLIA (default; user ref image #12 · 1080p 83.5-86): k leaf-LOOPS
-      // radiating from a dark centre hole. Measured from the ref frames (2026-07-08): the flower is
-      // NEVER a rigid star — petal lengths are irregular, each petal sways on its own slow clock,
-      // and the outline is a LIVE-WAVEFORM lightning stroke whose jag is comparable to the petal
-      // half-width, so the silhouette re-arranges every frame (the earlier wprof² window crushed
-      // the jag to a static clip-art leaf — the user's "very static" complaint).
-      // ★ THICK bolt via RIBBON weave (user vs the ref screenshot: the original's bolts are CHUNKY,
-      // several px wide — but WebGL lines are 1px and butterchurn 'thick' only adds ±half-pixel
-      // copies). SAME principle as the tether's double-stroke band (b5d852f): thickness = two tight
-      // rails + the stroke constantly crossing the gap to FILL it. The tether affords two separate
-      // strands because its 512 points are dense on one long line; a petal edge only has ~21 points,
-      // so a strand-split reads as two sparse crisp outlines (verified in a self-render). Instead,
-      // ONE stroke alternates consecutive points across the rails — the weave IS the fill, at full
-      // per-edge resolution.
-      var fk = s * k,
-        pi = Math.floor(fk),
-        pu = fk - pi; // petal index + 0..1 within the petal
-      // per-petal IDENTITY: hashed irregular length, seeded ONCE per motif dwell (spiroSeed) — NOT
-      // per stamp: if lengths re-roll each stamp, a long ghost pokes out from under the new short
-      // petal and reads as a DIFFERENT overlapping petal (user: "petals overlap"). Stable lengths
-      // keep every ghost hugging its own petal → the ref's dense layered-flower look.
-      var ph = Math.sin((pi + 1) * 12.9898 + spiroSeed) * 43758.5453;
-      ph -= Math.floor(ph);
-      // gentle independent sway per petal (~2.3s via the q9 clock) — undulation with no net spin
-      // (continuous spin + feedback = the rejected gear-smear; sway oscillates, so no smear)
-      var sway = 0.04 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
-      var baseAng = (pi / k) * 6.2832 + spiroRot + sway;
-      var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
-      var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
-      var hole = 0.3 * R; // a REAL dark centre hole (Fable: 0.12R piled into a bright knot)
-      // ★ COMPRESS / DECOMPRESS (user): the whole flower BREATHES hard with the beat — petals shoot
-      // out on hits and retract between, never static. q32 = 1 + 1.3*pulse (smoothed beat carrier).
+      // 0 DAHLIA · 4 FERRIS WHEEL — the SAME petal star (user, validated against 480p 51-56):
+      // the original's "wheel" is not a separate build; the dahlia appears, then a ROUND live-
+      // WAVEFORM ring briefly CONNECTS the petal tips, then the ring fades away. Variant 4 =
+      // dahlia + ring; the ring's alpha rides spiroRingAmt (eased in frame(), so it grows in
+      // while the wheel construction is up and melts out when the stamp re-rolls away).
+      // Measured (2026-07-08): the flower is NEVER a rigid star — petal lengths are irregular,
+      // each petal sways on its own slow clock, and the outline is a LIVE-WAVEFORM lightning
+      // stroke whose jag is comparable to the petal half-width (an earlier wprof² window crushed
+      // the jag into a static clip-art leaf — the user's "very static" complaint).
       var breathe = Math.max(0.28, 0.5 + 0.85 * ((a.q32 || 1) - 1)); // ~0.5 calm → ~1.6 on a hit
-      var plen = 0.72 + 0.5 * ph; // irregular per-petal length (ref petals differ visibly)
-      var d = hole + (R * plen - hole) * breathe * edge; // petal length pulses with the music
-      // CURVED LEAF profile, slim enough that adjacent petals PACK without crossing: angular
-      // half-width ≈ atan(0.13R/0.55R) ≈ 0.23 rad < half the k=12 spacing (0.26) — the ref petals
-      // sit side by side like a real flower, never over each other
-      var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
-      var halfW = R * 0.13 * wprof;
-      // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
-      // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
-      // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
-      var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
-      var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
-      // ribbon teeth are LIVE (user: "ours is statically jagged"): the rail gap rides the LOCAL
-      // waveform magnitude — quiet passage → thin near-smooth stroke, a hit → fat jagged teeth,
-      // and the serration depth varies point-to-point with the actual samples, like the original.
-      // Small floor keeps a visible stroke; parity of the GLOBAL point index flips the rail.
-      var vmag = Math.abs(a.value1 || 0);
-      var ribbon =
-        ((Math.round(s * 512) & 1) * 2 - 1) * R * (0.005 + 0.055 * vmag) * (0.35 + 0.65 * wprof);
-      var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
-      // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
-      // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
-      // ref's flame-tips instead of wagging sideways only
-      var dr = d + (a.value1 || 0) * amp * edge;
-      lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
-      loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
-      direct = true;
-      hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
-      a.a = 0.5 + 0.5 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
-      if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
+      if (s >= 0.88) {
+        // ROUND-WAVEFORM connector ring (the wheel phase): a live-waveform circle through the
+        // petal-tip zone; alpha rides spiroRingAmt so it grows in / melts out.
+        var su = (s - 0.88) / 0.12;
+        var rth = su * 6.2832 + spiroRot;
+        // same base+breathe law as the petal tips (below) so the ring rides AT the tips at any
+        // beat phase instead of collapsing inside the flower when calm
+        var rr = 0.3 * R + (R * 0.95 - 0.3 * R) * breathe + (a.value1 || 0) * (a.q6 || 0.05) * 1.6;
+        lox = rr * Math.cos(rth);
+        loy = rr * Math.sin(rth);
+        direct = true;
+        a.a = 0.75 * spiroRingAmt;
+        if (su < 0.02 || su > 0.98) kill = true; // hide the petals→ring seam + the wrap gap
+      } else {
+        // ★ THICK bolt via RIBBON weave (user vs the ref screenshot: the original's bolts are CHUNKY,
+        // several px wide — but WebGL lines are 1px and butterchurn 'thick' only adds ±half-pixel
+        // copies). SAME principle as the tether's double-stroke band (b5d852f): thickness = two tight
+        // rails + the stroke constantly crossing the gap to FILL it. The tether affords two separate
+        // strands because its 512 points are dense on one long line; a petal edge only has ~21 points,
+        // so a strand-split reads as two sparse crisp outlines (verified in a self-render). Instead,
+        // ONE stroke alternates consecutive points across the rails — the weave IS the fill, at full
+        // per-edge resolution.
+        var sp = s / 0.88; // petals take the samples the ring slice doesn't
+        var fk = sp * k,
+          pi = Math.floor(fk),
+          pu = fk - pi; // petal index + 0..1 within the petal
+        // per-petal IDENTITY: hashed irregular length, seeded ONCE per motif dwell (spiroSeed) — NOT
+        // per stamp: if lengths re-roll each stamp, a long ghost pokes out from under the new short
+        // petal and reads as a DIFFERENT overlapping petal (user: "petals overlap"). Stable lengths
+        // keep every ghost hugging its own petal → the ref's dense layered-flower look.
+        var ph = Math.sin((pi + 1) * 12.9898 + spiroSeed) * 43758.5453;
+        ph -= Math.floor(ph);
+        // gentle independent sway per petal (~2.3s via the q9 clock) — undulation with no net spin
+        // (continuous spin + feedback = the rejected gear-smear; sway oscillates, so no smear)
+        var sway = 0.04 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
+        var baseAng = (pi / k) * 6.2832 + spiroRot + sway;
+        var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
+        var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
+        var hole = 0.3 * R; // a REAL dark centre hole (Fable: 0.12R piled into a bright knot)
+        // ★ COMPRESS / DECOMPRESS (user): the flower BREATHES with the beat via `breathe` (above) —
+        // petals shoot out on hits and retract between, never static. q32 = smoothed beat carrier.
+        var plen = 0.72 + 0.5 * ph; // irregular per-petal length (ref petals differ visibly)
+        var d = hole + (R * plen - hole) * breathe * edge; // petal length pulses with the music
+        // CURVED LEAF profile, slim enough that adjacent petals PACK without crossing: angular
+        // half-width ≈ atan(0.13R/0.55R) ≈ 0.23 rad < half the k=12 spacing (0.26) — the ref petals
+        // sit side by side like a real flower, never over each other
+        var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
+        var halfW = R * 0.13 * wprof;
+        // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
+        // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
+        // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
+        var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
+        var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
+        // ribbon teeth are LIVE (user: "ours is statically jagged"): the rail gap rides the LOCAL
+        // waveform magnitude — quiet passage → thin near-smooth stroke, a hit → fat jagged teeth,
+        // and the serration depth varies point-to-point with the actual samples, like the original.
+        // Small floor keeps a visible stroke; parity of the GLOBAL point index flips the rail.
+        var vmag = Math.abs(a.value1 || 0);
+        var ribbon =
+          ((Math.round(s * 512) & 1) * 2 - 1) * R * (0.005 + 0.055 * vmag) * (0.35 + 0.65 * wprof);
+        var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
+        // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
+        // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
+        // ref's flame-tips instead of wagging sideways only
+        var dr = d + (a.value1 || 0) * amp * edge;
+        lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
+        loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
+        direct = true;
+        hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
+        a.a = 0.5 + 0.5 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
+        if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
+      }
     }
     if (direct) {
       a.x = cx + lox;
@@ -1281,6 +1285,7 @@
     spiroPhase = 0, // per-stamp scribble-phase for the medallion/wreath/ferris (big steps — their
     // stamp-to-stamp variety must NOT ride the now-tiny rotation snap)
     spiroSeed = 0, // per-DWELL petal-identity seed (stable while the motif is up → ghosts align)
+    spiroRingAmt = 0, // wheel connector-ring opacity (eases in on variant 4, melts out after)
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
@@ -1426,9 +1431,7 @@
         spiroK =
           spiroVar === 1
             ? 14 + Math.floor(Math.random() * 3) // crown 14-16 points
-            : spiroVar === 4
-              ? 8 + Math.floor(Math.random() * 3) // wheel 8-10 spokes
-              : 10 + Math.floor(Math.random() * 5); // lotus/medallion 10-14
+            : 10 + Math.floor(Math.random() * 5); // lotus/medallion/wheel 10-14 petals
         // SLIGHT rotation between stamps (h1 "feathery ghosting"). Was 0.25-0.75 rad — a full
         // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
         // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
@@ -1443,6 +1446,10 @@
     } else {
       spiroNext = -1;
     }
+    // ring lifecycle (user, 480p 51-56): the dahlia appears → a round waveform CONNECTS the petals
+    // (the "wheel") → the ring melts away. Eased so it grows/fades instead of popping with the roll.
+    spiroRingAmt +=
+      ((mEff === 17 && spiroVar === 4 ? 1 : 0) - spiroRingAmt) * Math.min(1, dt * 2.4);
 
     // ── ORBS + TETHER — wide diagonal pair joined by a jagged waveform line (the Dance signature, A_93/
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──
