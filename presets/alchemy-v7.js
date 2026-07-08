@@ -932,8 +932,18 @@
         // and the serration depth varies point-to-point with the actual samples, like the original.
         // Small floor keeps a visible stroke; parity of the GLOBAL point index flips the rail.
         var vmag = Math.abs(a.value1 || 0);
+        // per-tooth RAGGEDNESS (user: the uniform staircase read as "artificially created"):
+        // each tooth's depth is scaled by a per-point hash that drifts with the q9 clock, so the
+        // serration is irregular along the edge AND morphs over time — lightning, not stitching.
+        var j = Math.round(s * 512);
+        var rag = Math.sin(j * 12.9898 + (a.q9 || 0) * 40.0) * 43758.5453;
+        rag -= Math.floor(rag);
         var ribbon =
-          ((Math.round(s * 512) & 1) * 2 - 1) * R * (0.005 + 0.055 * vmag) * (0.35 + 0.65 * wprof);
+          ((j & 1) * 2 - 1) *
+          R *
+          (0.004 + 0.05 * vmag) *
+          (0.35 + 0.65 * wprof) *
+          (0.35 + 1.3 * rag);
         var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
         // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
         // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
