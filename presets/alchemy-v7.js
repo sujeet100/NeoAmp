@@ -853,33 +853,17 @@
     var s = a.sample || 0;
     var k = spiroK; // 10-14 dahlia/wheel petals · 26-40 fur-ball filaments (per stamp)
     var R = (a.q5 || 0.4) * 0.58; // compact — the ref figures sit ~30-45% of frame, not edge-to-edge
-    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.85; // live radial wobble (doc 08 spec 0.9; 0.5 read static vs the 480p scribble)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var th, r;
     var lox = 0,
-      loy = 0,
-      direct = false; // the lotus star builds x/y directly (leaf-loop geometry, not r/θ)
-    var hueOff = 0; // per-variant hue offset (only the lotus takes the alternating-petal duo)
+      loy = 0;
+    var hueOff = 0; // per-variant hue offset (only the dahlia takes the alternating-petal duo)
     var kill = false; // hide a single connector seam where a variant splits the sample sweep
-    if (spiroVar === 2) {
-      // 2 WREATH-BALL (h1 M5): overlapping-chord scribble annulus; drifting phases + feedback
-      // ghosts build the overlapping-chord torus (ring ~35%, hole ~12%). No beads (A8).
-      // (The former "sun medallion" variant was REMOVED 2026-07-08 — the user confirmed the p0
-      // 49.8 still is the same ferris wheel, so the medallion was an invented construction.)
-      th = s * 6.2832 + spiroRot;
-      r =
-        R *
-          (0.85 +
-            0.13 *
-              (Math.sin(th * 7.3 + spiroPhase) + 0.6 * Math.sin(th * 11.7 - spiroPhase * 0.7)) *
-              0.5) +
-        wob;
-    } else {
-      // 0 DAHLIA · 1 FUR-BALL (many-petal) · 3 FERRIS WHEEL — ONE petal-star construction (user,
+    {
+      // 0 DAHLIA · 1 FUR-BALL (many-petal) · 2 FERRIS WHEEL — ONE petal-star construction (user,
       // validated against 480p 35/49.8-56 + 1:03-1:06): the original's "wheel" is not a separate
       // build — the dahlia appears, a ROUND live-WAVEFORM ring briefly CONNECTS the petal tips,
-      // then fades (variant 3, alpha rides spiroRingAmt eased in frame()). The 0:35 pompom is the
+      // then fades (variant 2, alpha rides spiroRingAmt eased in frame()). The 0:35 pompom is the
       // same radial construction with MANY short fine petals (user: "like the ferris wheel but
       // with many many petals — fur ball") = variant 1: k 26-40, single pale hue, width ∝ 12/k.
       // Measured (2026-07-08): the flower is NEVER a rigid star — petal lengths are irregular,
@@ -894,10 +878,12 @@
         var rth = su * 6.2832 + spiroRot;
         // same base+breathe law as the petal tips (below) so the ring rides AT the tips at any
         // beat phase instead of collapsing inside the flower when calm
-        var rr = 0.3 * R + (R * 0.95 - 0.3 * R) * breathe + (a.value1 || 0) * (a.q6 || 0.05) * 1.6;
+        var rr =
+          0.3 * R +
+          (R * 0.95 - 0.3 * R) * breathe +
+          (a.value1 || 0) * (a.q6 || 0.05) * (2.6 + 2.2 * ((a.q32 || 1) - 1));
         lox = rr * Math.cos(rth);
         loy = rr * Math.sin(rth);
-        direct = true;
         a.a = 0.75 * spiroRingAmt;
         if (su < 0.02 || su > 0.98) kill = true; // hide the petals→ring seam + the wrap gap
       } else {
@@ -935,7 +921,7 @@
         // sit side by side like a real flower, never over each other. Width shrinks ∝ 12/k so the
         // many-petal fur ball (k 26-40) packs as fine filaments the same way.
         var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
-        var halfW = R * 0.13 * Math.min(1, 12 / k) * wprof;
+        var halfW = R * 0.085 * Math.min(1, 12 / k) * wprof; // needle-slim (user: match the fur ball's elegance at low k)
         // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
         // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
         // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
@@ -955,7 +941,6 @@
         var dr = d + (a.value1 || 0) * amp * edge;
         lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
         loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
-        direct = true;
         hueOff = spiroVar === 1 ? 0 : pi & 1 ? 0.38 : 0; // duo two-tone; fur ball single pale hue (p0 35)
         // fade toward the hub → no additive pile-up, keeps the hole dark; the many-petal fur ball
         // deposits ~3× the strokes, so scale by √(12/k) or its trail streaks blow out the buffer
@@ -963,16 +948,8 @@
         if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
       }
     }
-    if (direct) {
-      a.x = cx + lox;
-      a.y = cy + loy * spiroTilt; // 1.0 tilt until step 3
-    } else {
-      // ★ LIGHTNING (user, authoritative): every stroke is traced by the LIVE AUDIO WAVEFORM — an
-      // electric zigzag line like the tether, NOT a smooth curve. Dense per-sample perpendicular jag.
-      var ljag = (a.value1 || 0) * 0.06;
-      a.x = cx + r * Math.cos(th) - Math.sin(th) * ljag;
-      a.y = cy + (r * Math.sin(th) + Math.cos(th) * ljag) * spiroTilt; // 1.0 tilt until step 3
-    }
+    a.x = cx + lox;
+    a.y = cy + loy * spiroTilt; // 1.0 tilt; <1 = oblate lying-down pose
     var h = (a.q8 || 0) + spiroHue + hueOff;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
@@ -1089,7 +1066,6 @@
           ya = rA * Math.sin(angA);
         ox = xa + (rB * Math.cos(angB) - xa) * fr4;
         oy = ya + (rB * Math.sin(angB) - ya) * fr4;
-        direct = true;
         hueSel = c & 1;
         bandA = 0.75;
         if (fr4 < 0.03) kill = true; // hide chord-to-chord jumps
@@ -1268,13 +1244,12 @@
     restAmt = 0;
   // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
-  var spiroVar = 0, // 0 dahlia · 1 crown · 2 wreath · 3 ferris (dahlia + connector ring)
+  var spiroVar = 0, // 0 dahlia · 1 fur-ball (many-petal) · 2 ferris wheel (dahlia + connector ring)
     spiroK = 12, // petal/point/spoke count (per-stamp within a variant's range)
     spiroRot = 0, // per-stamp rotation snap — SLIGHT (feathery ghosting hugs the petals)
-    spiroPhase = 0, // per-stamp scribble-phase for the wreath (big steps — its
-    // stamp-to-stamp variety must NOT ride the now-tiny rotation snap)
     spiroSeed = 0, // per-DWELL petal-identity seed (stable while the motif is up → ghosts align)
-    spiroRingAmt = 0, // wheel connector-ring opacity (eases in on variant 4, melts out after)
+    spiroRingAmt = 0, // wheel connector-ring opacity (flashes in on variant 3, melts out)
+    spiroStampT = -9, // time of the last construction stamp
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
@@ -1409,7 +1384,7 @@
       }
       if (time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
         var pv = spiroVar;
-        while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 4); // always a DIFFERENT one
+        while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 3); // always a DIFFERENT one
         // debug pin (same gotcha as mEff above): a pinned self-render can hold ONE construction
         if (
           typeof window !== "undefined" &&
@@ -1425,20 +1400,22 @@
         // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
         // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
         spiroRot += 0.08 + Math.random() * 0.07; // 5-9°/stamp — visible slow crawl, still ≪ the 30° petal spacing
-        spiroPhase += 0.8 + Math.random() * 1.4; // scribble variants still re-arrange per stamp
         spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
         // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
         // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
         spiroTilt = Math.random() < 0.6 ? 1.0 : 0.5 + Math.random() * 0.2;
         spiroNext = time + 0.8 + Math.random() * 0.8; // ~0.8-1.6s cadence (1:03-1:06: crisp new stamps ~1/s)
+        spiroStampT = time; // the ring flash keys off the stamp instant
       }
     } else {
       spiroNext = -1;
     }
     // ring lifecycle (user, 480p 51-56): the dahlia appears → a round waveform CONNECTS the petals
     // (the "wheel") → the ring melts away. Eased so it grows/fades instead of popping with the roll.
-    spiroRingAmt +=
-      ((mEff === 17 && spiroVar === 3 ? 1 : 0) - spiroRingAmt) * Math.min(1, dt * 2.4);
+    // ring FLASH lifecycle (user, 480p 51-56): pops in fast with the wheel stamp, holds under a
+    // second, then melts out — appear → connect the petals → disappear (not a steady circle).
+    var ringTgt = mEff === 17 && spiroVar === 2 && time - spiroStampT < 0.9 ? 1 : 0;
+    spiroRingAmt += (ringTgt - spiroRingAmt) * Math.min(1, dt * (ringTgt > spiroRingAmt ? 6 : 2.4));
 
     // ── ORBS + TETHER — wide diagonal pair joined by a jagged waveform line (the Dance signature, A_93/
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──

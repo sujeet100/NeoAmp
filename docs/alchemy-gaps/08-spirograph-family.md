@@ -8,9 +8,11 @@
 > petal tips, then fades (commit da1db9f). And the 0:35 "lace-crown" is NOT a standalone
 > needle-diamond flower: the pompom itself is the same radial construction with MANY short
 > fine petals (user: "like the ferris wheel but with many many petals — fur ball"), so
-> variant 1 is that many-petal fur-ball flash (k 26-40, single pale hue). The shipped family
-> is 0 dahlia · 1 fur-ball · 2 wreath · 3 wheel(=dahlia+ring), all ONE petal-star
-> construction except the wreath. 1:03-1:06 shows the family morphing per stamp ~1/s.
+> variant 1 is that many-petal fur-ball flash (k 26-40, single pale hue). The WREATH was also
+> removed (user: the 0:52.3 scribble ball is the same fur-ball object, not a separate build).
+> The shipped family is 0 dahlia · 1 fur-ball · 2 wheel(=dahlia + transient jagged-waveform
+> connector ring, ~0.9s flash) — ONE petal-star construction, three dressings. 1:03-1:06
+> shows the family morphing per stamp ~1/s.
 
 **Matrix items:** A1 · **Priority:** P1 (both captures) · **Risk flags:** none in the matrix (see §5 for adjacent user-rejection history to respect) · **Confirmation needed:** no — all five variants are directly evidenced in the references; no dots, no new wave/shape slots, no camera changes.
 
