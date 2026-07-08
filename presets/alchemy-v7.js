@@ -766,7 +766,7 @@
       fk = (a.sample || 0) * S,
       seg = Math.floor(fk),
       u = fk - seg;
-    var seed = seg * 2.39996; // golden-angle spread → strands fan all directions
+    var seed = seg * 2.39996 + stampSeed; // golden-angle spread; re-rolled per stamp (D7)
     var R = a.q5 || 0.4;
     var rad = R * (0.08 + 0.92 * u);
     var curl = seed + (a.q9 || 0) + 2.3 * u * Math.sin(seed * 1.7) + (a.value1 || 0) * 0.7 * u; // curl + audio jitter
@@ -775,7 +775,7 @@
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + rad * Math.cos(curl) + jit * Math.cos(curl + 1.5708);
     a.y = cy + rad * Math.sin(curl) + jit * Math.sin(curl + 1.5708);
-    var h = (a.q8 || 0) + u * 0.1;
+    var h = (a.q8 || 0) + stampHueOff + u * 0.1; // emitter snaps; the trail keeps the old hue
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -1179,7 +1179,7 @@
       var cyS = a.q3 !== undefined ? a.q3 : 0.5;
       a.y = cyS + (a.y - cyS) * (1.0 - 0.34 * (a.q11 || 0));
     }
-    a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m];
+    a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m] * stampGain;
     return a;
   }
   // TETHER — the jagged waveform line joining the two orbs; colour cycles with the shared q8
@@ -1251,6 +1251,11 @@
     evStarR = 0.14,
     evStarHue = 0.3,
     evStarAnchor = 0, // 0 motif centre; 1 orb A (p3 186.5: a star wraps an orb)
+    stampT0 = -9, // STAMP-CADENCE modes (doc 03 D7): last stamp instant
+    stampNext = 0,
+    stampSeed = 0, // re-rolls the tangle geometry per stamp (r0: fully re-randomized)
+    stampHueOff = 0, // emitter-only hue walk; the trail keeps old hues (A14 resolution)
+    stampGain = 1, // crisp-vs-residual envelope, multiplied into centralDraw
     accDots = 0, // wave3 slot: 0 none · 1 marching bead row · 2 caterpillar chain
     accDotsNext = -1,
     accDotsPhase = 0,
@@ -1284,6 +1289,10 @@
     cocElong = 1, // crumple-cocoon elongation (step 4)
     cocSizeMul = 1, // per-stamp size (step 3; dia 25-38%)
     cocFlavour = 0; // 0 dreamcatcher · 1 crumple-cocoon · 2 geodesic sphere (step 4)
+  // h1 M7: the tangle stamps in ONE hue every 1.3-2s, crisp ~1-1.5s, then only trail; more
+  // modes can join this table later (r0's 0.2-0.3s fast tier already lives in the cocoon block)
+  var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
+  var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
   var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
@@ -1403,6 +1412,21 @@
     var mo = motifPick(time, dt, f > 0.6);
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
     if (FORCE && FORCE.motif !== undefined) mCur = FORCE.motif; // pin drives lifecycle logic, not just q30
+    // ── STAMP-CADENCE modes (doc 03 D7; h1 M7): the tangle lives as one-hue STAMP events —
+    //    geometry fully re-rolled per stamp, fresh emitter hue over the previous generation's
+    //    persisting cloud (never recolour the buffer — trails age in place, A14). ──
+    var stampCfg = STAMP_MODES[mCur];
+    if (stampCfg) {
+      if (time >= stampNext && (f > 0.6 || time >= stampNext + 1.5)) {
+        stampT0 = time;
+        stampSeed = Math.random() * 6.2832;
+        stampHueOff += (0.15 + Math.random() * 0.35) * (Math.random() < 0.5 ? -1 : 1); // h1: yellow→red→white steps
+        stampNext = time + stampCfg.gapMin + Math.random() * (stampCfg.gapMax - stampCfg.gapMin);
+      }
+      stampGain = time - stampT0 < stampCfg.crisp ? 1 : 0.25; // crisp life, then "a few live arms" (r0)
+    } else {
+      stampGain = 1;
+    }
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
     // dips at the swap instant; FLASHES on hits — but NOT under the kaleidoscope fold, which
