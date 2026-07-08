@@ -857,6 +857,9 @@
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     var th, r;
+    var lox = 0,
+      loy = 0,
+      direct = false; // the lotus star builds x/y directly (leaf-loop geometry, not r/θ)
     var hueOff = 0; // per-variant hue offset (only the lotus takes the alternating-petal duo)
     var kill = false; // hide a single connector seam where a variant splits the sample sweep
     if (spiroVar === 1) {
@@ -903,17 +906,43 @@
       }
       if (Math.abs(s - 0.6) < 0.01) kill = true; // hide only the ring→spokes seam
     } else {
-      // 0 LOTUS LOOPS (default, step 1): k rose lobes from a hollow centre; two-tone petal duo.
-      th = s * 6.2832 + spiroRot;
-      r = R * (0.14 + 0.86 * Math.abs(Math.sin(th * k * 0.5))) + wob;
-      hueOff = Math.floor(s * k) & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
+      // 0 LIGHTNING PETAL-STAR (default; user ref image #12): k DISTINCT leaf-LOOPS radiating from
+      // a dark centre hole — each petal = two LIVE-WAVEFORM lightning edges out to a sharp tip and
+      // back. This is the "n-gon rendered with lightning edges" the user described. Each edge zigzags
+      // with the real audio (a.value1), like the tether.
+      var fk = s * k,
+        pi = Math.floor(fk),
+        pu = fk - pi; // petal index + 0..1 within the petal
+      var baseAng = (pi / k) * 6.2832 + spiroRot;
+      var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
+      var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
+      var hole = 0.3 * R; // a REAL dark centre hole (Fable: 0.12R piled into a bright knot)
+      var d = hole + (R - hole) * edge; // distance along the petal axis
+      var envl = Math.sin(edge * 3.14159); // 0 at base + tip, max mid-edge → needle-sharp tips
+      var bow = R * 0.18 * sideSign * envl; // leaf width
+      // LIGHTNING via PARITY ALTERNATION (Fable): only ~20 samples/edge — too few to trace the
+      // waveform directly (→ smooth arc), so flip the sign every sample for a high-spatial-frequency
+      // zigzag while a.value1 drives the AMPLITUDE (silent audio → flat edge, exactly like the tether).
+      var alt = Math.round(s * 511) & 1 ? 1 : -1;
+      var amp = 0.016 * (0.6 + 0.6 * ((a.q32 || 1) - 1)); // beat-coupled, like the tether's q26
+      var lat = bow + (a.value1 || 0) * alt * amp * envl; // lateral offset (leaf width + lightning)
+      lox = d * Math.cos(baseAng) - lat * Math.sin(baseAng);
+      loy = d * Math.sin(baseAng) + lat * Math.cos(baseAng);
+      direct = true;
+      hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
+      a.a = 0.45 + 0.55 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
+      if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
     }
-    // ★ LIGHTNING (user): each petal/stroke is traced by the LIVE AUDIO WAVEFORM, exactly like the
-    // tether — not a smooth curve. Displace perpendicular to the radial (dense, 512 samples) so the
-    // outline zigzags like the tether's lightning line. This is the WMP signature (CLAUDE.md rule).
-    var ljag = (a.value1 || 0) * 0.038;
-    a.x = cx + r * Math.cos(th) - Math.sin(th) * ljag;
-    a.y = cy + (r * Math.sin(th) + Math.cos(th) * ljag) * spiroTilt; // 1.0 tilt until step 3
+    if (direct) {
+      a.x = cx + lox;
+      a.y = cy + loy * spiroTilt; // 1.0 tilt until step 3
+    } else {
+      // ★ LIGHTNING (user, authoritative): every stroke is traced by the LIVE AUDIO WAVEFORM — an
+      // electric zigzag line like the tether, NOT a smooth curve. Dense per-sample perpendicular jag.
+      var ljag = (a.value1 || 0) * 0.06;
+      a.x = cx + r * Math.cos(th) - Math.sin(th) * ljag;
+      a.y = cy + (r * Math.sin(th) + Math.cos(th) * ljag) * spiroTilt; // 1.0 tilt until step 3
+    }
     var h = (a.q8 || 0) + spiroHue + hueOff;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
