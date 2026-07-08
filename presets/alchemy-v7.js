@@ -1434,10 +1434,23 @@
       stampGain = 1;
     }
     t.q30 = mCur;
-    var dd = (mo.mix - 0.5) * 4.0;
-    // dips at the swap instant; FLASHES on hits — but NOT under the kaleidoscope fold, which
-    // tiles the motif across the whole frame and amplifies the flash into a milky washout
-    t.q4 = 0.85 * (1 - 0.75 * Math.exp(-dd * dd)) * (1 + (bgMode === 1 ? 0 : 0.3) * pulse);
+
+    // (flash NOT under the kaleidoscope fold — it tiles the motif frame-wide and amplifies
+    //  the flash into a milky washout)
+    // ── B4a HANDOFF (doc 03 Step 5, user-confirmed): the old emitter STOPS ≤0.17s into the
+    //    transition (its ghost carries the frame ~0.8s), then the new motif BLOOMS 25%→100% in
+    //    <0.5s (p1 moth 82.9; h0 41.0). Replaces the whole-frame Gaussian dim dip — "the buffer
+    //    does the crossfade" (r0). mo.mix runs 0→1 over the 2s window; q30 snaps at 0.5. ──
+    var trans = mo.mix,
+      flashMul = 1 + (bgMode === 1 ? 0 : 0.3) * pulse,
+      bloomMul = 1;
+    if (trans <= 0 || trans >= 1) t.q4 = 0.85 * flashMul;
+    else if (trans < 0.5) t.q4 = 0.85 * Math.max(0, 1 - trans * 6) * flashMul;
+    else {
+      var bl = Math.min(1, (trans - 0.5) * 4);
+      t.q4 = 0.85 * bl * flashMul;
+      bloomMul = 0.25 + 0.75 * bl;
+    }
 
     focusAmt +=
       ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 ? 1 : 0) - focusAmt) *
@@ -1452,7 +1465,8 @@
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
-    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse); // beat-puff tamed 0.45→0.28 (motifs were filling the frame on hits)
+    t.q5 =
+      scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse) * bloomMul; // beat-puff tamed 0.45→0.28; bloomMul = the B4a entrance
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
