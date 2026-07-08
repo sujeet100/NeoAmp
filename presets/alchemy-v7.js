@@ -853,7 +853,7 @@
     var s = a.sample || 0;
     var k = spiroK; // 10-14 lotus/medallion · 14-16 crown points · 8-10 wheel spokes (per stamp)
     var R = (a.q5 || 0.4) * 0.58; // compact — the ref medallion sits ~30-45% of frame, not edge-to-edge
-    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.9; // live wobble re-arranges per frame (p0 PASS)
+    var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.5; // small radial breathing (perpendicular lightning below is the main jag)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     var th, r;
@@ -906,11 +906,14 @@
       // 0 LOTUS LOOPS (default, step 1): k rose lobes from a hollow centre; two-tone petal duo.
       th = s * 6.2832 + spiroRot;
       r = R * (0.14 + 0.86 * Math.abs(Math.sin(th * k * 0.5))) + wob;
-      r += R * 0.02 * Math.sin(s * 190 + spiroRot * 3); // fine filigree crimp (ref = delicate scribbly rosette)
       hueOff = Math.floor(s * k) & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
     }
-    a.x = cx + r * Math.cos(th);
-    a.y = cy + r * Math.sin(th) * spiroTilt; // 1.0 until step 3
+    // ★ LIGHTNING (user): each petal/stroke is traced by the LIVE AUDIO WAVEFORM, exactly like the
+    // tether — not a smooth curve. Displace perpendicular to the radial (dense, 512 samples) so the
+    // outline zigzags like the tether's lightning line. This is the WMP signature (CLAUDE.md rule).
+    var ljag = (a.value1 || 0) * 0.038;
+    a.x = cx + r * Math.cos(th) - Math.sin(th) * ljag;
+    a.y = cy + (r * Math.sin(th) + Math.cos(th) * ljag) * spiroTilt; // 1.0 tilt until step 3
     var h = (a.q8 || 0) + spiroHue + hueOff;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
