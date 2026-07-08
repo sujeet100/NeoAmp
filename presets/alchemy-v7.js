@@ -660,7 +660,7 @@
     var sp = (a.q9 || 0) * 0.12; // SOFTENED: barely rotate (was 0.4) → no rotational smear-into-a-gear-web
     var aa0 = (i0 / P) * 6.2832 + sp,
       aa1 = (i1 / P) * 6.2832 + sp;
-    var R = (a.q5 || 0.4) * 0.85; // shrunk (was near-full-frame; ref ~40-60%)
+    var R = (a.q5 || 0.4) * 0.6; // shrunk again (0.85→0.6): was filling the whole frame on beats
     var x0 = Math.cos(aa0) * R,
       y0 = Math.sin(aa0) * R,
       x1 = Math.cos(aa1) * R,
@@ -852,7 +852,7 @@
   function fSpiro(a) {
     var s = a.sample || 0;
     var k = spiroK; // 10-14 lotus/medallion · 14-16 crown points · 8-10 wheel spokes (per stamp)
-    var R = (a.q5 || 0.4) * 0.9;
+    var R = (a.q5 || 0.4) * 0.58; // compact — the ref medallion sits ~30-45% of frame, not edge-to-edge
     var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.9; // live wobble re-arranges per frame (p0 PASS)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
@@ -1322,7 +1322,7 @@
     t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
-    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.45 * pulse);
+    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse); // beat-puff tamed 0.45→0.28 (motifs were filling the frame on hits)
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
