@@ -926,7 +926,7 @@
         // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
         // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
         var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
-        var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
+        var amp = (a.q6 || 0.05) * (1.15 + 1.0 * ((a.q32 || 1) - 1)); // beat-coupled; tamed so the FINE per-point teeth (below) dominate over long swings
         // ribbon teeth are LIVE (user: "ours is statically jagged"): the rail gap rides the LOCAL
         // waveform magnitude — quiet passage → thin near-smooth stroke, a hit → fat jagged teeth,
         // and the serration depth varies point-to-point with the actual samples, like the original.
@@ -941,7 +941,7 @@
         var ribbon =
           ((j & 1) * 2 - 1) *
           R *
-          (0.004 + 0.05 * vmag) *
+          (0.003 + 0.034 * vmag) * // shallow-but-dense teeth — fine serration, not big zigzag
           (0.35 + 0.65 * wprof) *
           (0.35 + 1.3 * rag);
         var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
@@ -1599,7 +1599,7 @@
         additive: 1,
         usedots: 0,
         scaling: 1,
-        smoothing: 0.15, // near the tether's 0.1 — 0.25 lowpassed the live jag into rounded wobble (dahlia read static)
+        smoothing: 0.08, // 0.25 lowpassed the live jag into rounded wobble; 0.15 still ate the finest per-point teeth (user: jag too coarse)
         thick: 1,
         a: 0.62,
       }),
