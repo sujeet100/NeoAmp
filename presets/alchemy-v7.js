@@ -917,19 +917,21 @@
       var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
       var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
       var hole = 0.3 * R; // a REAL dark centre hole (Fable: 0.12R piled into a bright knot)
-      var envl = Math.sin(edge * 3.14159); // 0 at base + tip, max mid-edge → needle-sharp tips
       // ★ COMPRESS / DECOMPRESS (user): the whole flower BREATHES hard with the beat — petals shoot
       // out on hits and retract between, never static. q32 = 1 + 1.3*pulse (smoothed beat carrier).
       var breathe = Math.max(0.28, 0.5 + 0.85 * ((a.q32 || 1) - 1)); // ~0.5 calm → ~1.6 on a hit
       var d = hole + (R - hole) * breathe * edge; // petal length pulses with the music
-      var bow = R * 0.18 * sideSign * envl; // leaf width
-      // ★ VIOLENT LIGHTNING via PARITY ALTERNATION (Fable + user): flip sign every sample for a
-      // high-spatial-frequency zigzag; a.value1 drives the amplitude (silent → flat, like the tether).
-      // Amp is big + strongly beat-coupled so edges jag VIOLENTLY on hits; windowed by envl so the
-      // tips/base stay anchored while the mid-edge dances electrically.
+      // ★ CURVED LEAF (user + Fable): asymmetric width profile — sqrt(edge) rounds the BASE into a
+      // convex lobe, (1-edge) closes to a SHARP tip; sides stay convex the whole way (a real leaf,
+      // NOT a symmetric diamond/kite). Peak ≈1 near edge≈1/3, normalised by 0.385.
+      var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
+      var halfW = R * 0.22 * wprof; // curved half-width (fat rounded leaf, ~1.6:1)
+      // LIGHTNING rides INSIDE the width envelope as a TEXTURE (Fable): parity-alternation zigzag,
+      // a.value1 drives the amplitude, kept small vs halfW and windowed by wprof so the curved leaf
+      // silhouette always survives and the tip/base stay clean.
       var alt = Math.round(s * 511) & 1 ? 1 : -1;
-      var amp = 0.03 * (0.5 + 1.3 * ((a.q32 || 1) - 1)); // ~0.015 calm → ~0.06 on a hit
-      var lat = bow + (a.value1 || 0) * alt * amp * envl; // lateral offset (leaf width + lightning)
+      var amp = 0.012 * (0.6 + 0.9 * ((a.q32 || 1) - 1)); // beat-coupled, ≤ ~0.5×halfW peak
+      var lat = sideSign * (halfW + (a.value1 || 0) * alt * amp * wprof);
       lox = d * Math.cos(baseAng) - lat * Math.sin(baseAng);
       loy = d * Math.sin(baseAng) + lat * Math.cos(baseAng);
       direct = true;
