@@ -906,6 +906,7 @@
       // 0 LOTUS LOOPS (default, step 1): k rose lobes from a hollow centre; two-tone petal duo.
       th = s * 6.2832 + spiroRot;
       r = R * (0.14 + 0.86 * Math.abs(Math.sin(th * k * 0.5))) + wob;
+      r += R * 0.02 * Math.sin(s * 190 + spiroRot * 3); // fine filigree crimp (ref = delicate scribbly rosette)
       hueOff = Math.floor(s * k) & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
     }
     a.x = cx + r * Math.cos(th);
@@ -1114,7 +1115,7 @@
     0.66,
     0.66,
     0.36,
-    0.58, // spiro (17): k lobes converge at the hub → additive pileup; below the 12-star's 0.62
+    0.4, // spiro (17): lowered 0.58→0.4 (user: finer/less bloom — the ref is a thin delicate rosette)
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
   ];
   function scaleFor(m) {
