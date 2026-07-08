@@ -1385,8 +1385,7 @@
         // ~40% open a LONG SESSION (3.5-10s) — the user confirmed the original often keeps the
         // tether up for a while, with brief random dropouts (the flicker block below).
         evTetherT0 = time;
-        evTetherLife =
-          Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
+        evTetherLife = Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
@@ -1423,11 +1422,16 @@
     t.q16 = 0.01 * Math.sin(time * 0.06); // gentle sign-oscillating roll (no constant spin)
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
-    // ── CAMERA PAN — abrupt-snap direction dragging the trail buffer (the 2:24-2:31 parallax). ──
-    panMag += (0.0045 - panMag) * Math.min(1, dt * 0.8);
+    // ── CAMERA PAN — abrupt-snap direction dragging the trail buffer (the 2:24-2:31 parallax).
+    //    REST field (C1, doc 01 step 1): the refs go near-still during rest beats (4-10s near-still
+    //    rests in every report) — the pan eases out with restAmt (prev-frame value; eased, so the
+    //    one-frame lag is invisible) and resumes the familiar snap-pan when the rest ends. ──
+    panMag += (0.0045 * (1 - 0.9 * restAmt) - panMag) * Math.min(1, dt * 0.8);
     var pdir = panDir(time);
     t.q18 = panMag * Math.cos(pdir);
-    t.q19 = panMag * Math.sin(pdir) - 0.0012; // a touch of constant upward drift (scene "moves up")
+    // constant bias streams the buffer DOWNWARD (measured sign map: +q19 streams UP — the old
+    // "upward drift" comment was wrong); rests damp it like the pan.
+    t.q19 = panMag * Math.sin(pdir) - 0.0012 * (1 - 0.9 * restAmt);
 
     // ── OFF-CENTRE drifting pivot on an elliptical path → asymmetric parallax (edges sweep faster). ──
     var vpAng = time * 0.045,
@@ -1503,8 +1507,7 @@
     t.q3 = lisY + (anchorY - lisY) * anchorAmt;
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
-    t.q5 =
-      scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse) * bloomMul; // beat-puff tamed 0.45→0.28; bloomMul = the B4a entrance
+    t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse) * bloomMul; // beat-puff tamed 0.45→0.28; bloomMul = the B4a entrance
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
@@ -1808,8 +1811,7 @@
             su3 = sc3 - sCopy;
           var sth = su3 * 6.2832 + sCopy * 0.06;
           var spike = Math.pow(Math.abs(Math.sin(sth * evStarPts * 0.5)), 1.5);
-          var sr =
-            evStarR * (0.42 + 0.58 * spike) * (1 + 0.035 * sCopy) + (a.value1 || 0) * 0.015;
+          var sr = evStarR * (0.42 + 0.58 * spike) * (1 + 0.035 * sCopy) + (a.value1 || 0) * 0.015;
           var sax = evStarAnchor
             ? a.q21 !== undefined
               ? a.q21
