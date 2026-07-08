@@ -1410,7 +1410,10 @@
         // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
         // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
         spiroRot += 0.08 + Math.random() * 0.07; // 5-9°/stamp — visible slow crawl, still ≪ the 30° petal spacing
-        spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
+        // per-stamp RE-TINT (measured, h1 M5: crisp lines re-tint ~2s/hue while the trail keeps
+        // the OLD hues): the hue WALKS forward each stamp instead of jittering around one point,
+        // so a dwell layers several tints (user: ours held the same 2 colours the whole time)
+        spiroHue += 0.09 + Math.random() * 0.1;
         // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
         // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
         spiroTilt = Math.random() < 0.6 ? 1.0 : 0.5 + Math.random() * 0.2;
