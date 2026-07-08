@@ -1244,6 +1244,13 @@
     evTetherT0 = -9, // tether-spawn event birth
     evTetherLife = 0, // this spawn's life (0.4-2s)
     tetherEnv = 0, // tether event envelope (read by waves[2])
+    evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
+    evStarLife = 0.22,
+    evStarOn = false, // read by waves[1] (point fns share the closure)
+    evStarPts = 10,
+    evStarR = 0.14,
+    evStarHue = 0.3,
+    evStarAnchor = 0, // 0 motif centre; 1 orb A (p3 186.5: a star wraps an orb)
     accDots = 0, // wave3 slot: 0 none · 1 marching bead row · 2 caterpillar chain
     accDotsNext = -1,
     accDotsPhase = 0,
@@ -1327,8 +1334,25 @@
     //    during rests). The old inline hue snap moved in here (same visual rate, now mutually
     //    exclusive with other events on the same hit). Later docs register more event types. ──
     if ((f > 0.75 || (FORCE && FORCE.ev !== undefined)) && time >= evNextT && restAmt < 0.5) {
-      var evPick = FORCE && FORCE.ev !== undefined ? FORCE.ev : Math.random() < 0.55 ? "tether" : "hue";
-      if (evPick === "tether") {
+      var evRoll = Math.random();
+      var evPick =
+        FORCE && FORCE.ev !== undefined
+          ? FORCE.ev
+          : evRoll < 0.45
+            ? "tether"
+            : evRoll < 0.8
+              ? "hue"
+              : "star";
+      if (evPick === "star") {
+        // ONE-SHOT STAR STAMP (A12; h2 2.7: nested chromatic-offset spiky outlines, ~25-35% of
+        // frame; p3: the ghost persists after). Crisp for a blink, then STOP - the buffer ghosts it.
+        evStarT0 = time;
+        evStarLife = 0.22;
+        evStarPts = 8 + Math.floor(Math.random() * 5); // 8-12 points
+        evStarR = 0.11 + Math.random() * 0.07;
+        evStarHue = 0.15 + Math.random() * 0.35;
+        evStarAnchor = Math.random() < 0.7 ? 0 : 1;
+      } else if (evPick === "tether") {
         // TETHER SPAWN (B2; doc 06 refines the anatomy): the refs spawn the tether as a discrete
         // event every 1-4s with a 0.4-2s life — punctuation, not an every-beat strobe.
         evTetherT0 = time;
@@ -1344,6 +1368,7 @@
       time < evTetherT0 + evTetherLife
         ? Math.min(1, (time - evTetherT0) * 12)
         : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6);
+    evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
     t.q31 = 0.92 * (1 + 0.1 * (bassA - 1) + 0.2 * pulse); // exposure — gentle smoothed beat lift
@@ -1658,6 +1683,42 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
+        // ONE-SHOT STAR STAMP event (doc 03 A12) — top priority for its ≤0.22s life; pre-empts
+        // the accessory briefly. 3 nested spiky outlines with chromatic hue offsets; small live
+        // radius jitter (h2: outline re-jitters per frame). Suppressed while the star-net motif
+        // is up (the branch below would double-expose). After the stamp stops, only the feedback
+        // ghost remains (~1-2s at this decay; p3's ≥7s ghost needs the C2 freeze fields).
+        if (evStarOn && Math.abs((a.q30 || 0) - 1) >= 0.5) {
+          var sc3 = (a.sample || 0) * 3,
+            sCopy = Math.floor(sc3),
+            su3 = sc3 - sCopy;
+          var sth = su3 * 6.2832 + sCopy * 0.06;
+          var spike = Math.pow(Math.abs(Math.sin(sth * evStarPts * 0.5)), 1.5);
+          var sr =
+            evStarR * (0.42 + 0.58 * spike) * (1 + 0.035 * sCopy) + (a.value1 || 0) * 0.015;
+          var sax = evStarAnchor
+            ? a.q21 !== undefined
+              ? a.q21
+              : 0.5
+            : a.q2 !== undefined
+              ? a.q2
+              : 0.5;
+          var say = evStarAnchor
+            ? a.q22 !== undefined
+              ? a.q22
+              : 0.5
+            : a.q3 !== undefined
+              ? a.q3
+              : 0.5;
+          a.x = sax + sr * Math.cos(sth);
+          a.y = say + sr * Math.sin(sth);
+          var sh = (a.q8 || 0) + evStarHue + sCopy * 0.12; // chromatic pink/green/blue edges
+          a.r = orbCol(sh, 0);
+          a.g = orbCol(sh, 0.33);
+          a.b = orbCol(sh, 0.67);
+          a.a = su3 < 0.015 || su3 > 0.985 ? 0 : 0.6; // hide copy-to-copy connectors
+          return a;
+        }
         if (Math.abs((a.q30 || 0) - 1) < 0.5) {
           // star-net companion (unchanged) — keeps priority when the star motif is up
           var N = 6,
