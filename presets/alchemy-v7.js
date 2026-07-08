@@ -1256,6 +1256,16 @@
     stampSeed = 0, // re-rolls the tangle geometry per stamp (r0: fully re-randomized)
     stampHueOff = 0, // emitter-only hue walk; the trail keeps old hues (A14 resolution)
     stampGain = 1, // crisp-vs-residual envelope, multiplied into centralDraw
+    prevMix = 0, // B4b: transition-start detector
+    anchorAmt = 0, // B4b anchor-seed blend (1 at spawn, releases over ~4-6s)
+    anchorX = 0.5,
+    anchorY = 0.5,
+    lastQ2 = 0.5, // previous frame's motif centre + orb anchors (orbs compute later in frame)
+    lastQ3 = 0.5,
+    lastOrbAX = 0.35,
+    lastOrbAY = 0.5,
+    lastOrbBX = 0.65,
+    lastOrbBY = 0.5,
     sketchAmt = 0, // SKETCHBOOK rest scene (doc 03 A13) engagement
     restStampMode = 1, // current wireframe construction (REST_CYCLE)
     restStampHue = 0, // cycles WITH the construction (h1: white-maroon-blue-magenta)
@@ -1441,6 +1451,16 @@
     //    transition (its ghost carries the frame ~0.8s), then the new motif BLOOMS 25%→100% in
     //    <0.5s (p1 moth 82.9; h0 41.0). Replaces the whole-frame Gaussian dim dip — "the buffer
     //    does the crossfade" (r0). mo.mix runs 0→1 over the 2s window; q30 snaps at 0.5. ──
+    // ── B4b ANCHOR-SEED (doc 03 Step 6; h2 §3.4): the incoming motif spawns ON an existing
+    //    element — the old motif's centre (60%) or an orb (40%) — then releases to the free
+    //    Lissajous path over ~4-6s. Positions are the previous frame's (computed later). ──
+    if (prevMix === 0 && mo.mix > 0) {
+      var ar = Math.random();
+      anchorX = ar < 0.6 ? lastQ2 : ar < 0.85 ? lastOrbAX : lastOrbBX;
+      anchorY = ar < 0.6 ? lastQ3 : ar < 0.85 ? lastOrbAY : lastOrbBY;
+      anchorAmt = 1;
+    }
+    prevMix = mo.mix;
     var trans = mo.mix,
       flashMul = 1 + (bgMode === 1 ? 0 : 0.3) * pulse,
       bloomMul = 1;
@@ -1461,8 +1481,11 @@
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
     // multi-hued WATERCOLOUR trail (the #1 reference signature, 1:29-1:36 / 2:11-2:30), like the
     // original's roaming flower. Small amplitude so it stays the central object.
-    t.q2 = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
-    t.q3 = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
+    var lisX = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
+    var lisY = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
+    anchorAmt *= Math.exp(-dt * 0.25); // release toward the free path over ~4-6s (B4b)
+    t.q2 = lisX + (anchorX - lisX) * anchorAmt;
+    t.q3 = lisY + (anchorY - lisY) * anchorAmt;
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
     t.q5 =
@@ -1668,6 +1691,14 @@
       t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
       t.q16 *= 1 - va; // no roll (a clean dive down the valley)
     }
+
+    // B4b: remember this frame's FINAL centre + orb anchors (corridor/valley overrides included)
+    lastQ2 = t.q2;
+    lastQ3 = t.q3;
+    lastOrbAX = t.q21;
+    lastOrbAY = t.q22;
+    lastOrbBX = t.q23;
+    lastOrbBY = t.q24;
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
     if (typeof window !== "undefined" && window.__ALC_FORCE) {
