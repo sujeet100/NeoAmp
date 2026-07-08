@@ -1256,6 +1256,11 @@
     stampSeed = 0, // re-rolls the tangle geometry per stamp (r0: fully re-randomized)
     stampHueOff = 0, // emitter-only hue walk; the trail keeps old hues (A14 resolution)
     stampGain = 1, // crisp-vs-residual envelope, multiplied into centralDraw
+    sketchAmt = 0, // SKETCHBOOK rest scene (doc 03 A13) engagement
+    restStampMode = 1, // current wireframe construction (REST_CYCLE)
+    restStampHue = 0, // cycles WITH the construction (h1: white-maroon-blue-magenta)
+    restStampT0 = -9,
+    restStampNext = 0,
     accDots = 0, // wave3 slot: 0 none · 1 marching bead row · 2 caterpillar chain
     accDotsNext = -1,
     accDotsPhase = 0,
@@ -1326,6 +1331,7 @@
     // ── BACKGROUND — its own slow clock; 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel ──
     var bg = bgPick(time, dt, false);
     t.q29 = BG_BAG[bg.mix < 0.5 ? bg.a : bg.b]; // discrete snap (the persistent trail buffer bridges cuts)
+    if (FORCE && FORCE.q29 !== undefined) t.q29 = FORCE.q29; // pin drives bg-gated lifecycle too
     var bgMode = Math.floor(t.q29 + 0.5);
 
     // ── COLOUR (MEASURED). Continuous hue clock: ~0.07 cyc/s calm → ~0.22 cyc/s kaleidoscope/energetic
@@ -1548,6 +1554,30 @@
     restAmt += ((resting ? 1 : 0) - restAmt) * Math.min(1, dt * 0.8);
     accVis = 1 - 0.88 * restAmt;
     t.q14 *= 1 - 0.92 * restAmt;
+
+    // ── SKETCHBOOK REST (doc 03 A13; h1 S3 74.8-83): on a flat-wash rest the frame becomes a
+    //    static page — ONE wireframe motif re-stamps every ~1-2s cycling BOTH construction AND
+    //    hue, old stamps ghost-fade ~1s, centre static, NO music jag (clock-driven stamps).
+    //    Existing constructions only (star-net / net / 12-star / tri-mandala). B2 events are
+    //    already silent here (the rest gate). ──
+    var sketch = restAmt > 0.7 && bgMode === 5;
+    sketchAmt += ((sketch ? 1 : 0) - sketchAmt) * Math.min(1, dt * 2);
+    if (sketch && time >= restStampNext) {
+      restStampMode = REST_CYCLE[Math.floor(Math.random() * REST_CYCLE.length)];
+      restStampHue += 0.2 + Math.random() * 0.4;
+      restStampT0 = time;
+      restStampNext = time + 1 + Math.random();
+    }
+    if (sketchAmt > 0.5) {
+      mCur = restStampMode; // draw path only — the pickers keep their own clocks
+      t.q30 = restStampMode;
+      t.q2 += (0.5 - t.q2) * sketchAmt; // page centre, dead still (h1: camera static)
+      t.q3 += (0.5 - t.q3) * sketchAmt;
+      t.q6 *= 1 - 0.9 * sketchAmt; // clock-driven, not audio-jagged (h1: no music jag)
+      t.q8 += restStampHue * sketchAmt;
+      t.q4 = Math.max(t.q4, 0.7 * sketchAmt); // the page ignores the swap machinery's envelopes
+      stampGain = time - restStampT0 < 0.3 ? 1 : 0; // crisp blink, then only the fading ghost
+    }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
     //    absolute screen space (independent of the motif — the original parents nothing). ──
