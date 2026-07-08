@@ -1432,7 +1432,7 @@
         // SLIGHT rotation between stamps (h1 "feathery ghosting"). Was 0.25-0.75 rad — a full
         // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
         // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
-        spiroRot += 0.04 + Math.random() * 0.06;
+        spiroRot += 0.08 + Math.random() * 0.07; // 5-9°/stamp — visible slow crawl, still ≪ the 30° petal spacing
         spiroPhase += 0.8 + Math.random() * 1.4; // scribble variants still re-arrange per stamp
         spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
         // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
