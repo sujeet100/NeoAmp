@@ -5,8 +5,12 @@
 > still is the same ferris wheel. It was implemented, then REMOVED (commit 5a77039). Do not
 > re-add it. Also user-verified: the ferris wheel is NOT an independent ring+spokes build —
 > it is the dahlia petal-star with a transient round-waveform ring that briefly CONNECTS the
-> petal tips, then fades (commit da1db9f). The shipped family is 0 dahlia · 1 crown ·
-> 2 wreath · 3 wheel(=dahlia+ring).
+> petal tips, then fades (commit da1db9f). And the 0:35 "lace-crown" is NOT a standalone
+> needle-diamond flower: the pompom itself is the same radial construction with MANY short
+> fine petals (user: "like the ferris wheel but with many many petals — fur ball"), so
+> variant 1 is that many-petal fur-ball flash (k 26-40, single pale hue). The shipped family
+> is 0 dahlia · 1 fur-ball · 2 wreath · 3 wheel(=dahlia+ring), all ONE petal-star
+> construction except the wreath. 1:03-1:06 shows the family morphing per stamp ~1/s.
 
 **Matrix items:** A1 · **Priority:** P1 (both captures) · **Risk flags:** none in the matrix (see §5 for adjacent user-rejection history to respect) · **Confirmation needed:** no — all five variants are directly evidenced in the references; no dots, no new wave/shape slots, no camera changes.
 

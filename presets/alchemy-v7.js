@@ -851,7 +851,7 @@
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
   function fSpiro(a) {
     var s = a.sample || 0;
-    var k = spiroK; // 10-14 dahlia/wheel petals · 14-16 crown points (per stamp)
+    var k = spiroK; // 10-14 dahlia/wheel petals · 26-40 fur-ball filaments (per stamp)
     var R = (a.q5 || 0.4) * 0.58; // compact — the ref figures sit ~30-45% of frame, not edge-to-edge
     var wob = (a.value1 || 0) * (a.q6 || 0.05) * 0.85; // live radial wobble (doc 08 spec 0.9; 0.5 read static vs the 480p scribble)
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
@@ -862,12 +862,7 @@
       direct = false; // the lotus star builds x/y directly (leaf-loop geometry, not r/θ)
     var hueOff = 0; // per-variant hue offset (only the lotus takes the alternating-petal duo)
     var kill = false; // hide a single connector seam where a variant splits the sample sweep
-    if (spiroVar === 1) {
-      // 1 LACE-CROWN STAR (p0 35.3): narrow diamond points around a rim; single pale hue —
-      // let the additive stroke + tone-map make it pale, do NOT force white.
-      th = s * 6.2832 + spiroRot;
-      r = R * (0.38 + 0.62 * Math.pow(Math.abs(Math.sin(th * k * 0.5)), 2.6)) + wob; // hole 0.38
-    } else if (spiroVar === 2) {
+    if (spiroVar === 2) {
       // 2 WREATH-BALL (h1 M5): overlapping-chord scribble annulus; drifting phases + feedback
       // ghosts build the overlapping-chord torus (ring ~35%, hole ~12%). No beads (A8).
       // (The former "sun medallion" variant was REMOVED 2026-07-08 — the user confirmed the p0
@@ -881,11 +876,12 @@
               0.5) +
         wob;
     } else {
-      // 0 DAHLIA · 3 FERRIS WHEEL — the SAME petal star (user, validated against 480p 49.8-56):
-      // the original's "wheel" is not a separate build; the dahlia appears, then a ROUND live-
-      // WAVEFORM ring briefly CONNECTS the petal tips, then the ring fades away. Variant 3 =
-      // dahlia + ring; the ring's alpha rides spiroRingAmt (eased in frame(), so it grows in
-      // while the wheel construction is up and melts out when the stamp re-rolls away).
+      // 0 DAHLIA · 1 FUR-BALL (many-petal) · 3 FERRIS WHEEL — ONE petal-star construction (user,
+      // validated against 480p 35/49.8-56 + 1:03-1:06): the original's "wheel" is not a separate
+      // build — the dahlia appears, a ROUND live-WAVEFORM ring briefly CONNECTS the petal tips,
+      // then fades (variant 3, alpha rides spiroRingAmt eased in frame()). The 0:35 pompom is the
+      // same radial construction with MANY short fine petals (user: "like the ferris wheel but
+      // with many many petals — fur ball") = variant 1: k 26-40, single pale hue, width ∝ 12/k.
       // Measured (2026-07-08): the flower is NEVER a rigid star — petal lengths are irregular,
       // each petal sways on its own slow clock, and the outline is a LIVE-WAVEFORM lightning
       // stroke whose jag is comparable to the petal half-width (an earlier wprof² window crushed
@@ -936,9 +932,10 @@
         var d = hole + (R * plen - hole) * breathe * edge; // petal length pulses with the music
         // CURVED LEAF profile, slim enough that adjacent petals PACK without crossing: angular
         // half-width ≈ atan(0.13R/0.55R) ≈ 0.23 rad < half the k=12 spacing (0.26) — the ref petals
-        // sit side by side like a real flower, never over each other
+        // sit side by side like a real flower, never over each other. Width shrinks ∝ 12/k so the
+        // many-petal fur ball (k 26-40) packs as fine filaments the same way.
         var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
-        var halfW = R * 0.13 * wprof;
+        var halfW = R * 0.13 * Math.min(1, 12 / k) * wprof;
         // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
         // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
         // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
@@ -959,8 +956,10 @@
         lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
         loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
         direct = true;
-        hueOff = pi & 1 ? 0.38 : 0; // alternating-petal DUO (h1 two-tone)
-        a.a = 0.5 + 0.5 * edge; // fade toward the hub → no additive pile-up, keeps the hole dark
+        hueOff = spiroVar === 1 ? 0 : pi & 1 ? 0.38 : 0; // duo two-tone; fur ball single pale hue (p0 35)
+        // fade toward the hub → no additive pile-up, keeps the hole dark; the many-petal fur ball
+        // deposits ~3× the strokes, so scale by √(12/k) or its trail streaks blow out the buffer
+        a.a = (0.5 + 0.5 * edge) * Math.min(1, Math.sqrt(12 / k));
         if (pu < (1.5 * k) / 512) kill = true; // guarantee ≥1 hidden base connector per petal (Fable)
       }
     }
@@ -1420,7 +1419,7 @@
           spiroVar = window.__ALC_FORCE.spiroVar;
         spiroK =
           spiroVar === 1
-            ? 14 + Math.floor(Math.random() * 3) // crown 14-16 points
+            ? 26 + Math.floor(Math.random() * 15) // fur ball: many many short petals (p0 35)
             : 10 + Math.floor(Math.random() * 5); // dahlia/wreath/wheel 10-14
         // SLIGHT rotation between stamps (h1 "feathery ghosting"). Was 0.25-0.75 rad — a full
         // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
@@ -1431,7 +1430,7 @@
         // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
         // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
         spiroTilt = Math.random() < 0.6 ? 1.0 : 0.5 + Math.random() * 0.2;
-        spiroNext = time + 1.0 + Math.random() * 1.0; // ~1-2s cadence
+        spiroNext = time + 0.8 + Math.random() * 0.8; // ~0.8-1.6s cadence (1:03-1:06: crisp new stamps ~1/s)
       }
     } else {
       spiroNext = -1;
