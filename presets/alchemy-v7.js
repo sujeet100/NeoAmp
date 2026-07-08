@@ -1403,7 +1403,8 @@
       var rl = Math.random();
       // none / ray-curtain / waveform bundle / rotating PINWHEEL (the 480p 0:39-0:45 windmill
       // fan — long lines through an off-centre hub, rotating steadily for the whole dwell)
-      accLine = rl < 0.32 ? 0 : rl < 0.52 ? 1 : rl < 0.74 ? 2 : 4;
+      // pinwheel (4) made RARER (user): ~0.26→~0.15, freed weight → "none" (calmer, motif-only)
+      accLine = rl < 0.4 ? 0 : rl < 0.58 ? 1 : rl < 0.85 ? 2 : 4;
       accLineNext = time + 5 + Math.random() * 6;
       accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
       accLineAng = Math.random() * 3.14159;
@@ -1584,18 +1585,20 @@
             kp = Math.floor(fkp),
             up = fkp - kp;
           var pang = accLineRot + kp * (3.14159 / Kp);
-          var pp = (up - 0.5) * 1.7;
+          // CONTAINED reach (user: it was spraying edge-to-edge and burying the motif; the ref
+          // windmill is a localized fan): half-length 1.7→0.7 so rays stay near the hub.
+          var pp = (up - 0.5) * 0.7;
           // hub ANCHORED to the central motif (user, twice: the 480p 0:39-0:45 fan rotates
-          // around the CENTRE MOTIF, not free-floating) + bright enough to actually register
+          // around the CENTRE MOTIF, not free-floating)
           var phx = a.q2 !== undefined ? a.q2 : 0.5,
             phy = a.q3 !== undefined ? a.q3 : 0.5;
           a.x = phx + Math.cos(pang) * pp;
           a.y = phy + Math.sin(pang) * pp;
           var hp = (a.q8 || 0) + 0.2;
-          a.r = orbCol(hp, 0) * 0.75 * accVis;
-          a.g = orbCol(hp, 0.33) * 0.75 * accVis;
-          a.b = orbCol(hp, 0.67) * 0.75 * accVis;
-          a.a = (up < 0.03 ? 0 : 0.5) * accVis;
+          a.r = orbCol(hp, 0) * 0.5 * accVis; // dimmer (0.75→0.5) so it reads as a soft fan, not a wall
+          a.g = orbCol(hp, 0.33) * 0.5 * accVis;
+          a.b = orbCol(hp, 0.67) * 0.5 * accVis;
+          a.a = (up < 0.03 ? 0 : 0.4) * accVis;
           return a;
         }
         if (accLine === 1 && accLineEnv > 0.01) {
