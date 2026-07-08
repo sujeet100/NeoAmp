@@ -1226,7 +1226,11 @@
     valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
     freezeAmt = 0, // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
     sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
-    radialAmt = 0; // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
+    radialAmt = 0, // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
+    eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
+    eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
+    eyeY = 0.3,
+    eyeOn = false; // upward-crossing tracker for the re-roll
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1674,6 +1678,24 @@
       t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
       t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
       t.q19 *= 1 - 0.8 * radialAmt;
+    }
+    // SWIRL-EYE (field 4): vortex scenes rotate the trail about an off-centre eye — the dark
+    // "eye" is just the un-fed centre of rotation (p3 §3.1 at (33%,8%); p0 rotation-smear).
+    // Keep q17 ≤ ~0.09 — above that the 1/r falloff whips the centre.
+    eyeAmt += ((mCur === 8 ? 1 : 0) - eyeAmt) * Math.min(1, dt * 0.5);
+    if (eyeAmt > 0.02 && !eyeOn) {
+      eyeOn = true; // re-roll the eye per activation, off-centre like the refs
+      eyeX = 0.25 + 0.5 * Math.random();
+      eyeY = 0.15 + 0.3 * Math.random();
+    } else if (eyeAmt <= 0.02) {
+      eyeOn = false;
+    }
+    if (eyeAmt > 0.01) {
+      t.q17 += (0.07 - t.q17) * eyeAmt; // strong local swirl (the tunnel bg uses 0.04)
+      t.q20 += (eyeX - t.q20) * 0.7 * eyeAmt; // pivot → the eye
+      t.q27 += (eyeY - t.q27) * 0.7 * eyeAmt;
+      t.q18 *= 1 - 0.85 * eyeAmt;
+      t.q19 *= 1 - 0.85 * eyeAmt;
     }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
