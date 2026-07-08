@@ -1291,6 +1291,10 @@
 
   function frame(t) {
     var time = t.time || 0;
+    // __ALC_FORCE debug keys (doc 03 Step 0; PRODUCTION NO-OP — the object is never set live).
+    // Read once so closure-level LIFECYCLE state (motif/rest/event) is pinnable in self-renders;
+    // the tail-of-frame hook only overrides t.* q-vars AFTER the frame logic has already run.
+    var FORCE = (typeof window !== "undefined" && window.__ALC_FORCE) || null;
     var bass = t.bass || 1,
       bassA = t.bass_att !== undefined ? t.bass_att : bass;
     var dt = Math.min(0.05, Math.max(0.001, time - lastT));
@@ -1355,6 +1359,7 @@
     // ── CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly. ──
     var mo = motifPick(time, dt, f > 0.6);
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
+    if (FORCE && FORCE.motif !== undefined) mCur = FORCE.motif; // pin drives lifecycle logic, not just q30
     t.q30 = mCur;
     var dd = (mo.mix - 0.5) * 4.0;
     // dips at the swap instant; FLASHES on hits — but NOT under the kaleidoscope fold, which
@@ -1466,6 +1471,7 @@
         breathNext = time + 8 + Math.random() * 6; // busy 8-14s
       }
     }
+    if (FORCE && FORCE.rest !== undefined) resting = !!FORCE.rest; // debug pin
     restAmt += ((resting ? 1 : 0) - restAmt) * Math.min(1, dt * 0.8);
     accVis = 1 - 0.88 * restAmt;
     t.q14 *= 1 - 0.92 * restAmt;
