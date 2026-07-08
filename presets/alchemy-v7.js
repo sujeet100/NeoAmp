@@ -27,7 +27,7 @@
  *      revealing earlier renders = parallax / sense of 3D motion.
  *
  * Q-VAR MAP (engine vs motif split; no collisions):
- *   ENGINE  q1 decay · q8 hue(shared) · q12 fold-on · q13 fold-scale · q15 magnify · q16 roll ·
+ *   ENGINE  q1 decay · q8 hue(shared) · q12 shear (warp; 0=off) · q13 fold-scale · q15 magnify · q16 roll ·
  *     q17 swirl · q18 dx · q19 dy · q20/q27 pivot · q28 blur/diffusion mix · q29 bgMode · q31 exp · q32 beat
  *   MOTIF   q2,q3 center · q4 motif-visibility dip · q5 size · q6 jag · q7 orbR · q9 spin · q10 twist ·
  *     q11 focus(pupil) · q14 orbB vis · q21..q24 orb nodes · q25 orbA vis · q26 tether amp · q30 motif mode id
@@ -56,6 +56,9 @@
     "  pd *= (1.0 - q15);\n" +
     "  pd.x /= asp;\n" +
     "  vec2 suv = piv + pd + vec2(q18, q19);\n" + // PAN translate (abrupt-snap direction from frame())
+    // SAWTOOTH X-SHEAR as f(y) (doc 01 step 6, p2: stamps shear into chevron ribbons). A triangle
+    // wave in y, 3 teeth; q12 in -1..1, 0 = OFF (dormant capability for the structured grounds).
+    "  suv.x += q12 * 0.03 * (abs(fract(suv.y * 3.0 + time * 0.05) * 2.0 - 1.0) * 2.0 - 1.0);\n" +
     // WATERCOLOUR DIFFUSION — a wide 9-tap gaussian of the previous frame, blended back by q28. Because
     // the WARP output feeds back, this COMPOUNDS: a deposit gets blurred again every frame → it spreads
     // and softens like ink bleeding into wet paper. Weights sum to 1.0.
@@ -1174,8 +1177,9 @@
     if (m < 0) m = 0;
     if (m >= MODES.length) m = MODES.length - 1;
     MODES[m](a);
-    // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on circle.
-    if ((m === 0 || m === 2) && (a.q12 || 1) < 1.5) {
+    // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on
+    // circle. Gated to "not kaleido" via q29 (the fold source) — q12 was freed for the shear warp.
+    if ((m === 0 || m === 2) && Math.abs((a.q29 || 0) - 1.0) > 0.5) {
       var cyS = a.q3 !== undefined ? a.q3 : 0.5;
       a.y = cyS + (a.y - cyS) * (1.0 - 0.34 * (a.q11 || 0));
     }
@@ -1446,8 +1450,10 @@
     t.q20 = 0.5 + vpR * Math.cos(vpAng);
     t.q27 = 0.5 + vpR * Math.sin(vpAng * 1.31);
 
-    // ── FOLD — engage the kaleidoscope only on bgMode 1 (the COMP tiled-diamond fold reads q12/q13). ──
-    t.q12 = bgMode === 1 ? 4 : 1;
+    // ── FOLD — engage the kaleidoscope only on bgMode 1 (the COMP tiled-diamond fold reads q13;
+    //    fold-on is implied by q29==1). q12 FREED (doc 01 step 6): now the warp's sawtooth x-shear
+    //    amount (-1..1, 0 = off) — DORMANT until the structured-grounds doc (C4) writes it. ──
+    t.q12 = 0;
     t.q13 = bgMode === 1 ? 0.5 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)) : 0;
 
     // ── CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly. ──
