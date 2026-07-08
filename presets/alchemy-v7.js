@@ -873,7 +873,7 @@
       // inner star over the empty annulus + dark ground gives the eye the core.
       if (s < 0.8) {
         th = (s / 0.8) * 6.2832 + spiroRot;
-        r = R * (0.78 + 0.14 * Math.sin(th * k + spiroRot * 2)) + wob;
+        r = R * (0.78 + 0.14 * Math.sin(th * k + spiroPhase)) + wob;
       } else {
         th = ((s - 0.8) / 0.2) * 6.2832 + spiroRot;
         r = R * 0.22 * (0.6 + 0.4 * Math.abs(Math.sin(th * 4))) + wob * 0.4;
@@ -887,7 +887,7 @@
         R *
           (0.85 +
             0.13 *
-              (Math.sin(th * 7.3 + spiroRot * 3) + 0.6 * Math.sin(th * 11.7 - spiroRot * 2)) *
+              (Math.sin(th * 7.3 + spiroPhase) + 0.6 * Math.sin(th * 11.7 - spiroPhase * 0.7)) *
               0.5) +
         wob;
     } else if (spiroVar === 4) {
@@ -896,7 +896,7 @@
       // the FREE additive pileup of 9 spoke-ends — do not add a glow.
       if (s < 0.6) {
         th = (s / 0.6) * 6.2832 + spiroRot;
-        r = R * (0.85 + 0.06 * Math.sin(th * 7.3 + spiroRot * 3)) + wob * 0.6; // gentler wobble
+        r = R * (0.85 + 0.06 * Math.sin(th * 7.3 + spiroPhase)) + wob * 0.6; // gentler wobble
       } else {
         var u = (s - 0.6) / 0.4;
         var j = Math.floor(u * 9),
@@ -923,12 +923,15 @@
       var fk = s * k,
         pi = Math.floor(fk),
         pu = fk - pi; // petal index + 0..1 within the petal
-      // per-petal IDENTITY: hashed irregular length, re-seeded per stamp (spiroRot moves per stamp)
-      var ph = Math.sin((pi + 1) * 12.9898 + spiroRot * 57.0) * 43758.5453;
+      // per-petal IDENTITY: hashed irregular length, seeded ONCE per motif dwell (spiroSeed) — NOT
+      // per stamp: if lengths re-roll each stamp, a long ghost pokes out from under the new short
+      // petal and reads as a DIFFERENT overlapping petal (user: "petals overlap"). Stable lengths
+      // keep every ghost hugging its own petal → the ref's dense layered-flower look.
+      var ph = Math.sin((pi + 1) * 12.9898 + spiroSeed) * 43758.5453;
       ph -= Math.floor(ph);
-      // independent slow sway per petal (~2.3s via the q9 clock) — undulation with no net spin
+      // gentle independent sway per petal (~2.3s via the q9 clock) — undulation with no net spin
       // (continuous spin + feedback = the rejected gear-smear; sway oscillates, so no smear)
-      var sway = 0.07 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
+      var sway = 0.04 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
       var baseAng = (pi / k) * 6.2832 + spiroRot + sway;
       var edge = pu < 0.5 ? pu * 2 : 2 - pu * 2; // 0 at base → 1 at tip → 0 at base
       var sideSign = pu < 0.5 ? 1 : -1; // left edge out, right edge back
@@ -938,17 +941,23 @@
       var breathe = Math.max(0.28, 0.5 + 0.85 * ((a.q32 || 1) - 1)); // ~0.5 calm → ~1.6 on a hit
       var plen = 0.72 + 0.5 * ph; // irregular per-petal length (ref petals differ visibly)
       var d = hole + (R * plen - hole) * breathe * edge; // petal length pulses with the music
-      // CURVED LEAF profile kept but slimmer — the live jag below now carries the width/texture
+      // CURVED LEAF profile, slim enough that adjacent petals PACK without crossing: angular
+      // half-width ≈ atan(0.13R/0.55R) ≈ 0.23 rad < half the k=12 spacing (0.26) — the ref petals
+      // sit side by side like a real flower, never over each other
       var wprof = (Math.pow(edge, 0.5) * (1 - edge)) / 0.385;
-      var halfW = R * 0.17 * wprof;
+      var halfW = R * 0.13 * wprof;
       // ★ LIGHTNING edges at N-GON strength (user: "waveform like the n-gon has"): full q6-scale
       // displacement like ngonPoint's disp = value1*q6, anchored only near the base so the loop
       // still closes; the tip keeps ~half jag (flame-lick) instead of being pinned to a point.
       var jw = Math.min(1, edge * 6) * (0.45 + 0.55 * wprof);
       var amp = (a.q6 || 0.05) * (1.6 + 1.2 * ((a.q32 || 1) - 1)); // beat-coupled; > tether (short edges need a bigger excursion to read as lightning)
-      // ribbon half-width ~0.7% of R-scaled frame (the ref bolt is ~0.8% of frame wide), tapered
-      // toward base/tip but never to zero; parity of the GLOBAL point index flips the rail
-      var ribbon = ((Math.round(s * 512) & 1) * 2 - 1) * R * 0.014 * (0.35 + 0.65 * wprof);
+      // ribbon teeth are LIVE (user: "ours is statically jagged"): the rail gap rides the LOCAL
+      // waveform magnitude — quiet passage → thin near-smooth stroke, a hit → fat jagged teeth,
+      // and the serration depth varies point-to-point with the actual samples, like the original.
+      // Small floor keeps a visible stroke; parity of the GLOBAL point index flips the rail.
+      var vmag = Math.abs(a.value1 || 0);
+      var ribbon =
+        ((Math.round(s * 512) & 1) * 2 - 1) * R * (0.005 + 0.055 * vmag) * (0.35 + 0.65 * wprof);
       var lat = sideSign * halfW + ribbon + (a.value1 || 0) * amp * jw;
       // radial tip FLICK: the same live sample also jitters the petal ALONG its axis, strongest at
       // the tip — the displacement direction rotates lateral→radial outward, so tips lick like the
@@ -1268,7 +1277,10 @@
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
   var spiroVar = 0, // 0 lotus · 1 crown · 2 medallion · 3 wreath · 4 ferris
     spiroK = 12, // petal/point/spoke count (per-stamp within a variant's range)
-    spiroRot = 0, // per-stamp rotation snap (feathery ghosting)
+    spiroRot = 0, // per-stamp rotation snap — SLIGHT (feathery ghosting hugs the petals)
+    spiroPhase = 0, // per-stamp scribble-phase for the medallion/wreath/ferris (big steps — their
+    // stamp-to-stamp variety must NOT ride the now-tiny rotation snap)
+    spiroSeed = 0, // per-DWELL petal-identity seed (stable while the motif is up → ghosts align)
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
@@ -1397,7 +1409,10 @@
     if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
       mEff = Math.floor(window.__ALC_FORCE.q30 + 0.5);
     if (mEff === 17) {
-      if (spiroNext < 0) spiroNext = time; // first entry: stamp immediately
+      if (spiroNext < 0) {
+        spiroNext = time; // first entry: stamp immediately
+        spiroSeed = Math.random() * 100; // petal identities for THIS dwell (stable across stamps)
+      }
       if (time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
         var pv = spiroVar;
         while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 5); // always a DIFFERENT one
@@ -1414,7 +1429,11 @@
             : spiroVar === 4
               ? 8 + Math.floor(Math.random() * 3) // wheel 8-10 spokes
               : 10 + Math.floor(Math.random() * 5); // lotus/medallion 10-14
-        spiroRot += 0.25 + Math.random() * 0.5; // slight rotation between stamps (feathery ghosts)
+        // SLIGHT rotation between stamps (h1 "feathery ghosting"). Was 0.25-0.75 rad — a full
+        // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
+        // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
+        spiroRot += 0.04 + Math.random() * 0.06;
+        spiroPhase += 0.8 + Math.random() * 1.4; // scribble variants still re-arrange per stamp
         spiroHue = (Math.random() - 0.5) * 0.3; // per-stamp hue snap, riding the shared q8 clock
         // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
         // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
