@@ -1498,7 +1498,7 @@
         // per-stamp FLAVOUR (r0 measures alternating flavours): dreamcatcher 45% · crumple 30% · sphere 25%
         var rf = Math.random();
         cocFlavour = rf < 0.45 ? 0 : rf < 0.75 ? 1 : 2;
-        cocElong = 1.3 + Math.random() * 0.3; // crumple-cocoon elongation (~1.5:1 diagonal)
+        cocElong = 1.2 + Math.random() * 0.15; // crumple elongation tamed 1.3-1.6→1.2-1.35 (was too lopsided)
         if (Math.random() < 0.4)
           cocHue += (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.14); // hue step ~1.5-2s
       }
