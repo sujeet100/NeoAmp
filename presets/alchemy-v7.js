@@ -1225,7 +1225,8 @@
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
     valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
     freezeAmt = 0, // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
-    sagAmt = 0; // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
+    sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
+    radialAmt = 0; // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1662,6 +1663,17 @@
       var sagRest = 1 - 0.9 * restAmt;
       t.q18 += (0.0004 * Math.sin(time * 0.13) * sagRest - t.q18) * sagAmt; // trace of lateral waviness (p2 field d)
       t.q19 += (-0.0022 * sagRest - t.q19) * sagAmt; // ≈0.13 UV/s downward
+    }
+    // RADIAL-OUT (field 3): urchin/fluff scenes stream the trail outward from the motif hub
+    // (p1 moth fans t=83-89; h1 M6 2-4%/s; h0 M11 filaments radiate to the edges).
+    // CAP q15 ≤0.008 — a big magnify is the rejected "spiky-burst over-fill" (see the q15 note).
+    radialAmt += ((mCur === 2 || mCur === 16 ? 1 : 0) - radialAmt) * Math.min(1, dt * 0.5);
+    if (radialAmt > 0.01) {
+      t.q15 += (0.006 - t.q15) * radialAmt; // outward growth ≈2-4%/s — NEVER above 0.008
+      t.q20 += (t.q2 - t.q20) * 0.7 * radialAmt; // hub = the motif centre (streaming is motif-centred)
+      t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
+      t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
+      t.q19 *= 1 - 0.8 * radialAmt;
     }
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
