@@ -3431,13 +3431,15 @@
   // PASTEL = the accurate WMP look (480p + the orig-19s clip both measure muted/dusty/pastel, true blacks):
   // lower saturation, lifted softer washes, milky low-contrast, a faint mauve/sage cast.
   var PROFILE_PASTEL = {
-    gboost: 1.32, // was 1.7 — too washed; muted but the geometry keeps presence on a darker-ish ground
+    gboost: 1.1, // was 1.32/1.7 — user 2026-07-10 "backgrounds too milky/faded"; the ref has TRUE
+    // blacks, so darken the DARK GROUND (gboost multiplies only `ground`, never the trail/glow —
+    // the geometry keeps its presence while the empty/dark regions deepen).
     kbold: 0.85,
     ksat: 0.38, // kaleidoscope diamonds DESATURATED → soft pastel (they were reading too vivid in pastel)
     tonek: 0.68,
     sat: 0.82, // was 0.62 — keep real (muted) COLOUR, not greyed-out
-    deepen: 0.84, // was 0.95 — restore some contrast so it isn't flat/milky
-    lift: 0.02, // was 0.05 — barely a milky floor
+    deepen: 0.74, // was 0.84/0.95 — more darks-compression (toned²) so the floor stays deep, not milky
+    lift: 0.0, // was 0.02/0.05 — NO milky floor lift (ref has true blacks)
     tintR: 0.5,
     tintG: 0.5,
     tintB: 0.58,
