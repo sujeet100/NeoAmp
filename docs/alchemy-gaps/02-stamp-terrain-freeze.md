@@ -7,6 +7,14 @@
 > 17 — spiro/cocoon landed first; README landing-order rule). **Step 5 re-tint = SKIPPED** per the
 > answered README Q2 (never recolour the buffer). **Awaiting the per-step LIVE looks** — step 3
 > (accessory layer) needs the closest scrutiny; each commit reverts independently.
+>
+> **★ A10 MECHANISM CORRECTION (user, 2026-07-09, scallop v2 `af064fe`):** the in-doc "drawn as
+> big smooth scallops" reading is WRONG. The user (confirmed by frame check 0:04-0:11): the
+> scallop is **a straight tether-like chord whose sinking TRAIL is bent into the arches by the
+> displacement field** — fScallop draws only the straight chord between orb-parked terminals;
+> the warp's q12<0 per-column y-flow (sign-multiplexed with the C4 sawtooth shear) makes the
+> scallops. Never draw the wave shape. Also: mountains deposits are BURST-gated (53f281c) —
+> an always-on crest fuzzes the pile under the freeze.
 
 **Matrix items:** B3 (P1) · D11 (P2) · A3 (P1) · A10 (P2) · **Priority:** P1 cluster ·
 **Risk flags:** (4) on B3/D11/A3 — warp + accessory-layer changes are the rejected-rework class (`9ba675e`): ship ONE step at a time, user-verified live between commits; (1) on A10 — the refs' bead-stack terminals are skipped here (no dots, no filled beads; route later per A4 / doc 07); (6) implicit — frozen deposits live longer, so keep the Reinhard headroom (never raise trail gain or q31). ·
