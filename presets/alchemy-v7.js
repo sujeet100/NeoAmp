@@ -1244,14 +1244,25 @@
       ay = a.q22 !== undefined ? a.q22 : 0.5;
     var bx = a.q23 !== undefined ? a.q23 : 0.6,
       by = a.q24 !== undefined ? a.q24 : 0.5;
+    if (tetherKind === 6) {
+      // CASCADE hangs from ONE orb (h0 T3): the far end is a point below orb A, not orb B
+      bx = ax + 0.1 * Math.sin(tetherSeed);
+      by = ay - 0.32; // y-up wave coords: -0.32 = hangs DOWNWARD on screen
+    }
     var dx = bx - ax,
       dy = by - ay,
       len = Math.hypot(dx, dy) || 1;
     var nx = -dy / len,
       ny = dx / len;
-    var s2 = (a.sample || 0) * 2,
-      strand = s2 < 1 ? 0 : 1,
-      tt = strand ? s2 - 1 : s2;
+    // strand fold: 2 strands default · 1 kite · 3 rope · 4 cascade
+    var NS = tetherKind === 4 ? 3 : tetherKind === 6 ? 4 : tetherKind === 5 ? 1 : 2;
+    var sN = (a.sample || 0) * NS,
+      strand = Math.floor(sN),
+      tt = sN - strand;
+    if (strand >= NS) {
+      strand = NS - 1;
+      tt = 1;
+    }
     var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
     var disp, off;
     if (tetherKind === 1) {
@@ -1276,6 +1287,24 @@
       // LIGHTNING (p1 T4 / r0 2.6): bolder jag than the chord; strand 1 grows 2-3 side twigs below.
       disp = (a.value1 || 0) * (a.q26 || 0.03) * 2.0 * win;
       off = (strand ? 1 : -1) * 0.0035 * win;
+    } else if (tetherKind === 4) {
+      // BRAIDED ROPE (h1 T2): 3 strands, incoherent per-strand jag phases → a fuzzy ~25-30px
+      // bundle; persistent ~5s (life extended at spawn); reads as a solid soft rod.
+      disp =
+        (a.value1 || 0) * (a.q26 || 0.03) * win +
+        Math.sin(tt * 40 + strand * 2.1 + tetherSeed) * 0.004 * win;
+      off = (strand - 1) * 0.008;
+    } else if (tetherKind === 5) {
+      // LOOPY KITE-STRING (p1 T2): one wandering strand — large open loops + fine live jag.
+      disp =
+        0.025 * Math.sin(tt * (3 + (((tetherSeed * 5) | 0) % 3)) * 6.2832 + tetherSeed) * win +
+        (a.value1 || 0) * 0.006 * win;
+      off = 0;
+    } else if (tetherKind === 6) {
+      // HANGING CASCADE (h0 T3): 4 roughly-parallel strands from ONE orb, separation GROWING
+      // toward the low end (the fan opens downward), whole fan swaying slowly.
+      disp = (a.value1 || 0) * 0.01 * win;
+      off = (strand - 1.5) * 0.012 * tt + 0.02 * Math.sin((a.q9 || 0) * 18) * tt;
     } else {
       // 0 — fine-tooth waveform chord (baseline double-stroke)
       disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
@@ -1303,12 +1332,17 @@
     }
     // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet)
     var h = (a.q8 || 0) + inkOff + (tetherKind === 2 ? strand * 0.12 : 0);
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
+    var dim = tetherKind === 4 ? 0.85 : 1; // rope reads soft but SOLID (h1: pale fuzzy rod)
+    // kite POLARITY (p1 T2): dark-on-light over the flat-wash / caustic grounds
+    var bgm = Math.floor((a.q29 || 0) + 0.5);
+    if (tetherKind === 5 && (bgm === 5 || bgm === 8)) dim *= 0.25;
+    a.r = orbCol(h, 0) * dim;
+    a.g = orbCol(h, 0.33) * dim;
+    a.b = orbCol(h, 0.67) * dim;
     // alpha set EVERY point (the reused point object would leak a one-shot 0 across strand 2);
-    // the fly-back segment joining the strands is hidden
-    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.85 * twigDim;
+    // fly-back segments joining consecutive strands are hidden (generalised for 1-4 strands)
+    var flyback = (tt < 0.012 && strand > 0) || (tt > 0.988 && strand < NS - 1);
+    a.a = flyback ? 0 : (tetherKind === 4 ? 0.75 : 0.85) * twigDim;
     return a;
   }
 
@@ -1440,8 +1474,9 @@
   // h1 M7: the tangle stamps in ONE hue every 1.3-2s, crisp ~1-1.5s, then only trail; more
   // modes can join this table later (r0's 0.2-0.3s fast tier already lives in the cocoon block)
   var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
-  // doc 06 A5 construction bag — chord dominant; grows as kinds land (helix/staircase/lightning in)
-  var TETHER_BAG = [0, 0, 0, 0, 1, 1, 2, 2, 3];
+  // doc 06 A5 construction bag — chord dominant (0 chord ·1 helix ·2 staircase ·3 lightning
+  // ·4 rope ·5 kite ·6 cascade); pearl-chain SKIPPED per the answered README Q8
+  var TETHER_BAG = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 5, 6];
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
