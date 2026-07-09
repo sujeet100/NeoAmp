@@ -523,7 +523,10 @@
   }
   // stochastic discrete index cross-fader (V6 makePicker): dwells minS..maxS, then ramps a smoothstep
   // crossfade to a NEW index over `fade` seconds. LONG fade ⇒ morph not cut.
-  function makePicker(n, minS, maxS, fade) {
+  // `accept(idx)` (optional, doc 04 B11): veto-with-retry on the fresh roll — up to 3 re-rolls if
+  // the proposed index is disfavoured under the current scene; the last roll always stands
+  // (weighting, never forbidding — variety survives).
+  function makePicker(n, minS, maxS, fade, accept) {
     var a = Math.floor(Math.random() * n),
       b = a,
       mix = 0,
@@ -536,8 +539,11 @@
       if (!transing) {
         var el = time - start;
         if (el >= roll && (gate === undefined || gate || el >= roll + 5)) {
-          b = n > 1 ? Math.floor(Math.random() * (n - 1)) : a;
-          if (b >= a) b++;
+          for (var tr = 0; tr < 4; tr++) {
+            b = n > 1 ? Math.floor(Math.random() * (n - 1)) : a;
+            if (b >= a) b++;
+            if (!accept || accept(b)) break;
+          }
           tstart = time;
           transing = true;
         }
@@ -1773,8 +1779,29 @@
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
     18, 18, 19,
   ];
+  // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
+  //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
+  //    kaleido + radial mirror-friendly · wash + ONE organic ball · bands + small centre motif).
+  //    Disfavoured combos still pass at ~35% (weight, never forbid). ──
+  var FEAT_PAIRING = true;
+  var PAIR = {
+    4: [13, 15, 16, 14, 17], // bars → tangle/mandala/fluff/mountains/dahlia (stem-standing)
+    3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
+    1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
+    5: [16, 13, 9, 18], // flat wash → ONE dominant organic ball
+    6: [13, 16, 15], // bands/wallpaper → small centre motif
+  };
+  var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
+  function acceptMotif(idx) {
+    if (!FEAT_PAIRING) return true;
+    var fav = PAIR[curBgMode];
+    if (!fav) return true;
+    var id = MOTIF_BAG[idx];
+    for (var i = 0; i < fav.length; i++) if (fav[i] === id) return true;
+    return Math.random() < 0.35;
+  }
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
-  var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
+  var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0, acceptMotif);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
   // ── ORB BALLOON EVENTS (doc 07 D2a). The refs' orb pops are BALLISTIC one-shot events —
   //    inflate 2-3x in ~0.1-0.35s, settle back over ~0.4-1.2s (p2 166.58: 50→150px in 0.35s;
@@ -1836,6 +1863,7 @@
     t.q29 = BG_BAG[bg.mix < 0.5 ? bg.a : bg.b]; // discrete snap (the persistent trail buffer bridges cuts)
     if (FORCE && FORCE.q29 !== undefined) t.q29 = FORCE.q29; // pin drives bg-gated lifecycle too
     var bgMode = Math.floor(t.q29 + 0.5);
+    curBgMode = bgMode; // B11 pairing: the motif accept callback reads the live bg
 
     // ── COLOUR (MEASURED). Continuous hue clock: ~0.07 cyc/s calm → ~0.22 cyc/s kaleidoscope/energetic
     //    (full wheel in ~14s..~5s, matching the measured net-drift). Plus a small per-beat nudge for the
