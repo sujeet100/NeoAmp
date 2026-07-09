@@ -1849,7 +1849,10 @@
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
-  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1, 9]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s) · 9 treadmill(doc 04)
+  // doc 12 D5: the flat WASH is the dominant REST ground in the refs (p1 B2, ≈half the runtime),
+  // not the wavy-fluid — so wash(5)×4 + wavy(0)×3 now lead. New structured regimes 10-14 (curtain/
+  // floor/strata/wallpaper/chevron) append here as each lands.
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
