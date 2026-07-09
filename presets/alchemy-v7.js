@@ -219,6 +219,18 @@
       ";\n" + // PROFILE: kaleidoscope boldness (vivid bold / pastel soft)
       "    ground = mix(ground * 0.12, kcol, 0.9);\n" +
       "  }\n" +
+      // ── B9b/B5 WEDGE SWEEP layer (doc 04 step 5; p1 B5 "~0.1 frame/s, depth without camera
+      //    motion"): two soft half-plane gradients rotating slowly — the 5th simultaneous
+      //    element class at climaxes. Open-ground regimes only; MUTED + faint (0.10 gain,
+      //    desat 0.6) — the vivid zone is the fold, never the wedge. ──
+      "  if (m < 0.5 || (m > 4.5 && m < 6.5)) {\n" +
+      "    float wa = time * 0.05;\n" +
+      "    float w1 = smoothstep(-0.5, 0.9, dot(c, vec2(cos(wa), sin(wa))));\n" +
+      "    float w2 = smoothstep(-0.5, 0.9, dot(c, vec2(cos(wa + 2.1), sin(wa + 2.1))));\n" +
+      "    vec3 wedge = (pal(hb + 0.12) * w1 + pal(hb + 0.55) * w2) * 0.10;\n" +
+      "    float wl = dot(wedge, vec3(0.333)); wedge = mix(vec3(wl), wedge, 0.6);\n" +
+      "    ground += wedge;\n" +
+      "  }\n" +
       "  ground *= mix(0.55, 1.06, smoothstep(1.45, 0.1, prad));\n" + // depth vignette
       "  ground *= " +
       G(P.gboost) +
