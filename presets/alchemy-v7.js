@@ -1253,8 +1253,20 @@
       strand = s2 < 1 ? 0 : 1,
       tt = strand ? s2 - 1 : s2;
     var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
-    var disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
-    var off = (strand ? 1 : -1) * 0.0035 * win;
+    var disp, off;
+    if (tetherKind === 1) {
+      // TELEPHONE-CORD HELIX (p1 T3): the two strands WIND around each other, 12-14 loops over
+      // the span (antiphase = the crossing braid), plus a small live jag so it stays audio-alive.
+      var LOOPS = 12 + (((tetherSeed * 7) | 0) % 3);
+      disp =
+        0.028 * Math.sin(tt * LOOPS * 6.2832 + (strand ? 3.1416 : 0)) * win +
+        (a.value1 || 0) * 0.008 * win;
+      off = 0;
+    } else {
+      // 0 — fine-tooth waveform chord (baseline double-stroke)
+      disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
+      off = (strand ? 1 : -1) * 0.0035 * win;
+    }
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
     var h = (a.q8 || 0) + inkOff; // the per-event ACCENT ink, shared with the orb rings (B1)
@@ -1327,6 +1339,9 @@
     // by the tether + both orb RINGS; snaps per tether/hue event ("orbs+tether share one ink
     // pair that snaps per event" — the spine of the whole visualizer, p3 §3.3)
     fillLag = 0.08, // orb FILLS lag the rings ~1s (r0: gold fill kept under a new green ring)
+    tetherKind = 0, // doc 06 A5: construction, re-rolled PER SPAWN (0 chord · 1 helix · 2 staircase
+    // · 3 lightning+twigs · 4 rope · 5 kite · 6 cascade); chord stays dominant in the bag
+    tetherSeed = 0, // per-appearance parameter re-roll (loop counts, branch points, phases)
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
     evStarOn = false, // read by waves[1] (point fns share the closure)
@@ -1390,6 +1405,8 @@
   // h1 M7: the tangle stamps in ONE hue every 1.3-2s, crisp ~1-1.5s, then only trail; more
   // modes can join this table later (r0's 0.2-0.3s fast tier already lives in the cocoon block)
   var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
+  // doc 06 A5 construction bag — chord dominant; grows as kinds land (helix in; more to come)
+  var TETHER_BAG = [0, 0, 0, 0, 1, 1];
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
@@ -1469,6 +1486,11 @@
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
         // B1: the accent ink snaps PER EVENT (bounded q8 offset ±0.36 — never a raw hue, stays muted)
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+        // A5: per-appearance construction re-roll (chord dominant); rope (4) is persistent ~5s (h1)
+        tetherKind = TETHER_BAG[(Math.random() * TETHER_BAG.length) | 0];
+        tetherSeed = Math.random() * 100;
+        if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
+        if (tetherKind === 4) evTetherLife = Math.max(evTetherLife, 4 + Math.random() * 2);
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
