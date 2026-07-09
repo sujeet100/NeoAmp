@@ -274,7 +274,7 @@
     a.g += (lm - a.g) * 0.14;
     a.b += (lm - a.b) * 0.14;
   }
-  function orbShape(qx, qy, hueOff, visVar) {
+  function orbShape(qx, qy, hueOff, visVar, idx) {
     return {
       baseVals: Object.assign({}, SHAPE_BASE, {
         enabled: 1,
@@ -303,7 +303,9 @@
         var bri = (0.9 + 0.5 * be) * (1 + 0.35 * spikeAmt); // fill pulses; D13 spike ~0.6s
         s.x = cx;
         s.y = cy;
-        s.rad = (s.q7 || 0.06) * (1 + 0.45 * be); // radius pulses with the beat
+        // radius: balloon EVENTS carry the pops (doc 07 D2a; per-orb closure envelope);
+        // only a small beat residue remains (was 0.45·be + the 0.85·pulse breathing)
+        s.rad = (s.q7 || 0.06) * (1 + 0.15 * be) * (idx ? radScaleB : radScaleA);
         // SOLID coloured fill — near-1 opacity when present (the original's orbs are solid, THEN fade;
         // the `vis` come-and-go envelope does the fade). Body kept solid too, not translucent.
         s.r = Math.min(1, fr * bri);
@@ -325,7 +327,7 @@
       },
     };
   }
-  function orbGlow(qx, qy, hueOff, visVar) {
+  function orbGlow(qx, qy, hueOff, visVar, idx) {
     return {
       baseVals: Object.assign({}, SHAPE_BASE, {
         enabled: 1,
@@ -348,12 +350,12 @@
           gb = orbCol(hf, 0.67);
         s.x = cx;
         s.y = cy;
-        var puls = ((s.q32 || 1) - 1) / 1.3; // smoothed beat envelope (q32 = 1 + 1.3*pulse)
         // A14 splat window (doc 05 step 6): a 0.35s sine swell — one fat bright emission the
         // feedback immediately owns (diffuses in place, hue-frozen). lastT = this frame's time.
         var sl = (lastT - splatT0) / 0.35;
         var spl = sl >= 0 && sl < 1 ? Math.sin(sl * 3.14159) : 0;
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.1 * puls + 1.3 * spl); // the puff SWELLS on hits
+        // the halo balloons WITH its orb (doc 07 D2a; was riding the smoothed q32 pulse)
+        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.3 * spl) * (idx ? radScaleB : radScaleA);
         var spk = 1 + 0.35 * spikeAmt; // D13 accent spike
         s.r = Math.min(1, gr * 0.85 * spk);
         s.g = Math.min(1, gg * 0.85 * spk);
@@ -1629,6 +1631,35 @@
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
+  // ── ORB BALLOON EVENTS (doc 07 D2a). The refs' orb pops are BALLISTIC one-shot events —
+  //    inflate 2-3x in ~0.1-0.35s, settle back over ~0.4-1.2s (p2 166.58: 50→150px in 0.35s;
+  //    h0: attack ≤2 frames) — NOT a continuous breathing swell. The two orbs fire near-together
+  //    but desynced ~0.1s with different maxima (p2). Closure state; the orb shapes read
+  //    radScaleA/B directly (no free q-vars, shapes share this scope). ──
+  var balloonT0A = -9,
+    balloonT0B = -9,
+    balloonMagA = 1,
+    balloonMagB = 1,
+    balloonNext = -9,
+    radScaleA = 1,
+    radScaleB = 1;
+  function fireBalloon(time) {
+    balloonT0A = time;
+    balloonT0B = time + 0.06 + 0.08 * Math.random(); // ~0.1s offset (p2)
+    balloonMagA = 1.8 + 1.2 * Math.random(); // peak 1.8-3x
+    balloonMagB = 1.8 + 1.2 * Math.random(); // different maxima (p2)
+    balloonNext = time + 2 + 3 * Math.random(); // rate limit: every ~2-4s in busy passages
+  }
+  function ballEnv(age, mag) {
+    // overshoot-and-settle: smoothstep attack to the peak, exponential release
+    if (age < 0) return 1;
+    var atk = 0.12; // refs: 0.03-0.35s attack
+    if (age < atk) {
+      var u = age / atk;
+      return 1 + (mag - 1) * u * u * (3 - 2 * u);
+    }
+    return 1 + (mag - 1) * Math.exp(-(age - atk) / 0.35); // settle ~0.4-1.2s
+  }
 
   function frame(t) {
     var time = t.time || 0;
@@ -2036,9 +2067,13 @@
     t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081) + snB;
     t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0) - snB;
     t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0) + snA;
-    // orb radius: BALLOON pulse (the 19s clip: orbs swell ~2-3x within a second on hits, then
-    // settle — ride the smoothed pulse envelope, gain raised 0.35→0.85)
-    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.85 * pulse);
+    // orb radius base (audio + a small residual breathing). The big pops are now the ballistic
+    // BALLOON events (doc 07 D2a) — one-shot overshoot-and-settle per orb, not a pulse ride.
+    if (f > 0.9 && time > balloonNext && Math.random() < 0.6) fireBalloon(time);
+    if (FORCE && FORCE._balloon && time - balloonT0A > 3) fireBalloon(time); // debug pin (re-fires every 3s)
+    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.1 * pulse);
+    radScaleA = ballEnv(time - balloonT0A, balloonMagA);
+    radScaleB = ballEnv(time - balloonT0B, balloonMagB);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
 
     // ── REST/BUSY BREATHING — the original empties to 1-2 element classes for a few seconds
@@ -2343,9 +2378,10 @@
     lastOrbBY = t.q24;
 
     // __DEBUG__ self-render hook (PRODUCTION NO-OP — window.__ALC_FORCE is never set live).
+    // Underscore-prefixed keys are CLOSURE pins (doc 07 step 0) handled inside frame(), not q-vars.
     if (typeof window !== "undefined" && window.__ALC_FORCE) {
       var F = window.__ALC_FORCE;
-      for (var fk in F) t[fk] = F[fk];
+      for (var fk in F) if (fk.charAt(0) !== "_") t[fk] = F[fk];
     }
 
     // ── COCOON EYES (doc 09 A2): both orb anchors live INSIDE the cage, ~0.07 UV each side of
@@ -2676,10 +2712,10 @@
         return a;
       },
     };
-    preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25"); // orb A (near-persistent anchor)
-    preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14"); // orb B (comes & goes; different hue)
-    preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25"); // additive glow halo A
-    preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14"); // additive glow halo B
+    preset.shapes[0] = orbShape("q21", "q22", 0.0, "q25", 0); // orb A (near-persistent anchor)
+    preset.shapes[1] = orbShape("q23", "q24", 0.35, "q14", 1); // orb B (comes & goes; different hue)
+    preset.shapes[2] = orbGlow("q21", "q22", 0.0, "q25", 0); // additive glow halo A
+    preset.shapes[3] = orbGlow("q23", "q24", 0.35, "q14", 1); // additive glow halo B
 
     return preset;
   }
