@@ -158,11 +158,15 @@
       "    ground = ground * 0.05 + pal(hb + 0.1) * 0.03 * exp(-pow(c.y * 6.0, 2.0));\n" +
       "  }\n" +
       // ── STRUCTURED-FIELD backgrounds (survey gaps) — they REPLACE the wavy ground. ──
-      // 4 VERTICAL BARS / barcode (1:48-2:02): purple↔green vertical stripes, top-bottom mirrored.
+      // 4 VERTICAL BARS (doc 12 D3; p1 B9 / p2 2.9.1): ~10 STATIC dark vertical bars (they never
+      // scroll — verified across bursts) + a gold backlight flooding DOWNWARD through the gaps;
+      // old motif/tether pigment stays TRAPPED in the gaps (the trail shown only BETWEEN the bars —
+      // see the bar-gap mask just before the composite). Was 22 bars scrolling at time*0.12 (wrong).
       "  else if (m > 3.5 && m < 4.5) {\n" +
-      "    float bars = pow(0.5 + 0.5 * cos((uv.x * 22.0 + time * 0.12) * 6.2832), 1.3);\n" +
-      "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
-      "    ground = barCol * (0.07 + 0.16 * bars);\n" +
+      "    float bars = pow(0.5 + 0.5 * cos(uv.x * 10.0 * 6.2832), 1.3);\n" + // STATIC, ~10 bars
+      "    float flood = smoothstep(0.35, 0.0, abs(fract(uv.y + time * 0.55) - 0.5));\n" + // gold front descends ~55%h/s
+      "    ground = mix(pal(hb + 0.5), pal(hb + 0.04), bars) * (0.06 + 0.14 * bars);\n" +
+      "    ground += pal(hb + 0.12) * flood * (0.10 + 0.10 * bars) * 0.6;\n" + // descending gold flood
       "  }\n" +
       // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, dusty. doc 12 D5 —
       // the wash hue WALKS in discrete steps (~1.2s hold + ~0.4s fade, h0 bg4), NOT a continuous
@@ -282,6 +286,10 @@
       // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth).
       //    trail 1.28→1.15 / glow 0.6→0.55 rebalance pays for the fatter dilate + blur2 fuzz
       //    (total energy ≈ constant; never lift highlights — the pastel discipline). ──
+      // doc 12 D3 — TRAPPED PIGMENT: under the bars regime the deposited trail shows ONLY in the
+      // gaps between the static bars (the bar mask dims the trail ON the bars); elsewhere 1.0.
+      "  float barGap = (m > 3.5 && m < 4.5) ? (0.35 + 0.65 * (1.0 - pow(0.5 + 0.5 * cos(uv.x * 10.0 * 6.2832), 1.3))) : 1.0;\n" +
+      "  trail *= barGap;\n" +
       "  vec3 col = ground + trail * 1.15 + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
