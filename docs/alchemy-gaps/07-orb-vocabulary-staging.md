@@ -1,5 +1,20 @@
 # Doc 07 — Orb anatomy vocabulary, balloon events, staging & columns
 
+> **★ LANDED 2026-07-09 (7 commits a8c4a89→8884834; confirmation questions were pre-answered as
+> README Q10/Q11/Q12 = the recommended options).** Deviations from the plan below:
+> **Step 6 (milk-fill) landed WITH step 4** — it's gated to the kind-1 anatomy descriptor, so a
+> revert of anatomy necessarily takes it. **Step 7 (bead-chain taper) SKIPPED** — superseded: the
+> user pulled motif 11 from MOTIF_BAG on 2026-07-09 (reads as a dotted stick, answered-Q8
+> territory); do not re-polish it without a fresh ask. The doc's `fillHueLag` descriptor field was
+> dropped (doc 05's `fillHue` lag mechanism is now always-on and covers it). The column got a
+> slight per-seg stalk CURVE (the 480p 14–23s stalks bend — frame-verified before coding) and the
+> mushroom's parity split needed BOTH seg ends hidden wide (u<0.12 / u>0.94) or connector lines
+> draw between the two figures. Balloon radius scales live in closure (`radScaleA/B`), NOT in q7 —
+> so accessory rings that must ride the balloon multiply by the host's radScale explicitly.
+> **Un-judged live:** everything here awaits the user's next look; per-step pins in §4 still work
+> (`_balloon`/`_stage`/`_anatA`/`_anatB`/`_acc3`/`_mushroom` via the underscore closure-pin
+> channel added to `__ALC_FORCE`).
+
 **Matrix items:** A16 (orb anatomy vocabulary, P1) · D2 (balloon events + base size, P1) · D15 (posts/rail staging, P1) · A4 (ring-stack / telescope / cone columns, P1) · D9 (bead-chain taper + attachment, P3) · A18 (mushroom figures, P3) · **Priority:** P1 core (A16/D2/D15/A4), P3 tail (D9/A18) · **Risk flags:** (1) budget routing — all 4 shape slots committed, ring-only variants must route via waves; filled beads were user-rejected before · (4) prior-revert territory — D2's base-size fix was reverted with the rejected motion rework; D15's snake wobble shipped with the user's eyes in 9b5ea11 · **Confirmation needed:** **yes** —
 1. **A4 columns:** filled *glassy-sphere* bead stacks (p0 O6) need a filled-shape renderer, and all 4 shape slots are taken by the 2 orbs × (fill + halo). The plan ships columns as **hollow-RING stacks** drawn in the often-idle waves[3] slot (ring outlines only — faithful to p1 O7/p3 D-ORB.4, which are ring/disc *outlines*). OK to ship ring-only columns, or would you rather sacrifice orb B's additive halo slot to get filled glassy beads?
 2. **D15 staging:** the refs measure orbs as *stationary posts* with occasional slow slides; our continuous snake-wobble orbit (shipped 9b5ea11 with your approval) is a v7 invention that prevents the "anchor" reading. Confirm you're OK replacing the orbs' S-curve comet snaking with parked posts + slides (the central motif keeps painting its watercolour trail — only the two orbs change).
