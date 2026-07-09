@@ -1208,7 +1208,9 @@
     0.34,
     0.62,
     0.82,
-    0.72,
+    // valley (12) 0.72→0.48: 16 always-drawn sheet lines + spine piled the wedges to blown
+    // white (user's 84s clip); the ref valley is a muted dark-green scene
+    0.48,
     0.5,
     0.66,
     0.66,
@@ -1920,12 +1922,12 @@
       t.q26 += (0.05 - t.q26) * co; // steady tether-waveform jag along the corridor
     }
 
-    // ── VALLEY camera (motif 12): a gentle forward DOLLY into the vanishing point — the sheets converge
-    //    at center, so a slow zoom-in flies down the valley. Brief + scene-local (not the rejected
-    //    always-on plunge). Slight extra decay so the receding sheet-lines leave a depth trail. ──
+    // ── VALLEY (motif 12): DOLLY REMOVED (README answer 21 + user's 84s clip 2026-07-09: the
+    //    magnify grew every sheet deposit outward, filling the wedges to a blown-white bow-tie;
+    //    the refs' terrain scenes are camera-still — the geometry reads as a valley without a
+    //    camera move). Keep the decay bump (depth trail) + roll-off. ──
     if (valleyAmt > 0.01) {
       var va = valleyAmt;
-      t.q15 += (0.012 - t.q15) * va; // q15>0 magnifies the old buffer → forward DOLLY into the VP
       t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
       t.q16 *= 1 - va; // no roll (a clean dive down the valley)
     }
