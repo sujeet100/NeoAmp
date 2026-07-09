@@ -2629,6 +2629,13 @@
         ) {
           mushT0 = time;
           mushLast = time;
+          // SPAWN IN PLACE (user: "an orb with a line moved in rapidly" — the capture lerp was
+          // dragging visible orbs+tube across the screen; events pop at their posts, C1)
+          stgAx = 0.4;
+          stgAy = 0.45;
+          stgBx = 0.6;
+          stgBy = 0.47;
+          stgNext = Math.max(stgNext, time + 6); // no re-cast mid-event
         }
       }
     } else if (acc3.type > 0) acc3Env = Math.min(1, acc3Env + dt / 0.4);
@@ -2636,6 +2643,11 @@
       // debug pin: force the event (and the column it rides on) now
       mushT0 = time;
       mushLast = time;
+      stgAx = 0.4;
+      stgAy = 0.45;
+      stgBx = 0.6;
+      stgBy = 0.47;
+      stgNext = Math.max(stgNext, time + 6);
       if (acc3.type !== 2) {
         acc3 = rollAcc3(2);
         acc3.t0 = time;
@@ -2718,6 +2730,16 @@
     //    park the orbs at the chord terminals (p0: ringed-orb line ends) and engage the warp's
     //    q12<0 per-column y-flow — the chord's sinking trail bends into the scallop arches. ──
     var scalEff = Math.floor((t.q30 || 0) + 0.5) === 19 ? 1 : 0;
+    if (scalEff && scalAmt < 0.02) {
+      // SPAWN IN PLACE at entry (user: the chord + orbs were gliding to the terminals —
+      // read as a rapid camera move): snap the STAGING posts to the terminals while the
+      // motif is still faded; the crossfade covers the pop
+      stgAx = 0.2;
+      stgAy = 0.4;
+      stgBx = 0.85;
+      stgBy = 0.62;
+      stgNext = Math.max(stgNext, time + 4);
+    }
     scalAmt += (scalEff - scalAmt) * Math.min(1, dt * 0.6);
     if (scalAmt > 0.01) {
       var sa = scalAmt * (1 - corridorAmt);
