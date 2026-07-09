@@ -820,11 +820,13 @@
     a.a = u < 0.02 || u > 0.98 ? 0 : 0.16 + 0.84 * mtStampEnv;
     return a;
   }
-  // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2): ONE waveform line marching along a LL→UR
-  // diagonal, drawn as big smooth rounded scallops (clocked arch envelope per the AMBIGUOUS
-  // waveform verdict — heavily smoothed audio), a stereo two-hue strand pair (p0 8-11s: green +
-  // crimson = L/R). Its ~10s height walk (scRowOff) + the sink builds the mountain-row bg band
-  // entirely from trail. NO bead terminals (risk 1 — routed to doc 07/A4).
+  // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2) — REWORKED after the user's live look
+  // (2026-07-09 screenshot: bright white crisp coils, "too ugly"; user re-read of the original:
+  // the scallop effect is a thin chord's TRAIL distorted by the field, not drawn geometry —
+  // frame check of 0:04-0:11 confirms: soft dark multi-hue wave RIBBONS + one hairline chord).
+  // So: ONE thin FAINT smooth-wave line (no |sin| cusps), bright only at stamp instants; the
+  // visible scallop body is 100% accumulation (freeze + sink). Two strands kept clearly apart
+  // (adjacent green+crimson zigzags in the ref) so they never fuse additively to white.
   function fScallop(a) {
     var s = a.sample || 0;
     var strand = s < 0.5 ? 0 : 1,
@@ -834,11 +836,11 @@
     var tiltS = 0.42, // LL→UR diagonal (~24°)
       ct = Math.cos(tiltS),
       st = Math.sin(tiltS);
-    var march = (a.q9 || 0) * 9.0; // arches SLIDE along the line (q9 = time·0.06)
-    var arch = Math.abs(Math.sin(u * 3.14159 * 6.0 - march)); // ~6 rounded scallops (period 70-90px)
-    var amp = 0.17 * (0.55 + 0.6 * Math.max(0, (a.q32 || 1) - 1)); // amp 80-100px, riding the SMOOTH pulse
+    var march = (a.q9 || 0) * 9.0; // the wave SLIDES along the line (q9 = time·0.06)
+    var wavePh = Math.sin(u * 6.2832 * 6.0 - march); // smooth wave, ~6 periods (~90-110px crest spacing)
+    var amp = 0.09 * (0.55 + 0.6 * Math.max(0, (a.q32 || 1) - 1)); // ±amp ≈ the ref 17-21% h peak-to-peak
     var live = (strand ? a.value2 : a.value1) || 0;
-    var d = -(arch * amp + live * 0.012) - strand * 0.008 + scRowOff;
+    var d = -(wavePh * amp + live * 0.012) - strand * 0.028 + scRowOff;
     var lx = (u - 0.5) * W;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
@@ -848,7 +850,8 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    a.a = u < 0.02 || u > 0.98 ? 0 : 0.8;
+    // FAINT live chord; the deposits brighten only at stamps (same pattern as fMountains)
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.14 + 0.7 * mtStampEnv;
     return a;
   }
   // TRIANGLE-FLOWER MANDALA (user: "many triangles rotating creating flower-like pattern") —
