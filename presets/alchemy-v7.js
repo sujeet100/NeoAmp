@@ -1515,6 +1515,7 @@
     motifStepNext = 0,
     accHue = 0.3, // free-accessory clock (p0: strands/columns snap at their own moments)
     accStepNext = 0,
+    lastMCur = -1, // motif-identity swap detector (B7 step 3: re-seed the motif hue vs ground)
     accentHue = 0.55, // B7 (doc 05 step 2): the HELD accent-family ink — both orb rings + the
     // tether read this one value (r0: "tether hue = ring hue"); events re-anchor it near the
     // ground family, beats walk it. Held between snaps — never dragged by the continuous clock.
@@ -1766,6 +1767,22 @@
     if (FORCE && FORCE.motifHue !== undefined) {
       motifHue = FORCE.motifHue; // debug pin (self-render acceptance shots)
       motifHueOld = FORCE.motifHueOld !== undefined ? FORCE.motifHueOld : FORCE.motifHue;
+    }
+    // ── B7 COMPLEMENTARY SEEDING (doc 05 step 3): when the motif IDENTITY swaps, re-seed its
+    //    clock RELATIVE TO THE GROUND — 1-in-4 near-complementary (p1 M2: coral-red mesh ON a
+    //    sage-green ground), else analogous (the default harmony). Hue relationships only; on
+    //    Pastel a complementary pair still renders dusty (the comp is untouched). The B4a
+    //    stop-then-bloom handoff already hides the seam. ──
+    if (mCur !== lastMCur) {
+      if (lastMCur >= 0) {
+        motifHueOld = motifHue;
+        motifHue =
+          Math.random() < 0.25
+            ? t.q8 + 0.5 + (Math.random() - 0.5) * 0.16 // complementary
+            : t.q8 + (Math.random() - 0.5) * 0.3; // analogous
+        motifStepT = time;
+      }
+      lastMCur = mCur;
     }
     var ownWalk = mCur === 13 || mCur === 14 || mCur === 17 || mCur === 18;
     if (!ownWalk && time >= motifStepNext) {
