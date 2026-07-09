@@ -2071,7 +2071,9 @@
     // BALLOON events (doc 07 D2a) — one-shot overshoot-and-settle per orb, not a pulse ride.
     if (f > 0.9 && time > balloonNext && Math.random() < 0.6) fireBalloon(time);
     if (FORCE && FORCE._balloon && time - balloonT0A > 3) fireBalloon(time); // debug pin (re-fires every 3s)
-    t.q7 = (0.06 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.1 * pulse);
+    // 0.048 = the MEASURED ref base radius (doc 07 D2b, answered README Q12; reverted before
+    // only as part of the rejected motion rework, never judged on its own)
+    t.q7 = (0.048 + 0.02 * Math.max(0, bassA - 1)) * (1 + 0.1 * pulse);
     radScaleA = ballEnv(time - balloonT0A, balloonMagA);
     radScaleB = ballEnv(time - balloonT0B, balloonMagB);
     t.q26 = 0.06 * (0.5 + 0.7 * bassA); // tether jag amplitude (audio-coupled)
