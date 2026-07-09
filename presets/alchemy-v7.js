@@ -1741,7 +1741,12 @@
     starveAmt = 0; // eased starvation drain (trails collapse, emitters starve)
   var FEAT_DEEPREST = true, // doc 04 A/B flips (one-line disable per step)
     FEAT_STARVE = true,
-    FEAT_TRANS = true;
+    FEAT_TRANS = true,
+    transType = 0, // B10: 0 wash-dissolve · 1 sweep-replace · 2 quad-fold spike · 3 hard wipe
+    transT0 = -99,
+    transDur = 0.7,
+    prevBgSnap = -1, // snap detectors (-1 = unseeded, no fire on the first frame)
+    prevMoSnap = -1;
   // ── PER-CLASS COLOUR CLOCKS (doc 05 B7/D12). The refs run INDEPENDENT hue clocks per element
   // class — ground (the continuous q8 shader clock, unchanged), central motif (a STEPPED walk:
   // hold 0.75-2s, then jump a hue family), free accessories (their own slower walk). All changes
@@ -1890,7 +1895,8 @@
 
     // ── BACKGROUND — its own slow clock; 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel ──
     var bg = bgPick(time, dt, false);
-    t.q29 = BG_BAG[bg.mix < 0.5 ? bg.a : bg.b]; // discrete snap (the persistent trail buffer bridges cuts)
+    var bgSnapIdx = bg.mix < 0.5 ? bg.a : bg.b; // B10: transition detector reads the snap moment
+    t.q29 = BG_BAG[bgSnapIdx]; // discrete snap (the persistent trail buffer bridges cuts)
     if (FORCE && FORCE.q29 !== undefined) t.q29 = FORCE.q29; // pin drives bg-gated lifecycle too
     var bgMode = Math.floor(t.q29 + 0.5);
     curBgMode = bgMode; // B11 pairing: the motif accept callback reads the live bg
@@ -2095,6 +2101,22 @@
     // ── CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly. ──
     var mo = motifPick(time, dt, f > 0.6);
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
+    // ── B10 (doc 04 step 6): every ref transition is a FEEDBACK EVENT, not a palette cut —
+    //    on any bg/motif snap roll a transition type: 0 wash-dissolve (common) · 1 sweep-replace
+    //    (ground-only, = the existing snap) · 2 quad-fold vivid spike · 3 rare HARD WIPE
+    //    (answered README Q5). Applied at the frame tail on q-vars the closure already owns. ──
+    var moSnapIdx = mo.mix < 0.5 ? mo.a : mo.b;
+    if (
+      (bgSnapIdx !== prevBgSnap && prevBgSnap >= 0) ||
+      (moSnapIdx !== prevMoSnap && prevMoSnap >= 0)
+    ) {
+      var rt = Math.random();
+      transType = rt < 0.55 ? 0 : rt < 0.75 ? 1 : rt < 0.95 ? 2 : 3;
+      transT0 = time;
+      transDur = transType === 3 ? 1.4 : transType === 2 ? 0.6 : 0.7;
+    }
+    prevBgSnap = bgSnapIdx;
+    prevMoSnap = moSnapIdx;
     if (FORCE && FORCE.motif !== undefined) mCur = FORCE.motif; // pin drives lifecycle logic, not just q30
     // ── D12 STEPPED MOTIF CLOCK (doc 05 step 1): the emitter hue arrives in STEPS — hold
     //    0.75-2s, then jump a visible hue-family (h0; busier music → shorter holds). The ground
@@ -2747,6 +2769,39 @@
       }
     }
 
+    // ── B10 transition APPLY (doc 04 step 6; rolled at the snap detector above). Placed at the
+    //    tail so it modulates the final q1/q4/q31; starvation (below) still wins. ──
+    if (FORCE && FORCE._transType !== undefined && time - transT0 > 3) {
+      transType = +FORCE._transType; // pin: re-fires every 3s
+      transT0 = time;
+      transDur = transType === 3 ? 1.4 : transType === 2 ? 0.6 : 0.7;
+    }
+    var tprog = FEAT_TRANS && transT0 > 0 ? (time - transT0) / transDur : 2;
+    if (tprog < 1) {
+      var tenv = Math.sin(Math.max(0, tprog) * 3.14159);
+      if (transType === 0) t.q1 = Math.min(0.995, t.q1 + 0.012 * tenv); // wash-dissolve lingers
+      if (transType === 2) {
+        // quad-fold spike (p1 90.05): the comp's kaleido mirror-fold switched ON over the live
+        // buffer ~0.6s + a brief exposure lift — the sanctioned vivid moment (D13). bgMode was
+        // computed from the REAL q29 earlier, so only the comp folds; the engine stays put.
+        t.q29 = 1;
+        t.q31 *= 1 + 0.25 * tenv;
+      }
+      if (transType === 3) {
+        // rare HARD WIPE (p0 23.5, ~5% of snaps): clear the field in ~0.15s, hold a ~1s dark
+        // rest, snap the new scene in. Orbs + tether are NOT touched — they bridge the cut.
+        // q28 MUST drop with q1: the warp's blur re-injection otherwise re-seeds the buffer
+        // from the previous frame's soft copy and the clear never lands (probe-verified).
+        if (tprog < 0.1) {
+          t.q1 = 0.2; // strong per-frame kill — the clear must land even at low fps (the
+          t.q28 = 0; // 0.14s window is only ~1 frame on a slow renderer; 0.2^2 ≈ black)
+        } else if (tprog < 0.75) {
+          t.q4 *= 0.05;
+          accVis *= 0.05;
+        }
+      }
+    }
+
     // ── B6b STARVATION DRAIN (doc 04 step 3; p3 S6 "outro drain", answered README Q4): the
     //    refs' empty frames are EMERGENT, not authored — quiet audio → no stamps → the feedback
     //    has nothing to eat and converges to its mean. Sustained deep-quiet (>1.5s) collapses
@@ -2776,6 +2831,8 @@
     if (typeof window !== "undefined" && window.__ALC_FORCE) {
       var F = window.__ALC_FORCE;
       for (var fk in F) if (fk.charAt(0) !== "_") t[fk] = F[fk];
+      // live state probe for pinned self-renders (read back over CDP): sampled q-vars + clocks
+      F.__dbg = { t: time, q1: t.q1, q4: t.q4, ty: transType, tage: time - transT0 };
     }
 
     // ── COCOON EYES (doc 09 A2): both orb anchors live INSIDE the cage, ~0.07 UV each side of
