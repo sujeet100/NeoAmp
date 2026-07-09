@@ -1262,6 +1262,20 @@
         0.028 * Math.sin(tt * LOOPS * 6.2832 + (strand ? 3.1416 : 0)) * win +
         (a.value1 || 0) * 0.008 * win;
       off = 0;
+    } else if (tetherKind === 2) {
+      // SQUARE-STEP STAIRCASE (h0 T2): sample-and-hold of the REAL waveform — horizontal runs
+      // joined by near-vertical jumps, wilder mid-span, reshuffling every frame (live).
+      var stKey = strand * 100 + ((tt * 24) | 0);
+      if (stKey !== heldKey) {
+        heldKey = stKey;
+        heldVal = a.value1 || 0;
+      }
+      disp = heldVal * (a.q26 || 0.03) * 2.2 * win;
+      off = (strand ? 1 : -1) * 0.0035 * win;
+    } else if (tetherKind === 3) {
+      // LIGHTNING (p1 T4 / r0 2.6): bolder jag than the chord; strand 1 grows 2-3 side twigs below.
+      disp = (a.value1 || 0) * (a.q26 || 0.03) * 2.0 * win;
+      off = (strand ? 1 : -1) * 0.0035 * win;
     } else {
       // 0 — fine-tooth waveform chord (baseline double-stroke)
       disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
@@ -1269,13 +1283,32 @@
     }
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
-    var h = (a.q8 || 0) + inkOff; // the per-event ACCENT ink, shared with the orb rings (B1)
+    var twigDim = 1;
+    if (tetherKind === 3 && strand === 1) {
+      // side TWIGS (r0: mid-span branches): strand 1 donates its points inside 2-3 hashed
+      // windows to short rays leaving the chord at hashed angles; strand 0 keeps the full bolt.
+      var nb = 2 + (((tetherSeed * 3) | 0) % 2);
+      for (var bi = 0; bi < nb; bi++) {
+        var bp = 0.25 + ((tetherSeed * (13 + bi * 7)) % 1) * 0.5;
+        if (tt > bp && tt < bp + 0.05) {
+          var u2 = (tt - bp) / 0.05;
+          var bang = (tetherSeed * (1.7 + bi)) % 6.2832;
+          var tl = 0.05 + 0.05 * ((tetherSeed * (3.3 + bi)) % 1);
+          a.x = ax + bp * dx + Math.cos(bang) * u2 * tl;
+          a.y = ay + bp * dy + Math.sin(bang) * u2 * tl + (a.value1 || 0) * 0.008;
+          twigDim = 0.6;
+          break;
+        }
+      }
+    }
+    // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet)
+    var h = (a.q8 || 0) + inkOff + (tetherKind === 2 ? strand * 0.12 : 0);
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
     // alpha set EVERY point (the reused point object would leak a one-shot 0 across strand 2);
     // the fly-back segment joining the strands is hidden
-    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.85;
+    a.a = Math.abs((a.sample || 0) - 0.5) < 0.004 ? 0 : 0.85 * twigDim;
     return a;
   }
 
@@ -1342,6 +1375,8 @@
     tetherKind = 0, // doc 06 A5: construction, re-rolled PER SPAWN (0 chord · 1 helix · 2 staircase
     // · 3 lightning+twigs · 4 rope · 5 kite · 6 cascade); chord stays dominant in the bag
     tetherSeed = 0, // per-appearance parameter re-roll (loop counts, branch points, phases)
+    heldKey = -1, // kind-2 staircase sample-and-hold state (points iterate in sample order)
+    heldVal = 0,
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
     evStarOn = false, // read by waves[1] (point fns share the closure)
@@ -1405,8 +1440,8 @@
   // h1 M7: the tangle stamps in ONE hue every 1.3-2s, crisp ~1-1.5s, then only trail; more
   // modes can join this table later (r0's 0.2-0.3s fast tier already lives in the cocoon block)
   var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
-  // doc 06 A5 construction bag — chord dominant; grows as kinds land (helix in; more to come)
-  var TETHER_BAG = [0, 0, 0, 0, 1, 1];
+  // doc 06 A5 construction bag — chord dominant; grows as kinds land (helix/staircase/lightning in)
+  var TETHER_BAG = [0, 0, 0, 0, 1, 1, 2, 2, 3];
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
