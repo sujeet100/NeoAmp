@@ -164,9 +164,13 @@
       "    vec3 barCol = mix(pal(hb + 0.5), pal(hb + 0.04), bars);\n" + // two analogous bar hues
       "    ground = barCol * (0.07 + 0.16 * bars);\n" +
       "  }\n" +
-      // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, slow analogous drift, dusty.
+      // 5 FLAT SOLID-COLOUR WASH (0:48 / 1:16): a calm even mid-tone stage, dusty. doc 12 D5 —
+      // the wash hue WALKS in discrete steps (~1.2s hold + ~0.4s fade, h0 bg4), NOT a continuous
+      // drift. Stepped random blend between two analogous tones: hold, then ease to the next step.
       "  else if (m > 4.5 && m < 5.5) {\n" +
-      "    ground = mix(pal(hb), pal(hb + 0.13), 0.5 + 0.5 * sin(time * 0.06));\n" +
+      "    float wf = time * 0.85; float ws = floor(wf); float wu = fract(wf);\n" +
+      "    float wmix = mix(hash21(vec2(ws, 3.0)), hash21(vec2(ws + 1.0, 3.0)), smoothstep(0.0, 0.35, wu));\n" +
+      "    ground = mix(pal(hb), pal(hb + 0.33), wmix);\n" +
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.5);\n" +
       "    ground *= 0.15 + 0.03 * n;\n" + // faint fbm tooth so it's not dead-flat
       "  }\n" +
