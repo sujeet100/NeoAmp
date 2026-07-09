@@ -1240,11 +1240,17 @@
   // jag): the user confirmed against the WMP video that the original's tether reads thicker and
   // softer than a crisp hairline. (Standalone, not alcTether — the double-stroke remaps a.sample.)
   function fTether(a) {
-    var ax = a.q21 !== undefined ? a.q21 : 0.4,
-      ay = a.q22 !== undefined ? a.q22 : 0.5;
-    var bx = a.q23 !== undefined ? a.q23 : 0.6,
-      by = a.q24 !== undefined ? a.q24 : 0.5;
-    if (tetherKind === 6) {
+    // RAIL mode (doc 06 step 5): while a rail lives the chord uses the FROZEN slowly-rotating
+    // rail endpoints, kind forced to the plain chord with a micro-jag; beat events REUSE the
+    // rail chord with full jag/ink (p0: "doubled by a crisp orange live-jag copy on hits").
+    var railOn = railAmt > 0.01;
+    var tk = railOn ? 0 : tetherKind;
+    var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
+      ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
+    var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
+      by = railOn ? railBy : a.q24 !== undefined ? a.q24 : 0.5;
+    var q26e = railOn ? 0.004 + ((a.q26 || 0.03) - 0.004) * tetherEnv : a.q26 || 0.03;
+    if (tk === 6) {
       // CASCADE hangs from ONE orb (h0 T3): the far end is a point below orb A, not orb B
       bx = ax + 0.1 * Math.sin(tetherSeed);
       by = ay - 0.32; // y-up wave coords: -0.32 = hangs DOWNWARD on screen
@@ -1255,7 +1261,7 @@
     var nx = -dy / len,
       ny = dx / len;
     // strand fold: 2 strands default · 1 kite · 3 rope · 4 cascade
-    var NS = tetherKind === 4 ? 3 : tetherKind === 6 ? 4 : tetherKind === 5 ? 1 : 2;
+    var NS = tk === 4 ? 3 : tk === 6 ? 4 : tk === 5 ? 1 : 2;
     var sN = (a.sample || 0) * NS,
       strand = Math.floor(sN),
       tt = sN - strand;
@@ -1265,7 +1271,7 @@
     }
     var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
     var disp, off;
-    if (tetherKind === 1) {
+    if (tk === 1) {
       // TELEPHONE-CORD HELIX (p1 T3): the two strands WIND around each other, 12-14 loops over
       // the span (antiphase = the crossing braid), plus a small live jag so it stays audio-alive.
       var LOOPS = 12 + (((tetherSeed * 7) | 0) % 3);
@@ -1273,7 +1279,7 @@
         0.028 * Math.sin(tt * LOOPS * 6.2832 + (strand ? 3.1416 : 0)) * win +
         (a.value1 || 0) * 0.008 * win;
       off = 0;
-    } else if (tetherKind === 2) {
+    } else if (tk === 2) {
       // SQUARE-STEP STAIRCASE (h0 T2): sample-and-hold of the REAL waveform — horizontal runs
       // joined by near-vertical jumps, wilder mid-span, reshuffling every frame (live).
       var stKey = strand * 100 + ((tt * 24) | 0);
@@ -1281,26 +1287,25 @@
         heldKey = stKey;
         heldVal = a.value1 || 0;
       }
-      disp = heldVal * (a.q26 || 0.03) * 2.2 * win;
+      disp = heldVal * q26e * 2.2 * win;
       off = (strand ? 1 : -1) * 0.0035 * win;
-    } else if (tetherKind === 3) {
+    } else if (tk === 3) {
       // LIGHTNING (p1 T4 / r0 2.6): bolder jag than the chord; strand 1 grows 2-3 side twigs below.
-      disp = (a.value1 || 0) * (a.q26 || 0.03) * 2.0 * win;
+      disp = (a.value1 || 0) * q26e * 2.0 * win;
       off = (strand ? 1 : -1) * 0.0035 * win;
-    } else if (tetherKind === 4) {
+    } else if (tk === 4) {
       // BRAIDED ROPE (h1 T2): 3 strands, incoherent per-strand jag phases → a fuzzy ~25-30px
       // bundle; persistent ~5s (life extended at spawn); reads as a solid soft rod.
       disp =
-        (a.value1 || 0) * (a.q26 || 0.03) * win +
-        Math.sin(tt * 40 + strand * 2.1 + tetherSeed) * 0.004 * win;
+        (a.value1 || 0) * q26e * win + Math.sin(tt * 40 + strand * 2.1 + tetherSeed) * 0.004 * win;
       off = (strand - 1) * 0.008;
-    } else if (tetherKind === 5) {
+    } else if (tk === 5) {
       // LOOPY KITE-STRING (p1 T2): one wandering strand — large open loops + fine live jag.
       disp =
         0.025 * Math.sin(tt * (3 + (((tetherSeed * 5) | 0) % 3)) * 6.2832 + tetherSeed) * win +
         (a.value1 || 0) * 0.006 * win;
       off = 0;
-    } else if (tetherKind === 6) {
+    } else if (tk === 6) {
       // HANGING CASCADE (h0 T3): 4 roughly-parallel strands from ONE orb, separation GROWING
       // toward the low end (the fan opens downward), whole fan swaying slowly.
       disp = (a.value1 || 0) * 0.01 * win;
@@ -1313,14 +1318,14 @@
       var fi = tt * 8,
         i0 = Math.min(7, fi | 0),
         frc = fi - i0;
-      var chev = (envHold[i0] * (1 - frc) + envHold[i0 + 1] * frc) * 0.055 * win;
-      disp = (a.value1 || 0) * (a.q26 || 0.03) * win + chev;
+      var chev = (envHold[i0] * (1 - frc) + envHold[i0 + 1] * frc) * (railOn ? 0 : 0.055) * win;
+      disp = (a.value1 || 0) * q26e * win + chev;
       // strand 1 is the one-sided CHROMATIC GHOST (p2: 1px blue-violet ghost beside the stroke)
       off = strand ? 0.005 : -0.0035 * win;
     }
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
-    if (tetherKind === 0) {
+    if (tk === 0 && !railOn) {
       // mid-span scribble KNOT (h2: ~80-120px cluster roaming around mid-span, re-shuffling live)
       var kp = knotPos + 0.05 * Math.sin((a.q9 || 0) * 11.7);
       var ku = (tt - kp) / 0.05;
@@ -1331,7 +1336,7 @@
       }
     }
     var twigDim = 1;
-    if (tetherKind === 3 && strand === 1) {
+    if (tk === 3 && strand === 1) {
       // side TWIGS (r0: mid-span branches): strand 1 donates its points inside 2-3 hashed
       // windows to short rays leaving the chord at hashed angles; strand 0 keeps the full bolt.
       var nb = 2 + (((tetherSeed * 3) | 0) % 2);
@@ -1350,23 +1355,25 @@
     }
     // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet); the kind-0 ghost
     // strand takes the contrast hue at low alpha (p2's one-sided chromatic ghost)
-    var h =
-      (a.q8 || 0) +
-      inkOff +
-      (tetherKind === 2 ? strand * 0.12 : 0) +
-      (tetherKind === 0 && strand ? 0.45 : 0);
-    var ghostDim = tetherKind === 0 && strand ? 0.4 : 1;
-    var dim = tetherKind === 4 ? 0.85 : 1; // rope reads soft but SOLID (h1: pale fuzzy rod)
+    var h = (a.q8 || 0) + inkOff + (tk === 2 ? strand * 0.12 : 0) + (tk === 0 && strand ? 0.45 : 0);
+    var ghostDim = tk === 0 && strand ? 0.4 : 1;
+    var dim = tk === 4 ? 0.85 : 1; // rope reads soft but SOLID (h1: pale fuzzy rod)
     // kite POLARITY (p1 T2): dark-on-light over the flat-wash / caustic grounds
     var bgm = Math.floor((a.q29 || 0) + 0.5);
-    if (tetherKind === 5 && (bgm === 5 || bgm === 8)) dim *= 0.25;
+    if (tk === 5 && (bgm === 5 || bgm === 8)) dim *= 0.25;
     a.r = orbCol(h, 0) * dim;
     a.g = orbCol(h, 0.33) * dim;
     a.b = orbCol(h, 0.67) * dim;
+    if (railOn && tetherEnv < 0.5) {
+      // quiet rail = a pale desaturated hairline (p2: lavender/white); events restore full ink
+      a.r = a.r * 0.4 + 0.6;
+      a.g = a.g * 0.4 + 0.6;
+      a.b = a.b * 0.4 + 0.6;
+    }
     // alpha set EVERY point (the reused point object would leak a one-shot 0 across strand 2);
     // fly-back segments joining consecutive strands are hidden (generalised for 1-4 strands)
     var flyback = (tt < 0.012 && strand > 0) || (tt > 0.988 && strand < NS - 1);
-    a.a = flyback ? 0 : (tetherKind === 4 ? 0.75 : 0.85) * twigDim * ghostDim;
+    a.a = flyback ? 0 : (tk === 4 ? 0.75 : 0.85) * twigDim * ghostDim;
     return a;
   }
 
@@ -1440,6 +1447,14 @@
     envNext = 0,
     envRefresh = false,
     knotPos = 0.5, // kind-0 mid-span scribble knot centre (re-rolled per spawn, roams slowly)
+    railAmt = 0, // doc 06 step 5: PERSISTENT rail-chord (rare, 15-30s, survives scene changes)
+    railWant = 0,
+    railT0 = -99,
+    railLife = 20,
+    railAx = 0.35, // frozen rail endpoints (rotate slowly about the midpoint, p2: 3-5°/s)
+    railAy = 0.5,
+    railBx = 0.65,
+    railBy = 0.5,
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
     evStarOn = false, // read by waves[1] (point fns share the closure)
@@ -1577,6 +1592,18 @@
         evStarHue = 0.15 + Math.random() * 0.35;
         evStarAnchor = Math.random() < 0.7 ? 0 : 1;
       } else if (evPick === "tether") {
+        // RAIL (doc 06 step 5): a would-be spawn occasionally opens a persistent RAIL instead
+        // (~1 per 1-3 min): a dim pale micro-jagged chord that outlives scene changes and rests,
+        // orbs parked on its endpoints (answered README Q11: parked posts approved).
+        if (!railWant && corridorAmt < 0.1 && Math.random() < 0.08) {
+          railWant = 1;
+          railT0 = time;
+          railLife = 15 + Math.random() * 15; // 15-30s (p0: ~25s across a hard wipe)
+          railAx = lastOrbAX;
+          railAy = lastOrbAY;
+          railBx = lastOrbBX;
+          railBy = lastOrbBY;
+        }
         // TETHER SPAWN (B2; doc 06 refines the anatomy): most spawns are short 0.4-2s bursts;
         // ~40% open a LONG SESSION (3.5-10s) — the user confirmed the original often keeps the
         // tether up for a while, with brief random dropouts (the flicker block below).
@@ -1615,6 +1642,31 @@
     fillLag += (inkOff - fillLag) * Math.min(1, dt * 1.0); // fills chase the accent over ~1s (B1)
     envRefresh = time > envNext; // kind-0 chevron envelope refresh window (~0.5-1s, h2)
     if (envRefresh) envNext = time + 0.5 + Math.random() * 0.5;
+    // RAIL lifecycle (doc 06 step 5): expire, ease, and rotate slowly about the midpoint
+    // (~4°/s, p2). Deliberately NOT coupled to bgPick/motifPick/rests — it survives them (p0).
+    if (FORCE && FORCE.rail && !railWant) {
+      railWant = 1;
+      railT0 = time;
+      railLife = 999; // debug pin holds it
+      railAx = lastOrbAX;
+      railAy = lastOrbAY;
+      railBx = lastOrbBX;
+      railBy = lastOrbBY;
+    }
+    if (railWant && time - railT0 > railLife) railWant = 0;
+    railAmt += ((railWant ? 1 : 0) - railAmt) * Math.min(1, dt * 2);
+    if (railAmt > 0.01) {
+      var rmx = (railAx + railBx) / 2,
+        rmy = (railAy + railBy) / 2;
+      var rc = Math.cos(0.07 * dt),
+        rs = Math.sin(0.07 * dt);
+      var r1x = railAx - rmx,
+        r1y = railAy - rmy;
+      railAx = rmx + r1x * rc - r1y * rs;
+      railAy = rmy + r1x * rs + r1y * rc;
+      railBx = rmx - (r1x * rc - r1y * rs); // B mirrors A about the midpoint
+      railBy = rmy - (r1x * rs + r1y * rc);
+    }
     evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
@@ -2130,6 +2182,16 @@
       t.q25 = Math.max(t.q25, 0.9 * sa); // both terminal orbs present
       t.q14 = Math.max(t.q14, 0.9 * sa);
     }
+    // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
+    //    its endpoints — the snake wobble fades with the blend and returns when the rail dies. ──
+    if (railAmt > 0.01) {
+      t.q21 += (railAx - t.q21) * railAmt;
+      t.q22 += (railAy - t.q22) * railAmt;
+      t.q23 += (railBx - t.q23) * railAmt;
+      t.q24 += (railBy - t.q24) * railAmt;
+      t.q25 = Math.max(t.q25, 0.9 * railAmt);
+      t.q14 = Math.max(t.q14, 0.9 * railAmt);
+    }
     return t;
   }
 
@@ -2332,7 +2394,12 @@
         var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
         // COCOON (doc 09 A2): suppress the tether while the eyes sit inside the cage — the refs
         // show no line between the eyes. cocAmt is closure state, readable here like accLine.
-        a.a = (a.a === undefined ? 0.9 : a.a) * g * Math.max(beatG, corridor) * (1 - 0.85 * cocAmt);
+        // RAIL bypasses the orb gate + event envelope (dim, persistent — doc 06 step 5).
+        a.a =
+          (a.a === undefined ? 0.9 : a.a) *
+          Math.max(g, railAmt * 0.8) *
+          Math.max(beatG, corridor, railAmt * 0.5) *
+          (1 - 0.85 * cocAmt);
         return a;
       },
     };
