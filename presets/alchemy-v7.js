@@ -258,6 +258,15 @@
       // 13 WALLPAPER (doc 12 C3): the tiled TRAIL (folded above) IS the image — dim the base ground
       // so the grid of live-centre copies reads on near-black.
       "  else if (m > 12.5 && m < 13.5) { ground *= 0.1; }\n" +
+      // 14 CHEVRON sawtooth-band ground (doc 12 C4; p2 2.6): horizontal bands with sawtooth
+      // (chevron) edges — the COMP counterpart to doc 01's shear WARP (which sinks landing stamps
+      // into zigzag ribbons); together they read as chevron terrain. Muted ×0.14.
+      "  else if (m > 13.5 && m < 14.5) {\n" +
+      "    float tooth = abs(fract(uv.x * 8.0) * 2.0 - 1.0) * 0.06;\n" +
+      "    float yb = uv.y * 5.0 + tooth;\n" +
+      "    vec3 bc = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
+      "    float gl = dot(bc, vec3(0.333)); ground = mix(vec3(gl), bc, 0.62) * 0.14;\n" +
+      "  }\n" +
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
       "  if (m > 0.5 && m < 1.5) {\n" +
@@ -1905,7 +1914,7 @@
   // doc 12 D5: the flat WASH is the dominant REST ground in the refs (p1 B2, ≈half the runtime),
   // not the wavy-fluid — so wash(5)×4 + wavy(0)×3 now lead. New structured regimes 10-14 (curtain/
   // floor/strata/wallpaper/chevron) append here as each lands.
-  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
