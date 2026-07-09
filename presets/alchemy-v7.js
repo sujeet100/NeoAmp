@@ -403,8 +403,14 @@
         s.x = cx;
         s.y = cy;
         // radius: balloon EVENTS carry the pops (doc 07 D2a; per-orb closure envelope);
-        // only a small beat residue remains (was 0.45·be + the 0.85·pulse breathing)
-        s.rad = (s.q7 || 0.048) * (1 + 0.15 * be) * (idx ? radScaleB : radScaleA) * A.sizeMul;
+        // only a small beat residue remains (was 0.45·be + the 0.85·pulse breathing).
+        // GIANT anatomies damp the balloon (they "balloon IN at full size", p0 O5 — a 2.6x
+        // giant × a 3x balloon filled the screen with ring ghosts, user 2026-07-09) and the
+        // absolute radius caps at the ref giants' ~22-28% frame dia.
+        var RS = idx ? radScaleB : radScaleA;
+        if (A.sizeMul > 1.5) RS = 1 + (RS - 1) / A.sizeMul;
+        s.rad = (s.q7 || 0.048) * (1 + 0.15 * be) * RS * A.sizeMul;
+        if (s.rad > 0.17) s.rad = 0.17;
         if (A.dark) {
           // ECLIPSE (p0 O10): near-black teal disc + crisp warm-red rim — reads as a dark
           // hole in the glowing trail field (darker-than-raw-ground is out of comp reach)
@@ -484,13 +490,13 @@
         var sl = (lastT - splatT0) / 0.35;
         var spl = sl >= 0 && sl < 1 ? Math.sin(sl * 3.14159) : 0;
         // the halo balloons WITH its orb (doc 07 D2a; was riding the smoothed q32 pulse);
-        // anatomy (A16a): hollow/eclipse kill the halo, the sun doubles down on it
+        // anatomy (A16a): hollow/eclipse kill the halo, the sun doubles down on it.
+        // Same giant-balloon damp + absolute cap as the fill (user: giant×balloon blowups).
         var A = ANAT[idx || 0];
-        s.rad =
-          (s.q7 || 0.048) *
-          (1.7 + 0.5 * be + 1.3 * spl) *
-          (idx ? radScaleB : radScaleA) *
-          Math.max(1, A.sizeMul * 0.8);
+        var RS = idx ? radScaleB : radScaleA;
+        if (A.sizeMul > 1.5) RS = 1 + (RS - 1) / A.sizeMul;
+        s.rad = (s.q7 || 0.048) * (1.7 + 0.5 * be + 1.3 * spl) * RS * Math.max(1, A.sizeMul * 0.8);
+        if (s.rad > 0.26) s.rad = 0.26;
         var spk = 1 + 0.35 * spikeAmt; // D13 accent spike
         s.r = Math.min(1, gr * 0.85 * spk);
         s.g = Math.min(1, gg * 0.85 * spk);
@@ -3012,7 +3018,9 @@
         }
         var ox = acc3.orb ? (a.q23 !== undefined ? a.q23 : 0.5) : a.q21 !== undefined ? a.q21 : 0.5;
         var oy = acc3.orb ? (a.q24 !== undefined ? a.q24 : 0.5) : a.q22 !== undefined ? a.q22 : 0.5;
-        var RS = acc3.orb ? radScaleB : radScaleA; // host balloon → rings balloon too (p0 O9)
+        // host balloon → rings balloon too (p0 O9), CLAMPED — an unclamped 3x pop blew the
+        // bullseye's outer ring to half the screen (user 2026-07-09: nested giant ring ghosts)
+        var RS = Math.min(acc3.orb ? radScaleB : radScaleA, 1.6);
         if (ty === 1) {
           // MULTI-RING BULLSEYE — CALL the kit factory (working-agreements rule), then
           // post-gate rings ≥ n using the factory's own sample split and re-centre-scale
@@ -3056,7 +3064,9 @@
           var axA = angBase + swy + (mush ? 0 : seg * 0.06 * Math.sin(lastT * 0.6 + acc3.t0));
           var frac = segEff / (Nn - 1);
           var d2 = (0.14 + 0.86 * frac) * lenEff * ext;
-          var rr = (a.q7 || 0.048) * (1 - taperEff * frac);
+          // 0.72: full-q7 base rings read as giant cups (user screenshots); ref beads are
+          // 28-35px on the 300px pane ≈ ~10% dia — about 3/4 of the orb
+          var rr = (a.q7 || 0.048) * 0.72 * (1 - taperEff * frac);
           var bx2 = ox + Math.cos(axA) * d2,
             by2 = oy + Math.sin(axA) * d2;
           var th = u * 6.2832;
