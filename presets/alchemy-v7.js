@@ -1252,7 +1252,11 @@
     mtTilt = 0, // rail tilt (0 or ~±35-45°, p2 2.7)
     mtPinchPhase = 0, // pinch-envelope phase → triangular peaks
     mtHueStep = 0, // per-stamp EMITTER hue walk; the pile keeps old hues (trail is hue-frozen)
-    mtStampEnv = 0; // bright-deposit window right after a stamp
+    mtStampEnv = 0, // bright-deposit window right after a stamp
+    swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
+    accSwathTick = -9, // last discrete strand-copy stamp
+    accSwathFam = 0, // alternating colour family (p0: gold+indigo interleaved)
+    accSwathEnv = 0; // ~1-frame bright deposit window per tick
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1771,7 +1775,9 @@
       // none / ray-curtain / waveform bundle / rotating PINWHEEL (the 480p 0:39-0:45 windmill
       // fan — long lines through an off-centre hub, rotating steadily for the whole dwell)
       // pinwheel (4) made RARER (user): ~0.26→~0.15, freed weight → "none" (calmer, motif-only)
-      accLine = rl < 0.4 ? 0 : rl < 0.58 ? 1 : rl < 0.85 ? 2 : 4;
+      // HARP SWATH (5, doc 02 A3) carved ~.16 from curtain/bundle/pinwheel; "none" keeps .40:
+      accLine = rl < 0.4 ? 0 : rl < 0.5 ? 1 : rl < 0.66 ? 5 : rl < 0.87 ? 2 : 4;
+      if (accLine === 5 && corridorAmt > 0.1) accLine = 1; // corridor forces its own pan — no swath there
       accLineNext = time + 5 + Math.random() * 6;
       accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
       accLineAng = Math.random() * 3.14159;
@@ -1786,11 +1792,38 @@
     }
     var clife = (time - accLineT0) / 1.6;
     accLineEnv = accLine === 1 ? (clife >= 0 && clife < 1 ? Math.sin(clife * 3.14159) : 0) : 1;
+    if (FORCE && FORCE.swath && accLine !== 5) {
+      accLine = 5; // debug pin: force a swath dwell (self-render acceptance)
+      accLinePickT = time;
+      accLineNext = time + 9;
+    }
     if (accLine === 4) {
       // steady windmill rotation (~0.28 rad/s), direction from the drift sign
       accLineRot = accLineAng + (time - accLinePickT) * 0.28 * (accLineDrift < 0 ? -1 : 1);
+    } else if (accLine === 5) {
+      // A3 harp swath: the free end sweeps ~15°/s with a slow wander (r0: pivot 15-20°/s)
+      accLineRot =
+        accLineAng +
+        (time - accLinePickT) * 0.26 * (accLineDrift < 0 ? -1 : 1) +
+        0.15 * Math.sin(time * 0.5);
     } else {
       accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the curtain pivots as it lives
+    }
+    // A3 stamp TICKS: a discrete frozen copy every ~0.18s, alternating the two colour families
+    // (p0: gold+indigo interleaved). spacing = 0.26 rad/s × 0.18s × ~0.4 UV ≈ the measured 10-20px pitch.
+    if (accLine === 5 && time - accSwathTick > 0.18) {
+      accSwathTick = time;
+      accSwathFam = 1 - accSwathFam;
+    }
+    accSwathEnv = Math.max(0, 1 - (time - accSwathTick) / 0.07); // ~1-frame bright deposit
+    // mini-FREEZE while a swath lives — the copies must freeze, not diffuse (wavetest_21).
+    // Accessory-scoped field change; strands live 4-6s, a spent fan lingers ~8s (p0).
+    swathAmt += ((accLine === 5 ? 1 : 0) - swathAmt) * Math.min(1, dt * 1.2);
+    if (swathAmt > 0.01) {
+      t.q28 *= 1 - 0.85 * swathAmt; // blur ~off → discrete strands (0.7 left copies merging)
+      t.q1 += (0.968 - t.q1) * 0.5 * swathAmt;
+      t.q18 *= 1 - 0.6 * swathAmt; // damp the pan so the fan doesn't shear away
+      t.q19 *= 1 - 0.6 * swathAmt;
     }
     accLineY += accLineDrift * dt; // the bundle drifts on its own axis
     if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
@@ -1987,6 +2020,26 @@
           return a;
         }
         // ACCESSORY LINES (mode from the closure director)
+        if (accLine === 5) {
+          // HARP SWATH (doc 02 A3): ONE strand, apex PINNED on orb A, free end sweeping —
+          // the fan is entirely frozen trail copies (bright only at ticks); only the newest
+          // edge strand is live. Two interleaved hue families (p0: gold+indigo class).
+          var uS = a.sample || 0;
+          var apx = a.q21 !== undefined ? a.q21 : 0.4,
+            apy = a.q22 !== undefined ? a.q22 : 0.5;
+          var LS = 0.42 + 0.1 * Math.sin(accLinePickT * 3.7); // strand length, rolled per pick
+          // ~50px clocked waviness (aligned phases — clocked, not audio) + a whisper of live jag
+          var wavS = 0.006 * Math.sin(uS * 31.0 + accLinePickT * 5.0) + (a.value1 || 0) * 0.004;
+          a.x = apx + Math.cos(accLineRot) * uS * LS - Math.sin(accLineRot) * wavS;
+          a.y = apy + Math.sin(accLineRot) * uS * LS + Math.cos(accLineRot) * wavS;
+          var hS = (a.q8 || 0) + (accSwathFam ? 0.05 : 0.42);
+          var briS = (0.18 + 0.82 * accSwathEnv) * accVis; // faint live strand; bright only at ticks
+          a.r = orbCol(hS, 0) * briS;
+          a.g = orbCol(hS, 0.33) * briS;
+          a.b = orbCol(hS, 0.67) * briS;
+          a.a = (uS < 0.03 ? 0 : 0.62) * accVis;
+          return a;
+        }
         if (accLine === 4) {
           // ROTATING PINWHEEL (480p 0:39-0:45): 8 long thin lines through an off-centre hub,
           // rotating steadily like a windmill for the whole accessory dwell
