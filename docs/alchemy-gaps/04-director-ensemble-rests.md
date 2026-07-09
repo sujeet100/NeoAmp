@@ -1,5 +1,17 @@
 # 04 — Director: ensemble density, true rests / starvation outro, scene pairings & transitions
 
+> **★ LANDED 2026-07-09 night (6 commits fea49de→10088f7; confirmations pre-answered as README
+> Q4/Q5 = yes).** Deviations: the PAIR table uses the post-doc-07/08/09 motif ids (spiro 17 into
+> bars+kaleido, cocoon 18 into wash; bead-chain 11 is pulled) · deep rests never roll on bgMode 5
+> (the sketchbook rest owns the wash) · step 6's quad-fold writes **q29=1 for 0.6s** (the comp's
+> kaleido fold over live feedback) — NOT q12/q13, which docs 01/02 repurposed for shear/scallop ·
+> the hard wipe MUST kill **q28 with q1** (the warp's blur re-injection otherwise re-seeds the
+> buffer and the clear never lands — probe-verified) and uses q1=0.2 so the ~0.14s window clears
+> even on slow renderers · `__ALC_FORCE.__dbg` (t/q1/q4/transition state) was added to the tail
+> hook for CDP probing — keep it. Pins: `_restDeep` / `_starve` / `_transType` (q29 pins override
+> the fold's q29 write — test folds unpinned). Waves[3] reclaim stayed deferred (the doc-07 ring
+> accessory owns that slot now; its column type was pulled the same night). **All un-judged live.**
+
 **Matrix items:** B5 (ensemble density 5–6 classes), B6 (rest depth + starvation outro), B9 (scene
 couplings: sweep-under-motif · treadmill band · wedge sweeps), B10 (transition-type repertoire),
 B11 (composed scene pairings) · **Priority:** B6 **P1** (promoted — near-empty rests appear in all
