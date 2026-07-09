@@ -278,11 +278,12 @@
         var cx = s[qx] !== undefined ? s[qx] : 0.5,
           cy = s[qy] !== undefined ? s[qy] : 0.5;
         var be = Math.max(0, (s.bass_att || 1) - 1); // beat energy
-        // B1 (doc 06): the RING border flashes the per-event accent ink (shared with the tether;
-        // each orb keeps its hueOff identity); the FILL only chases it lazily via fillLag (r0:
-        // ring snaps with the tether, fill lags ~1s).
-        var hf = (s.q8 || 0) + fillLag * 0.5 + (hueOff || 0),
-          hb = (s.q8 || 0) + inkOff + (hueOff || 0); // ring = the tether's ink (B1, r0 measured)
+        // B1 (doc 06) + B7 (doc 05 step 2): the RING flashes the HELD accent-family ink (shared
+        // with the tether; each orb keeps its hueOff identity); the FILL chases it lazily via
+        // fillHue (r0: ring snaps with the tether, fill lags ~1s). Held between snaps — the
+        // continuous ground clock no longer drags the orbs (p1 S13 layer independence).
+        var hf = fillHue + (hueOff || 0),
+          hb = accentHue + (hueOff || 0); // ring = the tether's ink (B1, r0 measured)
         var fr = orbCol(hf, 0),
           fg = orbCol(hf, 0.33),
           fb = orbCol(hf, 0.67);
@@ -329,8 +330,9 @@
           cy = s[qy] !== undefined ? s[qy] : 0.5;
         var be = Math.max(0, (s.bass_att || 1) - 1);
         // hue-OFFSET colour puff (480p 2:35-2:45: the orbs carry fat soft watercolour splats
-        // in a NEIGHBOURING hue that pulse with the music and stain the trail)
-        var hf = (s.q8 || 0) + (hueOff || 0) + 0.12 + inkOff * 0.5; // puff leans toward the accent (B1)
+        // in a NEIGHBOURING hue that pulse with the music and stain the trail). Rides the held
+        // accent clock (B7) at a +0.12 neighbouring offset.
+        var hf = accentHue + (hueOff || 0) + 0.12;
         var gr = orbCol(hf, 0),
           gg = orbCol(hf, 0.33),
           gb = orbCol(hf, 0.67);
@@ -1360,7 +1362,9 @@
     }
     // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet); the kind-0 ghost
     // strand takes the contrast hue at low alpha (p2's one-sided chromatic ghost)
-    var h = (a.q8 || 0) + inkOff + (tk === 2 ? strand * 0.12 : 0) + (tk === 0 && strand ? 0.45 : 0);
+    // B7 (doc 05 step 2): the tether reads the HELD accent ink — one hue per appearance,
+    // snapping per event (the r0 tether trace), shared exactly with the orb rings.
+    var h = accentHue + (tk === 2 ? strand * 0.12 : 0) + (tk === 0 && strand ? 0.45 : 0);
     var ghostDim = tk === 0 && strand ? 0.4 : 1;
     var dim = tk === 4 ? 0.85 : 1; // rope reads soft but SOLID (h1: pale fuzzy rod)
     // kite POLARITY (p1 T2): dark-on-light over the flat-wash / caustic grounds
@@ -1441,7 +1445,8 @@
     inkOff = 0.08, // doc 06 B1: per-event ACCENT ink — a bounded offset on the q8 clock shared
     // by the tether + both orb RINGS; snaps per tether/hue event ("orbs+tether share one ink
     // pair that snaps per event" — the spine of the whole visualizer, p3 §3.3)
-    fillLag = 0.08, // orb FILLS lag the rings ~1s (r0: gold fill kept under a new green ring)
+    fillHue = 0.55, // orb FILLS lag the rings ~1s (r0: gold fill kept under a new green ring) —
+    // eases toward accentHue (was fillLag, an offset chasing inkOff, before doc 05 step 2)
     tetherKind = 0, // doc 06 A5: construction, re-rolled PER SPAWN (0 chord · 1 helix · 2 staircase
     // · 3 lightning+twigs · 4 rope · 5 kite · 6 cascade); chord stays dominant in the bag
     tetherSeed = 0, // per-appearance parameter re-roll (loop counts, branch points, phases)
@@ -1509,7 +1514,11 @@
     motifStepT = -9, // last step instant (-9 = unseeded)
     motifStepNext = 0,
     accHue = 0.3, // free-accessory clock (p0: strands/columns snap at their own moments)
-    accStepNext = 0;
+    accStepNext = 0,
+    accentHue = 0.55, // B7 (doc 05 step 2): the HELD accent-family ink — both orb rings + the
+    // tether read this one value (r0: "tether hue = ring hue"); events re-anchor it near the
+    // ground family, beats walk it. Held between snaps — never dragged by the continuous clock.
+    accentSnapT = -9;
   // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
   var spiroVar = 0, // 0 dahlia · 1 fur-ball (many-petal) · 2 ferris wheel (dahlia + connector ring)
@@ -1629,6 +1638,8 @@
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
         // B1: the accent ink snaps PER EVENT (bounded q8 offset ±0.36 — never a raw hue, stays muted)
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+        accentHue = huePhase + hueStep + inkOff; // B7: the event RE-ANCHORS the held accent ink
+        accentSnapT = time;
         // A5: per-appearance construction re-roll (chord dominant); rope (4) is persistent ~5s (h1)
         tetherKind = TETHER_BAG[(Math.random() * TETHER_BAG.length) | 0];
         tetherSeed = Math.random() * 100;
@@ -1639,6 +1650,8 @@
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1); // accent rides the snap
+        accentHue = huePhase + hueStep + inkOff; // B7: re-anchor (see the tether branch)
+        accentSnapT = time;
       }
       evNextT = time + 0.8 + Math.random() * 1.7; // mean gap ~1.65s (was ~1.9 — user: tether too rare)
     }
@@ -1656,7 +1669,20 @@
       (tethAlive
         ? Math.min(1, (time - evTetherT0) * 12)
         : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6)) * tethDrop;
-    fillLag += (inkOff - fillLag) * Math.min(1, dt * 1.0); // fills chase the accent over ~1s (B1)
+    // ── B7 ACCENT WALK (doc 05 step 2): between scheduler events the accent family still snaps
+    //    on qualifying beats with a 0.6s floor (h2 tier b: discrete snaps ~0.5-0.75s on compact
+    //    orbs; r0: 1.5-3s per event — beat-gating spans both depending on the music). Bounded
+    //    walk steps keep it inside the muted envelope; rests are naturally silent (no beats). ──
+    if (accentSnapT < -1) {
+      accentHue = huePhase + hueStep + inkOff; // first-frame seed
+      accentSnapT = time;
+    }
+    if (f > 0.6 && time - accentSnapT > 0.6) {
+      accentHue += (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      accentSnapT = time;
+    }
+    if (FORCE && FORCE.accentHue !== undefined) accentHue = FORCE.accentHue; // debug pin
+    fillHue += (accentHue - fillHue) * Math.min(1, dt * 1.0); // orb FILLS chase the ink over ~1s (B1)
     envRefresh = time > envNext; // kind-0 chevron envelope refresh window (~0.5-1s, h2)
     if (envRefresh) envNext = time + 0.5 + Math.random() * 0.5;
     // RAIL lifecycle (doc 06 step 5): expire, ease, and rotate slowly about the midpoint
@@ -2490,7 +2516,7 @@
           vpy = 0.49;
         a.x = nearX + (vpx - nearX) * d;
         a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-        var h = a.q8 || 0;
+        var h = accentHue; // the row matches its anchor orbs (B7 — one accent family)
         a.r = orbCol(h, 0);
         a.g = orbCol(h, 0.33);
         a.b = orbCol(h, 0.67);
