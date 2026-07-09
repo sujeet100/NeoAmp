@@ -335,7 +335,11 @@
     },
     acc3Next = -1, // roll clock (6-14s dwells)
     acc3Env = 0, // 0.4s ease on type transitions (no pops)
-    acc3Fading = false; // fade-out-then-swap latch
+    acc3Fading = false, // fade-out-then-swap latch
+    mushT0 = -99, // A18 mushroom-figures rise event (rare: column + calm + fluid/wash ground)
+    mushLast = -99, // events ≥90s apart
+    mushSnapT = -9, // cap colour-snap cadence (~0.6s, h2 2.15)
+    mushAmt = 0; // eased engagement (read by the waves[3] column branch)
   function rollAcc3(force) {
     var host = Math.random() < 0.5 ? 0 : 1;
     var ty;
@@ -2593,6 +2597,7 @@
     var acc3Pin = FORCE && FORCE._acc3 !== undefined ? FORCE._acc3 : undefined;
     if (
       !acc3Fading &&
+      mushAmt < 0.1 && // never swap the column out mid-mushroom
       (time >= acc3Next ||
         (acc3Pin !== undefined &&
           acc3.type !== (acc3Pin.type !== undefined ? acc3Pin.type : acc3Pin)))
@@ -2606,8 +2611,51 @@
         acc3.t0 = time;
         acc3Fading = false;
         acc3Next = time + 6 + Math.random() * 8;
+        // ── A18 MUSHROOM eligibility (doc 07 step 8): a fresh COLUMN on a calm fluid/wash
+        //    ground rarely opens the scripted rise event (h2 2.14-2.15), ≥90s apart. ──
+        if (
+          acc3.type === 2 &&
+          (bgMode === 0 || bgMode === 5) &&
+          energy < 1.15 &&
+          railAmt < 0.01 &&
+          time - mushLast > 90 &&
+          Math.random() < 0.15
+        ) {
+          mushT0 = time;
+          mushLast = time;
+        }
       }
     } else if (acc3.type > 0) acc3Env = Math.min(1, acc3Env + dt / 0.4);
+    if (FORCE && FORCE._mushroom && time - mushT0 > 6) {
+      // debug pin: force the event (and the column it rides on) now
+      mushT0 = time;
+      mushLast = time;
+      if (acc3.type !== 2) {
+        acc3 = rollAcc3(2);
+        acc3.t0 = time;
+        acc3Fading = false;
+      }
+    }
+    // ── A18 MUSHROOM RISE (h2 2.14-2.15, full_170.7/173.5): for ~4s both posts go symmetric
+    //    about centre-x ~20% apart and RISE ~2s; each anchor carries a short coiled ring-TUBE
+    //    (the cap — seg-parity split in the column branch) whose rise history stacks the fuzzy
+    //    disc BODY below it (pure trail, zero extra slots). Caps colour-snap every ~0.6s. ──
+    mushAmt += ((time - mushT0 < 4 ? 1 : 0) - mushAmt) * Math.min(1, dt * 2);
+    if (mushAmt > 0.01) {
+      var mu = mushAmt * (1 - cocAmt) * (1 - scalAmt) * (1 - corridorAmt) * (1 - railAmt);
+      var mAge = time - mushT0;
+      var yR = 0.45 + 0.18 * Math.min(1, Math.max(0, mAge) / 2); // caps rise over ~2s
+      t.q21 += (0.4 - t.q21) * mu;
+      t.q22 += (yR - t.q22) * mu;
+      t.q23 += (0.6 - t.q23) * mu;
+      t.q24 += (yR + 0.02 - t.q24) * mu; // slight stagger — the pair leans, not a mirror-clone
+      t.q25 = Math.max(t.q25, 0.9 * mu);
+      t.q14 = Math.max(t.q14, 0.9 * mu);
+      if (time - mushSnapT > 0.6) {
+        mushSnapT = time; // h2: caps snap cream→cyan→magenta→… every ~0.5-0.75s
+        accentHue += (Math.random() < 0.5 ? -1 : 1) * 0.12;
+      }
+    }
 
     // B4b: remember this frame's FINAL centre + orb anchors (corridor/valley overrides included)
     lastQ2 = t.q2;
@@ -2984,13 +3032,31 @@
           var fk = (a.sample || 0) * N,
             seg = Math.min(Math.floor(fk), N - 1),
             u = fk - seg;
+          var segEff = seg,
+            Nn = N,
+            lenEff = acc3.len,
+            taperEff = acc3.taper,
+            angBase = acc3.ang,
+            mush = mushAmt > 0.5;
+          if (mush) {
+            // A18 MUSHROOM: seg parity splits this one wave across BOTH anchors — each cap is
+            // a short coiled ring-TUBE leaning outward (h2 2.14); the rise trail stacks the body
+            var useB = (seg & 1) === 1;
+            ox = useB ? (a.q23 !== undefined ? a.q23 : 0.5) : a.q21 !== undefined ? a.q21 : 0.5;
+            oy = useB ? (a.q24 !== undefined ? a.q24 : 0.5) : a.q22 !== undefined ? a.q22 : 0.5;
+            segEff = seg >> 1;
+            Nn = Math.max(2, N >> 1);
+            lenEff = 0.07; // short tube, not a long stalk
+            taperEff = 0.3;
+            angBase = -1.5708 + (useB ? 0.14 : -0.14); // the pair leans outward (mirror figures)
+          }
           var age = lastT - acc3.t0;
-          var ext = 1 + 0.09 * Math.sin((6.2832 * age) / acc3.extT);
-          var swy = 0.09 * Math.sin(age * 6.2832);
-          var axA = acc3.ang + swy + seg * 0.06 * Math.sin(lastT * 0.6 + acc3.t0);
-          var frac = seg / (N - 1);
-          var d2 = (0.14 + 0.86 * frac) * acc3.len * ext;
-          var rr = (a.q7 || 0.048) * (1 - acc3.taper * frac);
+          var ext = mush ? 1 : 1 + 0.09 * Math.sin((6.2832 * age) / acc3.extT);
+          var swy = (mush ? 0.03 : 0.09) * Math.sin(age * 6.2832);
+          var axA = angBase + swy + (mush ? 0 : seg * 0.06 * Math.sin(lastT * 0.6 + acc3.t0));
+          var frac = segEff / (Nn - 1);
+          var d2 = (0.14 + 0.86 * frac) * lenEff * ext;
+          var rr = (a.q7 || 0.048) * (1 - taperEff * frac);
           var bx2 = ox + Math.cos(axA) * d2,
             by2 = oy + Math.sin(axA) * d2;
           var th = u * 6.2832;
@@ -2998,17 +3064,19 @@
             eyy = Math.sin(th) * rr * 0.38; // squash ALONG the axis → foreshortened 3D stack
           a.x = bx2 + exx * Math.sin(axA) + eyy * Math.cos(axA);
           a.y = by2 - exx * Math.cos(axA) + eyy * Math.sin(axA);
-          var h2 = accentHue + seg * 0.03;
+          var h2 = accentHue + segEff * 0.03;
           a.r = orbCol(h2, 0);
           a.g = orbCol(h2, 0.33);
           a.b = orbCol(h2, 0.67);
-          if (seg === N - 1) {
+          if (segEff === Nn - 1) {
             a.r = Math.min(1, a.r * 1.3 + 0.15); // the TIP ring is brighter (p1: tip snaps)
             a.g = Math.min(1, a.g * 1.3 + 0.15);
             a.b = Math.min(1, a.b * 1.3 + 0.15);
           }
           mutRGB(a);
-          a.a = u < 0.05 ? 0 : 0.6 * gate; // discrete rings — hide ring-to-ring connectors
+          // discrete rings — hide ring-to-ring connectors; during the mushroom the parity split
+          // makes EVERY seg boundary jump between the two figures, so hide BOTH seg ends wide
+          a.a = u < (mush ? 0.12 : 0.05) || (mush && u > 0.94) ? 0 : 0.6 * gate;
           return a;
         }
         if (ty === 3) {
