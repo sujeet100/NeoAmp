@@ -278,8 +278,11 @@
         var cx = s[qx] !== undefined ? s[qx] : 0.5,
           cy = s[qy] !== undefined ? s[qy] : 0.5;
         var be = Math.max(0, (s.bass_att || 1) - 1); // beat energy
-        var hf = (s.q8 || 0) + (hueOff || 0),
-          hb = hf + 0.5;
+        // B1 (doc 06): the RING border flashes the per-event accent ink (shared with the tether;
+        // each orb keeps its hueOff identity); the FILL only chases it lazily via fillLag (r0:
+        // ring snaps with the tether, fill lags ~1s).
+        var hf = (s.q8 || 0) + fillLag * 0.5 + (hueOff || 0),
+          hb = (s.q8 || 0) + inkOff + (hueOff || 0); // ring = the tether's ink (B1, r0 measured)
         var fr = orbCol(hf, 0),
           fg = orbCol(hf, 0.33),
           fb = orbCol(hf, 0.67);
@@ -327,7 +330,7 @@
         var be = Math.max(0, (s.bass_att || 1) - 1);
         // hue-OFFSET colour puff (480p 2:35-2:45: the orbs carry fat soft watercolour splats
         // in a NEIGHBOURING hue that pulse with the music and stain the trail)
-        var hf = (s.q8 || 0) + (hueOff || 0) + 0.12;
+        var hf = (s.q8 || 0) + (hueOff || 0) + 0.12 + inkOff * 0.5; // puff leans toward the accent (B1)
         var gr = orbCol(hf, 0),
           gg = orbCol(hf, 0.33),
           gb = orbCol(hf, 0.67);
@@ -1254,7 +1257,7 @@
     var off = (strand ? 1 : -1) * 0.0035 * win;
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
-    var h = (a.q8 || 0) + 0.08;
+    var h = (a.q8 || 0) + inkOff; // the per-event ACCENT ink, shared with the orb rings (B1)
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -1320,6 +1323,10 @@
     evTetherDropLen = 0,
     evTetherDropNext = 0,
     tetherEnv = 0, // tether event envelope (read by waves[2])
+    inkOff = 0.08, // doc 06 B1: per-event ACCENT ink — a bounded offset on the q8 clock shared
+    // by the tether + both orb RINGS; snaps per tether/hue event ("orbs+tether share one ink
+    // pair that snaps per event" — the spine of the whole visualizer, p3 §3.3)
+    fillLag = 0.08, // orb FILLS lag the rings ~1s (r0: gold fill kept under a new green ring)
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
     evStarOn = false, // read by waves[1] (point fns share the closure)
@@ -1460,9 +1467,12 @@
         evTetherT0 = time;
         evTetherLife = Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
+        // B1: the accent ink snaps PER EVENT (bounded q8 offset ±0.36 — never a raw hue, stays muted)
+        inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+        inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1); // accent rides the snap
       }
       evNextT = time + 0.8 + Math.random() * 1.7; // mean gap ~1.65s (was ~1.9 — user: tether too rare)
     }
@@ -1480,6 +1490,7 @@
       (tethAlive
         ? Math.min(1, (time - evTetherT0) * 12)
         : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6)) * tethDrop;
+    fillLag += (inkOff - fillLag) * Math.min(1, dt * 1.0); // fills chase the accent over ~1s (B1)
     evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
