@@ -1711,7 +1711,14 @@
     accBundleVis = 1, // bundle gate: off while a busy sprawling motif is up (net/vortex/tangle)
     resting = false,
     breathNext = -1,
-    restAmt = 0;
+    restAmt = 0,
+    restDeep = false, // B6a (doc 04): this rest is DEEP — the central motif leaves too
+    deepAmt = 0, // eased deep-rest engagement (multiplies q4 down)
+    starveT = 0, // B6b: seconds of continuous deep-quiet (starvation detector)
+    starveAmt = 0; // eased starvation drain (trails collapse, emitters starve)
+  var FEAT_DEEPREST = true, // doc 04 A/B flips (one-line disable per step)
+    FEAT_STARVE = true,
+    FEAT_TRANS = true;
   // ── PER-CLASS COLOUR CLOCKS (doc 05 B7/D12). The refs run INDEPENDENT hue clocks per element
   // class — ground (the continuous q8 shader clock, unchanged), central motif (a STEPPED walk:
   // hold 0.75-2s, then jump a hue family), free accessories (their own slower walk). All changes
@@ -2315,16 +2322,24 @@
     if (time >= breathNext) {
       if (!resting && energy < 1.15 && corridorAmt < 0.1 && Math.random() < 0.5) {
         resting = true;
+        // B6a (doc 04 step 2, answered README Q4): ~40% of rests go DEEP — the central motif
+        // stamp-stops and LEAVES (bg + orb anchor only; p1's near-empty frames, h0's 4.5s dark
+        // rest). Never on the wash (bgMode 5) — the sketchbook rest owns that ground.
+        restDeep = FEAT_DEEPREST && bgMode !== 5 && Math.random() < 0.4;
         breathNext = time + 3 + Math.random() * 4; // rest 3-7s
       } else {
         resting = false;
+        restDeep = false;
         breathNext = time + 8 + Math.random() * 6; // busy 8-14s
       }
     }
     if (FORCE && FORCE.rest !== undefined) resting = !!FORCE.rest; // debug pin
+    if (FORCE && FORCE._restDeep !== undefined) resting = restDeep = !!FORCE._restDeep;
     restAmt += ((resting ? 1 : 0) - restAmt) * Math.min(1, dt * 0.8);
+    deepAmt += ((restDeep ? 1 : 0) - deepAmt) * Math.min(1, dt * 0.7);
     accVis = 1 - 0.88 * restAmt;
     t.q14 *= 1 - 0.92 * restAmt;
+    t.q4 *= 1 - 0.92 * deepAmt; // deep rest: the motif fades out entirely
 
     // ── SKETCHBOOK REST (doc 03 A13; h1 S3 74.8-83): on a flat-wash rest the frame becomes a
     //    static page — ONE wireframe motif re-stamps every ~1-2s cycling BOTH construction AND
