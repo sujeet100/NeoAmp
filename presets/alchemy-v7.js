@@ -264,6 +264,16 @@
   function orbCol(h, off) {
     return 0.5 + 0.5 * Math.cos(6.2832 * (h + off));
   }
+  // D13 (doc 05 step 7, answered README Q6): everything EXCEPT the accent family (orb pair +
+  // tether) gets a mild EMIT-TIME desaturate — pull 14% toward luma — so the small accent reads
+  // as "deliberately the most saturated thing on screen" (p1 O11). Comp profiles untouched:
+  // this reorders saturation, never lifts the envelope.
+  function mutRGB(a) {
+    var lm = 0.299 * a.r + 0.587 * a.g + 0.114 * a.b;
+    a.r += (lm - a.r) * 0.14;
+    a.g += (lm - a.g) * 0.14;
+    a.b += (lm - a.b) * 0.14;
+  }
   function orbShape(qx, qy, hueOff, visVar) {
     return {
       baseVals: Object.assign({}, SHAPE_BASE, {
@@ -290,7 +300,7 @@
         var br = orbCol(hb, 0),
           bg = orbCol(hb, 0.33),
           bb = orbCol(hb, 0.67);
-        var bri = 0.9 + 0.5 * be; // fill brightness pulses with the beat
+        var bri = (0.9 + 0.5 * be) * (1 + 0.35 * spikeAmt); // fill pulses; D13 spike ~0.6s
         s.x = cx;
         s.y = cy;
         s.rad = (s.q7 || 0.06) * (1 + 0.45 * be); // radius pulses with the beat
@@ -306,7 +316,7 @@
         s.a2 = 0.78 * vis;
         // PROMINENT border — BRIGHT contrast-hue rim (was dim ×0.34) that pulses hard on the beat (the
         // user: "border is still not prominent when it pulses" / "solid border with almost 1 opacity").
-        var bbri = 0.8 + 0.7 * be;
+        var bbri = (0.8 + 0.7 * be) * (1 + 0.35 * spikeAmt); // D13: the ring spikes with the fill
         s.border_r = Math.min(1, br * bbri);
         s.border_g = Math.min(1, bg * bbri);
         s.border_b = Math.min(1, bb * bbri);
@@ -344,9 +354,10 @@
         var sl = (lastT - splatT0) / 0.35;
         var spl = sl >= 0 && sl < 1 ? Math.sin(sl * 3.14159) : 0;
         s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.1 * puls + 1.3 * spl); // the puff SWELLS on hits
-        s.r = gr * 0.85;
-        s.g = gg * 0.85;
-        s.b = Math.min(1, gb * 1.4 + 0.12);
+        var spk = 1 + 0.35 * spikeAmt; // D13 accent spike
+        s.r = Math.min(1, gr * 0.85 * spk);
+        s.g = Math.min(1, gg * 0.85 * spk);
+        s.b = Math.min(1, (gb * 1.4 + 0.12) * spk);
         s.a = (0.42 + 0.5 * spl) * vis;
         s.r2 = gr * 0.4;
         s.g2 = gg * 0.4;
@@ -1256,6 +1267,7 @@
         MODES[m](a); // outside the front: redraw the point's COLOUR in the old hue
       }
     }
+    mutRGB(a); // D13: the motif is NOT the accent — mild emit-time desaturate
     // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on
     // circle. Gated to "not kaleido" via q29 (the fold source) — q12 was freed for the shear warp.
     if ((m === 0 || m === 2) && Math.abs((a.q29 || 0) - 1.0) > 0.5) {
@@ -1393,9 +1405,10 @@
     // kite POLARITY (p1 T2): dark-on-light over the flat-wash / caustic grounds
     var bgm = Math.floor((a.q29 || 0) + 0.5);
     if (tk === 5 && (bgm === 5 || bgm === 8)) dim *= 0.25;
-    a.r = orbCol(h, 0) * dim;
-    a.g = orbCol(h, 0.33) * dim;
-    a.b = orbCol(h, 0.67) * dim;
+    var spkT = dim * (1 + 0.35 * spikeAmt); // D13: the tether is accent-family — it spikes too
+    a.r = Math.min(1, orbCol(h, 0) * spkT);
+    a.g = Math.min(1, orbCol(h, 0.33) * spkT);
+    a.b = Math.min(1, orbCol(h, 0.67) * spkT);
     if (railOn && tetherEnv < 0.5) {
       // quiet rail = a pale desaturated hairline (p2: lavender/white); events restore full ink
       a.r = a.r * 0.4 + 0.6;
@@ -1544,6 +1557,8 @@
     // tether read this one value (r0: "tether hue = ring hue"); events re-anchor it near the
     // ground family, beats walk it. Held between snaps — never dragged by the continuous clock.
     accentSnapT = -9,
+    spikeT0 = -99, // D13: rare ~0.6s VIVID SPIKE window on the accent family (p1: t=90.3 fold)
+    spikeAmt = 0, // per-frame spike envelope, 0 under kaleido (the bg carries saturation there)
     splatT0 = -9; // A14 (doc 05 step 6): one-shot splat DEPOSIT at the tether endpoints — a
   // 0.35s orbGlow swell stamps a fat neighbouring-hue puff ~2x the orb into the feedback, which
   // diffuses 2-4s (3-6s on the C10 wash) and keeps its birth hue forever (THE ONE LAW). The
@@ -1715,6 +1730,16 @@
       accentSnapT = time;
     }
     if (FORCE && FORCE.accentHue !== undefined) accentHue = FORCE.accentHue; // debug pin
+    // ── D13 VIVID SPIKE (doc 05 step 7): on rare strong hits the accent family alone brightens
+    //    ~0.6s (p1: vivid spikes are brief). Under the kaleidoscope the BG is the saturation
+    //    carrier (p0 §3.4) — the accent stands down so there is only ever ONE hot element. ──
+    if (FORCE && FORCE.spike) {
+      spikeT0 = time;
+      FORCE.spike = 0;
+    }
+    if (f > 0.95 && time - spikeT0 > 8 && bgMode !== 1) spikeT0 = time;
+    var spu = (time - spikeT0) / 0.6;
+    spikeAmt = spu >= 0 && spu < 1 && bgMode !== 1 ? Math.sin(spu * 3.14159) : 0;
     fillHue += (accentHue - fillHue) * Math.min(1, dt * 1.0); // orb FILLS chase the ink over ~1s (B1)
     envRefresh = time > envNext; // kind-0 chevron envelope refresh window (~0.5-1s, h2)
     if (envRefresh) envNext = time + 0.5 + Math.random() * 0.5;
@@ -2446,6 +2471,7 @@
           a.g = orbCol(h, 0.33);
           a.b = orbCol(h, 0.67);
           a.a = u < 0.02 ? 0 : 0.5;
+          mutRGB(a); // D13: companion lattice is not the accent
           return a;
         }
         // ACCESSORY LINES (mode from the closure director)
@@ -2467,6 +2493,7 @@
           a.g = orbCol(hS, 0.33) * briS;
           a.b = orbCol(hS, 0.67) * briS;
           a.a = (uS < 0.03 ? 0 : 0.62) * accVis;
+          mutRGB(a); // D13
           return a;
         }
         if (accLine === 4) {
@@ -2491,6 +2518,7 @@
           a.g = orbCol(hp, 0.33) * 0.5 * accVis;
           a.b = orbCol(hp, 0.67) * 0.5 * accVis;
           a.a = (up < 0.03 ? 0 : 0.4) * accVis;
+          mutRGB(a); // D13
           return a;
         }
         if (accLine === 1 && accLineEnv > 0.01) {
@@ -2512,6 +2540,7 @@
           a.g = orbCol(h1, 0.33) * bri;
           a.b = orbCol(h1, 0.67) * bri;
           a.a = u1 < 0.03 ? 0 : 0.4 * accLineEnv * accVis;
+          mutRGB(a); // D13
           return a;
         }
         if (accLine === 2) {
@@ -2528,6 +2557,7 @@
           a.g = orbCol(h2, 0.33) * 0.8;
           a.b = orbCol(h2, 0.67) * 0.8;
           a.a = (u2 < 0.02 ? 0 : 0.5) * accVis * accBundleVis;
+          mutRGB(a); // D13
           return a;
         }
         a.a = 0;
@@ -2604,6 +2634,7 @@
         a.g = orbCol(h, 0.33);
         a.b = orbCol(h, 0.67);
         a.a = 0.9 * (1 - idx * 0.72); // fade with depth -> recede
+        mutRGB(a); // D13: accent HUE family, but only the orbs+tether carry the saturation
         return a;
       },
     };
