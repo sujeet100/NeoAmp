@@ -121,6 +121,14 @@
       "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
       "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
       "  }\n" +
+      // ── WALLPAPER tiling (doc 12 C3; p3 D-WALL): m==13 makes the frame a 6×6 grid of miniature
+      //    copies of the LIVE centre window — a fract() sample-fold (like the kaleido, no slot). The
+      //    grid does NOT scroll; cells morph in place as the centre changes. Ground is dimmed below. ──
+      "  if (m > 12.5 && m < 13.5) {\n" +
+      "    vec2 wc = (uv - 0.5) * 6.0; wc.x *= asp;\n" +
+      "    wc = fract(wc) - 0.5; wc.x /= asp;\n" +
+      "    suv = clamp(wc * 0.25 + 0.5, 0.0, 1.0);\n" +
+      "  }\n" +
       // ── the watercolour TRAIL + motif buffer, max-DILATED at ~2.5px (V1's "dilation radius →
       //    THICK lines" — the original renders ~300px and upscales, so every stroke is fat) +
       //    TWO-octave bloom (blur2 = the wide fuzz octave; V1 had it, v7 had dropped to blur1
@@ -247,6 +255,9 @@
       "    vec3 bc = pal(bh);\n" +
       "    float gl = dot(bc, vec3(0.333)); ground = mix(vec3(gl), bc, 0.6) * (0.14 + 0.10 * front);\n" +
       "  }\n" +
+      // 13 WALLPAPER (doc 12 C3): the tiled TRAIL (folded above) IS the image — dim the base ground
+      // so the grid of live-centre copies reads on near-black.
+      "  else if (m > 12.5 && m < 13.5) { ground *= 0.1; }\n" +
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
       "  if (m > 0.5 && m < 1.5) {\n" +
@@ -1894,7 +1905,7 @@
   // doc 12 D5: the flat WASH is the dominant REST ground in the refs (p1 B2, ≈half the runtime),
   // not the wavy-fluid — so wash(5)×4 + wavy(0)×3 now lead. New structured regimes 10-14 (curtain/
   // floor/strata/wallpaper/chevron) append here as each lands.
-  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
