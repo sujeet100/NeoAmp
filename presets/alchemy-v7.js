@@ -1855,9 +1855,10 @@
     } else {
       accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the curtain pivots as it lives
     }
-    // A3 stamp TICKS: a discrete frozen copy every ~0.18s, alternating the two colour families
-    // (p0: gold+indigo interleaved). spacing = 0.26 rad/s × 0.18s × ~0.4 UV ≈ the measured 10-20px pitch.
-    if (accLine === 5 && time - accSwathTick > 0.18) {
+    // A3 stamp TICKS: a discrete frozen copy per tick, alternating the two colour families
+    // (p0: gold+indigo interleaved). 0.18→0.28s (user screenshots: copies packed into a braided
+    // rope) — pitch ≈ 0.26 rad/s × 0.28s ≈ 4.2° ≈ the measured 10-20px strand spacing.
+    if (accLine === 5 && time - accSwathTick > 0.28) {
       accSwathTick = time;
       accSwathFam = 1 - accSwathFam;
     }
@@ -1867,7 +1868,9 @@
     swathAmt += ((accLine === 5 ? 1 : 0) - swathAmt) * Math.min(1, dt * 1.2);
     if (swathAmt > 0.01) {
       t.q28 *= 1 - 0.85 * swathAmt; // blur ~off → discrete strands (0.7 left copies merging)
-      t.q1 += (0.968 - t.q1) * 0.5 * swathAmt;
+      // decay 0.968→0.978 (user screenshots: strands died in ~1.5s, so the sweep never spread
+      // into a wedge — it read as a braided rope; ref strands live 4-6s, spent fan lingers ~8s)
+      t.q1 += (0.978 - t.q1) * 0.5 * swathAmt;
       t.q18 *= 1 - 0.6 * swathAmt; // damp the pan so the fan doesn't shear away
       t.q19 *= 1 - 0.6 * swathAmt;
     }
