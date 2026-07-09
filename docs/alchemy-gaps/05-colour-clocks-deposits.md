@@ -1,5 +1,28 @@
 # 05 — Independent per-class colour clocks, stepped hue arrival, deposit stains & hue stratigraphy
 
+> **★ LANDED IN FULL (2026-07-09, 7 commits `148ac0e`→`b1668d9`, one per step; not yet
+> live-confirmed).** Both confirm questions were pre-answered YES (README Q6/Q7). Deviations
+> from the plan below, made at landing time:
+> - **Step 0 folded into each step** as named `FORCE` keys (`motifHue`/`accentHue`/`splat`/
+>   `spike`), matching the file's established pin style — no underscore-prefix mechanism.
+> - **Step 1:** stamp-walk modes (tangle 13 / mountains 14 / spiro 17 / cocoon 18) HOLD the
+>   motif step clock while up — their per-stamp hue walks already are their D12; stepping the
+>   base under them would double-step. Sketchbook pages keep the global clock (+restStampHue).
+> - **Step 2:** implemented as the doc's re-time-inkOff variant: `accentHue` is HELD; scheduler
+>   events re-anchor it to `huePhase+hueStep+inkOff`, beats (0.6s floor) walk it. `fillLag` →
+>   `fillHue` (eases toward `accentHue` ~1s). Corridor dots joined the accent family.
+> - **Step 4:** tangle (13) EXCLUDED from RADIAL_FRONT — h2 measures it re-tinting
+>   whole-cluster per stamp, not as a front. Front verified numerically (centre point snaps,
+>   rim follows ~1s later).
+> - **Step 5:** two guards added from acceptance shots: sprawling full-frame line motifs
+>   (1/3/7/8/10/12/13) get 0.35× hold (they pile dozens of held copies into a web — a control
+>   render confirmed the net-on-wash web is pre-existing, but full hold quadrupled it), and the
+>   hold is damped 0.55× under the sketchbook (its ~1s ghost-fade was live-tuned). Plus the
+>   doc's own q4×0.8 white-guard fallback.
+> - **Step 6b SKIPPED:** `waves[3]` has `usedots:1` as a static baseVal — the "outline ring"
+>   would render as a dotted bead loop, i.e. the removed `bad7755` ugliness. 6a (glow swell)
+>   shipped; splats trigger inside the tether event branch (~half of casts, ≥4s apart).
+
 **Matrix items:** B7 (independent per-class colour clocks + complementary fg/bg, P1) · D12 (stepped hue arrival as the norm, P2) · D13 (one-vivid-accent saturation policy, P2, **CONFIRM**) · C10 (deposit-holding grounds, stains 3–10s, P2) · A14 (amoeba splats / deposit puffs, P3, **hue-ageing claim CONFLICTED**)
 **Priority:** B7 is P1 — it is the structural change the others ride on; D12/D13/C10 P2; A14 P3.
 **Risk flags:** (6) on B7/D12/D13 — every clock must stay inside the muted Pastel envelope (hue-only changes; saturation is touched ONLY in the confirm-gated D13 step, and only as an *ordering*, never a global lift). (4) on C10 — per-scene decay/blur modulation is a warp-*input* change of the rejected-rework class (`9ba675e`): ship wash-gated, ONE commit, user-verified; consume doc 01's field engine if it has landed. (1) on A14 — filled wobbly blobs have no renderer in budget (all 4 shape slots taken, shapes are rigid n-gons); route splats through the existing `orbGlow` stamps into the feedback, exactly as the matrix prescribes.
