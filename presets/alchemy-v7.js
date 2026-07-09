@@ -1351,9 +1351,14 @@
       disp = (a.value1 || 0) * q26e * 0.5 * win;
       off = (strand ? 1 : -1) * 0.011 * Math.cos(lastT * 3.2 + tt * 3.0 + tetherSeed) * win;
     } else if (tk === 5) {
-      // LOOPY KITE-STRING (p1 T2): one wandering strand — large open loops + fine live jag.
+      // LOOPY KITE-STRING (p1 T2): one WANDERING strand — the loops TRAVEL along the string
+      // (phase drifts, amplitude breathes) so per-frame it is a moving hairline, never a
+      // standing sine (user: a fixed-phase drawn wave read as a static shape). Brief life.
       disp =
-        0.025 * Math.sin(tt * (3 + (((tetherSeed * 5) | 0) % 3)) * 6.2832 + tetherSeed) * win +
+        0.025 *
+          (0.7 + 0.3 * Math.sin(lastT * 0.7 + tetherSeed)) *
+          Math.sin(tt * (3 + (((tetherSeed * 5) | 0) % 3)) * 6.2832 + tetherSeed + lastT * 2.2) *
+          win +
         (a.value1 || 0) * 0.006 * win;
       off = 0;
     } else if (tk === 6) {
@@ -1614,8 +1619,10 @@
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
   // the near-identical ray-star family (1/2/8/10) drops from 6 to 5 shares of the bag.
+  // bead-chain (11) PULLED from the bag (user 2026-07-09: reads as a drawn dotted stick —
+  // the same removed-bead territory as the answered Q8; slot moved to tri-mandala 15)
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
     18, 18, 19,
   ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
@@ -1693,7 +1700,6 @@
         // ~40% open a LONG SESSION (3.5-10s) — the user confirmed the original often keeps the
         // tether up for a while, with brief random dropouts (the flicker block below).
         evTetherT0 = time;
-        evTetherLife = Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
         // B1: the accent ink snaps PER EVENT (bounded q8 offset ±0.36 — never a raw hue, stays muted)
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
@@ -1705,9 +1711,22 @@
         // A14: about half the casts DEPOSIT a splat where the tether lands (p1 O12), ≥4s apart
         if (time - splatT0 > 4 && Math.random() < 0.5) splatT0 = time;
         if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
-        if (tetherKind === 4) evTetherLife = Math.max(evTetherLife, 4 + Math.random() * 2);
-        // cascade needs ≥1s of swing for its trail-fan to accumulate (the fan IS the trail)
-        if (tetherKind === 6) evTetherLife = Math.max(evTetherLife, 1.2 + Math.random());
+        // ★ PER-KIND LIFE (design language + measured duty; user: a helix/kite held for seconds
+        // reads as a drawn static shape and the refs never show one): only the plain chord and
+        // the staircase hold LONG sessions (h0: the staircase persists for the scene's life);
+        // every other construction is a BRIEF event. helix 1.5-2s ON (p1 duty) · lightning
+        // ~0.5s flash (p1) · kite mostly 0.25-0.5s flicks, occasionally ~2s (p1 T2) · rope
+        // ~5s rod (h1) · cascade 1.2-2.2s (the fan IS its trail).
+        if (tetherKind === 0 || tetherKind === 2)
+          evTetherLife =
+            Math.random() < 0.4 ? 3.5 + Math.random() * 6.5 : 0.4 + Math.random() * 1.6;
+        else if (tetherKind === 1) evTetherLife = 1.5 + Math.random() * 0.5;
+        else if (tetherKind === 3) evTetherLife = 0.35 + Math.random() * 0.3;
+        else if (tetherKind === 4) evTetherLife = 4 + Math.random() * 2;
+        else if (tetherKind === 5)
+          evTetherLife =
+            Math.random() < 0.8 ? 0.25 + Math.random() * 0.25 : 1.6 + Math.random() * 0.6;
+        else evTetherLife = 1.2 + Math.random();
         knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
