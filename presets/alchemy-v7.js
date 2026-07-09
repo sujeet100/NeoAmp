@@ -815,7 +815,9 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    a.a = u < 0.02 || u > 0.98 ? 0 : 0.4 + 0.6 * mtStampEnv; // dim live crest, bright per-stamp deposits
+    // FAINT live crest, bright only per stamp — at 0.4 the every-frame deposit filled the gaps
+    // between stamped generations under the freeze (user screenshot: one thick packed band).
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.16 + 0.84 * mtStampEnv;
     return a;
   }
   // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2): ONE waveform line marching along a LL→UR
@@ -1288,6 +1290,7 @@
     mtStampEnv = 0, // bright-deposit window right after a stamp
     scRowOff = 0, // doc 02 A10: scallop emitter row height (walks the band over ~10s)
     scRowT = -9, // last row re-seat
+    accTerrVis = 1, // accessory fade under terrain motifs 14/19 (frozen-ray-spray guard)
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
     accSwathFam = 0, // alternating colour family (p0: gold+indigo interleaved)
@@ -1741,7 +1744,7 @@
     sinkImp += (0 - sinkImp) * Math.min(1, dt * 4); // ~0.25s release
     // -q19 streams the buffer DOWN (measured sign map); integrated step ≈ 0.0042·60·0.25 ≈ 0.06 UV
     // ≈ the measured 20-40px generation gap. Applied after the freeze damping on purpose.
-    t.q19 -= 0.0042 * sinkImp * freezeAmt;
+    t.q19 -= 0.0055 * sinkImp * freezeAmt; // 0.0042→0.0055: wider generation gap (user: bands too packed)
     // D11 mountains identity (doc 02 step 2): roll the rail tilt + pinch phase ON ENTRY to the
     // dwell; step the EMITTER hue per stamp — the pile keeps its old hue for free (hue-frozen
     // trails, A14) so two colour generations coexist (p1 S6: gold pile under a green crest).
@@ -1877,6 +1880,11 @@
     // the original never stacks two sprawling organics; fade the bundle under net/vortex/tangle
     accBundleVis +=
       ((mCur === 7 || mCur === 8 || mCur === 13 ? 0 : 1) - accBundleVis) * Math.min(1, dt * 1.5);
+    // TERRAIN scenes are motif-dominant (user screenshot 2026-07-09: a pinwheel under the FREEZE
+    // field froze its rays into a permanent blue star over the mountains — the ref terrain scenes
+    // have no crossing accessory lines). Fade ALL accessory lines under mountains/scallop.
+    accTerrVis += ((mCur === 14 || mCur === 19 ? 0 : 1) - accTerrVis) * Math.min(1, dt * 1.5);
+    accVis *= accTerrVis;
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
