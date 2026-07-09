@@ -225,6 +225,15 @@
       "    vec3 wedge = mix(pal(hb + 0.08), pal(hb + 0.42), smoothstep(-0.25, 0.25, wpl));\n" +
       "    float gl = dot(wedge, vec3(0.333)); ground = mix(vec3(gl), wedge, 0.45) * 0.16;\n" +
       "  }\n" +
+      // 11 FLOOR-BAND / horizon strip (doc 12 C11; p1 S4/S5): a muted band across the BOTTOM ~18%
+      // of frame with a low-freq wavy top edge undulating via fbm, a slightly darker ground above.
+      // (the lateral-streaming variant r0 bg3 is deferred to doc 01's C2 displacement.)
+      "  else if (m > 10.5 && m < 11.5) {\n" +
+      "    float edge = 0.18 + 0.06 * fbm(vec2(uv.x * 3.0 + time * 0.05, 1.7));\n" +
+      "    float floorMask = smoothstep(edge + 0.02, edge - 0.02, 1.0 - uv.y);\n" + // band anchored to BOTTOM (uv.y=0 is top here)
+      "    vec3 floorCol = pal(hb + 0.5) * 0.20, skyCol = pal(hb + 0.06) * 0.10;\n" +
+      "    ground = mix(skyCol, floorCol, floorMask);\n" +
+      "  }\n" +
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
       "  if (m > 0.5 && m < 1.5) {\n" +
@@ -1872,7 +1881,7 @@
   // doc 12 D5: the flat WASH is the dominant REST ground in the refs (p1 B2, ≈half the runtime),
   // not the wavy-fluid — so wash(5)×4 + wavy(0)×3 now lead. New structured regimes 10-14 (curtain/
   // floor/strata/wallpaper/chevron) append here as each lands.
-  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
