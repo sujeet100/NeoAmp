@@ -61,9 +61,13 @@
     "  pd *= (1.0 - q15);\n" +
     "  pd.x /= asp;\n" +
     "  vec2 suv = piv + pd + vec2(q18, q19);\n" + // PAN translate (abrupt-snap direction from frame())
-    // SAWTOOTH X-SHEAR as f(y) (doc 01 step 6, p2: stamps shear into chevron ribbons). A triangle
-    // wave in y, 3 teeth; q12 in -1..1, 0 = OFF (dormant capability for the structured grounds).
-    "  suv.x += q12 * 0.03 * (abs(fract(suv.y * 3.0 + time * 0.05) * 2.0 - 1.0) * 2.0 - 1.0);\n" +
+    // q12 SIGN-MULTIPLEXED displacement terms, 0 = both OFF:
+    //  q12>0 — sawtooth x-shear as f(y) (doc 01 step 6, p2 chevrons; dormant until C4 writes it).
+    //  q12<0 — smooth per-column y-FLOW as f(x) (A10 scallops, user-corrected mechanism: the
+    //  straight chord's sinking trail copies BEND into arches as they age — the wave lives in
+    //  the FIELD, not the drawn line; ~0.04 UV/s at full amount, λ≈0.16 UV ≈ the ref 70-90px).
+    "  suv.x += max(q12, 0.0) * 0.03 * (abs(fract(suv.y * 3.0 + time * 0.05) * 2.0 - 1.0) * 2.0 - 1.0);\n" +
+    "  suv.y += max(-q12, 0.0) * 0.0009 * sin(suv.x * 40.0 + time * 0.35);\n" +
     // WATERCOLOUR DIFFUSION — a wide 9-tap gaussian of the previous frame, blended back by q28. Because
     // the WARP output feeds back, this COMPOUNDS: a deposit gets blurred again every frame → it spreads
     // and softens like ink bleeding into wet paper. Weights sum to 1.0.
@@ -821,38 +825,29 @@
     a.a = u < 0.02 || u > 0.98 ? 0 : 0.06 + 0.94 * mtStampEnv;
     return a;
   }
-  // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2) — REWORKED after the user's live look
-  // (2026-07-09 screenshot: bright white crisp coils, "too ugly"; user re-read of the original:
-  // the scallop effect is a thin chord's TRAIL distorted by the field, not drawn geometry —
-  // frame check of 0:04-0:11 confirms: soft dark multi-hue wave RIBBONS + one hairline chord).
-  // So: ONE thin FAINT smooth-wave line (no |sin| cusps), bright only at stamp instants; the
-  // visible scallop body is 100% accumulation (freeze + sink). Two strands kept clearly apart
-  // (adjacent green+crimson zigzags in the ref) so they never fuse additively to white.
+  // SCALLOP (doc 02 A10) — REWORK v2 (user, twice: "the scallop is NOT a separate line — it's
+  // the tether leaving a trail that gets distorted"). fScallop draws ONLY a thin STRAIGHT
+  // tether-like chord between the two orb anchors (the mode-19 coupling parks the orbs at its
+  // terminals — p0: ringed-orb line ends). The scallop arches are made ENTIRELY by the warp's
+  // q12<0 per-column y-flow bending the chord's sinking trail copies as they age. The ~3s row
+  // re-seat (scRowOff) + beat sink stack the bent rows into the p0-S2 mountain-row band.
   function fScallop(a) {
     var s = a.sample || 0;
-    var strand = s < 0.5 ? 0 : 1,
+    var strand = s < 0.5 ? 0 : 1, // stereo two-hue pair (p0 8-11s: green + crimson, adjacent)
       u = (s - strand * 0.5) * 2;
-    var R = a.q5 || 0.4,
-      W = R * 2.6;
-    var tiltS = 0.42, // LL→UR diagonal (~24°)
-      ct = Math.cos(tiltS),
-      st = Math.sin(tiltS);
-    var march = (a.q9 || 0) * 9.0; // the wave SLIDES along the line (q9 = time·0.06)
-    var wavePh = Math.sin(u * 6.2832 * 6.0 - march); // smooth wave, ~6 periods (~90-110px crest spacing)
-    var amp = 0.09 * (0.55 + 0.6 * Math.max(0, (a.q32 || 1) - 1)); // ±amp ≈ the ref 17-21% h peak-to-peak
+    var ax = a.q21 !== undefined ? a.q21 : 0.2,
+      ay = a.q22 !== undefined ? a.q22 : 0.4;
+    var bx = a.q23 !== undefined ? a.q23 : 0.85,
+      by = a.q24 !== undefined ? a.q24 : 0.62;
     var live = (strand ? a.value2 : a.value1) || 0;
-    var d = -(wavePh * amp + live * 0.012) - strand * 0.028 + scRowOff;
-    var lx = (u - 0.5) * W;
-    var cx = a.q2 !== undefined ? a.q2 : 0.5,
-      cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + lx * ct - d * st;
-    a.y = cy + lx * st + d * ct;
-    var h = (a.q8 || 0) + (strand ? 0.45 : 0.0); // measured 2-hue pair (mint core vs crimson partner)
+    var d = live * 0.01 + strand * 0.02 + scRowOff; // whisper of live jag + strand split + row walk
+    a.x = ax + (bx - ax) * u;
+    a.y = ay + (by - ay) * u + d;
+    var h = (a.q8 || 0) + (strand ? 0.45 : 0.0);
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    // FAINT live chord; the deposits brighten only at stamps (same pattern as fMountains)
-    a.a = u < 0.02 || u > 0.98 ? 0 : 0.14 + 0.7 * mtStampEnv;
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.3 + 0.6 * mtStampEnv; // thin hairline chord + stamp bursts
     return a;
   }
   // TRIANGLE-FLOWER MANDALA (user: "many triangles rotating creating flower-like pattern") —
@@ -1296,6 +1291,7 @@
     mtStampEnv = 0, // bright-deposit window right after a stamp
     scRowOff = 0, // doc 02 A10: scallop emitter row height (walks the band over ~10s)
     scRowT = -9, // last row re-seat
+    scalAmt = 0, // mode-19 engagement: orb parking + the warp's q12<0 scallop y-flow
     accTerrVis = 1, // accessory fade under terrain motifs 14/19 (frozen-ray-spray guard)
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
@@ -1982,6 +1978,21 @@
       t.q24 += (t.q3 - ey - t.q24) * ca;
       t.q25 = Math.max(t.q25, 0.9 * ca); // both eyes present for the ball's life
       t.q14 = Math.max(t.q14, 0.9 * ca);
+    }
+    // ── SCALLOP coupling (A10 v2; post-FORCE like the eyes, so a motif pin exercises it):
+    //    park the orbs at the chord terminals (p0: ringed-orb line ends) and engage the warp's
+    //    q12<0 per-column y-flow — the chord's sinking trail bends into the scallop arches. ──
+    var scalEff = Math.floor((t.q30 || 0) + 0.5) === 19 ? 1 : 0;
+    scalAmt += (scalEff - scalAmt) * Math.min(1, dt * 0.6);
+    if (scalAmt > 0.01) {
+      var sa = scalAmt * (1 - corridorAmt);
+      t.q12 = Math.min(t.q12, -0.75 * sa); // negative = the scallop y-flow (C4 shear stays >0)
+      t.q21 += (0.2 - t.q21) * 0.8 * sa; // low-left terminal
+      t.q22 += (0.4 - t.q22) * 0.8 * sa;
+      t.q23 += (0.85 - t.q23) * 0.8 * sa; // upper-right terminal (LL→UR diagonal, p0)
+      t.q24 += (0.62 - t.q24) * 0.8 * sa;
+      t.q25 = Math.max(t.q25, 0.9 * sa); // both terminal orbs present
+      t.q14 = Math.max(t.q14, 0.9 * sa);
     }
     return t;
   }
