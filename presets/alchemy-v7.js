@@ -339,11 +339,15 @@
         s.x = cx;
         s.y = cy;
         var puls = ((s.q32 || 1) - 1) / 1.3; // smoothed beat envelope (q32 = 1 + 1.3*pulse)
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.1 * puls); // the puff SWELLS on hits
+        // A14 splat window (doc 05 step 6): a 0.35s sine swell — one fat bright emission the
+        // feedback immediately owns (diffuses in place, hue-frozen). lastT = this frame's time.
+        var sl = (lastT - splatT0) / 0.35;
+        var spl = sl >= 0 && sl < 1 ? Math.sin(sl * 3.14159) : 0;
+        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.1 * puls + 1.3 * spl); // the puff SWELLS on hits
         s.r = gr * 0.85;
         s.g = gg * 0.85;
         s.b = Math.min(1, gb * 1.4 + 0.12);
-        s.a = 0.42 * vis;
+        s.a = (0.42 + 0.5 * spl) * vis;
         s.r2 = gr * 0.4;
         s.g2 = gg * 0.4;
         s.b2 = gb * 0.5;
@@ -1539,7 +1543,13 @@
     accentHue = 0.55, // B7 (doc 05 step 2): the HELD accent-family ink — both orb rings + the
     // tether read this one value (r0: "tether hue = ring hue"); events re-anchor it near the
     // ground family, beats walk it. Held between snaps — never dragged by the continuous clock.
-    accentSnapT = -9;
+    accentSnapT = -9,
+    splatT0 = -9; // A14 (doc 05 step 6): one-shot splat DEPOSIT at the tether endpoints — a
+  // 0.35s orbGlow swell stamps a fat neighbouring-hue puff ~2x the orb into the feedback, which
+  // diffuses 2-4s (3-6s on the C10 wash) and keeps its birth hue forever (THE ONE LAW). The
+  // refs' crisp filled wobbly-outline amoeba has NO renderer in budget (all 4 shape slots taken;
+  // waves[3] is dots-mode, so an outline ring there = the removed bead-row ugliness) — the
+  // glow-stamp route is the matrix-sanctioned approximation ("deposit = trail").
   // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
   var spiroVar = 0, // 0 dahlia · 1 fur-ball (many-petal) · 2 ferris wheel (dahlia + connector ring)
@@ -1664,6 +1674,8 @@
         // A5: per-appearance construction re-roll (chord dominant); rope (4) is persistent ~5s (h1)
         tetherKind = TETHER_BAG[(Math.random() * TETHER_BAG.length) | 0];
         tetherSeed = Math.random() * 100;
+        // A14: about half the casts DEPOSIT a splat where the tether lands (p1 O12), ≥4s apart
+        if (time - splatT0 > 4 && Math.random() < 0.5) splatT0 = time;
         if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
         if (tetherKind === 4) evTetherLife = Math.max(evTetherLife, 4 + Math.random() * 2);
         knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
@@ -1708,6 +1720,10 @@
     if (envRefresh) envNext = time + 0.5 + Math.random() * 0.5;
     // RAIL lifecycle (doc 06 step 5): expire, ease, and rotate slowly about the midpoint
     // (~4°/s, p2). Deliberately NOT coupled to bgPick/motifPick/rests — it survives them (p0).
+    if (FORCE && FORCE.splat) {
+      splatT0 = time; // debug pin: fire one splat NOW (deterministic self-render shots)
+      FORCE.splat = 0;
+    }
     if (FORCE && FORCE.rail && !railWant) {
       railWant = 1;
       railT0 = time;
