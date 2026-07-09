@@ -110,13 +110,14 @@
       "shader_body {\n" +
       "  float asp = resolution.x / resolution.y;\n" +
       "  float m = floor(q29 + 0.5);\n" + // 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel
+      "  float kv = floor(q13); float ksc = fract(q13);\n" + // doc 10: kaleido lattice variant | breathing fold scale
       "  vec2 c = uv - 0.5; c.x *= asp; float prad = length(c);\n" +
       "  float hb = q8;\n" +
       // ── sample coord: KALEIDOSCOPE tiled-diamond mirror-fold when m==1 (the reference's repeating
       //    diamond lattice of mirrored bursts) — a 4-fold abs mirror repeated ~1.6× across the frame. ──
       "  vec2 suv = uv;\n" +
       "  if (m > 0.5 && m < 1.5) {\n" +
-      "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * q13); kc.x *= asp;\n" +
+      "    vec2 kc = (uv - 0.5) * (1.5 + 0.4 * ksc); kc.x *= asp;\n" +
       "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
       "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
       "  }\n" +
@@ -216,8 +217,38 @@
       "    float pr2 = length(suv - 0.5);\n" +
       "    float region = step(0.14, pr2) + step(0.34, pr2);\n" + // 0 centre · 1 wedge · 2 band core
       "    float era = floor(time * 3.0 - region * 0.5);\n" + // ~3 floods/s, staggered per region
-      "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
-      "    vec3 kcol = pal(hb + era * 0.14 + cell * 0.45);\n" + // STEPPED region hue (was continuous)
+      "    float hf = hb + era * 0.14;\n" + // stepped, region-flooded hue base for every variant
+      // ── doc 10 step 2 — lattice VARIANT dispatched on kv (packed in q13): 0 diamonds
+      //    (shipped) · 1 bowtie sine-ribbons + wedge fans · 2 nested top/bottom sine-lens bands
+      //    + midline seam · 3 undulating rainbow horizontal wave-bands. Every variant still
+      //    region-floods (hf carries the era term). GLSL: locals named pang/d1/d2/lens/etc —
+      //    NEVER ang/rad (predeclared in the generated main(); a redefinition fails to link). ──
+      "    vec3 kcol;\n" +
+      "    if (kv < 0.5) {\n" +
+      "      float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
+      "      kcol = pal(hf + cell * 0.45);\n" +
+      "    } else if (kv < 1.5) {\n" +
+      // bowtie: two horizontal sine ribbons pinching at nodes (black-diamond negatives between),
+      // wedges filled with a radial filament fan
+      "      float ribbon = sin(suv.x * 6.2831 * 2.0) * 0.12;\n" +
+      "      float dband = min(abs((suv.y - 0.34) - ribbon), abs((suv.y - 0.66) + ribbon));\n" +
+      "      float bandM = smoothstep(0.06, 0.0, dband);\n" +
+      "      float pang = atan(suv.y - 0.5, suv.x - 0.5);\n" +
+      "      float fan = pow(0.5 + 0.5 * cos(pang * 30.0), 6.0);\n" +
+      "      kcol = mix(pal(hf + 0.4) * fan * 0.7, pal(hf), bandM);\n" +
+      "    } else if (kv < 2.5) {\n" +
+      // sine-lens: nested arcs around top/bottom foci + a bright midline specular seam
+      "      float d1 = length((suv - vec2(0.5, 0.28)) * vec2(1.0, 1.7));\n" +
+      "      float d2 = length((suv - vec2(0.5, 0.72)) * vec2(1.0, 1.7));\n" +
+      "      float lens = 0.5 + 0.5 * sin(min(d1, d2) * 40.0 - time * 0.4);\n" +
+      "      float seam = smoothstep(0.03, 0.0, abs(suv.y - 0.5));\n" +
+      "      kcol = pal(hf + floor(lens * 4.0) * 0.1) * (0.45 + 0.55 * lens);\n" +
+      "      kcol += vec3(1.0, 0.95, 0.7) * seam * 0.4;\n" +
+      "    } else {\n" +
+      // rainbow wave-bands: undulating horizontal ramp, the colour front rides the band movement
+      "      float yb = suv.y + 0.04 * sin(suv.x * 12.0 + time * 0.5);\n" +
+      "      kcol = pal(hf + floor(yb * 9.0) * 0.11);\n" +
+      "    }\n" +
       "    float kl = dot(kcol, vec3(0.333)); kcol = mix(vec3(kl), kcol, " +
       G(P.ksat) +
       ");\n" + // PROFILE: kaleidoscope SATURATION (vivid full / pastel muted — was reading too vivid in pastel)
@@ -1632,6 +1663,8 @@
     huePhase = 0,
     hueStep = 0,
     lastBgMode = -1,
+    alcKV = 0, // doc 10 step 2: kaleido lattice variant, picked once per visit (0 diamonds ·1 bowtie ·2 lens ·3 rainbow-bands)
+    alcInKal = false, // was in kaleido last frame? (fresh-visit edge → re-roll alcKV)
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
     panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
@@ -2106,7 +2139,24 @@
     //    fold-on is implied by q29==1). q12 FREED (doc 01 step 6): now the warp's sawtooth x-shear
     //    amount (-1..1, 0 = off) — DORMANT until the structured-grounds doc (C4) writes it. ──
     t.q12 = 0;
-    t.q13 = bgMode === 1 ? 0.5 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)) : 0;
+    // doc 10 step 2 — MULTIPLEX q13 (already kaleido-scoped, 0 elsewhere): integer part =
+    // lattice variant (picked once per kaleido visit), fraction = the breathing fold scale.
+    // The COMP reads kv=floor(q13), ksc=fract(q13). No new q-var (all 32 taken); the WARP's
+    // q17/q16/q18/q19 stay live during kaleido, so we never steal them.
+    if (bgMode === 1) {
+      if (!alcInKal) alcKV = (Math.random() * 4) | 0;
+      alcInKal = true;
+      var kscale = Math.max(
+        0,
+        Math.min(0.9, 0.5 + 0.4 * Math.min(1, bassA - 1 + 0.5 * Math.sin(time * 0.07)))
+      ); // clamp to [0,0.9] so floor(q13) stays the variant integer
+      t.q13 = alcKV + kscale;
+    } else {
+      alcInKal = false;
+      alcKV = 0;
+      t.q13 = 0;
+    }
+    if (FORCE && FORCE.q13 !== undefined) t.q13 = FORCE.q13; // pin drives lattice variant in self-renders
 
     // ── CENTRAL MOTIF — own clock; geometry swapped under an opacity dip (q4) so it morphs invisibly. ──
     var mo = motifPick(time, dt, f > 0.6);
