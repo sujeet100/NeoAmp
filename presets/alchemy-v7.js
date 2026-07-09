@@ -1302,8 +1302,15 @@
       len = Math.hypot(dx, dy) || 1;
     var nx = -dy / len,
       ny = dx / len;
-    // strand fold: 2 strands default · 1 kite · 3 rope · 4 cascade
-    var NS = tk === 4 ? 3 : tk === 6 ? 4 : tk === 5 ? 1 : 2;
+    // ★ TRAIL-BUILT CONSTRUCTIONS (user-corrected 2026-07-09, verified by frame-stepping the
+    // refs): the original never draws a multi-strand construction per frame — each frame shows
+    // ONE live strand (rope: a thin rotating pair), and the braid/rod/fan is the FEEDBACK TRAIL
+    // of that strand's motion. Helix (480p 1:37.5-1:41): one quasi-periodic strand, phase
+    // alternating frame-to-frame; rope (1080p 1:56-2:01): the rod is accumulated trace, live =
+    // hairlines; cascade (1080p 0:15.5-16.5): ONE hanging strand whose low end travels, the fan
+    // is its frozen copies. Strand fold: 1 helix/kite/cascade · 2 everything else (rope = the
+    // rotating pair; chord/staircase/lightning keep their measured in-frame ghost/twig strand).
+    var NS = tk === 1 || tk === 5 || tk === 6 ? 1 : 2;
     var sN = (a.sample || 0) * NS,
       strand = Math.floor(sN),
       tt = sN - strand;
@@ -1314,11 +1321,13 @@
     var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
     var disp, off;
     if (tk === 1) {
-      // TELEPHONE-CORD HELIX (p1 T3): the two strands WIND around each other, 12-14 loops over
-      // the span (antiphase = the crossing braid), plus a small live jag so it stays audio-alive.
+      // TELEPHONE-CORD HELIX (p1 T3): ONE live quasi-periodic strand whose wave phase FLIPS π
+      // every frame ("two separate waveforms appearing in split second") + drifts slowly — the
+      // trail overlays alternate rails into the wound braid. 12-14 loops over the span.
       var LOOPS = 12 + (((tetherSeed * 7) | 0) % 3);
+      var hpar = ((lastT * 60) | 0) & 1 ? 3.1416 : 0; // frame-parity rail flip
       disp =
-        0.028 * Math.sin(tt * LOOPS * 6.2832 + (strand ? 3.1416 : 0)) * win +
+        0.028 * Math.sin(tt * LOOPS * 6.2832 + hpar + lastT * 1.3 + tetherSeed) * win +
         (a.value1 || 0) * 0.008 * win;
       off = 0;
     } else if (tk === 2) {
@@ -1336,11 +1345,11 @@
       disp = (a.value1 || 0) * q26e * 2.0 * win;
       off = (strand ? 1 : -1) * 0.0035 * win;
     } else if (tk === 4) {
-      // BRAIDED ROPE (h1 T2): 3 strands, incoherent per-strand jag phases → a fuzzy ~25-30px
-      // bundle; persistent ~5s (life extended at spawn); reads as a solid soft rod.
-      disp =
-        (a.value1 || 0) * q26e * win + Math.sin(tt * 40 + strand * 2.1 + tetherSeed) * 0.004 * win;
-      off = (strand - 1) * 0.008;
+      // BRAIDED ROPE (h1 T2): TWO thin lines ROTATING about the chord (user-corrected) — their
+      // perpendicular offset oscillates with a slight along-length twist; the persistent ~5s
+      // trail of the rotation builds the solid fuzzy ~25-30px rod. Live = just the hairline pair.
+      disp = (a.value1 || 0) * q26e * 0.5 * win;
+      off = (strand ? 1 : -1) * 0.011 * Math.cos(lastT * 3.2 + tt * 3.0 + tetherSeed) * win;
     } else if (tk === 5) {
       // LOOPY KITE-STRING (p1 T2): one wandering strand — large open loops + fine live jag.
       disp =
@@ -1348,10 +1357,12 @@
         (a.value1 || 0) * 0.006 * win;
       off = 0;
     } else if (tk === 6) {
-      // HANGING CASCADE (h0 T3): 4 roughly-parallel strands from ONE orb, separation GROWING
-      // toward the low end (the fan opens downward), whole fan swaying slowly.
+      // HANGING CASCADE (h0 T3): ONE live strand hanging from the orb; its swing about the top
+      // anchor is QUANTIZED to ~0.16s re-seats (frame-stepped ref: the fan is DISCRETE frozen
+      // copies, not a smooth smear) — each re-seat leaves a strand, the fan opens downward.
       disp = (a.value1 || 0) * 0.01 * win;
-      off = (strand - 1.5) * 0.012 * tt + 0.02 * Math.sin((a.q9 || 0) * 18) * tt;
+      var cstep = Math.floor(lastT / 0.16) * 0.16;
+      off = 0.055 * Math.sin(cstep * 2.2 + tetherSeed) * tt;
     } else {
       // 0 — fine-tooth waveform chord + the SLOW chevron envelope underneath (h2's two
       // displacement scales: fine jag reshuffles per frame, the big envelope evolves ~0.5-1s)
@@ -1379,8 +1390,10 @@
     }
     var twigDim = 1;
     if (tk === 3 && strand === 1) {
-      // side TWIGS (r0: mid-span branches): strand 1 donates its points inside 2-3 hashed
-      // windows to short rays leaving the chord at hashed angles; strand 0 keeps the full bolt.
+      // side TWIGS (r0: mid-span branches): strand 1 draws ONLY the twigs — 2-3 hashed windows
+      // become short rays leaving the chord; OUTSIDE the windows it is INVISIBLE (the ref's
+      // frames show one bolt + twigs; the offset near-end copies are trail, not a second bolt).
+      twigDim = 0;
       var nb = 2 + (((tetherSeed * 3) | 0) % 2);
       for (var bi = 0; bi < nb; bi++) {
         var bp = 0.25 + ((tetherSeed * (13 + bi * 7)) % 1) * 0.5;
@@ -1693,6 +1706,8 @@
         if (time - splatT0 > 4 && Math.random() < 0.5) splatT0 = time;
         if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
         if (tetherKind === 4) evTetherLife = Math.max(evTetherLife, 4 + Math.random() * 2);
+        // cascade needs ≥1s of swing for its trail-fan to accumulate (the fan IS the trail)
+        if (tetherKind === 6) evTetherLife = Math.max(evTetherLife, 1.2 + Math.random());
         knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
