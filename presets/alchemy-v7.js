@@ -790,27 +790,32 @@
     if (u < 0.04) a.a = 0; // hide strand-to-strand jumps
     return a;
   }
-  // WAVEFORM MOUNTAINS / terrain (480p survey, 0:03 / 1:05 / 2:41): several STACKED horizontal live-
-  // waveform ridgelines (|sample| = sawtooth peaks) → a mountain range; feedback leaves the comb beneath.
+  // WAVEFORM MOUNTAINS / terrain — REWORKED (doc 02 step 2, D11+B3): ONE live ridgeline (a
+  // stereo strand pair), pinch-enveloped into triangular peaks on a per-dwell tiltable rail.
+  // The mountain BODY below is 100% feedback (doc 01 freeze + the step-1 sink) — accumulation,
+  // not drawing (r0: the crest re-jags per frame over static frozen peaks).
   function fMountains(a) {
-    var ROWS = 4,
-      fk = (a.sample || 0) * ROWS,
-      row = Math.floor(fk),
-      u = fk - row;
-    var R = a.q5 || 0.4;
-    var W = R * 2.1; // wide span
-    var amp = (a.q6 || 0.05) * 3.2;
-    var rowY = (row / (ROWS - 1) - 0.5) * 0.95 * R; // stack the ridges vertically
-    var ridge = Math.abs(a.value1 || 0) * amp; // |waveform| → upward sawtooth peaks
+    var s = a.sample || 0;
+    var strand = s < 0.5 ? 0 : 1, // 2 strands × 256 samples (p2 draws bundles; L/R stereo)
+      u = (s - strand * 0.5) * 2;
+    var R = a.q5 || 0.4,
+      W = R * 2.4;
+    var ct = Math.cos(mtTilt),
+      st = Math.sin(mtTilt);
+    var pinch = Math.abs(Math.sin(u * 3.14159 * 3.5 + mtPinchPhase)); // amplitude pinched → triangular peaks (p2 2.7)
+    var v = (strand ? a.value2 : a.value1) || 0; // REAL waveform — the live crest (r0)
+    var ridge = Math.abs(v) * (a.q6 || 0.05) * 4.0 * (0.35 + 0.65 * pinch);
+    var lx = (u - 0.5) * W,
+      ly = -ridge + strand * 0.005;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + (u - 0.5) * W;
-    a.y = cy + rowY - ridge;
-    var h = (a.q8 || 0) + row * 0.08;
+    a.x = cx + lx * ct - ly * st;
+    a.y = cy + lx * st + ly * ct;
+    var h = (a.q8 || 0) + mtHueStep + strand * 0.07; // emitter hue steps per stamp; pile keeps old hue
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02 || u > 0.98) a.a = 0;
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.4 + 0.6 * mtStampEnv; // dim live crest, bright per-stamp deposits
     return a;
   }
   // TRIANGLE-FLOWER MANDALA (user: "many triangles rotating creating flower-like pattern") —
@@ -1242,7 +1247,12 @@
     eyeOn = false, // upward-crossing tracker for the re-roll
     rippleT0 = -99, // C8 radial-ripple finale event birth (rare, cooldown ≥75s)
     mtStampT = -9, // doc 02 B3: last terrain stamp instant (mountains ridge generations)
-    sinkImp = 0; // per-stamp decaying SINK impulse — steps the buffer down one generation
+    sinkImp = 0, // per-stamp decaying SINK impulse — steps the buffer down one generation
+    lastMotif = -1, // doc 02 D11: entry detector for the per-dwell mountains identity roll
+    mtTilt = 0, // rail tilt (0 or ~±35-45°, p2 2.7)
+    mtPinchPhase = 0, // pinch-envelope phase → triangular peaks
+    mtHueStep = 0, // per-stamp EMITTER hue walk; the pile keeps old hues (trail is hue-frozen)
+    mtStampEnv = 0; // bright-deposit window right after a stamp
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1685,6 +1695,19 @@
     // -q19 streams the buffer DOWN (measured sign map); integrated step ≈ 0.0042·60·0.25 ≈ 0.06 UV
     // ≈ the measured 20-40px generation gap. Applied after the freeze damping on purpose.
     t.q19 -= 0.0042 * sinkImp * freezeAmt;
+    // D11 mountains identity (doc 02 step 2): roll the rail tilt + pinch phase ON ENTRY to the
+    // dwell; step the EMITTER hue per stamp — the pile keeps its old hue for free (hue-frozen
+    // trails, A14) so two colour generations coexist (p1 S6: gold pile under a green crest).
+    if (mCur === 14 && lastMotif !== 14) {
+      mtTilt =
+        Math.random() < 0.4 ? 0 : (Math.random() < 0.5 ? 1 : -1) * (0.6 + 0.18 * Math.random());
+      mtPinchPhase = Math.random() * 6.2832;
+      mtHueStep = 0;
+    }
+    lastMotif = mCur;
+    if (mCur === 14 && mtStampT === time)
+      mtHueStep += (0.06 + 0.09 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+    mtStampEnv = Math.max(0, 1 - (time - mtStampT) / 0.18); // bright stamp window
     // DOWN-SAG (field 2): bars/bands scenes stream the trail gently DOWNWARD (h2: 2-3%/s;
     // p1 rope cascade/stems; p0 S2 sag), replacing the random snap-dir while active.
     // Sign map (measured): -q19 streams DOWN. Freeze wins; rests stay still.
