@@ -349,8 +349,12 @@
     } else if (ANAT[host].kind === 0 && Math.random() < 0.4) {
       ty = 4; // eyelet inner ring completes the classic "milky ringed eyelet" (p0 O1)
     } else {
-      var r = Math.random(); // off .30 · bullseye .25 · column .25 · rosette .08 · eyelet .12
-      ty = r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.8 ? 2 : r < 0.88 ? 3 : 4;
+      // ★ COLUMN (type 2) PULLED from the bag (user 2026-07-09 night: "what are those empty
+      // rings" — hollow ring stacks read as floating empty coils, and sliding posts ghost them
+      // into the removed-bead-row caterpillar). The doc's pre-planned kill switch: weight → 0,
+      // fColumn + the _acc3/_mushroom pins stay for a future filled/glassy redesign.
+      var r = Math.random(); // off .30 · bullseye .30 · rosette .12 · eyelet .28
+      ty = r < 0.3 ? 0 : r < 0.6 ? 1 : r < 0.72 ? 3 : 4;
     }
     // column axis: pedestal (rising from under the orb, p0 O6) or toward the nearest corner
     // (p1 O7 corner telescopes; p3: 4 cones pointing into corners)
@@ -2618,7 +2622,9 @@
         acc3Fading = false;
         acc3Next = time + 6 + Math.random() * 8;
         // ── A18 MUSHROOM eligibility (doc 07 step 8): a fresh COLUMN on a calm fluid/wash
-        //    ground rarely opens the scripted rise event (h2 2.14-2.15), ≥90s apart. ──
+        //    ground rarely opens the scripted rise event (h2 2.14-2.15), ≥90s apart.
+        //    NOTE: with the column pulled from the bag (empty-rings round) type 2 never rolls
+        //    naturally, so the event is PIN-ONLY (_mushroom) until the column is redesigned. ──
         if (
           acc3.type === 2 &&
           (bgMode === 0 || bgMode === 5) &&
