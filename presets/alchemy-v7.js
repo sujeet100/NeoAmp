@@ -187,13 +187,24 @@
       // bands (hot pink over slate at @9, teal at @3) overlaid with rippling vertical caustic
       // streaks; the band colours ride the beat-snapped hue clock hard. Deliberately the
       // BRIGHTEST ground regime (the 19s clip proves the original goes this bold in places).
-      "  else if (m > 7.5) {\n" +
+      // (bounded — was the m>7.5 catch-all; doc 12's mandatory step-0 so new regimes can append)
+      "  else if (m > 7.5 && m < 8.5) {\n" +
       "    float band = smoothstep(-0.3, 0.3, sin(uv.y * 6.2832 * 1.6 + time * 0.5));\n" +
       "    vec3 bandCol = mix(pal(hb), pal(hb + 0.38), band);\n" +
       "    float cst = 0.5 + 0.5 * sin(uv.x * 60.0 + sin(uv.y * 7.0 + time * 0.6) * 2.2 + time * 0.35);\n" +
       "    cst = cst * cst;\n" +
       "    bandCol *= 0.4 + 0.22 * cst;\n" +
       "    float bl = dot(bandCol, vec3(0.333)); ground = mix(vec3(bl), bandCol, 0.75);\n" +
+      "  }\n" +
+      // 9 TREADMILL (doc 04 B9a; h1 S8): soft vertical streaks STREAM horizontally while the
+      // motif layer stays pinned — counter-motion parallax, camera static. Muted duo, dark.
+      "  else if (m > 8.5) {\n" +
+      "    float tx = fract(uv.x * 7.0 - time * 0.5);\n" +
+      "    float streak = 0.5 + 0.5 * cos(tx * 6.2832);\n" +
+      "    streak = streak * streak;\n" +
+      "    vec3 tcol = mix(pal(hb), pal(hb + 0.5), streak);\n" +
+      "    float tlm = dot(tcol, vec3(0.333)); tcol = mix(vec3(tlm), tcol, 0.6);\n" +
+      "    ground = tcol * (0.06 + 0.16 * streak);\n" +
       "  }\n" +
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
@@ -1775,7 +1786,7 @@
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
-  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s)
+  var BG_BAG = [0, 0, 0, 0, 0, 2, 2, 1, 3, 4, 5, 6, 7, 8, 1, 9]; // 0 wavy-fluid(dominant) · 1 kaleidoscope · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash · 6 horizontal-bands · 7 bullseye-rings · 8 caustic-bands(19s) · 9 treadmill(doc 04)
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
