@@ -1547,12 +1547,9 @@
       }
     }
     mutRGB(a); // D13: the motif is NOT the accent — mild emit-time desaturate
-    // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on
-    // circle. Gated to "not kaleido" via q29 (the fold source) — q12 was freed for the shear warp.
-    if ((m === 0 || m === 2) && Math.abs((a.q29 || 0) - 1.0) > 0.5) {
-      var cyS = a.q3 !== undefined ? a.q3 : 0.5;
-      a.y = cyS + (a.y - cyS) * (1.0 - 0.34 * (a.q11 || 0));
-    }
+    // PULSAR oblate squash REMOVED (user 2026-07-10 "aggressive — crisp & symmetric": the y-squash
+    // turned the symmetric anemone/urchin into ovals — the '2 overlapping ovals' they flagged). The
+    // COMP pupil (q11) stays for the dark eye-centre; only the shape-distorting squash is gone.
     a.a = (a.a === undefined ? 0.85 : a.a) * (a.q4 || 0) * MODE_ALPHA[m] * stampGain;
     return a;
   }
@@ -1921,9 +1918,12 @@
   // the near-identical ray-star family (1/2/8/10) drops from 6 to 5 shares of the bag.
   // bead-chain (11) PULLED from the bag (user 2026-07-09: reads as a drawn dotted stick —
   // the same removed-bead territory as the answered Q8; slot moved to tri-mandala 15)
+  // fTangle (13) DROPPED from the bag (user 2026-07-10: "ugly furball"; the ref's ball-motifs are
+  // all symmetric radial — dandelion/urchin/star — with no asymmetric-knot counterpart). Its two
+  // slots → hexagram(6)/12-star(10), clean symmetric motifs. fn kept in MODES for a possible revisit.
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
-    18, 18, 19,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 18,
+    18, 19,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -1931,11 +1931,11 @@
   //    Disfavoured combos still pass at ~35% (weight, never forbid). ──
   var FEAT_PAIRING = true;
   var PAIR = {
-    4: [13, 15, 16, 14, 17], // bars → tangle/mandala/fluff/mountains/dahlia (stem-standing)
+    4: [15, 16, 14, 17], // bars → mandala/fluff/mountains/dahlia (stem-standing; tangle dropped)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
     1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
-    5: [16, 13, 9, 18], // flat wash → ONE dominant organic ball
-    6: [13, 16, 15], // bands/wallpaper → small centre motif
+    5: [16, 9, 18], // flat wash → ONE dominant organic ball (tangle dropped)
+    6: [16, 15], // bands → small centre motif (tangle dropped)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
   function acceptMotif(idx) {
@@ -2182,8 +2182,10 @@
     t.q28 = 0.5; // BLUR / diffusion mix — the watercolour bleed; this IS the "grow + soften in place"
     // MAGNIFY kept TINY — the watercolour growth must come from the in-place BLUR, NOT a radial march
     // (a big magnify marches deposits to the frame edges = the rejected spiky-burst over-fill).
-    t.q15 = 0.0012 + 0.0018 * pulse;
-    t.q16 = 0.01 * Math.sin(time * 0.06); // gentle sign-oscillating roll (no constant spin)
+    t.q15 = 0.0004 + 0.0006 * pulse; // magnify cut ~1/3 (user "crisp & symmetric": old copies grew
+    // into expanding concentric rings — the "thin scattered" smear; keeping it tiny lets repeated
+    // symmetric stamps stay REGISTERED so the motif reads as ONE crisp thick shape, not smear rings.
+    t.q16 = 0.005 * Math.sin(time * 0.06); // roll halved 0.01→0.005 — less rotational trail smear
     t.q17 = 0.0; // swirl off (vortex mode raises it)
 
     // ── CAMERA PAN — abrupt-snap direction dragging the trail buffer (the 2:24-2:31 parallax).
@@ -2608,7 +2610,7 @@
     // CAP q15 ≤0.008 — a big magnify is the rejected "spiky-burst over-fill" (see the q15 note).
     radialAmt += ((mCur === 2 || mCur === 16 ? 1 : 0) - radialAmt) * Math.min(1, dt * 0.5);
     if (radialAmt > 0.01) {
-      t.q15 += (0.006 - t.q15) * radialAmt; // outward growth ≈2-4%/s — NEVER above 0.008
+      t.q15 += (0.002 - t.q15) * radialAmt; // outward growth cut 0.006→0.002 (user "crisp": the strong outward stream scattered the symmetric urchin/fluff into thin radiating smears)
       t.q20 += (t.q2 - t.q20) * 0.7 * radialAmt; // hub = the motif centre (streaming is motif-centred)
       t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
       t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
@@ -2626,7 +2628,7 @@
       eyeOn = false;
     }
     if (eyeAmt > 0.01) {
-      t.q17 += (0.07 - t.q17) * eyeAmt; // strong local swirl (the tunnel bg uses 0.04)
+      t.q17 += (0.025 - t.q17) * eyeAmt; // swirl cut 0.07→0.025 (user "crisp": the strong eye-swirl whipped the vortex trail into an asymmetric smear)
       t.q20 += (eyeX - t.q20) * 0.7 * eyeAmt; // pivot → the eye
       t.q27 += (eyeY - t.q27) * 0.7 * eyeAmt;
       t.q18 *= 1 - 0.85 * eyeAmt;
