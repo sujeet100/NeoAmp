@@ -818,6 +818,37 @@
     a.a = u < 0.02 || u > 0.98 ? 0 : 0.4 + 0.6 * mtStampEnv; // dim live crest, bright per-stamp deposits
     return a;
   }
+  // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2): ONE waveform line marching along a LL→UR
+  // diagonal, drawn as big smooth rounded scallops (clocked arch envelope per the AMBIGUOUS
+  // waveform verdict — heavily smoothed audio), a stereo two-hue strand pair (p0 8-11s: green +
+  // crimson = L/R). Its ~10s height walk (scRowOff) + the sink builds the mountain-row bg band
+  // entirely from trail. NO bead terminals (risk 1 — routed to doc 07/A4).
+  function fScallop(a) {
+    var s = a.sample || 0;
+    var strand = s < 0.5 ? 0 : 1,
+      u = (s - strand * 0.5) * 2;
+    var R = a.q5 || 0.4,
+      W = R * 2.6;
+    var tiltS = 0.42, // LL→UR diagonal (~24°)
+      ct = Math.cos(tiltS),
+      st = Math.sin(tiltS);
+    var march = (a.q9 || 0) * 9.0; // arches SLIDE along the line (q9 = time·0.06)
+    var arch = Math.abs(Math.sin(u * 3.14159 * 6.0 - march)); // ~6 rounded scallops (period 70-90px)
+    var amp = 0.17 * (0.55 + 0.6 * Math.max(0, (a.q32 || 1) - 1)); // amp 80-100px, riding the SMOOTH pulse
+    var live = (strand ? a.value2 : a.value1) || 0;
+    var d = -(arch * amp + live * 0.012) - strand * 0.008 + scRowOff;
+    var lx = (u - 0.5) * W;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + lx * ct - d * st;
+    a.y = cy + lx * st + d * ct;
+    var h = (a.q8 || 0) + (strand ? 0.45 : 0.0); // measured 2-hue pair (mint core vs crimson partner)
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.8;
+    return a;
+  }
   // TRIANGLE-FLOWER MANDALA (user: "many triangles rotating creating flower-like pattern") —
   // the kit ALREADY has this as alcTriMandala (9 equilateral triangles rotated about a shared
   // centre = a flower/mandala); v7 had never hooked it (kit-variants rule). Colour overridden
@@ -1151,6 +1182,7 @@
     fFluffBall,
     fSpiro, // id 17 (doc 08 A1; first new-motif doc to land → MODES.length was 17)
     fCocoon, // id 18 (doc 09 A2)
+    fScallop, // id 19 (doc 02 A10 — the README registry's "MODES.length at landing" rule)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1178,6 +1210,7 @@
     0.36,
     0.4, // spiro (17): lowered 0.58→0.4 (user: finer/less bloom — the ref is a thin delicate rosette)
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
+    0.6, // scallop (19): one smooth two-strand line — outline-class
   ];
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
@@ -1253,6 +1286,8 @@
     mtPinchPhase = 0, // pinch-envelope phase → triangular peaks
     mtHueStep = 0, // per-stamp EMITTER hue walk; the pile keeps old hues (trail is hue-frozen)
     mtStampEnv = 0, // bright-deposit window right after a stamp
+    scRowOff = 0, // doc 02 A10: scallop emitter row height (walks the band over ~10s)
+    scRowT = -9, // last row re-seat
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
     accSwathFam = 0, // alternating colour family (p0: gold+indigo interleaved)
@@ -1353,7 +1388,7 @@
   // the near-identical ray-star family (1/2/8/10) drops from 6 to 5 shares of the bag.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 17,
-    18, 18,
+    18, 18, 19,
   ];
   var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0);
@@ -1677,7 +1712,7 @@
     //    Priority: freeze > sag; corridor/valley override everything as today. ──
     // FREEZE (field 1): terrain stamps hold crisp — blur nearly off, longer decay, pan damped
     // (r0: peaks persist ≥3.5s, NO translation, "q-gated blur"; h2: stamps freeze where drawn).
-    freezeAmt += ((mCur === 14 ? 1 : 0) - freezeAmt) * Math.min(1, dt * 0.6);
+    freezeAmt += ((mCur === 14 || mCur === 19 ? 1 : 0) - freezeAmt) * Math.min(1, dt * 0.6);
     if (freezeAmt > 0.01) {
       t.q28 += (0.08 - t.q28) * freezeAmt; // blur ~off → stamps stay crisp
       t.q1 += (0.974 - t.q1) * freezeAmt; // ghosts live ~4-8s — NOT 1.0 (must still decay, no pileup)
@@ -1691,8 +1726,16 @@
     // A per-stamp decaying impulse, NOT a constant scroll — frozen peaks stay put when quiet,
     // and the beat gate means rests STARVE the terrain (B6). Rides the freeze (low blur keeps
     // the stepped generations discrete — p3's venetian comb).
-    if (mCur === 14 && f > 0.7 && time - mtStampT > 0.6 && restAmt < 0.5) {
+    if ((mCur === 14 || mCur === 19) && f > 0.7 && time - mtStampT > 0.6 && restAmt < 0.5) {
       mtStampT = time; // stamp event (step 2 reuses this for the emitter hue step + brightness)
+      sinkImp = 1;
+    }
+    // A10 scallop row stepper: the emitter re-seats at a new height every ~3s (~10s to walk the
+    // band, p0 S2); each re-seat is a stamp → lagging copies 8-15px below the fresh line.
+    if (mCur === 19 && time - scRowT > 2.8) {
+      scRowT = time;
+      scRowOff += 0.09;
+      if (scRowOff > 0.28) scRowOff = -0.18;
       sinkImp = 1;
     }
     sinkImp += (0 - sinkImp) * Math.min(1, dt * 4); // ~0.25s release
