@@ -274,6 +274,33 @@
     a.g += (lm - a.g) * 0.14;
     a.b += (lm - a.b) * 0.14;
   }
+  // ── ORB ANATOMY VOCABULARY (doc 07 A16a). The refs rotate orb IDENTITY per appearance
+  //    (p1 97.6→100.9: 6-ring bullseye → ring-stack → gold bullseyes across consecutive casts):
+  //    0 classic ringed (dominant) · 1 hollow ring (p0 O9: thin outline, near-empty interior)
+  //    · 2 giant translucent disc (p0 O5: up to 22% frame, milky, thin rim) · 3 ringless
+  //    glow/sun (p1 O1: soft gaussian, NO ring) · 4 pearl (p0 O8: milky white sphere, thin rim)
+  //    · 5 dark ECLIPSE (p0 O10: near-black teal disc + crisp warm-red rim — rare).
+  //    Descriptors live in the closure (shapes share this scope; all 32 q-vars are taken).
+  //    NOTE the eclipse darkens the TRAIL layer, not the raw ground (the comp adds ground
+  //    outside our reach) — accepted approximation, do NOT hack the comp for it. ──
+  var ANAT_BAG = [0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5];
+  function mkAnat(force) {
+    var k = force !== undefined ? force : ANAT_BAG[(Math.random() * ANAT_BAG.length) | 0];
+    return {
+      kind: k,
+      fill: k === 1 ? 0.0 : k === 2 ? 0.28 : 1.0, // hollow ring / translucent giant
+      milk: k === 4 ? 0.85 : k === 2 ? 0.4 : 0.0, // white-mix (pearl / milky giant)
+      dark: k === 5 ? 1 : 0, // eclipse: near-black fill + fixed warm-red rim
+      rim: k === 3 ? 0.0 : 1.0, // the sun has NO border ring
+      sizeMul: k === 2 ? 2.6 : k === 3 ? 2.2 : k === 4 ? 0.7 : 1.0, // giants ~18-25% dia
+      halo: k === 1 || k === 5 ? 0.0 : k === 3 ? 1.6 : 1.0, // hollow/eclipse: halo off; sun: big
+    };
+  }
+  var ANAT = [mkAnat(0), mkAnat(0)]; // start classic (the pre-doc-07 look)
+  var prevQ14v = 0, // orb B appearance detector (rising edge through 0.05)
+    anatNextA = -1, // orb A re-roll rate limiter (10-20s)
+    milkT0A = -9, // D2c milk-fill event birth per orb (step 6)
+    milkT0B = -9;
   function orbShape(qx, qy, hueOff, visVar, idx) {
     return {
       baseVals: Object.assign({}, SHAPE_BASE, {
@@ -301,28 +328,59 @@
           bg = orbCol(hb, 0.33),
           bb = orbCol(hb, 0.67);
         var bri = (0.9 + 0.5 * be) * (1 + 0.35 * spikeAmt); // fill pulses; D13 spike ~0.6s
+        var A = ANAT[idx || 0]; // per-appearance anatomy descriptor (doc 07 A16a)
         s.x = cx;
         s.y = cy;
         // radius: balloon EVENTS carry the pops (doc 07 D2a; per-orb closure envelope);
         // only a small beat residue remains (was 0.45·be + the 0.85·pulse breathing)
-        s.rad = (s.q7 || 0.06) * (1 + 0.15 * be) * (idx ? radScaleB : radScaleA);
-        // SOLID coloured fill — near-1 opacity when present (the original's orbs are solid, THEN fade;
-        // the `vis` come-and-go envelope does the fade). Body kept solid too, not translucent.
+        s.rad = (s.q7 || 0.048) * (1 + 0.15 * be) * (idx ? radScaleB : radScaleA) * A.sizeMul;
+        if (A.dark) {
+          // ECLIPSE (p0 O10): near-black teal disc + crisp warm-red rim — reads as a dark
+          // hole in the glowing trail field (darker-than-raw-ground is out of comp reach)
+          s.r = 0.03;
+          s.g = 0.1;
+          s.b = 0.1;
+          s.a = 0.92 * vis;
+          s.r2 = 0.02;
+          s.g2 = 0.07;
+          s.b2 = 0.07;
+          s.a2 = 0.9 * vis;
+          s.border_r = 1.0;
+          s.border_g = 0.25;
+          s.border_b = 0.18;
+          s.border_a = 0.9 * vis;
+          return s;
+        }
+        // D2c milk-fill (step 6): a ballooning HOLLOW ring fills with milk white over ~0.5s
+        // (r0 13.85-14.5), then the fill decays out with the settle. Per-orb closure timer.
+        var mfAge = lastT - (idx ? milkT0B : milkT0A);
+        var mf =
+          A.kind === 1 && mfAge > 0
+            ? Math.min(1, mfAge / 0.5) * Math.exp(-Math.max(0, mfAge - 0.8) / 0.5)
+            : 0;
+        var fillA = Math.max(A.fill, 0.9 * mf),
+          milk = Math.max(A.milk, 0.9 * mf);
+        // milk: pearls / milky giants / the milk-fill pull the fill toward white
+        fr += (1 - fr) * milk;
+        fg += (1 - fg) * milk;
+        fb += (1 - fb) * milk;
+        // fill — SOLID for the classic anatomy (near-1 opacity when present; `vis` does the
+        // come-and-go fade), 0 for the hollow ring, translucent for the giant disc.
         s.r = Math.min(1, fr * bri);
         s.g = Math.min(1, fg * bri);
         s.b = Math.min(1, fb * bri);
-        s.a = 1.0 * vis;
+        s.a = fillA * vis;
         s.r2 = fr * 0.9;
         s.g2 = fg * 0.9;
         s.b2 = fb * 0.9;
-        s.a2 = 0.78 * vis;
+        s.a2 = 0.78 * fillA * vis;
         // PROMINENT border — BRIGHT contrast-hue rim (was dim ×0.34) that pulses hard on the beat (the
         // user: "border is still not prominent when it pulses" / "solid border with almost 1 opacity").
         var bbri = (0.8 + 0.7 * be) * (1 + 0.35 * spikeAmt); // D13: the ring spikes with the fill
         s.border_r = Math.min(1, br * bbri);
         s.border_g = Math.min(1, bg * bbri);
         s.border_b = Math.min(1, bb * bbri);
-        s.border_a = Math.min(1, 0.7 + 0.6 * be) * vis;
+        s.border_a = Math.min(1, 0.7 + 0.6 * be) * vis * A.rim;
         return s;
       },
     };
@@ -354,13 +412,19 @@
         // feedback immediately owns (diffuses in place, hue-frozen). lastT = this frame's time.
         var sl = (lastT - splatT0) / 0.35;
         var spl = sl >= 0 && sl < 1 ? Math.sin(sl * 3.14159) : 0;
-        // the halo balloons WITH its orb (doc 07 D2a; was riding the smoothed q32 pulse)
-        s.rad = (s.q7 || 0.06) * (1.7 + 0.5 * be + 1.3 * spl) * (idx ? radScaleB : radScaleA);
+        // the halo balloons WITH its orb (doc 07 D2a; was riding the smoothed q32 pulse);
+        // anatomy (A16a): hollow/eclipse kill the halo, the sun doubles down on it
+        var A = ANAT[idx || 0];
+        s.rad =
+          (s.q7 || 0.048) *
+          (1.7 + 0.5 * be + 1.3 * spl) *
+          (idx ? radScaleB : radScaleA) *
+          Math.max(1, A.sizeMul * 0.8);
         var spk = 1 + 0.35 * spikeAmt; // D13 accent spike
         s.r = Math.min(1, gr * 0.85 * spk);
         s.g = Math.min(1, gg * 0.85 * spk);
         s.b = Math.min(1, (gb * 1.4 + 0.12) * spk);
-        s.a = (0.42 + 0.5 * spl) * vis;
+        s.a = (0.42 + 0.5 * spl) * vis * A.halo;
         s.r2 = gr * 0.4;
         s.g2 = gg * 0.4;
         s.b2 = gb * 0.5;
@@ -2426,6 +2490,33 @@
       var va = valleyAmt;
       t.q1 += (0.96 - t.q1) * 0.5 * va; // a touch more decay → the receding sheet-lines leave a depth trail
       t.q16 *= 1 - va; // no roll (a clean dive down the valley)
+    }
+
+    // ── ORB ANATOMY re-rolls (doc 07 A16a): identity rotates PER APPEARANCE — orb B on every
+    //    re-entry (rising edge), orb A right after a balloon settles, rate-limited 10-20s.
+    //    The corridor forces both classic (its anchors are the classic ringed look). ──
+    if (t.q14 > 0.05 && prevQ14v <= 0.05) ANAT[1] = mkAnat();
+    prevQ14v = t.q14;
+    if (anatNextA < 0) anatNextA = time + 10 + Math.random() * 10;
+    var settleAge = time - balloonT0A;
+    if (time >= anatNextA && settleAge > 1.2) {
+      ANAT[0] = mkAnat();
+      anatNextA = time + 10 + Math.random() * 10;
+    }
+    if (corridorAmt > 0.5) {
+      if (ANAT[0].kind !== 0) ANAT[0] = mkAnat(0);
+      if (ANAT[1].kind !== 0) ANAT[1] = mkAnat(0);
+    }
+    // D2c milk-fill arm (step 6): a balloon firing on a HOLLOW orb starts its milk clock at
+    // the envelope peak (attack 0.12s)
+    if (ANAT[0].kind === 1 && balloonT0A > milkT0A + 3) milkT0A = balloonT0A + 0.12;
+    if (ANAT[1].kind === 1 && balloonT0B > milkT0B + 3) milkT0B = balloonT0B + 0.12;
+    if (FORCE) {
+      // closure pins (underscore channel): anatomy + milk-fill are self-render-pinnable
+      if (FORCE._anatA !== undefined && ANAT[0].kind !== FORCE._anatA)
+        ANAT[0] = mkAnat(FORCE._anatA);
+      if (FORCE._anatB !== undefined && ANAT[1].kind !== FORCE._anatB)
+        ANAT[1] = mkAnat(FORCE._anatB);
     }
 
     // B4b: remember this frame's FINAL centre + orb anchors (corridor/valley overrides included)
