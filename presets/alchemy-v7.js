@@ -1498,11 +1498,13 @@
     var win = Math.sin(tt * 3.14159); // tips land exactly on the two orbs
     var disp, off;
     if (tk === 1) {
-      // TELEPHONE-CORD HELIX (p1 T3): ONE live quasi-periodic strand whose wave phase FLIPS π
-      // every frame ("two separate waveforms appearing in split second") + drifts slowly — the
-      // trail overlays alternate rails into the wound braid. 12-14 loops over the span.
+      // TELEPHONE-CORD HELIX (p1 T3; user re-corrected 2026-07-09: "2 waveforms intertwining,
+      // or 1 waveform appears a split second later and disappears again — NOT a drawn shape").
+      // The old FRAME-parity flip lit both rails every 16ms → read as a drawn solid spring.
+      // Now: ONE strand dwells ~0.14s on a rail, blinks OFF ~30ms, reappears on the mirror
+      // rail — the braid exists only in the trail. 12-14 loops over the span.
       var LOOPS = 12 + (((tetherSeed * 7) | 0) % 3);
-      var hpar = ((lastT * 60) | 0) & 1 ? 3.1416 : 0; // frame-parity rail flip
+      var hpar = ((lastT / 0.14) | 0) & 1 ? 3.1416 : 0; // time-quantized rail dwell
       disp =
         0.028 * Math.sin(tt * LOOPS * 6.2832 + hpar + lastT * 1.3 + tetherSeed) * win +
         (a.value1 || 0) * 0.008 * win;
@@ -1571,6 +1573,7 @@
       }
     }
     var twigDim = 1;
+    if (tk === 1 && (lastT / 0.14) % 1 > 0.8) twigDim = 0; // helix blink-gap between rails
     if (tk === 3 && strand === 1) {
       // side TWIGS (r0: mid-span branches): strand 1 draws ONLY the twigs — 2-3 hashed windows
       // become short rays leaving the chord; OUTSIDE the windows it is INVISIBLE (the ref's
@@ -3190,11 +3193,14 @@
         var RS = Math.min(acc3.orb ? radScaleB : radScaleA, 1.6);
         if (ty === 1) {
           // MULTI-RING BULLSEYE — CALL the kit factory (working-agreements rule), then
-          // post-gate rings ≥ n using the factory's own sample split and re-centre-scale
-          // by the balloon envelope.
+          // post-gate rings ≥ n using the factory's own sample split. Outer radius is
+          // NORMALISED to the ref's 8-20% frame bullseyes (p1 O5) — the raw kit scale ×
+          // balloons blew frame-filling nested ring ghosts (user: "large orb ghosts").
           (acc3.orb ? bullB : bullA).point_eqs(a);
-          a.x = ox + (a.x - ox) * RS;
-          a.y = oy + (a.y - oy) * RS;
+          var q7e = a.q7 || 0.048;
+          var sc = Math.min(Math.min(RS, 1.25), 0.1 / (q7e * (0.65 + (acc3.n - 1) * 0.5)));
+          a.x = ox + (a.x - ox) * sc;
+          a.y = oy + (a.y - oy) * sc;
           var bk = Math.min(Math.floor((a.sample || 0) * 6), 5);
           a.a = bk >= acc3.n ? 0 : 0.55 * gate;
           return a;
