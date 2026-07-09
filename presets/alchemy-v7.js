@@ -1223,6 +1223,10 @@
   function scaleFor(m) {
     return m === 0 ? 0.36 : 0.4;
   }
+  // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
+  // radial discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
+  // h2 has it re-tinting whole-cluster per stamp (its own walk), never as a front.
+  var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1, 16: 1 };
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
     if (m < 0) m = 0;
@@ -1233,6 +1237,21 @@
     // (+restStampHue) — that user-verified look predates this clock.
     if (sketchAmt < 0.5) a.q8 = motifHue;
     MODES[m](a);
+    // D12 RADIAL FRONT (doc 05 step 4): for ~1.8s after a hue step the NEW hue occupies the
+    // disc centre-out; the OLD hue persists longest at the rim (h2 §2.8: "a travelling front,
+    // NOT a strobe"). The mode fns are deterministic per sample (geometry from sample/value1/
+    // q-vars), so re-running a point with the old hue RECOLOURS it without moving it. lastT is
+    // this frame's time (frame() runs before the wave point fns).
+    var fr = (lastT - motifStepT) / 1.8;
+    if (RADIAL_FRONT[m] && sketchAmt < 0.5 && fr >= 0 && fr < 1) {
+      var fcx = a.q2 !== undefined ? a.q2 : 0.5,
+        fcy = a.q3 !== undefined ? a.q3 : 0.5;
+      var rr = Math.hypot(a.x - fcx, a.y - fcy) / ((a.q5 || 0.4) * 1.1);
+      if (rr > fr) {
+        a.q8 = motifHueOld;
+        MODES[m](a); // outside the front: redraw the point's COLOUR in the old hue
+      }
+    }
     // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on
     // circle. Gated to "not kaleido" via q29 (the fold source) — q12 was freed for the shear warp.
     if ((m === 0 || m === 2) && Math.abs((a.q29 || 0) - 1.0) > 0.5) {
