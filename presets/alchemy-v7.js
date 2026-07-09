@@ -274,6 +274,15 @@
     a.g += (lm - a.g) * 0.14;
     a.b += (lm - a.b) * 0.14;
   }
+  // colorizer for the kit alcOrbTarget bullseyes (doc 07 A16b): accent-family ink, per-ring
+  // +0.06 hue step, accessory-desaturated (D13 — only the orbs+tether carry the saturation)
+  function colAcc(a, k) {
+    var h = accentHue + k * 0.06;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    mutRGB(a);
+  }
   // ── ORB ANATOMY VOCABULARY (doc 07 A16a). The refs rotate orb IDENTITY per appearance
   //    (p1 97.6→100.9: 6-ring bullseye → ring-stack → gold bullseyes across consecutive casts):
   //    0 classic ringed (dominant) · 1 hollow ring (p0 O9: thin outline, near-empty interior)
@@ -301,6 +310,58 @@
     anatNextA = -1, // orb A re-roll rate limiter (10-20s)
     milkT0A = -9, // D2c milk-fill event birth per orb (step 6)
     milkT0B = -9;
+  // ── ORB RING-ACCESSORY (doc 07 A16b+A4): the waves[3] multiplexer descriptor. Ring-stack /
+  //    telescope columns appear in EVERY ref segment (p0 O6/O7, p1 O7/O8, r0 2.7.2); multi-ring
+  //    bullseyes are the p1 O5 anatomy. All HOLLOW RING outlines in the line-mode wave — the
+  //    4 shape slots are taken, and filled beads were user-rejected (bad7755; README Q10 answered
+  //    ring-only). Deliberately unlike the removed bead-row on every axis that made it ugly:
+  //    non-additive, anchored to a stationary post, few + tapered, never marching. ──
+  var acc3 = {
+      type: 0,
+      orb: 0,
+      n: 4,
+      nCol: 6,
+      taper: 0.7,
+      ang: -1.57,
+      extT: 2.5,
+      len: 0.26,
+      t0: 0,
+    },
+    acc3Next = -1, // roll clock (6-14s dwells)
+    acc3Env = 0, // 0.4s ease on type transitions (no pops)
+    acc3Fading = false; // fade-out-then-swap latch
+  function rollAcc3(force) {
+    var host = Math.random() < 0.5 ? 0 : 1;
+    var ty;
+    if (force !== undefined && force !== null) {
+      ty = force.type !== undefined ? force.type : force;
+      if (force.orb !== undefined) host = force.orb;
+    } else if (ANAT[host].kind === 0 && Math.random() < 0.4) {
+      ty = 4; // eyelet inner ring completes the classic "milky ringed eyelet" (p0 O1)
+    } else {
+      var r = Math.random(); // off .30 · bullseye .25 · column .25 · rosette .08 · eyelet .12
+      ty = r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.8 ? 2 : r < 0.88 ? 3 : 4;
+    }
+    // column axis: pedestal (rising from under the orb, p0 O6) or toward the nearest corner
+    // (p1 O7 corner telescopes; p3: 4 cones pointing into corners)
+    var hx = host ? lastOrbBX : lastOrbAX,
+      hy = host ? lastOrbBY : lastOrbAY;
+    var cAng =
+      Math.random() < 0.5
+        ? -1.5708 + (Math.random() - 0.5) * 0.28 // pedestal ±8°
+        : Math.atan2((hy < 0.5 ? 0.08 : 0.92) - hy, (hx < 0.5 ? 0.08 : 0.92) - hx);
+    return {
+      type: ty,
+      orb: host,
+      n: 2 + ((Math.random() * 5) | 0), // bullseye 2-6 rings (p1 O5)
+      nCol: 4 + ((Math.random() * 6) | 0), // column 4-9 rings (p1 O7)
+      taper: 0.6 + Math.random() * 0.15, // ~3:1 base:tip (p0 O7: 95→28px)
+      ang: cAng,
+      extT: 2 + Math.random(), // extend/retract period 2-3s (p1 O7)
+      len: 0.2 + Math.random() * 0.1, // up to ~31% tall (p1 O7 navy column)
+      t0: lastT,
+    };
+  }
   function orbShape(qx, qy, hueOff, visVar, idx) {
     return {
       baseVals: Object.assign({}, SHAPE_BASE, {
@@ -2519,6 +2580,29 @@
         ANAT[1] = mkAnat(FORCE._anatB);
     }
 
+    // ── ORB RING-ACCESSORY director (doc 07 A16b+A4): roll the waves[3] descriptor on its own
+    //    6-14s clock, fading 0.4s out → swap → 0.4s in (no pops). A FORCE._acc3 pin swaps on
+    //    the same eased path. ──
+    if (acc3Next < 0) acc3Next = time + 4 + Math.random() * 6;
+    var acc3Pin = FORCE && FORCE._acc3 !== undefined ? FORCE._acc3 : undefined;
+    if (
+      !acc3Fading &&
+      (time >= acc3Next ||
+        (acc3Pin !== undefined &&
+          acc3.type !== (acc3Pin.type !== undefined ? acc3Pin.type : acc3Pin)))
+    )
+      acc3Fading = true;
+    if (acc3Fading) {
+      acc3Env -= dt / 0.4;
+      if (acc3Env <= 0) {
+        acc3Env = 0;
+        acc3 = rollAcc3(acc3Pin);
+        acc3.t0 = time;
+        acc3Fading = false;
+        acc3Next = time + 6 + Math.random() * 8;
+      }
+    } else if (acc3.type > 0) acc3Env = Math.min(1, acc3Env + dt / 0.4);
+
     // B4b: remember this frame's FINAL centre + orb anchors (corridor/valley overrides included)
     lastQ2 = t.q2;
     lastQ3 = t.q3;
@@ -2817,21 +2901,20 @@
         return a;
       },
     };
-    // waves[3] = CORRIDOR ring-dot ROW — a row of glowing dots receding from the near-left anchor toward a
-    // right vanishing point, foreshortened (spacing compresses with depth) + fading (the 0:06-0:16 corridor
-    // recede). Gated to bgMode 3 (q29). Dots-mode; the spare 4th wave slot, 0 shape budget.
+    // waves[3] = MULTIPLEXER (doc 07 A16b+A4): corridor ring-row (priority 1, bgMode 3) → else
+    // the ORB RING-ACCESSORY (multi-ring bullseye via the kit alcOrbTarget / telescope column /
+    // rosette / eyelet inner ring / off). Line-mode now (was dots — a baseVals constant, so the
+    // corridor row is drawn as tiny rings): NON-ADDITIVE crisp ring outlines, which is what lets
+    // the eyelet ring read DARKER and avoids the removed-bead-row additive failure (bad7755 —
+    // that was additive beads MARCHING; these are few, tapered, anchored to stationary posts).
+    var bullA = alcOrbTarget("q21", "q22", 6, colAcc),
+      bullB = alcOrbTarget("q23", "q24", 6, colAcc);
     preset.waves[3] = {
-      // ★ BEAD-ROW ACCESSORY REMOVED (2026-07-04): the original's marching bead rows are NOT
-      // implementable well in this slot — dots render as fixed ~2px points (too tiny at any
-      // size), and ring outlines re-stamp into ugly tube/slinky scrolls as they march (user:
-      // "remove them if you can't fix it properly"). All 4 solid-shape slots are taken by the
-      // orbs+halos, so a small FILLED glowing bead simply has no renderer in budget. wave3 is
-      // back to its original role: the corridor ring-dot row only.
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1,
-        samples: 80,
-        additive: 1,
-        usedots: 1,
+        samples: 512,
+        additive: 0,
+        usedots: 0,
         scaling: 1,
         smoothing: 0.0,
         thick: 1,
@@ -2840,25 +2923,113 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
-        if (Math.abs((a.q29 || 0) - 3) > 0.5) {
+        if (Math.abs((a.q29 || 0) - 3) < 0.5) {
+          // CORRIDOR row — a row of small rings receding from the near-left anchor toward the
+          // right vanishing point, foreshortened + fading (the 0:06-0:16 corridor recede).
+          var K = 10,
+            fk0 = (a.sample || 0) * K,
+            ki = Math.min(Math.floor(fk0), K - 1),
+            ku = fk0 - ki;
+          var idx = ki / (K - 1);
+          var d = Math.pow(idx, 1.5); // compress spacing toward the vanishing point
+          var nearX = 0.16,
+            nearY = 0.52,
+            vpx = 0.82,
+            vpy = 0.49;
+          var bx = nearX + (vpx - nearX) * d;
+          var by = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
+          var rr0 = 0.008 * (1 - 0.5 * idx); // the ring shrinks with depth
+          a.x = bx + Math.cos(ku * 6.2832) * rr0;
+          a.y = by + Math.sin(ku * 6.2832) * rr0;
+          var h0 = accentHue; // the row matches its anchor orbs (B7 — one accent family)
+          a.r = orbCol(h0, 0);
+          a.g = orbCol(h0, 0.33);
+          a.b = orbCol(h0, 0.67);
+          mutRGB(a); // D13: accent HUE family, but only orbs+tether carry the saturation
+          a.a = ku < 0.05 ? 0 : 0.9 * (1 - idx * 0.72);
+          return a;
+        }
+        var ty = acc3.type;
+        var hostVis = acc3.orb ? a.q14 || 0 : a.q25 || 0;
+        var gate = acc3Env * hostVis * accVis * (1 - cocAmt) * (1 - sketchAmt);
+        if (ty === 0 || gate < 0.02) {
           a.a = 0;
           return a;
         }
-        var K = 10,
-          idx = Math.floor((a.sample || 0) * K) / (K - 1); // 0 near .. 1 far (10 dots)
-        var d = Math.pow(idx, 1.5); // foreshorten: compress spacing toward the vanishing point
-        var nearX = 0.16,
-          nearY = 0.52,
-          vpx = 0.82,
-          vpy = 0.49;
-        a.x = nearX + (vpx - nearX) * d;
-        a.y = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-        var h = accentHue; // the row matches its anchor orbs (B7 — one accent family)
-        a.r = orbCol(h, 0);
-        a.g = orbCol(h, 0.33);
-        a.b = orbCol(h, 0.67);
-        a.a = 0.9 * (1 - idx * 0.72); // fade with depth -> recede
-        mutRGB(a); // D13: accent HUE family, but only the orbs+tether carry the saturation
+        var ox = acc3.orb ? (a.q23 !== undefined ? a.q23 : 0.5) : a.q21 !== undefined ? a.q21 : 0.5;
+        var oy = acc3.orb ? (a.q24 !== undefined ? a.q24 : 0.5) : a.q22 !== undefined ? a.q22 : 0.5;
+        var RS = acc3.orb ? radScaleB : radScaleA; // host balloon → rings balloon too (p0 O9)
+        if (ty === 1) {
+          // MULTI-RING BULLSEYE — CALL the kit factory (working-agreements rule), then
+          // post-gate rings ≥ n using the factory's own sample split and re-centre-scale
+          // by the balloon envelope.
+          (acc3.orb ? bullB : bullA).point_eqs(a);
+          a.x = ox + (a.x - ox) * RS;
+          a.y = oy + (a.y - oy) * RS;
+          var bk = Math.min(Math.floor((a.sample || 0) * 6), 5);
+          a.a = bk >= acc3.n ? 0 : 0.55 * gate;
+          return a;
+        }
+        if (ty === 2) {
+          // TELESCOPE / RING-STACK COLUMN (p0 O6/O7, p1 O7): 4-9 hollow ellipse rings tapering
+          // ~3:1 along an axis off the orb; extends/retracts ±9% (T 2-3s), sways (~1s) with a
+          // slight stalk CURVE (the 480p 14-23s stalks bend); tip ring brightest (snaps first).
+          var N = acc3.nCol;
+          var fk = (a.sample || 0) * N,
+            seg = Math.min(Math.floor(fk), N - 1),
+            u = fk - seg;
+          var age = lastT - acc3.t0;
+          var ext = 1 + 0.09 * Math.sin((6.2832 * age) / acc3.extT);
+          var swy = 0.09 * Math.sin(age * 6.2832);
+          var axA = acc3.ang + swy + seg * 0.06 * Math.sin(lastT * 0.6 + acc3.t0);
+          var frac = seg / (N - 1);
+          var d2 = (0.14 + 0.86 * frac) * acc3.len * ext;
+          var rr = (a.q7 || 0.048) * (1 - acc3.taper * frac);
+          var bx2 = ox + Math.cos(axA) * d2,
+            by2 = oy + Math.sin(axA) * d2;
+          var th = u * 6.2832;
+          var exx = Math.cos(th) * rr,
+            eyy = Math.sin(th) * rr * 0.38; // squash ALONG the axis → foreshortened 3D stack
+          a.x = bx2 + exx * Math.sin(axA) + eyy * Math.cos(axA);
+          a.y = by2 - exx * Math.cos(axA) + eyy * Math.sin(axA);
+          var h2 = accentHue + seg * 0.03;
+          a.r = orbCol(h2, 0);
+          a.g = orbCol(h2, 0.33);
+          a.b = orbCol(h2, 0.67);
+          if (seg === N - 1) {
+            a.r = Math.min(1, a.r * 1.3 + 0.15); // the TIP ring is brighter (p1: tip snaps)
+            a.g = Math.min(1, a.g * 1.3 + 0.15);
+            a.b = Math.min(1, a.b * 1.3 + 0.15);
+          }
+          mutRGB(a);
+          a.a = u < 0.05 ? 0 : 0.6 * gate; // discrete rings — hide ring-to-ring connectors
+          return a;
+        }
+        if (ty === 3) {
+          // ROSETTE — scalloped ring rim on the host (h0 gear-flower). Secondary accessory →
+          // a procedural scallop is allowed (the waveform rule binds PRIMARY motifs only).
+          var th3 = (a.sample || 0) * 6.2832;
+          var R3 = (a.q7 || 0.048) * 1.15 * (1 + 0.12 * Math.cos(th3 * 10)) * RS;
+          a.x = ox + Math.cos(th3) * R3;
+          a.y = oy + Math.sin(th3) * R3;
+          a.r = orbCol(accentHue, 0);
+          a.g = orbCol(accentHue, 0.33);
+          a.b = orbCol(accentHue, 0.67);
+          mutRGB(a);
+          a.a = 0.5 * gate;
+          return a;
+        }
+        // ty 4: EYELET INNER RING (p0 O1: a smaller DARKER ring offset up-left INSIDE the orb —
+        // completes the classic "milky ringed eyelet"; non-additive dark ink darkens the fill)
+        var th4 = (a.sample || 0) * 6.2832;
+        var R4 = (a.q7 || 0.048) * 0.45 * RS;
+        var off4 = (a.q7 || 0.048) * 0.25 * RS;
+        a.x = ox - off4 + Math.cos(th4) * R4;
+        a.y = oy + off4 + Math.sin(th4) * R4;
+        a.r = 0.16;
+        a.g = 0.14;
+        a.b = 0.2;
+        a.a = 0.55 * gate;
         return a;
       },
     };
