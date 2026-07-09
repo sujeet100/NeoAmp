@@ -8,6 +8,19 @@
 > re-roll, `FORCE.tetherKind`) · kind-0 anatomy (chevron envelope/knot/ghost) · persistent
 > rail w/ parked-post orbs (`FORCE.rail`; Q11 approved). **Pearl-chain SKIPPED** per answered
 > Q8. Awaiting live looks.
+>
+> **★ MECHANISM CORRECTION (user, 2026-07-09, commit `d1610e9`) — constructions are
+> TRAIL-BUILT, not drawn.** The first landing drew helix/rope/cascade as multi-strand shapes
+> per frame; the user corrected (and frame-stepping the refs confirmed §1's own note "only the
+> newest strand is live"): each frame shows ONE live strand — the braid/rod/fan is the
+> FEEDBACK TRAIL of its motion. Rebuilt: **helix** = 1 strand, wave phase flips π per frame
+> ("two waveforms in a split second") + slow drift → trail braids; **rope** = 2 rotating
+> hairlines ("two lines rotating in the centre leaving trace") → trail builds the ~25-30px
+> rod; **cascade** = 1 hanging strand, swing QUANTIZED to ~0.16s re-seats → discrete frozen
+> copies open the fan (life floor 1.2s so the fan accumulates); **lightning** strand 1 draws
+> ONLY the twigs (the near-end bolt copies are trail). Chord/staircase keep their measured
+> in-frame ghost/chromatic pair. See memory `alchemy-design-language-trail-built` — apply that
+> lens to every element BEFORE implementation.
 
 **Matrix items:** A5 (tether construction vocabulary incl. hanging cascade + persistent rail-chord) · D1 (tether event lifecycle: per-event spawn, per-event ink snap, mid-span knot, rare persistent rail) · B1 (two-anchor "current ink" spine) · **Priority:** all P1 · **Risk flags:** (1) pearl-chain only — dot beads need user sign-off (bead rows were removed as "ugly, unfixable", commit `bad7755`); (4) on B1/Step 5 — touches user-tuned orb identity/staging, one change at a time; (6) ink snaps must stay inside the muted Pastel envelope · **Confirmation needed:** **yes** —
 1. *Pearl-chain*: the ref's bead-path tether (60–80 tiny 4–5px beads on an S-curve) can only be built with wave DOTS (~2px fixed) routed through the otherwise-idle `waves[3]` dots slot. You removed the bead-row accessory as ugly. Build this one tiny-bead variant behind its own flag, or skip it entirely?
