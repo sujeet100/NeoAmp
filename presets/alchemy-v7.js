@@ -407,15 +407,16 @@
     if (force !== undefined && force !== null) {
       ty = force.type !== undefined ? force.type : force;
       if (force.orb !== undefined) host = force.orb;
-    } else if (ANAT[host].kind === 0 && Math.random() < 0.4) {
-      ty = 4; // eyelet inner ring completes the classic "milky ringed eyelet" (p0 O1)
     } else {
-      // ★ COLUMN (type 2) PULLED from the bag (user 2026-07-09 night: "what are those empty
-      // rings" — hollow ring stacks read as floating empty coils, and sliding posts ghost them
-      // into the removed-bead-row caterpillar). The doc's pre-planned kill switch: weight → 0,
-      // fColumn + the _acc3/_mushroom pins stay for a future filled/glassy redesign.
-      var r = Math.random(); // off .30 · bullseye .30 · rosette .12 · eyelet .28
-      ty = r < 0.3 ? 0 : r < 0.6 ? 1 : r < 0.72 ? 3 : 4;
+      // ★ ALL orb-anchored ring accessories (bullseye 1 / rosette 3 / eyelet 4) PULLED — user's
+      // 3 live screenshots: "ugly shapes with orbs — if you can't fix them remove them" (rosette =
+      // a scalloped star with a smeared orb at its base; bullseye = nested ring ghosts). Exactly
+      // the telescope-column story: HOLLOW line-mode rings ghost into floating empty coils under
+      // the thick-line comp + feedback — a dead end as drawn outlines (same lesson as the column +
+      // bad7755). Natural roll → always OFF. fBullseye/rosette/eyelet + the _acc3 pin stay for a
+      // future FILLED/glassy redesign; the corridor ring-row (bgMode 3, its own branch) is
+      // unaffected, and the eyelet-on-classic-anatomy auto-open is gone with them.
+      ty = 0;
     }
     // column axis: pedestal (rising from under the orb, p0 O6) or toward the nearest corner
     // (p1 O7 corner telescopes; p3: 4 cones pointing into corners)
