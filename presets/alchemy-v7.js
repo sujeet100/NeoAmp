@@ -1306,12 +1306,30 @@
       disp = (a.value1 || 0) * 0.01 * win;
       off = (strand - 1.5) * 0.012 * tt + 0.02 * Math.sin((a.q9 || 0) * 18) * tt;
     } else {
-      // 0 — fine-tooth waveform chord (baseline double-stroke)
-      disp = (a.value1 || 0) * (a.q26 || 0.03) * win;
-      off = (strand ? 1 : -1) * 0.0035 * win;
+      // 0 — fine-tooth waveform chord + the SLOW chevron envelope underneath (h2's two
+      // displacement scales: fine jag reshuffles per frame, the big envelope evolves ~0.5-1s)
+      var ci = Math.min(8, (tt * 8) | 0);
+      if (envRefresh) envHold[ci] = a.value1 || 0;
+      var fi = tt * 8,
+        i0 = Math.min(7, fi | 0),
+        frc = fi - i0;
+      var chev = (envHold[i0] * (1 - frc) + envHold[i0 + 1] * frc) * 0.055 * win;
+      disp = (a.value1 || 0) * (a.q26 || 0.03) * win + chev;
+      // strand 1 is the one-sided CHROMATIC GHOST (p2: 1px blue-violet ghost beside the stroke)
+      off = strand ? 0.005 : -0.0035 * win;
     }
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
+    if (tetherKind === 0) {
+      // mid-span scribble KNOT (h2: ~80-120px cluster roaming around mid-span, re-shuffling live)
+      var kp = knotPos + 0.05 * Math.sin((a.q9 || 0) * 11.7);
+      var ku = (tt - kp) / 0.05;
+      if (ku > -1 && ku < 1) {
+        var kw = 1 - ku * ku;
+        a.x += 0.06 * Math.sin(ku * 25 + tetherSeed) * kw * ((a.value1 || 0) * 0.5 + 0.5);
+        a.y += 0.06 * Math.cos(ku * 19 + tetherSeed) * kw * ((a.value1 || 0) * 0.5 + 0.5);
+      }
+    }
     var twigDim = 1;
     if (tetherKind === 3 && strand === 1) {
       // side TWIGS (r0: mid-span branches): strand 1 donates its points inside 2-3 hashed
@@ -1330,8 +1348,14 @@
         }
       }
     }
-    // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet)
-    var h = (a.q8 || 0) + inkOff + (tetherKind === 2 ? strand * 0.12 : 0);
+    // kind 2 is a CHROMATIC strand pair (h0: red+yellow / purple+violet); the kind-0 ghost
+    // strand takes the contrast hue at low alpha (p2's one-sided chromatic ghost)
+    var h =
+      (a.q8 || 0) +
+      inkOff +
+      (tetherKind === 2 ? strand * 0.12 : 0) +
+      (tetherKind === 0 && strand ? 0.45 : 0);
+    var ghostDim = tetherKind === 0 && strand ? 0.4 : 1;
     var dim = tetherKind === 4 ? 0.85 : 1; // rope reads soft but SOLID (h1: pale fuzzy rod)
     // kite POLARITY (p1 T2): dark-on-light over the flat-wash / caustic grounds
     var bgm = Math.floor((a.q29 || 0) + 0.5);
@@ -1342,7 +1366,7 @@
     // alpha set EVERY point (the reused point object would leak a one-shot 0 across strand 2);
     // fly-back segments joining consecutive strands are hidden (generalised for 1-4 strands)
     var flyback = (tt < 0.012 && strand > 0) || (tt > 0.988 && strand < NS - 1);
-    a.a = flyback ? 0 : (tetherKind === 4 ? 0.75 : 0.85) * twigDim;
+    a.a = flyback ? 0 : (tetherKind === 4 ? 0.75 : 0.85) * twigDim * ghostDim;
     return a;
   }
 
@@ -1411,6 +1435,11 @@
     tetherSeed = 0, // per-appearance parameter re-roll (loop counts, branch points, phases)
     heldKey = -1, // kind-2 staircase sample-and-hold state (points iterate in sample order)
     heldVal = 0,
+    envHold = [0, 0, 0, 0, 0, 0, 0, 0, 0], // kind-0 SLOW chevron envelope: 9 coarse REAL-waveform
+    // samples held ~0.5-1s (h2: the envelope evolves slowly while the fine jag reshuffles at 60fps)
+    envNext = 0,
+    envRefresh = false,
+    knotPos = 0.5, // kind-0 mid-span scribble knot centre (re-rolled per spawn, roams slowly)
     evStarT0 = -9, // one-shot star stamp event (doc 03 A12)
     evStarLife = 0.22,
     evStarOn = false, // read by waves[1] (point fns share the closure)
@@ -1561,6 +1590,7 @@
         tetherSeed = Math.random() * 100;
         if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
         if (tetherKind === 4) evTetherLife = Math.max(evTetherLife, 4 + Math.random() * 2);
+        knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
@@ -1583,6 +1613,8 @@
         ? Math.min(1, (time - evTetherT0) * 12)
         : Math.max(0, 1 - (time - evTetherT0 - evTetherLife) * 6)) * tethDrop;
     fillLag += (inkOff - fillLag) * Math.min(1, dt * 1.0); // fills chase the accent over ~1s (B1)
+    envRefresh = time > envNext; // kind-0 chevron envelope refresh window (~0.5-1s, h2)
+    if (envRefresh) envNext = time + 0.5 + Math.random() * 0.5;
     evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
     t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
 
