@@ -2724,6 +2724,22 @@
       }
     }
 
+    // ── B6b STARVATION DRAIN (doc 04 step 3; p3 S6 "outro drain", answered README Q4): the
+    //    refs' empty frames are EMERGENT, not authored — quiet audio → no stamps → the feedback
+    //    has nothing to eat and converges to its mean. Sustained deep-quiet (>1.5s) collapses
+    //    the trails and starves the emitters; only the orb-A anchor survives. Recovers with the
+    //    audio. Placed after every other q1/q4 writer so the drain wins. ──
+    starveT = energy < 1.02 ? starveT + dt : 0;
+    var starveTgt = FEAT_STARVE ? Math.min(1, Math.max(0, (starveT - 1.5) / 3)) : 0;
+    if (FORCE && FORCE._starve !== undefined) starveTgt = +FORCE._starve;
+    starveAmt += (starveTgt - starveAmt) * Math.min(1, dt * 0.5);
+    if (starveAmt > 0.001) {
+      t.q1 -= 0.1 * starveAmt; // decay drop — the field flattens toward its average colour
+      t.q4 *= 1 - 0.95 * starveAmt; // motif stamps starve
+      accVis *= 1 - 0.9 * starveAmt;
+      t.q14 *= 1 - 0.95 * starveAmt; // orb B leaves; orb A stays the pinprick anchor
+    }
+
     // B4b: remember this frame's FINAL centre + orb anchors (corridor/valley overrides included)
     lastQ2 = t.q2;
     lastQ3 = t.q3;
