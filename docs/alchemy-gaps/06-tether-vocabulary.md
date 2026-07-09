@@ -1,5 +1,14 @@
 # 06 — Tether vocabulary & event lifecycle
 
+> **★ LANDED (2026-07-09, 6 commits `572f568`→`1840076`):** Step 1 (lifecycle) **SKIPPED as
+> superseded** — doc 03's typed scheduler + the user's own presence tuning (aa74f83) own the
+> cadence; this doc's sparser 2-4s cadence would have undone that. Landed on top of it: B1
+> accent ink (ring = tether ink exactly, the old +0.5 contrast border dropped; fills lag) ·
+> all 7 constructions (chord/helix/staircase/lightning-twigs/rope/kite/cascade, per-spawn
+> re-roll, `FORCE.tetherKind`) · kind-0 anatomy (chevron envelope/knot/ghost) · persistent
+> rail w/ parked-post orbs (`FORCE.rail`; Q11 approved). **Pearl-chain SKIPPED** per answered
+> Q8. Awaiting live looks.
+
 **Matrix items:** A5 (tether construction vocabulary incl. hanging cascade + persistent rail-chord) · D1 (tether event lifecycle: per-event spawn, per-event ink snap, mid-span knot, rare persistent rail) · B1 (two-anchor "current ink" spine) · **Priority:** all P1 · **Risk flags:** (1) pearl-chain only — dot beads need user sign-off (bead rows were removed as "ugly, unfixable", commit `bad7755`); (4) on B1/Step 5 — touches user-tuned orb identity/staging, one change at a time; (6) ink snaps must stay inside the muted Pastel envelope · **Confirmation needed:** **yes** —
 1. *Pearl-chain*: the ref's bead-path tether (60–80 tiny 4–5px beads on an S-curve) can only be built with wave DOTS (~2px fixed) routed through the otherwise-idle `waves[3]` dots slot. You removed the bead-row accessory as ugly. Build this one tiny-bead variant behind its own flag, or skip it entirely?
 2. *Rail posts (D15 fragment)*: while a persistent rail is up, may the two orbs be temporarily pinned to the rail's endpoints (they stop snake-wobbling for the rail's 15–30s life)? This is a small slice of item D15 (orb posts/slide-along-rail — its own doc); shipping the pin here makes the rail read correctly, but say no and the rail will span the orbs' spawn positions without freezing them.
