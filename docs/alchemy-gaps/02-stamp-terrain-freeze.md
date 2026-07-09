@@ -1,5 +1,13 @@
 # 02 — Stamp accumulation: terrain from dead stamps, freeze & sink, harp swaths, scallop mountains
 
+> **★ LANDED (2026-07-09, 4 commits `85c8f30`→`2d3c057`):** steps 1–4 implemented, one commit per
+> step, npm-test + pinned self-renders per step. Sink impulse (B3) · fMountains one-crest rework
+> (D11) · harp swath = accessory type 5 w/ `FORCE.swath` pin (A3; live-strand floor 0.18, blur cut
+> 0.85 — tuned so the copies stay discrete) · scallop marcher = **motif mode 19** (NOT the in-doc
+> 17 — spiro/cocoon landed first; README landing-order rule). **Step 5 re-tint = SKIPPED** per the
+> answered README Q2 (never recolour the buffer). **Awaiting the per-step LIVE looks** — step 3
+> (accessory layer) needs the closest scrutiny; each commit reverts independently.
+
 **Matrix items:** B3 (P1) · D11 (P2) · A3 (P1) · A10 (P2) · **Priority:** P1 cluster ·
 **Risk flags:** (4) on B3/D11/A3 — warp + accessory-layer changes are the rejected-rework class (`9ba675e`): ship ONE step at a time, user-verified live between commits; (1) on A10 — the refs' bead-stack terminals are skipped here (no dots, no filled beads; route later per A4 / doc 07); (6) implicit — frozen deposits live longer, so keep the Reinhard headroom (never raise trail gain or q31). ·
 **Confirmation needed:** yes, ONE question, and only for the optional Step 5: *"The 19s clip (r0 2.4) shows the whole terrain re-tinting in place over ~1s, but four other reports agree deposits never retro-change hue (gap-matrix A14 resolution: keep hue-frozen trails). If you want the re-tint, OK to fake it as a fresh overdraw sweep (new-hue ridge stamps re-tracing the pile over ~1s) rather than recolouring the buffer — or skip it entirely?"* Steps 0–4 need no pre-confirmation, only the per-step live look required by risk (4).
