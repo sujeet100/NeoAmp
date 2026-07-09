@@ -1660,6 +1660,16 @@
     }
     return 1 + (mag - 1) * Math.exp(-(age - atk) / 0.35); // settle ~0.4-1.2s
   }
+  // ── ORB STAGING state (doc 07 D15): parked posts + slides + single-endpoint re-casts ──
+  var stgAx = 0.28, // posts (diagonal default — refs: diagonal-dominant axes)
+    stgAy = 0.72,
+    stgBx = 0.72,
+    stgBy = 0.28,
+    stgNext = -1, // next cast/dwell decision
+    stgSlideT0 = -9, // slide window start (both posts drift along the axis ~2s)
+    stgSlideVX = 0,
+    stgSlideVY = 0,
+    stgForce = ""; // debug pin: "hold" | "slide"
 
   function frame(t) {
     var time = t.time || 0;
@@ -2053,20 +2063,67 @@
     // endpoints fully visible for its life, so every spawn actually reads.
     t.q25 = Math.max(t.q25, tetherEnv);
     t.q14 = Math.max(t.q14, tetherEnv);
-    var axis = time * 0.05 + 0.6 * Math.sin(time * 0.017);
-    var sep = 0.3 + 0.06 * Math.sin(time * 0.037),
-      wob = 0.35 * Math.sin(time * 0.043);
-    // SNAKING orb paths (user + the 19s clip / 480p 1:00-1:12: orb trails paint S-curves like
-    // sea-plant stalks, never a smooth straight orbit) — faster incommensurate wobble sines on
-    // top of the slow orbit, big enough for the comet trails to visibly snake.
-    // wobble periods ~2.6s/1.5s — fast enough that the ~2-3s comet trail paints visible
-    // S-curves (the first attempt used 11s/5s periods: trails stayed straight, user flagged it)
-    var snA = 0.03 * Math.sin(time * 2.35) + 0.015 * Math.sin(time * 4.1 + 0.7);
-    var snB = 0.03 * Math.sin(time * 2.05 + 2.1) + 0.015 * Math.sin(time * 3.6 + 1.4);
-    t.q21 = 0.5 + sep * Math.cos(axis) + 0.045 * Math.sin(time * 0.09) + snA;
-    t.q22 = 0.5 + sep * Math.sin(axis) + 0.045 * Math.cos(time * 0.081) + snB;
-    t.q23 = 0.5 - sep * Math.cos(axis + wob) + 0.045 * Math.sin(time * 0.071 + 2.0) - snB;
-    t.q24 = 0.5 - sep * Math.sin(axis + wob) + 0.045 * Math.cos(time * 0.063 + 1.0) + snA;
+    // ── D15 STAGING (doc 07 step 3; answered README Q11): the refs stage the orbs as PARKED
+    //    POSTS — pinned for whole dwells (h1 S4b: 3s+ at fixed posts, persistent BETWEEN tether
+    //    events), an occasional slow SLIDE along the pair axis (p2 2.11: 5-10% frame per 2s),
+    //    and single-endpoint re-casts (p1: one endpoint persists from the previous cast). The
+    //    v7 continuous orbit + snake wobble was an invention that prevented the "anchor"
+    //    reading — removed; the refs' comet smears come from TRAIL displacement, not orbits. ──
+    if (FORCE && FORCE._stage !== undefined) stgForce = FORCE._stage; // "hold" | "slide"
+    if (time >= stgNext) {
+      var castB = Math.random() < 0.7; // prefer the come-and-go orb
+      if ((castB ? t.q14 : t.q25) < 0.05) {
+        // re-cast ONE endpoint while it's invisible (posts never teleport on-screen);
+        // diagonal-dominant, separation 0.4-0.7 from the PERSISTING endpoint (refs 40-78%)
+        var kpx = castB ? stgAx : stgBx,
+          kpy = castB ? stgAy : stgBy;
+        var npx = 1 - kpx,
+          npy = 1 - kpy; // fallback: mirror across centre
+        for (var ci = 0; ci < 8; ci++) {
+          var cxr = 0.12 + Math.random() * 0.76,
+            cyr = 0.12 + Math.random() * 0.76;
+          var cdx = cxr - kpx,
+            cdy = cyr - kpy,
+            cd = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (cd > 0.4 && cd < 0.7) {
+            npx = cxr;
+            npy = cyr;
+            break;
+          }
+        }
+        if (castB) {
+          stgBx = npx;
+          stgBy = npy;
+        } else {
+          stgAx = npx;
+          stgAy = npy;
+        }
+        stgNext = time + 6 + Math.random() * 8; // dwell 6-14s
+        // ~40% of dwells open a SLIDE window: both posts drift along the axis for ~2s
+        if (stgForce !== "hold" && Math.random() < 0.4) {
+          stgSlideT0 = time + 1 + Math.random() * 2;
+          var sdx = stgBx - stgAx,
+            sdy = stgBy - stgAy,
+            sl2 = Math.sqrt(sdx * sdx + sdy * sdy) || 1,
+            sdir = Math.random() < 0.5 ? 1 : -1,
+            svel = 0.025 + 0.025 * Math.random(); // 5-10% frame per 2s (p2)
+          stgSlideVX = (sdir * sdx * svel) / sl2;
+          stgSlideVY = (sdir * sdy * svel) / sl2;
+        }
+      } else stgNext = time + 1.5; // endpoint currently visible — retry shortly
+    }
+    if (stgForce === "slide" && time - stgSlideT0 > 4) stgSlideT0 = time; // pin: keep sliding
+    if (time >= stgSlideT0 && time < stgSlideT0 + 2) {
+      stgAx = Math.min(0.92, Math.max(0.08, stgAx + stgSlideVX * dt));
+      stgAy = Math.min(0.92, Math.max(0.08, stgAy + stgSlideVY * dt));
+      stgBx = Math.min(0.92, Math.max(0.08, stgBx + stgSlideVX * dt));
+      stgBy = Math.min(0.92, Math.max(0.08, stgBy + stgSlideVY * dt));
+    }
+    // tiny live sway only — the posts breathe, they never snake (S-curves were the invention)
+    t.q21 = stgAx + 0.006 * Math.sin(time * 1.3);
+    t.q22 = stgAy + 0.006 * Math.sin(time * 1.1 + 1.0);
+    t.q23 = stgBx + 0.006 * Math.sin(time * 1.35 + 2.1);
+    t.q24 = stgBy + 0.006 * Math.sin(time * 1.15 + 0.4);
     // orb radius base (audio + a small residual breathing). The big pops are now the ballistic
     // BALLOON events (doc 07 D2a) — one-shot overshoot-and-settle per orb, not a pulse ride.
     if (f > 0.9 && time > balloonNext && Math.random() < 0.6) fireBalloon(time);
@@ -2438,7 +2495,7 @@
       t.q14 = Math.max(t.q14, 0.9 * sa);
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
-    //    its endpoints — the snake wobble fades with the blend and returns when the rail dies. ──
+    //    its endpoints — the staging posts blend back in when the rail dies. ──
     if (railAmt > 0.01) {
       t.q21 += (railAx - t.q21) * railAmt;
       t.q22 += (railAy - t.q22) * railAmt;
