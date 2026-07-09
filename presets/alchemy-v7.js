@@ -815,9 +815,10 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    // FAINT live crest, bright only per stamp — at 0.4 the every-frame deposit filled the gaps
-    // between stamped generations under the freeze (user screenshot: one thick packed band).
-    a.a = u < 0.02 || u > 0.98 ? 0 : 0.16 + 0.84 * mtStampEnv;
+    // BURST-gated deposits (r0: bundles laid in ~1s bursts, then STOP — the pile holds crisp).
+    // Between stamps the crest is a near-invisible hairline (0.16 still fuzzed the ridges into
+    // furry bands — user's mountains clip 2026-07-09); the stamp window carries the deposit.
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.06 + 0.94 * mtStampEnv;
     return a;
   }
   // SCALLOP MARCHER (doc 02 step 4, A10; p0 M2/S2) — REWORKED after the user's live look
@@ -1723,7 +1724,7 @@
     freezeAmt += ((mCur === 14 || mCur === 19 ? 1 : 0) - freezeAmt) * Math.min(1, dt * 0.6);
     if (freezeAmt > 0.01) {
       t.q28 += (0.08 - t.q28) * freezeAmt; // blur ~off → stamps stay crisp
-      t.q1 += (0.974 - t.q1) * freezeAmt; // ghosts live ~4-8s — NOT 1.0 (must still decay, no pileup)
+      t.q1 += (0.98 - t.q1) * freezeAmt; // 0.974→0.98: generations died in ~2s, refs hold ≥3.5s (mountains clip); deposits are now burst-gated so pileup risk stays low
       t.q15 += (0.0 - t.q15) * freezeAmt; // no growth
       t.q18 *= 1 - 0.92 * freezeAmt; // near-still (r0: peaks do NOT translate)
       t.q19 *= 1 - 0.92 * freezeAmt;
@@ -1762,7 +1763,7 @@
     lastMotif = mCur;
     if (mCur === 14 && mtStampT === time)
       mtHueStep += (0.06 + 0.09 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
-    mtStampEnv = Math.max(0, 1 - (time - mtStampT) / 0.18); // bright stamp window
+    mtStampEnv = Math.max(0, 1 - (time - mtStampT) / 0.32); // burst window (r0: ~1s bursts; 0.18 was too thin a deposit)
     // DOWN-SAG (field 2): bars/bands scenes stream the trail gently DOWNWARD (h2: 2-3%/s;
     // p1 rope cascade/stems; p0 S2 sag), replacing the random snap-dir while active.
     // Sign map (measured): -q19 streams DOWN. Freeze wins; rests stay still.
