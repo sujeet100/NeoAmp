@@ -1870,9 +1870,10 @@
     swathAmt += ((accLine === 5 ? 1 : 0) - swathAmt) * Math.min(1, dt * 1.2);
     if (swathAmt > 0.01) {
       t.q28 *= 1 - 0.85 * swathAmt; // blur ~off → discrete strands (0.7 left copies merging)
-      // decay 0.968→0.978 (user screenshots: strands died in ~1.5s, so the sweep never spread
-      // into a wedge — it read as a braided rope; ref strands live 4-6s, spent fan lingers ~8s)
-      t.q1 += (0.978 - t.q1) * 0.5 * swathAmt;
+      // FULL-strength ease to 0.98 (the earlier ×0.5 blend landed the effective decay at ~0.968
+      // → copies still died in ~1.4s and the fan stayed a braided rope — user's 2nd swath clip;
+      // ref strands live 4-6s so the 15°/s sweep can spread ~11 copies into a ~45° wedge)
+      t.q1 += (0.98 - t.q1) * swathAmt;
       t.q18 *= 1 - 0.6 * swathAmt; // damp the pan so the fan doesn't shear away
       t.q19 *= 1 - 0.6 * swathAmt;
     }
