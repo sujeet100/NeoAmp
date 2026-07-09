@@ -1225,6 +1225,11 @@
     var m = Math.floor((a.q30 || 0) + 0.5);
     if (m < 0) m = 0;
     if (m >= MODES.length) m = MODES.length - 1;
+    // D12 (doc 05): the motif rides its own STEPPED clock — a LOCAL q8 override (this wave's
+    // point object only; the shader ground keeps the global). All mode fns + their per-stamp
+    // hue walks (offsets on a.q8) ride it unchanged. Sketchbook pages keep the global clock
+    // (+restStampHue) — that user-verified look predates this clock.
+    if (sketchAmt < 0.5) a.q8 = motifHue;
     MODES[m](a);
     // PULSAR oblate squash — the anemone/urchin (0/2) read as a tilted 3D eye, not a flat face-on
     // circle. Gated to "not kaleido" via q29 (the fold source) — q12 was freed for the shear warp.
@@ -1493,6 +1498,18 @@
     resting = false,
     breathNext = -1,
     restAmt = 0;
+  // ── PER-CLASS COLOUR CLOCKS (doc 05 B7/D12). The refs run INDEPENDENT hue clocks per element
+  // class — ground (the continuous q8 shader clock, unchanged), central motif (a STEPPED walk:
+  // hold 0.75-2s, then jump a hue family), free accessories (their own slower walk). All changes
+  // are EMITTER draw colours only; the trail keeps its birth hue (THE ONE LAW — never recolour
+  // the buffer), so two-generation two-tone accumulations come free. Closure state — the wave
+  // point fns share this scope; the shader only ever needs the global q8 (the ground's clock). ──
+  var motifHue = 0, // held motif draw hue — steps, never drifts (h0 §3.3)
+    motifHueOld = 0, // the previous held hue (rim ghosts / the radial front)
+    motifStepT = -9, // last step instant (-9 = unseeded)
+    motifStepNext = 0,
+    accHue = 0.3, // free-accessory clock (p0: strands/columns snap at their own moments)
+    accStepNext = 0;
   // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
   var spiroVar = 0, // 0 dahlia · 1 fur-ball (many-petal) · 2 ferris wheel (dahlia + connector ring)
@@ -1709,6 +1726,34 @@
     var mo = motifPick(time, dt, f > 0.6);
     var mCur = MOTIF_BAG[mo.mix < 0.5 ? mo.a : mo.b];
     if (FORCE && FORCE.motif !== undefined) mCur = FORCE.motif; // pin drives lifecycle logic, not just q30
+    // ── D12 STEPPED MOTIF CLOCK (doc 05 step 1): the emitter hue arrives in STEPS — hold
+    //    0.75-2s, then jump a visible hue-family (h0; busier music → shorter holds). The ground
+    //    keeps the continuous q8 clock: the per-wave q8 override in centralDraw is local to that
+    //    wave's point object (verified vendor mechanism), the shader still sees the global.
+    //    Stamp-walk modes (tangle 13 / mountains 14 / spiro 17 / cocoon 18) own their per-stamp
+    //    hue cadence — the base HOLDS while they're up so hue never double-steps. ──
+    if (motifStepT < -1) {
+      motifHue = t.q8 + 0.1; // first-frame seed near the ground family
+      motifHueOld = motifHue;
+      motifStepT = time;
+    }
+    if (FORCE && FORCE.motifHue !== undefined) {
+      motifHue = FORCE.motifHue; // debug pin (self-render acceptance shots)
+      motifHueOld = FORCE.motifHueOld !== undefined ? FORCE.motifHueOld : FORCE.motifHue;
+    }
+    var ownWalk = mCur === 13 || mCur === 14 || mCur === 17 || mCur === 18;
+    if (!ownWalk && time >= motifStepNext) {
+      motifHueOld = motifHue;
+      motifHue += (0.06 + 0.1 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      motifStepT = time;
+      motifStepNext = time + 0.75 + 1.25 * Math.random() * (1.2 - Math.min(0.7, pulse));
+    }
+    // free accessories: their own slower step walk, re-anchored near the ground clock each
+    // step (bounded offsets — the muted guardrail; p0: snaps at DIFFERENT moments than the motif)
+    if (time >= accStepNext) {
+      accHue = t.q8 + 0.18 + 0.3 * Math.random();
+      accStepNext = time + 1.0 + 1.5 * Math.random();
+    }
     // ── STAMP-CADENCE modes (doc 03 D7; h1 M7): the tangle lives as one-hue STAMP events —
     //    geometry fully re-rolled per stamp, fresh emitter hue over the previous generation's
     //    persisting cloud (never recolour the buffer — trails age in place, A14). ──
@@ -2232,6 +2277,12 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
+        // D12 per-class hue override (doc 05 step 1; local to this wave's point object): the
+        // star-net companion follows the MOTIF clock, the free accessories their own walk.
+        // The one-shot star stamp keeps the global base (it re-rolls evStarHue per event).
+        if (Math.abs((a.q30 || 0) - 1) < 0.5) {
+          if (sketchAmt < 0.5) a.q8 = motifHue;
+        } else if (!evStarOn) a.q8 = accHue;
         // ONE-SHOT STAR STAMP event (doc 03 A12) — top priority for its ≤0.22s life; pre-empts
         // the accessory briefly. 3 nested spiky outlines with chromatic hue offsets; small live
         // radius jitter (h2: outline re-jitters per frame). Suppressed while the star-net motif
