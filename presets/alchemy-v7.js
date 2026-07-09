@@ -2172,7 +2172,11 @@
       (moSnapIdx !== prevMoSnap && prevMoSnap >= 0)
     ) {
       var rt = Math.random();
-      transType = rt < 0.55 ? 0 : rt < 0.75 ? 1 : rt < 0.95 ? 2 : 3;
+      // quad-fold spike (type 2) REMOVED from the natural roll — user: "kaleidoscope appears for
+      // a very short duration"; that 0.6s q29:=1 comp-fold on ~20% of snaps read as a brief,
+      // frequent kaleido flash. Its 20% folds into wash-dissolve (the common benign one). The
+      // apply block below is kept intact for the FORCE._transType debug pin / a future revisit.
+      transType = rt < 0.75 ? 0 : rt < 0.95 ? 1 : 3;
       transT0 = time;
       transDur = transType === 3 ? 1.4 : transType === 2 ? 0.6 : 0.7;
     }
