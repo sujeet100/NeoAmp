@@ -1291,7 +1291,8 @@
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
       by = railOn ? railBy : a.q24 !== undefined ? a.q24 : 0.5;
-    var q26e = railOn ? 0.004 + ((a.q26 || 0.03) - 0.004) * tetherEnv : a.q26 || 0.03;
+    // idle rail keeps a VISIBLE live micro-jag (p2: 2-3px — alive, never a dead ruler line)
+    var q26e = railOn ? 0.007 + ((a.q26 || 0.03) - 0.007) * tetherEnv : a.q26 || 0.03;
     if (tk === 6) {
       // CASCADE hangs from ONE orb (h0 T3): the far end is a point below orb A, not orb B
       bx = ax + 0.1 * Math.sin(tetherSeed);
@@ -1687,10 +1688,13 @@
         // RAIL (doc 06 step 5): a would-be spawn occasionally opens a persistent RAIL instead
         // (~1 per 1-3 min): a dim pale micro-jagged chord that outlives scene changes and rests,
         // orbs parked on its endpoints (answered README Q11: parked posts approved).
-        if (!railWant && corridorAmt < 0.1 && Math.random() < 0.08) {
+        // rail duty tuned to the refs (~38s of rail across the 228s video ≈ 17%; ours at 8%
+        // per event was up ~half the time — user: "sometimes the tether shows as straight
+        // line only" far more than the original): ~2% per event ≈ one rail per ~80s busy time.
+        if (!railWant && corridorAmt < 0.1 && Math.random() < 0.02) {
           railWant = 1;
           railT0 = time;
-          railLife = 15 + Math.random() * 15; // 15-30s (p0: ~25s across a hard wipe)
+          railLife = 12 + Math.random() * 13; // 12-25s (p0 ~25s; p2 instances 5-8s)
           railAx = lastOrbAX;
           railAy = lastOrbAY;
           railBx = lastOrbBX;
