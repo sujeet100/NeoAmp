@@ -209,8 +209,15 @@
       // ── KALEIDOSCOPE regime (m==1): BOLD vivid diamonds (the reference's punchy red↔green, 0:22-0:27 —
       //    this phase deliberately BREAKS the muted rule). Alternating diamond cells take a 2-hue DUO. ──
       "  if (m > 0.5 && m < 1.5) {\n" +
+      // ── doc 10 step 1 — colour arrives as REGION FLOODS, not a continuous clock. The refs
+      //    (h0 M5) fill the centre diamond first, then side wedges, then band cores — 2-4
+      //    discrete floods/s, each era ~1-1.5s. Regions from the folded radius; each adopts a
+      //    STEPPED hue on its own ~0.17s delay so colour cascades centre→wedge→band. ──
+      "    float pr2 = length(suv - 0.5);\n" +
+      "    float region = step(0.14, pr2) + step(0.34, pr2);\n" + // 0 centre · 1 wedge · 2 band core
+      "    float era = floor(time * 3.0 - region * 0.5);\n" + // ~3 floods/s, staggered per region
       "    float cell = step(0.5, fract((suv.x + suv.y) * 1.5));\n" + // checker of diamond cells
-      "    vec3 kcol = pal(hb + cell * 0.45 + 0.12 * suv.x);\n" + // bold 2-tone duo across cells
+      "    vec3 kcol = pal(hb + era * 0.14 + cell * 0.45);\n" + // STEPPED region hue (was continuous)
       "    float kl = dot(kcol, vec3(0.333)); kcol = mix(vec3(kl), kcol, " +
       G(P.ksat) +
       ");\n" + // PROFILE: kaleidoscope SATURATION (vivid full / pastel muted — was reading too vivid in pastel)
