@@ -120,14 +120,18 @@
       "    kc = abs(fract(kc * 0.5 + 0.5) * 2.0 - 1.0);\n" + // repeating mirror → diamonds
       "    kc.x /= asp; suv = clamp(kc * 0.5 + 0.25, 0.0, 1.0);\n" +
       "  }\n" +
-      // ── the watercolour TRAIL + motif buffer (a tiny max-dilate so thin lines survive) + bloom glow ──
-      "  vec2 dpx = 1.0 / resolution;\n" +
+      // ── the watercolour TRAIL + motif buffer, max-DILATED at ~2.5px (V1's "dilation radius →
+      //    THICK lines" — the original renders ~300px and upscales, so every stroke is fat) +
+      //    TWO-octave bloom (blur2 = the wide fuzz octave; V1 had it, v7 had dropped to blur1
+      //    only — user 2026-07-09: "all lines look thin and sharp; the original is thicker,
+      //    fuzzier, low-res"). ──
+      "  float dil = 2.5 / resolution.y;\n" +
       "  vec3 trail = texture2D(sampler_main, suv).rgb;\n" +
-      "  trail = max(trail, texture2D(sampler_main, suv + vec2(dpx.x, 0.0)).rgb);\n" +
-      "  trail = max(trail, texture2D(sampler_main, suv - vec2(dpx.x, 0.0)).rgb);\n" +
-      "  trail = max(trail, texture2D(sampler_main, suv + vec2(0.0, dpx.y)).rgb);\n" +
-      "  trail = max(trail, texture2D(sampler_main, suv - vec2(0.0, dpx.y)).rgb);\n" +
-      "  vec3 glow = texture2D(sampler_blur1, suv).rgb;\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv + vec2(dil, 0.0)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv - vec2(dil, 0.0)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv + vec2(0.0, dil)).rgb);\n" +
+      "  trail = max(trail, texture2D(sampler_main, suv - vec2(0.0, dil)).rgb);\n" +
+      "  vec3 glow = texture2D(sampler_blur1, suv).rgb + texture2D(sampler_blur2, suv).rgb * 0.8;\n" +
       // ── DARK WAVY-FLUID GROUND (the W scene). Domain-warped fbm → liquid wavy bands; 3 ANALOGOUS dusty
       //    tones; kept DARK (measured V~0.2) + desaturated so the trails carry the vivid colour. ──
       "  vec2 g = c * 1.25;\n" +
@@ -208,8 +212,10 @@
       "  ground *= " +
       G(P.gboost) +
       ";\n" + // PROFILE: ground brightness (pastel lifts the washes; vivid keeps dark)
-      // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth). ──
-      "  vec3 col = ground + trail * 1.28 + glow * 0.6;\n" +
+      // ── COMPOSITE: vivid trails + glow halo POP on the dark ground (value separation = depth).
+      //    trail 1.28→1.15 / glow 0.6→0.55 rebalance pays for the fatter dilate + blur2 fuzz
+      //    (total energy ≈ constant; never lift highlights — the pastel discipline). ──
+      "  vec3 col = ground + trail * 1.15 + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
       //    luminance-preserving resaturate toward the measured ~0.45 + a darks-deepen so the dark ground
