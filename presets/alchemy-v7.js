@@ -199,7 +199,9 @@
       "  }\n" +
       // 9 TREADMILL (doc 04 B9a; h1 S8): soft vertical streaks STREAM horizontally while the
       // motif layer stays pinned — counter-motion parallax, camera static. Muted duo, dark.
-      "  else if (m > 8.5) {\n" +
+      // (bounded < 9.5 — doc 12 precondition so regimes ≥10 can append below without falling
+      // into this catch-all, exactly as doc 04 bounded the caustic branch)
+      "  else if (m > 8.5 && m < 9.5) {\n" +
       "    float tx = fract(uv.x * 7.0 - time * 0.5);\n" +
       "    float streak = 0.5 + 0.5 * cos(tx * 6.2832);\n" +
       "    streak = streak * streak;\n" +
