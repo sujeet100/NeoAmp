@@ -1417,6 +1417,7 @@
     valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
     freezeAmt = 0, // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
     sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
+    washAmt = 0, // bgMode 5 flat wash → DEPOSIT-HOLDING ground (doc 05 C10: stains live 3-6s)
     radialAmt = 0, // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
     eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
@@ -2092,6 +2093,36 @@
       t.q27 += (eyeY - t.q27) * 0.7 * eyeAmt;
       t.q18 *= 1 - 0.85 * eyeAmt;
       t.q19 *= 1 - 0.85 * eyeAmt;
+    }
+    // C10 DEPOSIT-HOLDING WASH (doc 05 step 5, answered README Q7): on the flat wash the bg IS
+    // the scene's accumulated history (p1 B7) — stains must live 3-6s (p0: 5-10s), so decay up,
+    // blur down, pan damped. Wash-gated ONLY; freeze wins (terrain crispness beats stains);
+    // corridor/valley couplings run later and override as shipped. The sketchbook rest look was
+    // live-tuned with ~1s ghost-fade — damp the hold there so pages keep their blink-and-ghost.
+    // White-guard: trail composite gain unchanged; decay capped 0.988; blur floor 0.18.
+    washAmt += ((bgMode === 5 ? 1 : 0) - washAmt) * Math.min(1, dt * 0.5);
+    washAmt *= 1 - freezeAmt;
+    if (washAmt > 0.01) {
+      // FULL hold only for compact deposit-y motifs (the refs' wash stains are small pigment
+      // patches — orb puffs, pompoms). A FULL-FRAME every-frame line motif (net/star/beams/
+      // vortex/tangle/valley) piles dozens of held copies into a white web (acceptance shot) —
+      // those get a much weaker hold (~1.4s trails) instead of the 3-6s stain life.
+      var sprawl =
+        mCur === 1 ||
+        mCur === 3 ||
+        mCur === 7 ||
+        mCur === 8 ||
+        mCur === 10 ||
+        mCur === 12 ||
+        mCur === 13;
+      var wh = washAmt * (1 - 0.55 * sketchAmt) * (sprawl ? 0.35 : 1);
+      t.q1 += (0.988 - t.q1) * wh; // 10% at ~3.2s (was 0.957: stains dead in ~0.9s)
+      t.q28 += (0.18 - t.q28) * wh; // stains blur SLOWLY, stay legible — not the instant bleed
+      t.q18 *= 1 - 0.7 * wh; // stains hold in place (p0: washes "near-static")
+      t.q19 *= 1 - 0.7 * wh;
+      // white-guard fallback (doc 05 §3 step 5): every-frame line motifs (net/star) pile toward
+      // white at this decay — dim the LIVE emitter, never the comp (acceptance shot: dense web)
+      t.q4 *= 1 - 0.2 * wh;
     }
     // C8 RADIAL RIPPLE finale: a RARE ~1s hub-centred buffer ripple on a hard beat (r0 18.6-19.6 —
     // observed ONCE in 19s, so cooldown ≥75s + probability ≈ once per few minutes). Never under
