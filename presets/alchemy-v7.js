@@ -1240,7 +1240,9 @@
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
     eyeY = 0.3,
     eyeOn = false, // upward-crossing tracker for the re-roll
-    rippleT0 = -99; // C8 radial-ripple finale event birth (rare, cooldown ≥75s)
+    rippleT0 = -99, // C8 radial-ripple finale event birth (rare, cooldown ≥75s)
+    mtStampT = -9, // doc 02 B3: last terrain stamp instant (mountains ridge generations)
+    sinkImp = 0; // per-stamp decaying SINK impulse — steps the buffer down one generation
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -1670,6 +1672,19 @@
       t.q19 *= 1 - 0.92 * freezeAmt;
       t.q16 *= 1 - 0.8 * freezeAmt; // no roll — frozen peaks must not smear rotationally
     }
+    // B3 terrain SINK (doc 02 step 1): each STAMP steps the whole buffer DOWN one generation
+    // (p1 S6: copies displace down 20-40px per stamp; r0: peaks do NOT translate BETWEEN stamps).
+    // A per-stamp decaying impulse, NOT a constant scroll — frozen peaks stay put when quiet,
+    // and the beat gate means rests STARVE the terrain (B6). Rides the freeze (low blur keeps
+    // the stepped generations discrete — p3's venetian comb).
+    if (mCur === 14 && f > 0.7 && time - mtStampT > 0.6 && restAmt < 0.5) {
+      mtStampT = time; // stamp event (step 2 reuses this for the emitter hue step + brightness)
+      sinkImp = 1;
+    }
+    sinkImp += (0 - sinkImp) * Math.min(1, dt * 4); // ~0.25s release
+    // -q19 streams the buffer DOWN (measured sign map); integrated step ≈ 0.0042·60·0.25 ≈ 0.06 UV
+    // ≈ the measured 20-40px generation gap. Applied after the freeze damping on purpose.
+    t.q19 -= 0.0042 * sinkImp * freezeAmt;
     // DOWN-SAG (field 2): bars/bands scenes stream the trail gently DOWNWARD (h2: 2-3%/s;
     // p1 rope cascade/stems; p0 S2 sag), replacing the random snap-dir while active.
     // Sign map (measured): -q19 streams DOWN. Freeze wins; rests stay still.
