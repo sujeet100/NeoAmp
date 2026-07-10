@@ -1950,6 +1950,9 @@
     lastBgMode = -1,
     alcKV = 0, // doc 10 step 2: kaleido lattice variant, picked once per visit (0 diamonds ·1 bowtie ·2 lens ·3 rainbow-bands)
     alcInKal = false, // was in kaleido last frame? (fresh-visit edge → re-roll alcKV)
+    kalOrbAmt = 0, // doc 10 step 3 (B8): orbs eased into the fold window while kaleido is up
+    kalOx = 0.08, // per-visit pair offset about centre (inside the ≈[0.25,0.75]² window)
+    kalOy = -0.08,
     pulse = 0, // SMOOTHED beat envelope (fast attack / slow release) — breathes, never strobes
     panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
@@ -3565,6 +3568,31 @@
         t.q3 += ((railAy + railBy) / 2 - t.q3) * railAmt;
       }
     }
+    // ── B8 KALEIDO MIRRORING (doc 10 step 3; answered Q14 = yes): the COMP fold samples only
+    //    the central window ≈[0.25,0.75]² and mirror-tiles it — posts parked outside are
+    //    CROPPED, not mirrored. While the kaleido bg is up, re-anchor the orb pair INSIDE the
+    //    window so they render as the refs' "4x-mirrored mini orbs" (p0 S4). SPAWN IN PLACE at
+    //    entry (C1 pop grammar — partial lerps read as a rapid camera move, doc-07 round); the
+    //    LAST coupling so it wins the rail/moth/swimmer parks; keyed off the EFFECTIVE q29 so
+    //    a {q29:1} pin exercises it. The tether is gated off in waves[2] (un-mirrorable). ──
+    var kalEff = Math.floor((t.q29 || 0) + 0.5) === 1 ? 1 : 0;
+    if (kalEff && kalOrbAmt < 0.02) {
+      var kaAng = Math.random() * 6.2832;
+      kalOx = 0.11 * Math.cos(kaAng);
+      kalOy = 0.11 * Math.sin(kaAng);
+      stgAx = 0.5 - kalOx;
+      stgAy = 0.5 - kalOy;
+      stgBx = 0.5 + kalOx;
+      stgBy = 0.5 + kalOy;
+      stgNext = Math.max(stgNext, time + 4);
+    }
+    kalOrbAmt += (kalEff - kalOrbAmt) * Math.min(1, dt * 2);
+    if (kalOrbAmt > 0.01) {
+      t.q21 += (0.5 - kalOx - t.q21) * kalOrbAmt;
+      t.q22 += (0.5 - kalOy - t.q22) * kalOrbAmt;
+      t.q23 += (0.5 + kalOx - t.q23) * kalOrbAmt;
+      t.q24 += (0.5 + kalOy - t.q24) * kalOrbAmt;
+    }
     return t;
   }
 
@@ -3861,6 +3889,14 @@
       init_eqs: passthrough,
       frame_eqs: passthrough,
       point_eqs: function (a) {
+        // B8 KALEIDO GATE (doc 10 step 3; answered Q14 = yes): a full-frame line cannot be
+        // exempted from the uniform COMP fold — it would mirror into a stray X (h1 S7's
+        // un-mirrored diagonal is a documented ceiling). The tether (and the rail it hosts)
+        // stands down while the kaleido bg is up; orbs mirror as mini-orbs instead.
+        if (Math.abs((a.q29 || 0) - 1) < 0.5) {
+          a.a = 0;
+          return a;
+        }
         fTether(a);
         var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
         var beatG = tetherEnv; // scheduler-driven spawn event (was: every-beat q32 flash)
