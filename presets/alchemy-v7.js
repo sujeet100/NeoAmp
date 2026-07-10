@@ -358,6 +358,18 @@
       "    float mjit = 0.85 + 0.15 * sin(time * 47.0);\n" +
       "    glow += vec3(0.35, 0.85, 0.95) * (lnh + lnv) * mfl * mjit * 0.5;\n" +
       "  }\n" +
+      // ── C9 CONTACT SHADOW (doc 17, answered Q4=yes; h1 M4 85.0 + wreath 90.0: the oblate
+      //    tilted motif "casts a soft contact shadow"): a small dim dark ellipse on the GROUND
+      //    just below the motif centre, gated to the tilted-disc modes jelly(9)/spiro(17)/
+      //    spinner(21) and fading with the motif's own q4 gate. Ground-only — the trail keeps
+      //    its birth colours (the ONE LAW). comp uv.y is TOP-DOWN vs wave y (crosshair gotcha),
+      //    so "below on screen" = uv.y > 1-q3. Locals shGate/shp/shd — never ang/rad. ──
+      "  float shGate = step(8.5, q30) * step(q30, 9.5) + step(16.5, q30) * step(q30, 17.5) + step(20.5, q30) * step(q30, 21.5);\n" +
+      "  if (shGate > 0.5) {\n" +
+      "    vec2 shp = vec2((uv.x - q2) * asp / max(q5 * 0.75, 0.05), (uv.y - (1.0 - q3 + q5 * 0.5)) / max(q5 * 0.22, 0.02));\n" +
+      "    float shd = smoothstep(1.0, 0.35, length(shp)) * 0.35 * clamp(q4, 0.0, 1.0);\n" +
+      "    ground *= 1.0 - shd;\n" +
+      "  }\n" +
       "  vec3 col = ground + trail * 1.15 + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
