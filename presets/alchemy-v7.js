@@ -1067,7 +1067,11 @@
       u = fk - seg;
     var i0 = (seg * stride) % P,
       i1 = (seg * stride + stride) % P;
-    var sp = (a.q9 || 0) * 0.12; // SOFTENED: barely rotate (was 0.4) → no rotational smear-into-a-gear-web
+    // CONTINUOUS rotation via the dwell driver (s12Spin, ~25°/s — ref 1080p 1:33.5-1:36 shows
+    // the points stepping between 0.17s frames; hairline strokes + ~1-2s decay make the ghost
+    // generations read like the ref's offset copies, not a gear web). Frozen outside the dwell
+    // (sketchbook stamps stay static). The old q9*0.12 (~0.4°/s) read as a static star.
+    var sp = s12Spin + (a.q9 || 0) * 0.12;
     var aa0 = (i0 / P) * 6.2832 + sp,
       aa1 = (i1 / P) * 6.2832 + sp;
     var R = (a.q5 || 0.4) * 0.6; // shrunk again (0.85→0.6): was filling the whole frame on beats
@@ -1086,7 +1090,10 @@
     var nX = -dyc / ln,
       nY = dxc / ln,
       delta = 0.0022 * (copy ? 1 : -1); // ~3px separation along the chord normal
-    var h = (a.q8 || 0) + 0.1; // base hue on the shared q8 clock (analogous/muted, not neon)
+    // base hue = the stepped q8 clock + the dwell driver's CONTINUOUS sweep (s12Hue, ~full
+    // wheel / 8s — the ref's hue rolls green→pink→teal through the bloom; the hue-frozen trail
+    // supplies the second generation's colour for free)
+    var h = (a.q8 || 0) + 0.1 + s12Hue;
     var cr = orbCol(h, 0),
       cg = orbCol(h, 0.33),
       cb = orbCol(h, 0.67);
@@ -2027,6 +2034,10 @@
     scalAmt = 0, // mode-19 engagement: orb parking + the warp's q12<0 scallop y-flow
     mothAmt = 0, // mode-20 engagement (doc 13): O10 vertical orb pair + scene clock
     mothT0 = -99, // moth dwell birth — the crimson-accent window keys off it
+    s12T0 = -1, // 12-star dwell birth (bloom growth clock; -1 = not in the dwell)
+    s12Spin = 0, // 12-star CONTINUOUS rotation angle (ref 1080p 1:33.5-1:36: ~25°/s)
+    s12Hue = 0, // 12-star continuous hue sweep (~full wheel / 8s; trail keeps older hues)
+    s12ZoomT0 = -99, // dwell exit → the ~1.6s dive-into-the-centre magnify pulse
     mothSnapT = -9, // O10 core-hue step clock (~1s/step, green→gold→white→pink read)
     mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
     spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
@@ -2856,6 +2867,22 @@
     } else {
       netGroupT0 = -1;
     }
+    // ── 12-STAR BLOOM driver (user + frame-check 1080p 1:29.5-1:41.5 @6fps): a compact
+    //    scribble wreath ERUPTS into the nested star at ~1:33.5, GROWS ~2.5x over ~2.5s while
+    //    ROTATING continuously (~25°/s — points visibly step between 0.17s frames) with a
+    //    CONTINUOUS hue sweep (~full wheel / 8s; the decaying trail keeps the older hue → the
+    //    ref's two-generation red-orange-under-teal look), then dissolves as the camera DIVES
+    //    into the dark centre. Our old f12Star spin (q9*0.12 ≈ 0.4°/s) was effectively static,
+    //    size was flat for the dwell, and hue only stepped with the motif clock. ──
+    if (mEff === 10) {
+      if (s12T0 < 0) s12T0 = time;
+      s12Spin += dt * 0.45; // ~26°/s continuous rotation
+      s12Hue += dt * 0.125; // continuous wheel (~8s) ON TOP of the stepped q8 walk
+    } else {
+      if (s12T0 >= 0) s12ZoomT0 = time; // dwell exit → fire the dive pulse
+      s12T0 = -1;
+    }
+
     // ── POMPOM apex-form roll (doc 11 step 3): one form per mode-16 dwell — ~40% of dwells
     //    render the dahlia APEX bloom (dark core hole + dense petal tufts), the rest the small
     //    chenille pompom (subtle 3-lobe tufting only). ──
@@ -3025,6 +3052,19 @@
     if (POLY_RADK[mFin]) {
       var aspW = typeof window !== "undefined" && window.__VIZ_ASPECT > 1 ? window.__VIZ_ASPECT : 1;
       t.q5 = Math.min(t.q5, 0.36 / aspW / POLY_RADK[mFin]);
+    }
+    // 12-star BLOOM growth (ref: wreath→peak ~2.5x over ~2.5s). Applied AFTER the height cap
+    // so the ramp scales the capped size; dwell only (s12T0 — sketchbook stamps stay static).
+    if (mFin === 10 && s12T0 >= 0) t.q5 *= 0.34 + 0.66 * Math.min(1, (time - s12T0) / 2.6);
+    // 12-star dwell EXIT (user: "towards the end the camera zooms in the center"; ref 1:36-1:38:
+    // the star dissolves and the trail field streams outward around a dark core = a forward
+    // dive). A ~1.6s magnify pulse within the ≤0.008 q15 cap + a decay hold so the dissolving
+    // star's wisps stay alive through the dive.
+    var dvL = (time - s12ZoomT0) / 1.6;
+    if (dvL >= 0 && dvL < 1) {
+      var dv = Math.sin(dvL * 3.14159);
+      t.q15 = Math.min(0.008, t.q15 + 0.006 * dv);
+      t.q1 = Math.max(t.q1, 0.965);
     }
 
     // ── PER-SCENE TRAIL-DISPLACEMENT FIELDS (doc 01 C2). The refs schedule the feedback warp
