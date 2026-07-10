@@ -196,8 +196,12 @@
       // 6 HORIZONTAL colour BANDS (2:28-2:39): smooth horizontal stripes, slow vertical drift.
       "  else if (m > 5.5 && m < 6.5) {\n" +
       // bands must MOVE, not recolour in place (user: ours look static; the original's bands
-      // sweep so the colour change reads as motion) — drift raised 0.06→0.32
-      "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - time * 0.32;\n" +
+      // sweep so the colour change reads as motion) — drift raised 0.06→0.32.
+      // SWIMMER scene (q30 22): the soft bands POUR DOWN at the measured world-stream rate
+      // (~35% frame height/s = 1.75/5) — the background's colours visibly stream past the
+      // rising orbs (user round 9; the ref's bg zones slide down with the scene).
+      "    float bdr = abs(q30 - 22.0) < 0.5 ? time * 1.75 : time * 0.32;\n" +
+      "    float yb = uv.y * 5.0 + sin(uv.x * 2.0 + time * 0.1) * 0.3 - bdr;\n" +
       "    ground = mix(pal(hb), pal(hb + 0.3), 0.5 + 0.5 * sin(yb * 3.14159));\n" +
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.62);\n" +
       "    ground *= 0.14;\n" +
@@ -4004,15 +4008,20 @@
       t.q17 *= 1 - swa;
       t.q15 = Math.min(t.q15, 0.0004);
       t.q19 *= 1 - 0.7 * swa;
-      // CAMERA FOLLOW (round 6/7): the WHOLE climb speed is the world-stream. MEASURED from
-      // the 19s clip 10.0-11.5s @10fps: the stalk S-kinks pour down ~25% frame height/s —
-      // twice the round-6 guess (the user: "very sluggish"). 0.0023/frame ≈ 0.14 UV/s ✓.
-      t.q19 = Math.min(t.q19, -0.0023 * swa);
+      // CAMERA FOLLOW (round 6/7/9): the WHOLE climb speed is the world-stream. Measured
+      // ~25% frame height/s (19s clip 10-11.5s @10fps); round 9 user push: "+speed — the
+      // fast stream separates the trail into defined-border orb copies" (their 0:11 still:
+      // a stack of distinct green-ringed ghosts, not a smear) → ~35% h/s.
+      t.q19 = Math.min(t.q19, -0.0033 * swa);
       // FLOOR + HORIZON (round 4): the ref scene ALWAYS stands its columns on a bright floor
       // band — the strongest side-view cue. Force the floor-band ground (regime 11) as this
       // scene's composed set-piece (B11 grammar). Guarded so an explicit FORCE q29 pin wins
       // (the FORCE q-copy runs BEFORE this coupling).
-      if (swimAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 11;
+      // soft horizontal BANDS (6), round 9 (the caustic 8 was tried and DROWNED the scene —
+      // it's the deliberately-brightest regime): the m==6 smooth dim stripes pour DOWN at
+      // the stream rate under q30 22 — the moving background colours give the camera-follow
+      // read, the ref's soft pink/slate zones
+      if (swimAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 6;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
