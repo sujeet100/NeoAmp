@@ -1879,7 +1879,8 @@
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
     accSwathFam = 0, // alternating colour family (p0: gold+indigo interleaved)
-    accSwathEnv = 0; // ~1-frame bright deposit window per tick
+    accSwathEnv = 0, // ~1-frame bright deposit window per tick
+    accLhPiv = 2; // D10 lighthouse pivot kind: 0 orb A · 1 tether mid-span · 2 motif hub
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -2843,19 +2844,56 @@
       accLine = rl < 0.4 ? 0 : rl < 0.5 ? 1 : rl < 0.66 ? 5 : rl < 0.87 ? 2 : 4;
       if (accLine === 5 && corridorAmt > 0.1) accLine = 1; // corridor forces its own pan — no swath there
       accLineNext = time + 5 + Math.random() * 6;
-      accLineArm = accLine === 1; // a curtain waits for a beat, then sweeps for ~1.6s
+      accLineArm = false; // D10: the one-shot beat-armed curtain became the persistent lighthouse
+      // D10 LIGHTHOUSE pivot is COMPOSITIONAL (h2 §4: ON the tether mid-span, behind the star
+      // head, on an orb) — rolled per dwell and CAPTURED at pick (pinned for the dwell; a
+      // live-tracking pivot painted a woven grid instead of a fan): 0 orb A · 1 tether mid · 2 hub
+      accLhPiv = Math.random() < 0.4 ? 0 : Math.random() < 0.6 ? 1 : 2;
       accLineAng = Math.random() * 3.14159;
       accLineX = 0.3 + Math.random() * 0.4;
       accLineY = 0.3 + Math.random() * 0.4;
+      if (accLine === 1) {
+        accLineX =
+          accLhPiv === 0
+            ? t.q21 || 0.4
+            : accLhPiv === 1
+              ? ((t.q21 || 0.4) + (t.q23 || 0.6)) / 2
+              : t.q2 || 0.5;
+        accLineY =
+          accLhPiv === 0
+            ? t.q22 || 0.5
+            : accLhPiv === 1
+              ? ((t.q22 || 0.5) + (t.q24 || 0.5)) / 2
+              : t.q3 || 0.5;
+      }
       accLineDrift = (Math.random() < 0.5 ? -1 : 1) * (0.008 + 0.02 * Math.random());
       accLinePickT = time;
     }
-    if (accLineArm && f > 0.6) {
+    // D10 (doc 14 step 4): accLine 1 is now the PERSISTENT lighthouse fan — alive for its whole
+    // 5-11s dwell (h2 2.3: fans live 5-20s), no beat-armed 1.6s pop. accLineEnv stays as a soft
+    // 0.5s fade-in so a fresh pick doesn't pop.
+    accLineEnv = accLine === 1 ? Math.min(1, (time - accLinePickT) / 0.5) : 1;
+    if (FORCE && FORCE.accLine !== undefined && accLine !== FORCE.accLine) {
+      accLine = FORCE.accLine; // debug pin (doc 15 step 0): force an accessory dwell
       accLineArm = false;
-      accLineT0 = time; // the beat fires the sweep (survey: curtains land ON hits, ~1.5s life)
+      accLinePickT = time;
+      accLineNext = time + 9;
+      if (accLine === 1) {
+        // lighthouse pin captures its pivot like the natural pick
+        accLineX =
+          accLhPiv === 0
+            ? t.q21 || 0.4
+            : accLhPiv === 1
+              ? ((t.q21 || 0.4) + (t.q23 || 0.6)) / 2
+              : t.q2 || 0.5;
+        accLineY =
+          accLhPiv === 0
+            ? t.q22 || 0.5
+            : accLhPiv === 1
+              ? ((t.q22 || 0.5) + (t.q24 || 0.5)) / 2
+              : t.q3 || 0.5;
+      }
     }
-    var clife = (time - accLineT0) / 1.6;
-    accLineEnv = accLine === 1 ? (clife >= 0 && clife < 1 ? Math.sin(clife * 3.14159) : 0) : 1;
     if (FORCE && FORCE.swath && accLine !== 5) {
       accLine = 5; // debug pin: force a swath dwell (self-render acceptance)
       accLinePickT = time;
@@ -2871,19 +2909,27 @@
         (time - accLinePickT) * 0.26 * (accLineDrift < 0 ? -1 : 1) +
         0.15 * Math.sin(time * 0.5);
     } else {
-      accLineRot = accLineAng + Math.max(0, Math.min(1, clife)) * 0.8; // the curtain pivots as it lives
+      // D10 lighthouse: the free end sweeps continuously ~10-20°/s (p0 M10: 15-25°/s while
+      // the pinch clump stays pinned), with a slow wander like the swath
+      accLineRot =
+        accLineAng +
+        (time - accLinePickT) * 0.24 * (accLineDrift < 0 ? -1 : 1) +
+        0.12 * Math.sin(time * 0.4);
     }
     // A3 stamp TICKS: a discrete frozen copy per tick, alternating the two colour families
     // (p0: gold+indigo interleaved). 0.18→0.28s (user screenshots: copies packed into a braided
     // rope) — pitch ≈ 0.26 rad/s × 0.28s ≈ 4.2° ≈ the measured 10-20px strand spacing.
-    if (accLine === 5 && time - accSwathTick > 0.28) {
-      accSwathTick = time;
+    if ((accLine === 5 || accLine === 1) && time - accSwathTick > 0.28) {
+      accSwathTick = time; // lighthouse (1) shares the swath's tick grammar — same mechanism
       accSwathFam = 1 - accSwathFam;
     }
     accSwathEnv = Math.max(0, 1 - (time - accSwathTick) / 0.07); // ~1-frame bright deposit
     // mini-FREEZE while a swath lives — the copies must freeze, not diffuse (wavetest_21).
     // Accessory-scoped field change; strands live 4-6s, a spent fan lingers ~8s (p0).
-    swathAmt += ((accLine === 5 ? 1 : 0) - swathAmt) * Math.min(1, dt * 1.2);
+    // lighthouse (1) rides the same mini-freeze — its fan body IS frozen strand copies
+    // (wavetest_21; without it the 0.968 decay kills copies in ~1.5s and the sweep never
+    // spreads them — the swath's braided-rope lesson)
+    swathAmt += ((accLine === 5 || accLine === 1 ? 1 : 0) - swathAmt) * Math.min(1, dt * 1.2);
     if (swathAmt > 0.01) {
       t.q28 *= 1 - 0.85 * swathAmt; // blur ~off → discrete strands (0.7 left copies merging)
       // FULL-strength ease to 0.98 (the earlier ×0.5 blend landed the effective decay at ~0.968
@@ -3388,24 +3434,24 @@
           return a;
         }
         if (accLine === 1 && accLineEnv > 0.01) {
-          // RAY-CURTAIN: 16 parallel rays × 32 samples, pivoting as a fan while it lives
-          var K = 16,
-            fk1 = (a.sample || 0) * K,
-            k = Math.floor(fk1),
-            u1 = fk1 - k;
-          var dx1 = Math.cos(accLineRot),
-            dy1 = Math.sin(accLineRot);
-          var offp = (k / (K - 1) - 0.5) * 0.85;
-          a.x = accLineX - dy1 * offp + dx1 * (u1 - 0.5) * 1.5;
-          a.y = accLineY + dx1 * offp + dy1 * (u1 - 0.5) * 1.5;
-          var h1 = (a.q8 || 0) + 0.24;
-          // kept LIGHT: the pivoting sweep stamps ~every frame into the trail, so a bright
-          // curtain accumulates into a solid wall of lines (the ref's sweeps stay thin)
-          var bri = 0.62 * accLineEnv * accVis;
+          // D10 LIGHTHOUSE FAN (doc 14 step 4; h2 2.3 / p0 M10): ONE live strand from a PINNED
+          // compositional pivot (orb A / tether mid-span / motif hub, rolled per dwell), free
+          // end sweeping ~14°/s for the whole 5-11s dwell. The fan BODY is the trail's frozen
+          // strand copies (swath tick + mini-freeze shared) — trail-built, never N drawn rays.
+          var uL = a.sample || 0;
+          var lpx = accLineX, // pivot CAPTURED at pick — pinned for the dwell (a live-tracking
+            lpy = accLineY; // pivot painted a woven grid instead of a fan)
+          var LL = 0.5 + 0.12 * Math.sin(accLinePickT * 2.9); // strand length, rolled per pick
+          // fan spread breathes open/closed over ~1s (h2: "fan spread opens/closes")
+          var wavL = 0.005 * Math.sin(uL * 27.0 + accLinePickT * 4.0) + (a.value1 || 0) * 0.004;
+          a.x = lpx + Math.cos(accLineRot) * uL * LL - Math.sin(accLineRot) * wavL;
+          a.y = lpy + Math.sin(accLineRot) * uL * LL + Math.cos(accLineRot) * wavL;
+          var h1 = (a.q8 || 0) + (accSwathFam ? 0.24 : 0.5);
+          var bri = (0.18 + 0.82 * accSwathEnv) * accLineEnv * accVis; // faint live edge; bright at ticks
           a.r = orbCol(h1, 0) * bri;
           a.g = orbCol(h1, 0.33) * bri;
           a.b = orbCol(h1, 0.67) * bri;
-          a.a = u1 < 0.03 ? 0 : 0.4 * accLineEnv * accVis;
+          a.a = (uL < 0.03 ? 0 : 0.55) * accLineEnv * accVis;
           mutRGB(a); // D13
           return a;
         }
