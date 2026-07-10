@@ -1384,8 +1384,10 @@
     var px = ((a.q21 !== undefined ? a.q21 : 0.4) + (a.q23 !== undefined ? a.q23 : 0.6)) / 2,
       py = ((a.q22 !== undefined ? a.q22 : 0.5) + (a.q24 !== undefined ? a.q24 : 0.5)) / 2;
     // CONTINUOUS rotation (user round 6: "rotates faster and continuously — it does not
-    // stop, reverse direction, or disappear/reappear"): steady ~29°/s, never modulated.
-    var ang = lastT * 0.5;
+    // stop, reverse direction, or disappear/reappear"). MEASURED (19s clip 10-11.5s @10fps):
+    // ~20-33°/s → 34°/s here; the round-6 "too slow" read was mostly the 0.42 alpha making
+    // the live line invisible so only its slow washed fan registered.
+    var ang = lastT * 0.6;
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     // DEAD STRAIGHT (user round 5; the ref stills show ruler-straight parallel copies —
@@ -1396,9 +1398,10 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    // faint stroke (round 3): the ref's fan combs are thin pale hairlines — at full alpha the
-    // held copies fused into big sail-sheets that read as z-perspective surfaces
-    a.a = u < 0.02 || u > 0.98 ? 0 : 0.42;
+    // 0.7 (round 7; was 0.42): the ref's LIVE line is bright/high-contrast — at 0.42 only
+    // the washed fan registered and the rotation read as far slower than it was. The
+    // sail-sheet risk the 0.42 guarded is handled by the mode's low q28 (crisp combs).
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.7;
     return a;
   }
   // SCISSOR FAN (user, 2026-07-10, from the 480p 0:39-0:45 frame-check): TWO full-frame
@@ -3929,8 +3932,8 @@
       // SNAP the live posts in place at the PARKED heights (spawn-in-place, C1; round 6 —
       // heads never travel on screen, so they spawn where they'll live): without the snap
       // the eased blend glides the orbs over, depositing a stray diagonal ghost column.
-      swimHubX = t.q2; // capture — the live hub roam must NOT drag the standing columns
-      swimHubY = t.q3;
+      swimHubX = 0.5; // FIXED centre (round 7): capturing the roamed q2 shifted both columns
+      swimHubY = 0.5; // sideways together (user recording) — the ref scene is centred
       t.q21 = swimHubX - 0.26; // ref round 2: columns near the two SIDES (~1/4 and ~3/4)
       t.q22 = swimHubY + 0.14; // upper head
       t.q23 = swimHubX + 0.26;
@@ -3987,14 +3990,16 @@
       // columns STAND for the whole scene (side-on view cue). Lower blur so the line's copies
       // stay discrete thin combs (the melted copies were sweeping big sail-sheets = the other
       // z-read); the stalk still diffuses floor-ward, just slower.
-      t.q1 = Math.max(t.q1, 0.966 + 0.022 * swa); // → ~0.988
+      t.q1 = Math.max(t.q1, 0.966 + 0.024 * swa); // → ~0.99: the stalk survives ~full height
       t.q28 += (0.32 - t.q28) * 0.7 * swa;
-      t.q18 *= 1 - 0.7 * swa;
+      // ZERO the horizontal pan completely (round 7 — the user's recording showed the wakes
+      // trailing DIAGONALLY down-left: the 30% pan leak alone breaks the rising read)
+      t.q18 *= 1 - swa;
       t.q19 *= 1 - 0.7 * swa;
-      // CAMERA FOLLOW (round 6): the WHOLE climb speed is the world-stream — the trail
-      // sinks at ~0.066 UV/s (≈12% frame height/s), so each parked head continuously grows
-      // its wake downward = the orb climbs forever with the camera locked on.
-      t.q19 = Math.min(t.q19, -0.0011 * swa);
+      // CAMERA FOLLOW (round 6/7): the WHOLE climb speed is the world-stream. MEASURED from
+      // the 19s clip 10.0-11.5s @10fps: the stalk S-kinks pour down ~25% frame height/s —
+      // twice the round-6 guess (the user: "very sluggish"). 0.0023/frame ≈ 0.14 UV/s ✓.
+      t.q19 = Math.min(t.q19, -0.0023 * swa);
       // FLOOR + HORIZON (round 4): the ref scene ALWAYS stands its columns on a bright floor
       // band — the strongest side-view cue. Force the floor-band ground (regime 11) as this
       // scene's composed set-piece (B11 grammar). Guarded so an explicit FORCE q29 pin wins
