@@ -2831,18 +2831,19 @@
         netPivX = 0.5 + (Math.random() - 0.5) * 0.16;
         netPivY = 0.5 + (Math.random() - 0.5) * 0.16;
         netAng = Math.random() * 3.14159;
-        // faster sweep (user: "way too slow"): ~14-24°/s in 0.4s pose steps
-        netStep = (0.1 + Math.random() * 0.07) * (Math.random() < 0.5 ? -1 : 1);
+        // FAST sweep (user round 2: "original speed is very fast"): ~35-60°/s in 0.25s steps
+        netStep = (0.15 + Math.random() * 0.11) * (Math.random() < 0.5 ? -1 : 1);
         netFan = 0.09 + Math.random() * 0.05; // PARALLEL gap ~0.09-0.14 UV (was ~0.05 rad fan)
         netCurv = (0.08 + Math.random() * 0.1) * (Math.random() < 0.5 ? -1 : 1);
-        // colour MUST change per group (user: "the color is staying the same") — a big
-        // guaranteed hue step, never a fresh random that can land on the same family
-        netHue += 0.22 + Math.random() * 0.35;
+        netHue += 0.22 + Math.random() * 0.35; // fresh family at each group start too
         netPoseT = time;
       }
-      if (time - netPoseT > 0.4) {
+      if (time - netPoseT > 0.25) {
         netPoseT = time; // discrete pose step → wide-spaced trail copies (the ref fan)
         netAng += netStep;
+        // colour steps on EVERY redraw (user round 2 + the ref zooms: consecutive poses in
+        // the same fan alternate green/white/gold — the decaying rainbow IS the mesh look)
+        netHue += 0.05 + Math.random() * 0.08;
       }
     } else {
       netGroupT0 = -1;
