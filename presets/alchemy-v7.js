@@ -2313,6 +2313,28 @@
         // A5: per-appearance construction re-roll (chord dominant); rope (4) is persistent ~5s (h1)
         tetherKind = TETHER_BAG[(Math.random() * TETHER_BAG.length) | 0];
         tetherSeed = Math.random() * 100;
+        // ★ WIDE DUMBBELL CAST (user recording round 4, 480p 1:10-1:30: the dumbbell orbs park
+        // OUT toward the corners/edges, the fan strung between): ~60% of spawns re-cast BOTH
+        // posts to a wide corner-biased pair AT the event instant (spawn-in-place = the C1
+        // event grammar — the summon pops the pair wide, it never glides). Scene couplings
+        // that own the posts (corridor/rail/moth/cocoon/scallop/swimmer) keep priority.
+        if (
+          Math.random() < 0.6 &&
+          corridorAmt < 0.1 &&
+          railAmt < 0.01 &&
+          mothAmt < 0.05 &&
+          cocAmt < 0.05 &&
+          scalAmt < 0.05 &&
+          swimAmt < 0.05
+        ) {
+          var wcx = Math.random() < 0.5 ? 0.1 + Math.random() * 0.16 : 0.74 + Math.random() * 0.16;
+          var wcy = Math.random() < 0.5 ? 0.1 + Math.random() * 0.16 : 0.74 + Math.random() * 0.16;
+          stgAx = wcx;
+          stgAy = wcy;
+          stgBx = 1 - wcx + (Math.random() - 0.5) * 0.12; // opposite side, jittered
+          stgBy = 1 - wcy + (Math.random() - 0.5) * 0.12;
+          stgNext = Math.max(stgNext, time + 5); // hold the wide pair for the session
+        }
         // A14: about half the casts DEPOSIT a splat where the tether lands (p1 O12), ≥4s apart
         if (time - splatT0 > 4 && Math.random() < 0.5) splatT0 = time;
         if (FORCE && FORCE.tetherKind !== undefined) tetherKind = FORCE.tetherKind;
@@ -2610,11 +2632,12 @@
     if (FORCE && FORCE.cometForce && time - cometT0 > 3.3) cometT0 = time - 1.1; // pin: mid-traverse
     var cp = (time - cometT0) / 3.3;
     var cometAmt = cp >= 0 && cp <= 1 ? Math.sin(cp * 3.14159) : 0;
-    // roam WIDENED ±0.17→±0.25 (recording round 2: our motif lived in the central ~34% of the
-    // frame; the ref's wanders wide — fluffballs near edges — and its trail history is what
-    // fills the canvas). Range now ~0.19-0.81 x / 0.25-0.75 y.
-    var lisX = 0.5 + 0.19 * Math.sin(time * 0.045) + 0.06 * Math.sin(time * 0.017 + 1.0);
-    var lisY = 0.5 + 0.15 * Math.cos(time * 0.038) + 0.06 * Math.sin(time * 0.021 + 2.0);
+    // roam REVERTED to CENTRED (user recording round 4: "everything looks off center" — the
+    // ±0.25 slow Lissajous has a ~140s period, so it parked the whole composition off-centre
+    // for minutes. The ORIGINAL's motif is essentially centred in every scene; the frame is
+    // filled by motif SIZE + trails + spread orbs, never by wandering the hub). ±0.10 max.
+    var lisX = 0.5 + 0.07 * Math.sin(time * 0.045) + 0.03 * Math.sin(time * 0.017 + 1.0);
+    var lisY = 0.5 + 0.06 * Math.cos(time * 0.038) + 0.03 * Math.sin(time * 0.021 + 2.0);
     anchorAmt *= Math.exp(-dt * 0.25); // release toward the free path over ~4-6s (B4b)
     t.q2 = lisX + (anchorX - lisX) * anchorAmt;
     t.q3 = lisY + (anchorY - lisY) * anchorAmt;
