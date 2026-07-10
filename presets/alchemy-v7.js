@@ -1228,6 +1228,12 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
+    // step 6 crimson accent (answered Q18): family 0 only, brief window set in frame()
+    if (mothCrim > 0 && k < 7) {
+      a.r = Math.min(1, a.r + 0.55 * mothCrim);
+      a.g *= 1 - 0.7 * mothCrim;
+      a.b *= 1 - 0.65 * mothCrim;
+    }
     if (u < 0.03) a.a = 0; // hide the hub connector spokes
     return a;
   }
@@ -3134,6 +3140,14 @@
         accentHue += (Math.random() < 0.5 ? -1 : 1) * 0.14;
       }
     }
+    // step 6 (answered README Q18): ~4-5.5s into each moth dwell ONE fan family goes briefly
+    // saturated crimson — the ref's t=87.2-89 accent, the single sanctioned muted-rule break.
+    // Soft 0.25s edges so it doesn't strobe; kill switch = pin mothCrim by zeroing this window.
+    var mcAge = time - mothT0;
+    mothCrim =
+      mothAmt > 0.5 && mcAge > 4.0 && mcAge < 5.5
+        ? Math.min(1, Math.min(mcAge - 4.0, 5.5 - mcAge) / 0.25)
+        : 0;
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
     if (railAmt > 0.01) {
