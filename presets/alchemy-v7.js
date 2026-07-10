@@ -896,48 +896,43 @@
   // older {13/5} star-art spray was rejected as chaotic — this is the measured middle: ordered
   // parallel strands, but each strand BOWS with its own slowly-drifting curvature.
   function fNet(a) {
+    // ★ REBUILT TRAIL-BUILT (2026-07-11; user: "this mesh existed even before v7" — correct,
+    // the old fNet DREW a 14-rail woven grid every frame, the drawn-N-strands violation).
+    // Frame-step 1080p 0:28.5-0:32.5 @2fps: the ref "net" is TWO families of fine parallel
+    // curved hairlines on a dark ground — each family is the ~1s TRAIL of ONE bowed full-width
+    // strand SWEEPING transversely (sweep time-quantized here so copies land ~8px apart as the
+    // ref's discrete comb lines); the weave is only the transient crossing of the two sweeps,
+    // never a static grid. Live per frame = just the two strands.
     var half = (a.sample || 0) < 0.5 ? 0 : 1;
-    var ss = half ? ((a.sample || 0) - 0.5) * 2.0 : (a.sample || 0) * 2.0; // 0..1 within each strand set
-    var N = 7,
-      fk = ss * N,
-      line = Math.floor(fk),
-      u = fk - line;
-    var t = (line / (N - 1)) * 2.0 - 1.0; // strand offset across the sheet, -1..1
-    var p = u * 2.0 - 1.0; // position along the strand, -1..1
-    var R = (a.q5 || 0.4) * 0.85; // a SWATH with ground around it, not a full-frame mesh
-    // per-strand BOW: a quadratic arc whose amplitude/phase drift slowly — the "bent sheaves"
-    var hsh = 0.5 + 0.5 * Math.sin(line * 12.9898 + half * 78.233);
-    var bow = (0.1 + 0.2 * hsh) * R * Math.sin((a.q9 || 0) * 0.35 + line * 1.7 + half * 2.4);
-    var arc = bow * (1.0 - p * p);
-    var gx, gy;
-    if (half === 0) {
-      gx = p * R;
-      gy = t * R + arc;
-    } else {
-      gx = t * R + arc;
-      gy = p * R;
-    }
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 0.2; // gentle perpendicular live-waveform jag
-    if (half === 0) gy += jag;
-    else gx += jag;
-    // GENTLE perspective foreshorten toward a slow tilt direction → a tilted sheet (not an extreme stretch)
-    var tA = (a.q9 || 0) * 0.15 + 0.7; // SOFTENED: tilt direction barely rotates → less rotational smear
-    var proj = gx * Math.cos(tA) + gy * Math.sin(tA);
-    var d = 1.0 / (1.0 + 0.4 * proj);
-    if (d > 1.4) d = 1.4;
-    if (d < 0.65) d = 0.65;
-    gx *= d;
-    gy *= d;
+    var u = half ? ((a.sample || 0) - 0.5) * 2.0 : (a.sample || 0) * 2.0; // 0..1 along the strand
+    var p = u * 2.0 - 1.0;
+    var R = (a.q5 || 0.4) * 1.1;
+    // quantized sweep clock: hold ~160ms per pose → per-pose trail copies ≈ 0.013 UV apart
+    // (the ref's ~9px comb-line spacing at constant speed)
+    var tq = Math.floor(lastT / 0.16) * 0.16;
+    // family angles: one near-horizontal, one crossing ~35° over it, both drifting slowly
+    var fa = half ? 0.55 + 0.1 * Math.sin(tq * 0.13 + 2.0) : -0.08 + 0.1 * Math.sin(tq * 0.1);
+    // transverse SWEEP (the comb builder): CONSTANT-speed triangle wave ±~38% frame (~0.08
+    // UV/s — a sine stalls at its extremes and piles copies instead of combing them)
+    var ph0 = (tq * 0.052) % 1;
+    var ph1 = (tq * 0.0625 + 0.37) % 1;
+    var sw = half ? 0.36 * (Math.abs(ph1 * 2 - 1) * 2 - 1) : 0.4 * (Math.abs(ph0 * 2 - 1) * 2 - 1);
+    // bowed profile, amplitude breathing slowly + gentle live-waveform jag
+    var bow = (0.12 + 0.1 * Math.sin(tq * 0.17 + half * 2.4)) * R * (1 - p * p);
+    var lx = p * R,
+      ly = sw + bow + (a.value1 || 0) * (a.q6 || 0.05) * 0.3;
+    var ca = Math.cos(fa),
+      sa = Math.sin(fa);
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + gx;
-    a.y = cy + gy;
-    // the two crossing families carry DISTINCT hues (ref 0:28: white-green sheaf x gold sheaf)
+    a.x = cx + lx * ca - ly * sa;
+    a.y = cy + lx * sa + ly * ca;
+    // the two families carry DISTINCT hues (1080p: green/gold families over near-black)
     var h = (a.q8 || 0) + 0.12 + (half ? 0.22 : 0);
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0; // hide strand-to-strand jumps
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the strand-to-strand connector
     return a;
   }
   // SPIRAL VORTEX / whirlpool (survey gap, 1:05-1:16): radial filaments whose angle GROWS with radius →
@@ -1995,7 +1990,8 @@
     sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
     washAmt = 0, // bgMode 5 flat wash → DEPOSIT-HOLDING ground (doc 05 C10: stains live 3-6s)
     radialAmt = 0, // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
-    fanAmt = 0, // motif 23 scissor-fan → trail hold (the swept wedges must persist + register)
+    fanAmt = 0, // motif 23 scissor-fan → pan damp (the swept combs must stay registered)
+    netAmt = 0, // motif 7 net → MILD trail hold (~2.5s: the ref combs are ~15-20 lines wide)
     eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
     eyeY = 0.3,
@@ -3048,6 +3044,15 @@
       // decay+blur). Keep only the pan damp so the short-lived combs stay registered.
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
+    }
+    // NET comb hold (rebuilt fNet, 2026-07-11): the two sweeping strands need ~2.5s of visible
+    // copies to build the ref's 15-20-line combs (1080p 0:28.5-0:32.5); milder than the removed
+    // scissor-fan hold, and only two bounded families exist, so no woven-mesh risk.
+    netAmt += ((mCur === 7 ? 1 : 0) - netAmt) * Math.min(1, dt * 0.6);
+    if (netAmt > 0.01) {
+      t.q1 += (0.972 - t.q1) * netAmt;
+      t.q18 *= 1 - 0.6 * netAmt;
+      t.q19 *= 1 - 0.6 * netAmt;
     }
     // SWIRL-EYE (field 4): vortex scenes rotate the trail about an off-centre eye — the dark
     // "eye" is just the un-fed centre of rotation (p3 §3.1 at (33%,8%); p0 rotation-smear).
