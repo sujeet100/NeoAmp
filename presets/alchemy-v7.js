@@ -3554,6 +3554,16 @@
       t.q24 += (railBy - t.q24) * railAmt;
       t.q25 = Math.max(t.q25, 0.9 * railAmt);
       t.q14 = Math.max(t.q14, 0.9 * railAmt);
+      // ── A8 THREADING (doc 11 step 5; answered header Q = option b, the persistent doc-06
+      //    rail): while a rail lives AND the pompom (16) is the motif, the bloom anchors ON the
+      //    wire mid-span (p1 S11: the chenille ball stamps mid-wire at t=97.8, threaded on the
+      //    cord) instead of free-floating. Post-FORCE (effective q30) so a {rail:1,q30:16} pin
+      //    exercises it; ×railAmt eases the handoff both ways, and the wire visibly threads
+      //    through the bloom because the rail chord (fTether) keeps drawing across it. ──
+      if (Math.floor((t.q30 || 0) + 0.5) === 16) {
+        t.q2 += ((railAx + railBx) / 2 - t.q2) * railAmt;
+        t.q3 += ((railAy + railBy) / 2 - t.q3) * railAmt;
+      }
     }
     return t;
   }
