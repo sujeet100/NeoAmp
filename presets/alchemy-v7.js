@@ -1932,9 +1932,13 @@
   // fTangle (13) DROPPED from the bag (user 2026-07-10: "ugly furball"; the ref's ball-motifs are
   // all symmetric radial — dandelion/urchin/star — with no asymmetric-knot counterpart). Its two
   // slots → hexagram(6)/12-star(10), clean symmetric motifs. fn kept in MODES for a possible revisit.
+  // fCocoon (18) DROPPED (user 2026-07-10: "the concentric ovals is not part of it, remove it, that
+  // shape does not exist in the original"). Our fCocoon renders geodesic latitude/meridian ELLIPSE
+  // rings = concentric ovals, which is not how the ref's 0:13 cocoon looks (a MESH). Its two slots →
+  // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 18,
-    18, 19,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
+    17, 19,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -1945,7 +1949,7 @@
     4: [15, 16, 14, 17], // bars → mandala/fluff/mountains/dahlia (stem-standing; tangle dropped)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
     1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
-    5: [16, 9, 18], // flat wash → ONE dominant organic ball (tangle dropped)
+    5: [16, 9], // flat wash → ONE dominant organic ball (tangle + cocoon dropped)
     6: [16, 15], // bands → small centre motif (tangle dropped)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
