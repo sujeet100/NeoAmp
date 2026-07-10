@@ -1378,12 +1378,15 @@
   function fSwimmer(a) {
     var u = a.sample || 0,
       tt = u * 2 - 1; // -1..1 — one full strand through the pivot
-    var cx = a.q2 !== undefined ? a.q2 : 0.5,
-      cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var ang = lastT * 0.19; // slow continuous sweep (ref: steep → horizontal over ~8s)
+    // pivot = the MIDPOINT of the orb-head pair (user round 2: "the line moves with the orbs
+    // and the centre of the line is on the virtual line connecting orbs") — it rides up as
+    // the heads rise. q21-24 are the live orb posts, propagated to wave points.
+    var px = ((a.q21 !== undefined ? a.q21 : 0.4) + (a.q23 !== undefined ? a.q23 : 0.6)) / 2,
+      py = ((a.q22 !== undefined ? a.q22 : 0.5) + (a.q24 !== undefined ? a.q24 : 0.5)) / 2;
+    // ROCKING sweep, measured 12-16s @8fps: ~2-4°/frame ≈ 20-30°/s peak, oscillating between
+    // ~-15° and ~+75° (never a full rotation — the mesh-lesson bound). Was 11°/s continuous.
+    var ang = 0.5 + 0.75 * Math.sin(lastT * 0.6);
     var wav = (a.value1 || 0) * 0.006 + 0.004 * Math.sin(u * 33.0 + lastT * 2.1);
-    var px = cx,
-      py = cy - 0.2; // pivot LOW between the columns (wave y is bottom-up)
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     a.x = px + tt * 0.7 * ct - wav * st;
@@ -3915,11 +3918,15 @@
     if (swimEff && swimAmt < 0.02) {
       swimT0 = time;
       swimSeed = Math.random() * 6.28;
-      stgAx = 0.39;
+      stgAx = 0.26; // ref round 2: the columns sit near the two SIDES (~1/4 and ~3/4 width)
       stgAy = 0.2; // spawn at the FLOOR (wave y is bottom-up)
-      stgBx = 0.61;
+      stgBx = 0.74;
       stgBy = 0.2;
       stgNext = Math.max(stgNext, time + 8);
+      // ref colours are DISTINCT per column incl. gold/brown families (user round 2; the
+      // 19s clip shows orange-gold vs violet stalks): re-anchor the accent ink per visit,
+      // warm-biased — orb B's standing +0.35 offset supplies the second family.
+      accentHue = Math.random() < 0.55 ? 0.07 + 0.08 * Math.random() : Math.random();
     }
     swimAmt += (swimEff - swimAmt) * Math.min(1, dt * 0.6);
     if (swimAmt > 0.01) {
@@ -3927,13 +3934,15 @@
       // blend never converges — same reason the mushroom uses mu directly)
       var swa = swimAmt * (1 - corridorAmt);
       var swAge = Math.max(0, time - swimT0);
-      var riseA = Math.min(0.56, swAge * 0.045) - 0.3; // floor ≈ q3-0.30 → top ≈ q3+0.26
-      var riseB = Math.min(0.32, swAge * 0.028) - 0.3; // the short right column
+      // rise sped up (user round 2: "orbs should move upwards in y axis" — the y-translation
+      // must dominate the balloon pulse, not read as z-scaling)
+      var riseA = Math.min(0.56, swAge * 0.06) - 0.3; // floor ≈ q3-0.30 → top ≈ q3+0.26 in ~9s
+      var riseB = Math.min(0.32, swAge * 0.04) - 0.3; // the short right column
       var swayA = 0.022 * Math.sin(time * 3.4 + swimSeed);
       var swayB = 0.02 * Math.sin(time * 3.0 + swimSeed + 2.1);
-      t.q21 += (t.q2 - 0.11 + swayA - t.q21) * swa;
+      t.q21 += (t.q2 - 0.24 + swayA - t.q21) * swa; // wide pair (~half the frame apart)
       t.q22 += (t.q3 + riseA + 0.012 * Math.sin(time * 2.2 + swimSeed) - t.q22) * swa;
-      t.q23 += (t.q2 + 0.11 + swayB - t.q23) * swa;
+      t.q23 += (t.q2 + 0.24 + swayB - t.q23) * swa;
       t.q24 += (t.q3 + riseB - t.q24) * swa;
       t.q25 = Math.max(t.q25, 0.9 * swa);
       t.q14 = Math.max(t.q14, 0.9 * swa);
