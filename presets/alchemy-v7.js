@@ -3995,6 +3995,14 @@
       // ZERO the horizontal pan completely (round 7 — the user's recording showed the wakes
       // trailing DIAGONALLY down-left: the 30% pan leak alone breaks the rising read)
       t.q18 *= 1 - swa;
+      // ZERO the field ROTATION/SWIRL + cap growth (round 8 — user: "one trail is downwards,
+      // the other sideways, why?": the baseline roll q16 pushes the trail TANGENTIALLY about
+      // the centre pivot, and the two columns sit on OPPOSITE sides of it — so the roll
+      // added a downward-ish push on one wake and a SIDEWAYS push on the other. This scene's
+      // only field motion must be the straight-down stream.)
+      t.q16 *= 1 - swa;
+      t.q17 *= 1 - swa;
+      t.q15 = Math.min(t.q15, 0.0004);
       t.q19 *= 1 - 0.7 * swa;
       // CAMERA FOLLOW (round 6/7): the WHOLE climb speed is the world-stream. MEASURED from
       // the 19s clip 10.0-11.5s @10fps: the stalk S-kinks pour down ~25% frame height/s —
