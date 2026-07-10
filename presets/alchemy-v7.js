@@ -914,18 +914,21 @@
       li = N - 1;
       u = 1;
     }
-    // one-sided from the pivot, long enough to cross the whole frame from any edge pivot
-    var d = u * 1.9;
-    // group pose + per-line fan offset (~4° between the 5 live lines) + gentle arc curvature
-    var pang = netAng + li * netFan + netCurv * d;
-    // live-waveform wobble like the ref hairlines (per-line phase comes free from the samples)
-    var jag = (a.value1 || 0) * 0.006;
-    var ca = Math.cos(pang),
-      sa = Math.sin(pang);
-    a.x = netPivX + ca * d - sa * jag;
-    a.y = netPivY + sa * d + ca * jag;
-    // per-GROUP hue (rolled at group start; the old group's trail keeps its colour → the
-    // ref's green-over-white / gold-over-pink two-tone mesh)
+    // ★ v5 (user's recording review): a rotating GRATING — 5 PARALLEL curved lines, offset
+    // ~0.1 UV apart along the group normal, the whole group rotating about the CENTRE axis
+    // (v4's edge-pivot fan was wrong: "in original they rotate at center axis"; separation
+    // was too small; each new group repaints the SAME place in a NEW colour).
+    var tt2 = (u * 2 - 1) * 1.15; // along the line — crosses the whole frame both ways
+    var off = (li - (N - 1) / 2) * netFan; // PARALLEL separation (~0.1 UV between lines)
+    var bow = netCurv * tt2 * tt2; // gentle parabolic arc
+    var jag = (a.value1 || 0) * 0.008; // the ref hairlines' visible wobble
+    var py = off + bow + jag;
+    var ca = Math.cos(netAng),
+      sa = Math.sin(netAng);
+    a.x = netPivX + tt2 * ca - py * sa;
+    a.y = netPivY + tt2 * sa + py * ca;
+    // per-GROUP hue (stepped FAR from the previous group's — the old decay must read as a
+    // DIFFERENT colour under the fresh grating: the ref's mesh grammar)
     var h = netHue + li * 0.03;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
@@ -2822,18 +2825,22 @@
     if (mEff === 7) {
       if (netGroupT0 < 0 || time - netGroupT0 > netGroupLen) {
         netGroupT0 = time;
-        netGroupLen = 6 + Math.random() * 3;
-        netPivX = Math.random() < 0.5 ? -0.04 - Math.random() * 0.08 : 1.04 + Math.random() * 0.08;
-        netPivY = 0.1 + Math.random() * 0.8;
-        // aim INTO the frame from the pivot, ± some spread
-        netAng = Math.atan2(0.5 - netPivY, 0.5 - netPivX) + (Math.random() - 0.5) * 0.9;
-        netStep = (0.06 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1);
-        netFan = 0.05 + Math.random() * 0.035;
-        netCurv = (0.1 + Math.random() * 0.2) * (Math.random() < 0.5 ? -1 : 1);
-        netHue = Math.random(); // per-group colour — the mesh's two generations differ
+        netGroupLen = 5 + Math.random() * 3;
+        // rotation CENTRE stays near the screen centre (user: "in original they rotate at
+        // center axis") — the next group repaints the SAME region over the old group's decay
+        netPivX = 0.5 + (Math.random() - 0.5) * 0.16;
+        netPivY = 0.5 + (Math.random() - 0.5) * 0.16;
+        netAng = Math.random() * 3.14159;
+        // faster sweep (user: "way too slow"): ~14-24°/s in 0.4s pose steps
+        netStep = (0.1 + Math.random() * 0.07) * (Math.random() < 0.5 ? -1 : 1);
+        netFan = 0.09 + Math.random() * 0.05; // PARALLEL gap ~0.09-0.14 UV (was ~0.05 rad fan)
+        netCurv = (0.08 + Math.random() * 0.1) * (Math.random() < 0.5 ? -1 : 1);
+        // colour MUST change per group (user: "the color is staying the same") — a big
+        // guaranteed hue step, never a fresh random that can land on the same family
+        netHue += 0.22 + Math.random() * 0.35;
         netPoseT = time;
       }
-      if (time - netPoseT > 0.5) {
+      if (time - netPoseT > 0.4) {
         netPoseT = time; // discrete pose step → wide-spaced trail copies (the ref fan)
         netAng += netStep;
       }
@@ -3079,12 +3086,12 @@
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
     }
-    // NET hold (v4): the old group must DECAY SLOWLY (user: the new colour set rotates "on
-    // decay of old lines creating mesh") — ~3-4s of visible wide-spaced copies; pan damped
-    // so the fan stays registered. Only 5 sparse lines deposit, so no dense-mesh risk.
+    // NET hold (v5): the old group must DECAY SLOWLY and stay visible under the NEXT group
+    // (user's recording: "they don't leave enough trail or decay behind") — ~5-6s of visible
+    // wide-spaced copies; pan damped so the grating stays registered. 5 sparse lines only.
     netAmt += ((mCur === 7 ? 1 : 0) - netAmt) * Math.min(1, dt * 0.6);
     if (netAmt > 0.01) {
-      t.q1 += (0.978 - t.q1) * netAmt;
+      t.q1 += (0.985 - t.q1) * netAmt;
       t.q18 *= 1 - 0.6 * netAmt;
       t.q19 *= 1 - 0.6 * netAmt;
     }
