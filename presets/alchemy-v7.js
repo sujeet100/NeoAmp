@@ -3059,12 +3059,15 @@
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1,
         samples: 512,
-        additive: 1,
+        additive: 0, // OPAQUE alpha-over (was 1/additive) — user 2026-07-10: additive summed
+        // overlapping strokes toward bright NEON and read TRANSPARENT, both wrong for Alchemy's
+        // muted/opaque language. Opaque strokes occlude in muted colour; trails still come from the
+        // WARP feedback (decay+blur), matching the original's solid-strokes-over-soft-trail look.
         usedots: 0,
         scaling: 1,
         smoothing: 0.08, // 0.25 lowpassed the live jag into rounded wobble; 0.15 still ate the finest per-point teeth (user: jag too coarse)
         thick: 1,
-        a: 0.62,
+        a: 0.9,
       }),
       init_eqs: passthrough,
       frame_eqs: passthrough,
@@ -3078,12 +3081,12 @@
       baseVals: Object.assign({}, WAVE_BASE, {
         enabled: 1,
         samples: 512,
-        additive: 1,
+        additive: 0, // OPAQUE (was additive) — same muted/opaque fix as waves[0]
         usedots: 0,
         scaling: 1,
         smoothing: 0.25,
         thick: 1,
-        a: 0.5,
+        a: 0.8,
       }),
       init_eqs: passthrough,
       frame_eqs: passthrough,
