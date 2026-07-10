@@ -1670,10 +1670,12 @@
     0.55, // swimmer (22): two slinky outlines — outline-class
   ];
   function scaleFor(m) {
-    // COMPACT motif (user 2026-07-10, frame-checked 480p 0:50-0:55: the central motif stays a
-    // small tightly-centred object ~15-25% of frame that MORPHS shape in place — never the
-    // frame-filling sprawl ours had). Was 0.36/0.4 (rest radius ~0.33 ≈ 66% diameter); now
-    // ~0.15 → rest diameter ~25%, beat-puff ~38%.
+    // TWO size classes (refined from the user's 2026-07-10 recording review vs the full 480p):
+    // — the morphing FLOWER/wheel/star class stays COMPACT (~15-25% dia, the 0:50-0:55 rule);
+    // — the ORGANIC-BALL class (jelly 9 / fluff 16 / spinner 21) runs bigger, like the ref's
+    //   40-60% pompoms/fluffballs (0:28-0:38, 0:70-0:75) — the uniform compact clamp had made
+    //   every scene read small + empty.
+    if (m === 9 || m === 16 || m === 21) return 0.22;
     return m === 0 ? 0.14 : 0.15;
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
