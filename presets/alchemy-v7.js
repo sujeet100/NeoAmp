@@ -2408,6 +2408,12 @@
         else evTetherLife = 1.2 + Math.random();
         knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
         knotOn = Math.random() < 0.12; // RARE: only ~12% of chord spawns get the mid-span knot
+        // MOTH scene guard (user's 2026-07-11 "diagonal ladder" flag): under the moth's
+        // radial-out field a LONG-lived chord's trail advects into a stacked segmented ladder
+        // across the frame. The ref moth scene only shows BRIEF dumbbell stamps (t=88.25,
+        // 1-2.5s) while the fans stream — so cap tether sessions short there. mothAmt is the
+        // previous frame's eased value (updated later in frame()) — fine for a gate.
+        if (mothAmt > 0.5) evTetherLife = Math.min(evTetherLife, 1.6);
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
@@ -2473,6 +2479,9 @@
       railBy = lastOrbBY;
     }
     if (railWant && time - railT0 > railLife) railWant = 0;
+    // the persistent rail is the other long straight line the moth's radial-out field smears
+    // into the ladder — it survives everything EXCEPT this scene (FORCE.rail pin still wins)
+    if (railWant && mothAmt > 0.5 && !(FORCE && FORCE.rail)) railWant = 0;
     railAmt += ((railWant ? 1 : 0) - railAmt) * Math.min(1, dt * 2);
     if (railAmt > 0.01) {
       var rmx = (railAx + railBx) / 2,
