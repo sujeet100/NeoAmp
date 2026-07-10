@@ -1898,7 +1898,10 @@
     accSwathTick = -9, // last discrete strand-copy stamp
     accSwathFam = 0, // alternating colour family (p0: gold+indigo interleaved)
     accSwathEnv = 0, // ~1-frame bright deposit window per tick
-    accLhPiv = 2; // D10 lighthouse pivot kind: 0 orb A · 1 tether mid-span · 2 motif hub
+    accLhPiv = 2, // D10 lighthouse pivot kind: 0 orb A · 1 tether mid-span · 2 motif hub
+    accWormX = 0.3, // A21 worm head (doc 15): position + heading, advanced in frame()
+    accWormY = 0.15,
+    accWormAng = 0;
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -2894,9 +2897,32 @@
       // fan — long lines through an off-centre hub, rotating steadily for the whole dwell)
       // pinwheel (4) made RARER (user): ~0.26→~0.15, freed weight → "none" (calmer, motif-only)
       // HARP SWATH (5, doc 02 A3) carved ~.16 from curtain/bundle/pinwheel; "none" keeps .40:
-      // A15 sawtooth rod (8, doc 16) carved ~.05 from "none" — RARE (P3): none .35 / rod .05 /
-      // lighthouse .10 / swath .16 / bundle .21 / pinwheel .13
-      accLine = rl < 0.35 ? 0 : rl < 0.4 ? 8 : rl < 0.5 ? 1 : rl < 0.66 ? 5 : rl < 0.87 ? 2 : 4;
+      // A15 sawtooth rod (8, doc 16) + A21 worm (6) + A19 sail (7, doc 15) carved from "none"
+      // — all RARE (P3): none .23 / worm .06 / sail .06 / rod .05 / lighthouse .10 / swath .16
+      // / bundle .21 / pinwheel .13
+      accLine =
+        rl < 0.23
+          ? 0
+          : rl < 0.29
+            ? 6
+            : rl < 0.35
+              ? 7
+              : rl < 0.4
+                ? 8
+                : rl < 0.5
+                  ? 1
+                  : rl < 0.66
+                    ? 5
+                    : rl < 0.87
+                      ? 2
+                      : 4;
+      if (accLine === 6) {
+        // worm spawn: near the frame top/edges (h2 2.6), heading mostly horizontal
+        accWormX = 0.2 + Math.random() * 0.6;
+        accWormY = Math.random() < 0.6 ? 0.12 + Math.random() * 0.12 : 0.72 + Math.random() * 0.12;
+        accWormAng = (Math.random() < 0.5 ? 0 : 3.14159) + (Math.random() - 0.5) * 0.5;
+      }
+      if (accLine === 7) accLineNext = time + 9 + Math.random() * 2; // sail persists ~9s (p3)
       if (accLine === 5 && corridorAmt > 0.1) accLine = 1; // corridor forces its own pan — no swath there
       accLineNext = time + 5 + Math.random() * 6;
       accLineArm = false; // D10: the one-shot beat-armed curtain became the persistent lighthouse
@@ -2996,6 +3022,17 @@
     }
     accLineY += accLineDrift * dt; // the bundle drifts on its own axis
     if (accLineY < 0.15 || accLineY > 0.85) accLineDrift = -accLineDrift;
+    // A21 worm head advance (doc 15 step 2): slow travel + heading wobble; reflect at the
+    // frame margins so it stays near the edges. The body ribbon trails the head in the wave.
+    if (accLine === 6) {
+      accWormAng += Math.sin(time * 1.1 + accLinePickT * 7) * 1.3 * dt; // S-meander
+      accWormX += Math.cos(accWormAng) * 0.05 * dt;
+      accWormY += Math.sin(accWormAng) * 0.05 * dt;
+      if (accWormX < 0.08 || accWormX > 0.92) accWormAng = 3.14159 - accWormAng;
+      if (accWormY < 0.06 || accWormY > 0.9) accWormAng = -accWormAng;
+      accWormX = Math.max(0.08, Math.min(0.92, accWormX));
+      accWormY = Math.max(0.06, Math.min(0.9, accWormY));
+    }
     // bead-row/caterpillar/snake accessory REMOVED (see waves[3] note) — accDots stays 0
     accDots = 0;
     accDotsPhase += dt * 0.045 * accDotsDir; // beads travel along their rail
@@ -3507,6 +3544,51 @@
           a.g = orbCol(h1, 0.33) * bri;
           a.b = orbCol(h1, 0.67) * bri;
           a.a = (uL < 0.03 ? 0 : 0.55) * accLineEnv * accVis;
+          mutRGB(a); // D13
+          return a;
+        }
+        if (accLine === 6) {
+          // A21 SNAKE-WORM (doc 15 step 2; h2 2.6): a small (~230px) live-jag ribbon near a
+          // frame edge — bright glow HEAD (the emitter, sample→1) + a dimmer body that the
+          // feedback smears into the fuzzy S-curve. Head is bright wave samples + bloom,
+          // never a drawn bead (risk 1); body wobble is REAL waveform, not a fixed sine.
+          var sW = a.sample || 0; // 0 = tail end · 1 = head
+          var along = (sW - 1) * 0.18; // ~230px body trailing the head
+          var jagW = (a.value1 || 0) * 0.03 * sW; // live S-wobble, strongest at the head
+          a.x = accWormX + along * Math.cos(accWormAng) - jagW * Math.sin(accWormAng);
+          a.y = accWormY + along * Math.sin(accWormAng) + jagW * Math.cos(accWormAng);
+          var hw = (a.q8 || 0) + (sW > 0.92 ? 0.33 : 0); // green-lean head over the pink body
+          var briW = 0.45 + 0.55 * sW;
+          a.r = orbCol(hw, 0) * briW;
+          a.g = orbCol(hw, 0.33) * briW;
+          a.b = orbCol(hw, 0.67) * briW;
+          a.a = (0.3 + 0.55 * sW) * accVis;
+          mutRGB(a); // D13
+          return a;
+        }
+        if (accLine === 7) {
+          // A19 SAIL/KELP BLADE (doc 15 step 3; p3 D-SAIL t=185-195): a tall curved blade —
+          // a fan of ~18 hairlines converging to a bottom corner, flexing SLOWLY in place
+          // like kelp. Faithfulness exception: the flex is CLOCK-driven sin(), deliberately
+          // NOT audio — the ref is explicitly smooth. Novelty: colour-GRADIENT along length
+          // (base→tip). The sideways sway-trail comes free from feedback. Coin-flip smoke
+          // variant: 3 thin strands instead of the blade (p1 S5).
+          var smoke = Math.floor(accLinePickT * 7) % 2 === 1; // per-dwell coin flip
+          var SK = smoke ? 3 : 18,
+            fkK = (a.sample || 0) * SK,
+            strK = Math.floor(fkK),
+            uK = fkK - strK;
+          var baseX = accLineX,
+            baseY = 0.9; // fan converges at a bottom point
+          var topX = baseX + (smoke ? 0.16 : 0.1) * (strK / SK - 0.5);
+          var flexK = 0.06 * Math.sin(lastT * 0.9 + strK * 0.35); // kelp CLOCK flex, ~0.3Hz class
+          a.x = baseX + (topX - baseX) * uK + flexK * uK;
+          a.y = baseY + (0.12 - baseY) * uK; // ~78% tall
+          var hg = (a.q8 || 0) + 0.15 + 0.35 * uK; // GRADIENT along length (green base→pale top)
+          a.r = orbCol(hg, 0) * 0.75;
+          a.g = orbCol(hg, 0.33) * 0.75;
+          a.b = orbCol(hg, 0.67) * 0.75;
+          a.a = (uK < 0.03 ? 0 : smoke ? 0.5 : 0.42) * accVis;
           mutRGB(a); // D13
           return a;
         }
