@@ -2313,9 +2313,15 @@
   // dark-core-hole apex was the worst offender. Its three slots → jelly(9)/anemone(0)/tri-mandala(15)
   // (clean symmetric organics + the accepted star family). fn + FORCE._pompApex pin kept for a
   // future faithful rebuild of the ref's 0:34-0:40 pompom.
+  // scissor fan (23) 2→4 entries (user 2026-07-10: "appears frequently in original, not ours").
+  // MEASURED (full-480p scan): crossing-line fan scenes at 0:38-0:45 + 2:22-2:28 (+ the moth
+  // ray-fan 1:23-1:29 which mode 20 covers) ≈ one per ~110s. Ours at 2/36 = one per ~153s
+  // NAIVE, and PAIR damps it further (23 is favoured under NO bg → passes at 35% under
+  // bars/corridor/kaleido/wash/bands ≈ 42% of the time) → effectively ~1 per 4-5 min.
+  // 4 entries ≈ one per ~110-150s effective = the ref band.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
-    17, 19, 20, 21, 21, 22, 23, 23,
+    17, 19, 20, 21, 21, 22, 23, 23, 23, 23,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
