@@ -72,7 +72,10 @@
     // the WARP output feeds back, this COMPOUNDS: a deposit gets blurred again every frame → it spreads
     // and softens like ink bleeding into wet paper. Weights sum to 1.0.
     "  vec2 wp = 1.0 / resolution;\n" +
-    "  float br = 2.4 + 2.2 * q28;\n" + // blur radius widens with the diffusion amount
+    // blur radius widens with the diffusion amount; the q15>0.005 term is the STAR-scene
+    // signature (ink-spread dwell 0.0075 / dive 0.013) — a much wider wet bleed there (user
+    // round 5: "diffusion needs to be more"), compounding per frame like real ink in water
+    "  float br = 2.4 + 2.2 * q28 + 4.5 * smoothstep(0.005, 0.0125, q15);\n" +
     "  vec3 blur = texture2D(sampler_main, suv).rgb * 0.25;\n" +
     "  blur += texture2D(sampler_main, suv + vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
     "  blur += texture2D(sampler_main, suv - vec2(wp.x * br, 0.0)).rgb * 0.125;\n" +
@@ -1835,6 +1838,19 @@
         MODES[16](a); // above the front: old hue
       }
     }
+    // STAR-FAMILY camera tilt (user round 5): squash the construction's plane about its centre
+    // + a perspective keystone (the FAR edge — screen-up, wave y is BOTTOM-UP — narrows), so
+    // the star reads as a disc tipping toward the z-axis, not a flat upright figure. Gated to
+    // the star family only — the earlier GLOBAL oblate squash was rejected ("2 overlapping
+    // ovals") because it deformed anemone/urchin; this one ramps with the dwell/dive clocks.
+    if (STAR_FAM[m] && starTilt > 0.01) {
+      var tcx = a.q2 !== undefined ? a.q2 : 0.5,
+        tcy = a.q3 !== undefined ? a.q3 : 0.5;
+      var rely = a.y - tcy;
+      var keys = 1 - 0.55 * starTilt * Math.max(0, Math.min(1, rely * 2.4));
+      a.x = tcx + (a.x - tcx) * keys;
+      a.y = tcy + rely * (1 - 0.52 * starTilt);
+    }
     mutRGB(a); // D13: the motif is NOT the accent — mild emit-time desaturate
     // PULSAR oblate squash REMOVED (user 2026-07-10 "aggressive — crisp & symmetric": the y-squash
     // turned the symmetric anemone/urchin into ovals — the '2 overlapping ovals' they flagged). The
@@ -2064,6 +2080,7 @@
     s12Hue = 0, // 12-star continuous hue sweep (~full wheel / 8s; trail keeps older hues)
     s12ZoomT0 = -99, // dwell exit → the ~1.6s dive-into-the-centre magnify pulse
     starAmt = 0, // eased star-dwell engagement → the persistent ink-spread field
+    starTilt = 0, // camera-angle tilt: the star's plane tips toward the z-axis over the dwell
     mothSnapT = -9, // O10 core-hue step clock (~1s/step, green→gold→white→pink read)
     mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
     spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
@@ -2905,9 +2922,14 @@
       s12Spin += dt * 0.9; // ~52°/s (MEASURED round 3: the ref's freshest copy jumps 10-15°
       // per 0.25s frame-pair at 1:34; 26°/s and 31°/s both read too slow to the user)
       s12Hue += dt * 0.125; // continuous wheel (~8s) ON TOP of the stepped q8 walk
+      // CAMERA-ANGLE tilt (user round 5 + the ref bloom frames' strong ellipse): the star
+      // enters face-on, then the viewing plane slowly TIPS toward the z-axis over the dwell —
+      // by the exit dive the motif points into the screen, not upward. The dive pushes further.
+      starTilt = Math.min(0.55, (time - s12T0) * 0.05);
     } else {
       if (s12T0 >= 0) s12ZoomT0 = time; // dwell exit → fire the dive-into-centre pulse
       s12T0 = -1;
+      starTilt = 0;
     }
     // debug pin: FORCE._dive schedules the exit dive N seconds from boot even while q30 stays
     // pinned (a pinned dwell never exits, so the pulse would otherwise be untestable)
@@ -3205,6 +3227,7 @@
       t.q27 += (t.q3 - t.q27) * 0.8 * dv;
       t.q18 *= 1 - 0.85 * dv; // no lateral pan mid-dive
       t.q19 *= 1 - 0.85 * dv;
+      starTilt = Math.max(starTilt, 0.8 * dv); // the dive tips the plane hardest
     }
     // SCISSOR-FAN hold (mode 23): the sweeping lines' traces must LIVE long enough to build
     // the full crossing fan that fills the bg (480p 0:39-0:45 — at the default 0.957 decay a
