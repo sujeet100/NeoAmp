@@ -1867,7 +1867,10 @@
     // rail endpoints, kind forced to the plain chord with a micro-jag; beat events REUSE the
     // rail chord with full jag/ink (p0: "doubled by a crisp orange live-jag copy on hits").
     var railOn = railAmt > 0.01;
-    var tk = railOn ? 0 : tetherKind;
+    // corridor forces the plain chord too: a cascade/helix strung between the FAST-flying
+    // heads deposits a lollipop train (ring + hanging stem per wake copy — user's 7s render)
+    var corOn = Math.abs((a.q29 || 0) - 3) < 0.5;
+    var tk = railOn || corOn ? 0 : tetherKind;
     var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
@@ -2041,6 +2044,11 @@
     panMag = 0,
     focusAmt = 0, // modes 0 (anemone) / 2 (urchin) → COMP pupil + oblate squash
     corridorAmt = 0, // bgMode 3 → the marching-orbiter corridor (side-view, rightward drift)
+    corX = 2, // corridor flying-head progress (>1.12 = respawn; starts past it → fresh roll on entry)
+    corY = 0.5, // this pass's row height
+    corSpeed = 2, // measured off the ref: ~2-4 frame-widths/s
+    corTwo = 0, // pair pass? (the jagged tether strings the two heads)
+    corGap = 0.2, // head-to-head gap on pair passes
     valleyAmt = 0, // motif 12 → the green valley corridor (forward dolly into the vanishing point)
     freezeAmt = 0, // motif 14 mountains → FREEZE displacement field (doc 01 C2: stamps hold crisp)
     sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
@@ -3520,20 +3528,39 @@
     if (corridorAmt > 0.01) {
       var co = corridorAmt;
       // fade the central motif during the corridor — EXCEPT the wireframe NET (mode 7): keeping the net
-      // visible over the void with the orbs + beaded row IS the opening-signature look (0:06-0:12).
+      // visible over the void with the orbs + marching wake-row IS the opening-signature look (0:06-0:12).
       if (mCur !== 7) t.q4 *= 1 - 0.94 * co;
       t.q18 += (0.0065 - t.q18) * co; // strong RIGHTWARD pan (camera/motifs move right)
       t.q19 += (0.0 - t.q19) * co; // kill the vertical drift
       t.q15 += (0.0 - t.q15) * co; // kill the magnify (a clean recede, not a watercolour bloom)
-      t.q25 = Math.max(t.q25, co); // both orbs present (the corridor anchors)
-      t.q14 = Math.max(t.q14, co);
-      t.q7 *= 1 + 0.4 * co; // a touch bigger anchor orbs
-      // near-LEFT anchor (foreground) ← orb A; far-RIGHT-ish anchor (recedes) ← orb B
-      t.q21 += (0.16 - t.q21) * co;
-      t.q22 += (0.52 - t.q22) * co;
-      t.q23 += (0.7 - t.q23) * co;
-      t.q24 += (0.49 - t.q24) * co;
-      t.q26 += (0.05 - t.q26) * co; // steady tether-waveform jag along the corridor
+      // ★ TRAIL-BUILT ROW (user frame-check 2026-07-10 night, 1080p 7.0-8.0 + 12.5-13.5 @15fps:
+      //    "the original is NOT fixed drawn shapes — the row is created by fast orbs flying
+      //    sideways at high speed; the trail feels like more orbs, colour changing fast;
+      //    sometimes a tether connects them"). Measured: the head jumps ~25% width per 1/15s
+      //    (~2-4 widths/s); per-60fps-frame wake deposits land ~0.04 apart = the bead row; a
+      //    ~45% share of passes fly a PAIR with the jagged thread strung between. So: the
+      //    orb/tether anchors ARE the flying heads; the drawn ring-row is GONE (waves[3] now
+      //    draws only the head rings, trail-built law) — the wake does the rest. ──
+      if (corX > 1.12) {
+        // respawn a fresh pass: new row height / speed / pair-ness / hue family
+        corX = -0.06;
+        corY = 0.34 + Math.random() * 0.3;
+        corSpeed = 1.7 + Math.random() * 1.5;
+        corTwo = Math.random() < 0.45 ? 1 : 0;
+        corGap = 0.16 + Math.random() * 0.12;
+        accentHue += 0.23 + Math.random() * 0.3;
+      }
+      corX += dt * corSpeed;
+      t.q21 += (corX - t.q21) * co; // head A owns the orb/tether anchor
+      t.q22 += (corY + 0.015 * Math.sin(corX * 9.0) - t.q22) * co;
+      t.q23 += (corX - corGap - t.q23) * co; // head B trails on pair passes
+      t.q24 += (corY + 0.035 - t.q24) * co;
+      t.q25 = Math.max(t.q25, co); // head A always up
+      t.q14 = Math.max(t.q14, corTwo * co); // head B only on pair passes
+      t.q7 *= 1 - 0.35 * co; // SMALL fast heads — the ref wake-beads are small (was 1.4x anchors)
+      t.q26 += (0.05 - t.q26) * co; // the jagged waveform thread between the pair
+      t.q1 = Math.max(t.q1, 0.957 + 0.031 * co); // ~0.988: the wake row persists for seconds (ref)
+      t.q28 = Math.min(t.q28, 0.4 - 0.15 * co); // low diffusion — crisp discrete deposits
     }
 
     // ── VALLEY (motif 12): DOLLY REMOVED (README answer 21 + user's 84s clip 2026-07-09: the
@@ -4223,7 +4250,9 @@
         fTether(a);
         var g = Math.max(0, (Math.min(a.q25 || 0, a.q14 || 0) - 0.45) / 0.55); // both orbs present
         var beatG = tetherEnv; // scheduler-driven spawn event (was: every-beat q32 flash)
-        var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 ? 1 : 0; // steady (the corridor's waveform thread)
+        // corridor thread only on PAIR passes — the ref's tether "sometimes" strings the two
+        // flying heads (q14 = head B, up only when corTwo); solo passes fly bare
+        var corridor = Math.abs((a.q29 || 0) - 3) < 0.5 && (a.q14 || 0) > 0.3 ? 1 : 0;
         // COCOON (doc 09 A2): suppress the tether while the eyes sit inside the cage — the refs
         // show no line between the eyes. cocAmt is closure state, readable here like accLine.
         // RAIL bypasses the orb gate + event envelope (dim, persistent — doc 06 step 5).
@@ -4258,29 +4287,29 @@
       frame_eqs: passthrough,
       point_eqs: function (a) {
         if (Math.abs((a.q29 || 0) - 3) < 0.5) {
-          // CORRIDOR row — a row of small rings receding from the near-left anchor toward the
-          // right vanishing point, foreshortened + fading (the 0:06-0:16 corridor recede).
-          var K = 10,
-            fk0 = (a.sample || 0) * K,
-            ki = Math.min(Math.floor(fk0), K - 1),
-            ku = fk0 - ki;
-          var idx = ki / (K - 1);
-          var d = Math.pow(idx, 1.5); // compress spacing toward the vanishing point
-          var nearX = 0.16,
-            nearY = 0.52,
-            vpx = 0.82,
-            vpy = 0.49;
-          var bx = nearX + (vpx - nearX) * d;
-          var by = nearY + (vpy - nearY) * d + 0.03 * Math.sin(idx * 6.0 + (a.q9 || 0) * 4.0);
-          var rr0 = 0.008 * (1 - 0.5 * idx); // the ring shrinks with depth
-          a.x = bx + Math.cos(ku * 6.2832) * rr0;
-          a.y = by + Math.sin(ku * 6.2832) * rr0;
-          var h0 = accentHue; // the row matches its anchor orbs (B7 — one accent family)
+          // CORRIDOR HEAD RINGS — the row itself is NEVER drawn (user frame-check 2026-07-10
+          // night, trail-built law): 1-2 small rings ride the fast rightward-flying head
+          // anchors (q21-24, animated in frame()); their per-frame wake deposits ARE the
+          // marching bead row. Hue FLIPS fast (~7.7Hz) so successive deposits alternate
+          // colour — the ref's green/purple alternating chain.
+          var hseg = (a.sample || 0) < 0.5 ? 0 : 1; // ring per head (half the samples each)
+          var hbx = hseg ? (a.q23 !== undefined ? a.q23 : 0.5) : a.q21 !== undefined ? a.q21 : 0.5;
+          var hby = hseg ? (a.q24 !== undefined ? a.q24 : 0.5) : a.q22 !== undefined ? a.q22 : 0.5;
+          var hvis = hseg ? a.q14 || 0 : a.q25 || 0;
+          if (hbx < -0.02 || hbx > 1.02 || hvis < 0.3) {
+            a.a = 0;
+            return a;
+          }
+          var ku = ((a.sample || 0) * 2) % 1;
+          var rr0 = 0.011 * (1 - 0.5 * Math.max(0, Math.min(1, hbx))); // shrink toward the right VP
+          a.x = hbx + Math.cos(ku * 6.2832) * rr0;
+          a.y = hby + Math.sin(ku * 6.2832) * rr0;
+          var h0 = accentHue + 0.45 * (Math.floor(lastT / 0.13) % 2) + hseg * 0.2; // FAST flip
           a.r = orbCol(h0, 0);
           a.g = orbCol(h0, 0.33);
           a.b = orbCol(h0, 0.67);
           mutRGB(a); // D13: accent HUE family, but only orbs+tether carry the saturation
-          a.a = ku < 0.05 ? 0 : 0.9 * (1 - idx * 0.72);
+          a.a = ku < 0.03 ? 0 : 0.9;
           return a;
         }
         var ty = acc3.type;
