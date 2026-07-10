@@ -1,5 +1,17 @@
 # 08 — Spirograph petal flower / wreath / ferris-wheel family
 
+> **★ CORRECTION 2 (2026-07-11, user design-language correction + frame-by-frame 480p 0:50-0:52
+> @15fps — trust this over the stamp model everywhere below): the flower is ONE continuously-
+> MORPHING live waveform construction, NOT discrete stamps.** Every distinct frame the whole
+> outline jiggles with the audio (like the tether strand) and the construction re-shapes
+> smoothly (wheel → bow-tie → dahlia → fur-ball inside ~2s); the only ghost is the trail's soft
+> after-image hugging the crisp copy. The discrete stamp clock + 5-9° rotation snaps + oblate
+> tilt stacked rotated squashed copies = the user's "croissant/prawn" flag (2026-07-11).
+> Rebuilt (16425d7 + b77c3fd): float petal-count k + identity seed EASE between targets per
+> beat-gated morph leg (0.8-2s), rotation fixed per dwell, face-on always, spiro joins the weak
+> wash-hold (~1.4s ghosts). The per-leg re-tint walk and the wheel's transient connector ring
+> survive unchanged.
+
 > **★ CORRECTION (2026-07-08, user-verified against the video — trust this over §1):**
 > the "(c) wavy-ray sun medallion with a dark core star" variant DOES NOT EXIST — the 49.8
 > still is the same ferris wheel. It was implemented, then REMOVED (commit 5a77039). Do not
