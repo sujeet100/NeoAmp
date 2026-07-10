@@ -3925,6 +3925,13 @@
       stgBx = 0.74;
       stgBy = 0.2;
       stgNext = Math.max(stgNext, time + 8);
+      // SNAP the live posts too (spawn-in-place, C1): the eased blend below starts near 0 at
+      // entry, so without this the orbs GLIDE from wherever they were to the floor spawn,
+      // depositing a stray diagonal ghost column (seen in the round-4 self-render).
+      t.q21 = stgAx;
+      t.q22 = stgAy;
+      t.q23 = stgBx;
+      t.q24 = stgBy;
       // ref colours are DISTINCT per column incl. gold/brown families (user round 2; the
       // 19s clip shows orange-gold vs violet stalks): re-anchor the accent ink per visit,
       // warm-biased — orb B's standing +0.35 offset supplies the second family.
@@ -3963,6 +3970,17 @@
       t.q28 += (0.32 - t.q28) * 0.7 * swa;
       t.q18 *= 1 - 0.7 * swa;
       t.q19 *= 1 - 0.7 * swa;
+      // CAMERA CHASE (round 4 — user: "the camera should be facing their side, moving up
+      // WITH them"; the corridor chase-pan lesson, vertical): while the heads climb, the
+      // trail buffer streams DOWN (−q19 = down) at ~half the rise speed, so the painted
+      // stalks + floor slide past and the view reads as ascending alongside the heads.
+      // Eases out when the rise caps (the ref's 8-16s camera is still).
+      if (riseA < 0.25) t.q19 = Math.min(t.q19, -0.00045 * swa);
+      // FLOOR + HORIZON (round 4): the ref scene ALWAYS stands its columns on a bright floor
+      // band — the strongest side-view cue. Force the floor-band ground (regime 11) as this
+      // scene's composed set-piece (B11 grammar). Guarded so an explicit FORCE q29 pin wins
+      // (the FORCE q-copy runs BEFORE this coupling).
+      if (swa > 0.6 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 11;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
