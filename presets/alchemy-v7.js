@@ -2752,9 +2752,11 @@
         // the OLD hues): the hue WALKS forward each stamp instead of jittering around one point,
         // so a dwell layers several tints (user: ours held the same 2 colours the whole time)
         spiroHue += 0.09 + Math.random() * 0.1;
-        // per-stamp oblate TILT (h1 M4 "tilts oblate to ~0.5"): face-on 60% · lying-down 40%. The
-        // snap at the stamp boundary is correct (the ref changes pose per stamp; the ghost bridges).
-        spiroTilt = Math.random() < 0.6 ? 1.0 : 0.5 + Math.random() * 0.2;
+        // per-stamp oblate TILT REMOVED (user 2026-07-11 "croissant/prawn-like shape", after the
+        // earlier "still distorted" flag already named spiroTilt as the next knob): squashed
+        // ghost stamps stacked with the rotation snaps read as a curled shell, never as the
+        // ref's tilted disc. Face-on ALWAYS; the h1 M4 oblate pose is dropped as a ceiling.
+        spiroTilt = 1.0;
         spiroNext = time + 0.8 + Math.random() * 0.8; // ~0.8-1.6s cadence (1:03-1:06: crisp new stamps ~1/s)
         spiroStampT = time; // the ring flash keys off the stamp instant
       }
@@ -3054,6 +3056,9 @@
         mCur === 10 ||
         mCur === 12 ||
         mCur === 13 ||
+        mCur === 17 || // spiro (user 2026-07-11 "croissant/prawn"): 3-6s held ghosts × 5-9°/
+        // stamp rotation × alternating constructions stacked into a curled ferris-shell —
+        // the ref flower's ghosts hug their petals (~1-2s life), so it gets the weak hold
         mCur === 20; // moth: an every-frame streaming radial fan piles under the wash hold
       var wh = washAmt * (1 - 0.55 * sketchAmt) * (sprawl ? 0.35 : 1);
       t.q1 += (0.988 - t.q1) * wh; // 10% at ~3.2s (was 0.957: stains dead in ~0.9s)
