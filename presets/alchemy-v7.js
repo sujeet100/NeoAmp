@@ -1447,12 +1447,15 @@
         var fk = sp * k,
           pi = Math.floor(fk),
           pu = fk - pi; // petal index + 0..1 within the petal
-        // per-petal IDENTITY: hashed irregular length, seeded ONCE per motif dwell (spiroSeed) — NOT
-        // per stamp: if lengths re-roll each stamp, a long ghost pokes out from under the new short
-        // petal and reads as a DIFFERENT overlapping petal (user: "petals overlap"). Stable lengths
-        // keep every ghost hugging its own petal → the ref's dense layered-flower look.
-        var ph = Math.sin((pi + 1) * 12.9898 + spiroSeed) * 43758.5453;
-        ph -= Math.floor(ph);
+        // per-petal IDENTITY: hashed irregular length — now a CONTINUOUS MORPH between the base
+        // and target seeds (2026-07-11 rebuild): each petal's length flows toward its next
+        // identity every leg, so the flower visibly RE-SHAPES like the ref instead of holding a
+        // frozen pose between discrete stamps. Ghosts still hug (the trail is only ~1s).
+        var phA = Math.sin((pi + 1) * 12.9898 + spiroSeed) * 43758.5453;
+        phA -= Math.floor(phA);
+        var phB = Math.sin((pi + 1) * 12.9898 + spiroSeedB) * 43758.5453;
+        phB -= Math.floor(phB);
+        var ph = phA + (phB - phA) * spiroMorphE;
         // gentle independent sway per petal (~2.3s via the q9 clock) — undulation with no net spin
         // (continuous spin + feedback = the rejected gear-smear; sway oscillates, so no smear)
         var sway = 0.04 * Math.sin((a.q9 || 0) * 45.0 + pi * 2.4);
@@ -1499,7 +1502,9 @@
         var dr = d + (a.value1 || 0) * amp * edge;
         lox = dr * Math.cos(baseAng) - lat * Math.sin(baseAng);
         loy = dr * Math.sin(baseAng) + lat * Math.cos(baseAng);
-        hueOff = spiroVar === 1 ? 0 : pi & 1 ? 0.38 : 0; // duo two-tone; fur ball single pale hue (p0 35)
+        // duo two-tone fades out CONTINUOUSLY as k morphs into fur-ball territory (single pale
+        // hue at high k, p0 35) — keyed to k, not the variant flag, so the morph carries it
+        hueOff = (pi & 1 ? 0.38 : 0) * Math.max(0, Math.min(1, (18 - k) / 6));
         // fade toward the hub → no additive pile-up, keeps the hole dark; the many-petal fur ball
         // deposits ~3× the strokes, so scale by √(12/k) or its trail streaks blow out the buffer
         a.a = (0.5 + 0.5 * edge) * Math.min(1, Math.sqrt(12 / k));
@@ -2150,9 +2155,15 @@
   // SPIROGRAPH per-stamp state (doc 08 A1) — the waves[0] point fn (fSpiro) reads these; no q-var
   // needed (all 32 taken; no shader wants the variant). Identity re-rolls per stamp (step 2).
   var spiroVar = 0, // 0 dahlia · 1 fur-ball (many-petal) · 2 ferris wheel (dahlia + connector ring)
-    spiroK = 12, // petal/point/spoke count (per-stamp within a variant's range)
-    spiroRot = 0, // per-stamp rotation snap — SLIGHT (feathery ghosting hugs the petals)
-    spiroSeed = 0, // per-DWELL petal-identity seed (stable while the motif is up → ghosts align)
+    spiroK = 12, // petal count — now a FLOAT that EASES between morph targets (2026-07-11 rebuild)
+    spiroRot = 0, // fixed per dwell (rotation snaps REMOVED — they stacked the croissant ghosts)
+    spiroSeed = 0, // petal-identity base seed (the morph eases spiroSeed → spiroSeedB)
+    spiroSeedB = 0, // petal-identity TARGET seed
+    spiroMorph = 1, // 0..1 morph progress along the current leg
+    spiroMorphE = 1, // eased morph value (read by fSpiro's per-petal mix)
+    spiroMorphDur = 1.2, // leg duration ~0.8-2s (the ref's visible re-shape time)
+    spiroKFrom = 12,
+    spiroKTo = 12,
     spiroRingAmt = 0, // wheel connector-ring opacity (flashes in on variant 3, melts out)
     spiroStampT = -9, // time of the last construction stamp
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
@@ -2725,12 +2736,27 @@
     var mEff = mCur;
     if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
       mEff = Math.floor(window.__ALC_FORCE.q30 + 0.5);
+    // ── SPIRO CONTINUOUS MORPH (★ 2026-07-11 rebuild — user design-language correction +
+    //    frame-by-frame 480p 0:50-0:52 @15fps: the original NEVER holds a static construction —
+    //    the ONE waveform flower MORPHS continuously (wheel→bow-tie→dahlia→fur-ball inside ~2s),
+    //    every edge carrying live jag like the tether strand, and the only ghost is the trail's
+    //    soft after-image hugging the crisp copy. The old discrete stamp clock froze geometry
+    //    between stamps and its rotation snaps stacked rotated copies = the croissant/prawn.)
+    //    Petal identities (seed) and petal COUNT (float k) now EASE between rolled targets; the
+    //    construction change IS the morph (k 10-14 = dahlia/wheel · 26-40 = fur-ball, petal
+    //    width already ∝ 12/k so the same loop math covers both). ──
     if (mEff === 17) {
       if (spiroNext < 0) {
-        spiroNext = time; // first entry: stamp immediately
-        spiroSeed = Math.random() * 100; // petal identities for THIS dwell (stable across stamps)
+        spiroNext = time;
+        spiroSeed = Math.random() * 100;
+        spiroSeedB = spiroSeed;
+        spiroRot = Math.random() * 6.2832; // fixed pose for the dwell (ref wheel never spins)
+        spiroKFrom = spiroKTo = spiroK = 10 + Math.random() * 5;
+        spiroMorph = spiroMorphE = 1;
+        spiroTilt = 1.0; // face-on always (oblate pose dropped — the croissant round)
       }
-      if (time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
+      // beat-gated morph LEG roll (the ref re-shapes with the music, ~1.2-3s per leg)
+      if (spiroMorph >= 1 && time >= spiroNext && (f > 0.5 || time >= spiroNext + 2.5)) {
         var pv = spiroVar;
         while (spiroVar === pv) spiroVar = Math.floor(Math.random() * 3); // always a DIFFERENT one
         // debug pin (same gotcha as mEff above): a pinned self-render can hold ONE construction
@@ -2740,26 +2766,24 @@
           window.__ALC_FORCE.spiroVar !== undefined
         )
           spiroVar = window.__ALC_FORCE.spiroVar;
-        spiroK =
+        spiroSeed = spiroSeedB; // the reached identity becomes the new base
+        spiroSeedB = Math.random() * 100; // petals RESHAPE toward this target over the leg
+        spiroKFrom = spiroK;
+        spiroKTo =
           spiroVar === 1
-            ? 26 + Math.floor(Math.random() * 15) // fur ball: many many short petals (p0 35)
-            : 10 + Math.floor(Math.random() * 5); // dahlia/wreath/wheel 10-14
-        // SLIGHT rotation between stamps (h1 "feathery ghosting"). Was 0.25-0.75 rad — a full
-        // petal-spacing at k=12, so each ghost flower landed ACROSS the crisp one (user: "petals
-        // overlap"). Tiny snaps keep every ghost hugging its petal → dense layered flower.
-        spiroRot += 0.08 + Math.random() * 0.07; // 5-9°/stamp — visible slow crawl, still ≪ the 30° petal spacing
-        // per-stamp RE-TINT (measured, h1 M5: crisp lines re-tint ~2s/hue while the trail keeps
-        // the OLD hues): the hue WALKS forward each stamp instead of jittering around one point,
-        // so a dwell layers several tints (user: ours held the same 2 colours the whole time)
+            ? 26 + Math.random() * 14 // fur ball: many many short petals (p0 35)
+            : 10 + Math.random() * 5; // dahlia/wreath/wheel 10-14
+        spiroMorph = 0;
+        spiroMorphDur = 0.8 + Math.random() * 1.2;
+        // emitter RE-TINT walk (measured, h1 M5: crisp lines re-tint ~2s/hue while the trail
+        // keeps the OLD hues) — per morph leg now, cadence unchanged
         spiroHue += 0.09 + Math.random() * 0.1;
-        // per-stamp oblate TILT REMOVED (user 2026-07-11 "croissant/prawn-like shape", after the
-        // earlier "still distorted" flag already named spiroTilt as the next knob): squashed
-        // ghost stamps stacked with the rotation snaps read as a curled shell, never as the
-        // ref's tilted disc. Face-on ALWAYS; the h1 M4 oblate pose is dropped as a ceiling.
-        spiroTilt = 1.0;
-        spiroNext = time + 0.8 + Math.random() * 0.8; // ~0.8-1.6s cadence (1:03-1:06: crisp new stamps ~1/s)
-        spiroStampT = time; // the ring flash keys off the stamp instant
+        spiroNext = time + spiroMorphDur + 0.4 + Math.random() * 0.9;
+        spiroStampT = time; // the wheel's connector-ring flash keys off the leg start
       }
+      spiroMorph = Math.min(1, spiroMorph + dt / (spiroMorphDur || 1));
+      spiroMorphE = spiroMorph * spiroMorph * (3 - 2 * spiroMorph);
+      spiroK = spiroKFrom + (spiroKTo - spiroKFrom) * spiroMorphE;
     } else {
       spiroNext = -1;
     }
