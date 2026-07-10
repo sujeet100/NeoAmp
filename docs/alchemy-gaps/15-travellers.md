@@ -1,5 +1,12 @@
 # 15 — Travelling elements: comet head · snake-worm · swimmer stalks · sail/kelp blade
 
+> **★ LANDED IN FULL (2026-07-10):** A6 comet = motif-centre traverse (~3.3s, rare 26-46s,
+> calm+net-gated, decay-bump tail, NO beads; `FORCE.cometForce`). A21 worm = **accLine 6**,
+> A19 sail/smoke = **accLine 7** (~9s dwell), per the registry (rod took 8). Swimmer = **mode
+> 22**, heads on the column TOPS — NOTE wave y is BOTTOM-UP (+y = top; the comp-crosshair
+> gotcha) and the head coupling needs a FULL-strength blend (D15 staging rewrites posts every
+> frame). `FORCE.accLine` pin added (step 0). Reflections omitted per Q20. Awaiting live look.
+
 **Matrix items:** A6 (travelling comet head, P2) · A21 (snake-worm / waveform-worm, P3) · A19 (sail/kelp blade + vertical smoke strands, P3) · A11 (swimmer stalks with morphing orb heads, P3)
 **Priority:** A6 = P2 (build first); A21/A19/A11 = P3.
 **Risk flags:** A6 (1) — the streaming tail MUST come from feedback ghosts / stamped copies, NEVER a drawn dot bead-chain (h0 describes "dotted bead-chain comets"; drawn bead rows were removed 2026-07-04 as "so ugly, remove", commit `bad7755`). A11 (2) — the refs show a blurred floor-reflection smear under each stalk; **omit it** (standing rule: skip reflections without user sign-off). A19/A21 — none.

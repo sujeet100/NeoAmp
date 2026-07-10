@@ -1,5 +1,12 @@
 # 16 — Zigzag ribbon scissor-X & sawtooth rod / serrated X
 
+> **★ STEPS 1-4 LANDED (2026-07-10):** fCrossX reworked — coarse 7-apex triangle CLOCK + q5
+> apex breathing + fine live jag + per-ribbon DUO hue + ±20° scissor about the node;
+> folding-screen fan = `STAMP_MODES[3]` (0.35-0.55s cadence, 0.3s crisp). A15 rod = **accLine
+> 8** (registry; 6/7 went to doc 15 worm/sail) — ONE traverse per dwell then the emitter
+> silences (h2: rare ~2s crisp + stacked copies). **Step 5 reflections intentionally omitted**
+> (answered README Q20: skip) — item CLOSED. Awaiting the user's live look.
+
 **Matrix items:** A9 (zigzag ribbon scissor-X, P2, 1080p) · A15 (sawtooth rod / serrated ribbon X, P3, 1080p)
 · **Priority:** P2 (highest of the two)
 · **Risk flags:** (2) faked-3D floor reflections REJECTED — appear in A9 evidence, gated behind confirmation ·

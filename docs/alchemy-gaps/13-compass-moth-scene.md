@@ -1,5 +1,15 @@
 # Doc 13 — Compass-moth radial scene (corrugated ray fans + crosshair axes + rose-bullseye pair)
 
+> **★ LANDED IN FULL (2026-07-10, 5 commits 86a690b→…; ADAPTATIONS):** motif = **mode 20**
+> (landing-order rule; the registry's 20 held). Radial-out reuses doc 01's field with a
+> moth-specific 0.005 target (urchin/fluff keep the de-distorted 0.002). Crosshair in comp —
+> NOTE comp `uv.y` is TOP-DOWN vs wave y (the horizontal line reads `1.0-uv.y`). **Step 4
+> ADAPTED:** the waves[3] ring accessories were PULLED 2026-07-10 (hollow-ring ghosts), so O10
+> ships as the ORB PAIR itself — vertical "8" through the hub, accent ink stepping ~1s; NO
+> rings. Step 5 = free via doc-03 tether events between the parked pair. Step 6 crimson
+> verified numerically. Accessory lines FADE under the moth (radial-out advected them into
+> frame-wide stripes — the pinwheel-under-freeze lesson again). Awaiting the user's live look.
+
 **Matrix items:** A7 · **Priority:** P2 · **Risk flags:** (6) Pastel stays muted — the crimson fan is a deliberate brief vivid accent, everything else desaturated dusty. · **Confirmation needed:** yes —
 
 1. A7's crimson fan family (t=87.2–89) is _explicitly the most-saturated element in the whole 6.5s segment_. Confirm we may ship ONE brief (~1–2 s) saturated-crimson accent that intentionally breaks the muted rule, per the vivid-accent policy (risk 6)? The reference does this, so it is faithful, but it is the one place we push saturation.

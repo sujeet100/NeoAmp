@@ -1,5 +1,13 @@
 # 14 — Ray-star family dedupe, chromatic doubling, radial hair field, lighthouse fans, oblate spinner disc
 
+> **★ STEPS 3-4 LANDED (2026-07-10; steps 1-2 landed 2026-07-07 as "doc 14a"):** A20 spinner =
+> **mode 21** — pinwheel core ~3s/rev + fringe restyle 1-2s (lash/scribble/spikes,
+> `FORCE._spinStyle` pin); tilt FIXED mild per the crisp-symmetric rule; jelly untouched.
+> D10 lighthouse = the accLine-1 rework: ONE strand from a compositional pivot (orb/tether-mid/
+> hub) **captured at pick** (live-tracking pivot painted a woven grid), sweeping ~14°/s for the
+> whole dwell; shares the swath's tick + mini-freeze (braided-rope lesson). A17 scale class NOT
+> built (frame-filling conflicts with the 2026-07-10 compact-motif rule — revisit only on user ask).
+
 **Matrix items:** D8 (ray-star dedupe + true chromatic doubling) · A17 (full-frame radial hair field) · D10 (accessory fans → lighthouse fans) · A20 (oblate spinner disc)
 **Priority:** all P2
 **Risk flags:** D8 none · A17 (4) via C2 — the radial-out streaming warp belongs to doc 01 · D10 (4) accessory rework was in the rejected-rework blast radius, one change at a time + live-verified · A20 none
