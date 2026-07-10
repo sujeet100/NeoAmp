@@ -1313,9 +1313,13 @@
       u = fk - k;
     var pang = k * (6.2832 / R) + (a.q9 || 0) * 5.0; // q9=time*0.06 → ~0.3 rad/s precession
     var rr = u * (a.q5 || 0.4) * 1.4;
-    // chevron: triangle CLOCK along the ray (~5 apexes over the compact emitter) + tip jitter
-    var tri = Math.abs(((u * 5.0) % 1) * 2 - 1) * 2 - 1;
-    var corr = tri * 0.009 + (a.value1 || 0) * 0.012 * (u * u);
+    // chevron: FINE ripple at a fixed SPATIAL wavelength keyed to the RADIUS (user re-check vs
+    // the 480p 1:21-1:30 frames: the ref's chevrons are ~12-15px λ / 2-3px amp on 480p ≈
+    // 0.03 UV / 0.0045 UV, and phase-align across rays into concentric zigzag WAVEFRONTS —
+    // the old 5-apex u-clock at 0.009+0.012 jitter drew coarse fat zigzag ribbons that read
+    // as an ugly solid ball, the user's 2026-07-11 flag) + a whisper of tip jitter.
+    var tri = Math.abs(((rr / 0.033) % 1) * 2 - 1) * 2 - 1;
+    var corr = tri * 0.0045 + (a.value1 || 0) * 0.006 * (u * u);
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + Math.cos(pang) * rr - Math.sin(pang) * corr;
@@ -1715,7 +1719,8 @@
     0.4, // spiro (17): lowered 0.58→0.4 (user: finer/less bloom — the ref is a thin delicate rosette)
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
     0.6, // scallop (19): one smooth two-strand line — outline-class
-    0.5, // moth (20): 20 fine rays — the fan MASS comes from the radial-out trail, keep the emitter light
+    0.32, // moth (20): 20 fine rays — the ref fan is an AIRY 1px-hairline spray (bg visible
+    // between rays, 480p 1:21-1:30); 0.5 + the thick comp read as a solid ball (user flag)
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
     0.55, // swimmer (22): two slinky outlines — outline-class
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
@@ -1733,6 +1738,8 @@
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
+    if (m === 20) return 0.16; // moth: the emitter stays modest — the ref's 80% span is the
+    // radial-out TRAIL's job, not the live rays' (user: "size unusually big")
     return m === 0 ? 0.17 : 0.18; // the compact morphing-flower tier (still the smallest class)
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly — the compact radial
