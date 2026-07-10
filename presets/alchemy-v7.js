@@ -1300,41 +1300,43 @@
     if (u < 0.04) a.a = 0;
     return a;
   }
-  // COMPASS-MOTH corrugated ray fan (doc 13 A7; 480p S8 t=82.9-89.5): ~20 fine rays from the
-  // hub, each carrying a REGULAR chevron ripple — a fixed-pitch CLOCK texture per the ref's
-  // ~12-15px corrugation (the live jag rides the TIPS only, alc-waveform-rule-scope) — in 3
-  // analogous pale families, precessing clockwise ~17°/s. The ref's dense 40-60-ray fill is
-  // TRAIL-STREAMED: frame() gates the radial-out field (doc 01 field 3) to this mode, so the
-  // feedback advects the crisp emitter copies outward — never draw more rays here.
+  // COMPASS-MOTH fan (doc 13 A7; 480p 1:21-1:30) — ★ REBUILT 2026-07-11 after the user
+  // checked the video: "the effect is created with 2 overlapping lines rotating from center
+  // at different speeds, leaving trails behind; the trails diffuse as they rotate — it's not
+  // a hand-painted shape." Live = TWO full-length chevron-rippled LINES through the hub; the
+  // rotation is time-QUANTIZED (~45ms steps → 6°/4.3° per step ≈ 133°/s and 95°/s, fps-
+  // independent) so each held pose deposits a distinct ray copy — the ref's 40-60-ray fan is
+  // ENTIRELY those trail copies streaming outward (radial-out field) and diffusing (blur).
+  // 5th trail-built correction (alchemy-design-language-trail-built): never draw N rays.
   function fMoth(a) {
-    var R = 20,
-      fk = (a.sample || 0) * R,
-      k = Math.floor(fk),
-      u = fk - k;
-    var pang = k * (6.2832 / R) + (a.q9 || 0) * 5.0; // q9=time*0.06 → ~0.3 rad/s precession
-    var rr = u * (a.q5 || 0.4) * 1.4;
-    // chevron: FINE ripple at a fixed SPATIAL wavelength keyed to the RADIUS (user re-check vs
-    // the 480p 1:21-1:30 frames: the ref's chevrons are ~12-15px λ / 2-3px amp on 480p ≈
-    // 0.03 UV / 0.0045 UV, and phase-align across rays into concentric zigzag WAVEFRONTS —
-    // the old 5-apex u-clock at 0.009+0.012 jitter drew coarse fat zigzag ribbons that read
-    // as an ugly solid ball, the user's 2026-07-11 flag) + a whisper of tip jitter.
-    var tri = Math.abs(((rr / 0.033) % 1) * 2 - 1) * 2 - 1;
-    var corr = tri * 0.0045 + (a.value1 || 0) * 0.006 * (u * u);
+    var s = a.sample || 0;
+    var line = s < 0.5 ? 0 : 1,
+      u = (s - line * 0.5) * 2,
+      tt = u * 2 - 1; // -1..1 — full length THROUGH the centre
+    var stp = Math.floor(lastT / 0.045); // quantized rotation clock (distinct ray deposits)
+    var ang = line ? stp * 0.075 + 1.3 : stp * 0.105; // two speeds, same direction (user)
+    var rr = tt * (a.q5 || 0.4) * 1.35;
+    // fine chevron ripple keyed to RADIUS (measured 480p: λ≈12-15px, amp 2-3px ≈ 0.033/
+    // 0.0045 UV) — phase-aligns across the swept copies into concentric zigzag wavefronts
+    var tri = Math.abs(((Math.abs(rr) / 0.033) % 1) * 2 - 1) * 2 - 1;
+    var corr = tri * 0.0045 + (a.value1 || 0) * 0.006 * (tt * tt); // live jag at the tips only
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + Math.cos(pang) * rr - Math.sin(pang) * corr;
-    a.y = cy + Math.sin(pang) * rr + Math.cos(pang) * corr;
-    var h = (a.q8 || 0) + Math.floor(k / 7) * 0.12; // 3 analogous families, muted tier
+    a.x = cx + Math.cos(ang) * rr - Math.sin(ang) * corr;
+    a.y = cy + Math.sin(ang) * rr + Math.cos(ang) * corr;
+    // the 2nd line takes a neighbouring family; the ref's 3 analogous families come FREE from
+    // the stepped motifHue walk — old trail rays keep their birth hue (hue-frozen trail law)
+    var h = (a.q8 || 0) + line * 0.14;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    // step 6 crimson accent (answered Q18): family 0 only, brief window set in frame()
-    if (mothCrim > 0 && k < 7) {
+    // step 6 crimson accent (answered Q18): one line only, brief window set in frame()
+    if (mothCrim > 0 && line === 0) {
       a.r = Math.min(1, a.r + 0.55 * mothCrim);
       a.g *= 1 - 0.7 * mothCrim;
       a.b *= 1 - 0.65 * mothCrim;
     }
-    if (u < 0.03) a.a = 0; // hide the hub connector spokes
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
     return a;
   }
   // SWIMMER STALKS (doc 15 step 4 A11; r0 2.3 t=8.2-12.6): two vertical slinky COIL columns
@@ -1719,8 +1721,8 @@
     0.4, // spiro (17): lowered 0.58→0.4 (user: finer/less bloom — the ref is a thin delicate rosette)
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
     0.6, // scallop (19): one smooth two-strand line — outline-class
-    0.32, // moth (20): 20 fine rays — the ref fan is an AIRY 1px-hairline spray (bg visible
-    // between rays, 480p 1:21-1:30); 0.5 + the thick comp read as a solid ball (user flag)
+    0.45, // moth (20): TWO live rotor lines — the airy 40-60-ray fan is their trail
+    // (480p 1:21-1:30; rebuilt per the user's rotating-lines read, 2026-07-11)
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
     0.55, // swimmer (22): two slinky outlines — outline-class
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
@@ -1738,8 +1740,9 @@
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
-    if (m === 20) return 0.16; // moth: the emitter stays modest — the ref's 80% span is the
-    // radial-out TRAIL's job, not the live rays' (user: "size unusually big")
+    if (m === 20) return 0.26; // moth: the two rotor lines span ~55-60% and the radial-out
+    // stream carries their trail to the ref's ~80% (the SOLID-ball read, not span, was the
+    // "unusually big" problem — fixed by the rotor rebuild + airy trail fill)
     return m === 0 ? 0.17 : 0.18; // the compact morphing-flower tier (still the smallest class)
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly — the compact radial
@@ -3562,6 +3565,10 @@
     mothAmt += (mothEff - mothAmt) * Math.min(1, dt * 0.6);
     if (mothAmt > 0.01) {
       var mam = mothAmt * (1 - corridorAmt);
+      // rotor-trail hold (2026-07-11 rebuild): the swept ray copies must live ~2s+ so the
+      // 133°/95° rotors paint the full fan before their deposits fade; blur stays default —
+      // the diffusion IS the ref's "trails getting diffused as it rotates" (user).
+      t.q1 += (0.97 - t.q1) * mam;
       t.q21 += (t.q2 - t.q21) * 0.8 * mam; // stacked "8" through the hub
       t.q22 += (t.q3 - 0.07 - t.q22) * 0.8 * mam;
       t.q23 += (t.q2 - t.q23) * 0.8 * mam;
