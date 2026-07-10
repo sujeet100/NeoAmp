@@ -1887,6 +1887,12 @@
     mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
     spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
     spinNext = -1, // fringe restyle clock (~1-2s, h0 M9)
+    cometNext = 15, // doc 15 A6: next comet-eligibility check (rare, calm-gated)
+    cometT0 = -99, // traverse birth (~3.3s corner-to-corner)
+    cometFromX = 0.12, // traverse endpoints (opposite corners, lower→upper)
+    cometFromY = 0.85,
+    cometToX = 0.88,
+    cometToY = 0.15,
     accTerrVis = 1, // accessory fade under terrain motifs 14/19 (frozen-ray-spray guard)
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
@@ -2501,11 +2507,36 @@
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
     // multi-hued WATERCOLOUR trail (the #1 reference signature, 1:29-1:36 / 2:11-2:30), like the
     // original's roaming flower. Small amplitude so it stays the central object.
+    // ── A6 COMET (doc 15 step 1): occasionally the motif TRAVELS corner-to-corner in ~3.3s
+    //    (p0 M11: crumple-net ball LL→UR at ~30% frame-width/s; the salmon fuzz tail is the
+    //    head's own feedback wake — NO drawn beads, risk 1 / bad7755). Rare (~26-46s between),
+    //    calm-gated, prefers the net ball (7; tangle 13 is out of the bag but kept in the gate).
+    //    sin(cp·π) envelope → the head eases out of and back into the Lissajous, no pop. ──
+    if (time >= cometNext) {
+      var canComet =
+        (mCur === 7 || mCur === 13) && energy < 1.2 && corridorAmt < 0.1 && restAmt < 0.2;
+      if (canComet && Math.random() < 0.5) {
+        cometT0 = time;
+        cometFromX = Math.random() < 0.5 ? 0.12 : 0.88; // LL→UR or LR→UL
+        cometFromY = 0.85;
+        cometToX = 1 - cometFromX;
+        cometToY = 0.15;
+        cometNext = time + 26 + Math.random() * 20;
+      } else cometNext = time + 8 + Math.random() * 8;
+    }
+    if (FORCE && FORCE.cometForce && time - cometT0 > 3.3) cometT0 = time - 1.1; // pin: mid-traverse
+    var cp = (time - cometT0) / 3.3;
+    var cometAmt = cp >= 0 && cp <= 1 ? Math.sin(cp * 3.14159) : 0;
     var lisX = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
     var lisY = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
     anchorAmt *= Math.exp(-dt * 0.25); // release toward the free path over ~4-6s (B4b)
     t.q2 = lisX + (anchorX - lisX) * anchorAmt;
     t.q3 = lisY + (anchorY - lisY) * anchorAmt;
+    if (cometAmt > 0) {
+      var trav = Math.max(0, Math.min(1, cp));
+      t.q2 += (cometFromX + (cometToX - cometFromX) * trav - t.q2) * cometAmt;
+      t.q3 += (cometFromY + (cometToY - cometFromY) * trav - t.q3) * cometAmt;
+    }
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
     t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse) * bloomMul; // beat-puff tamed 0.45→0.28; bloomMul = the B4a entrance
@@ -2849,6 +2880,11 @@
       t.q20 += (t.q2 - t.q20) * 0.8; // hub = the motif centre (r0: hub-centred)
       t.q27 += (t.q3 - t.q27) * 0.8;
     }
+
+    // A6 comet tail (doc 15): lengthen the trail while travelling so the wake stretches into
+    // the ~250px fuzz tail (same hue as the head for free — the trail IS the head's ghost).
+    // Max-blend so the wash/freeze holds still win; no drawn beads anywhere (risk 1).
+    if (cometAmt > 0.05) t.q1 = Math.max(t.q1, 0.97 + 0.005 * cometAmt);
 
     // ── ACCESSORY DIRECTOR — the 3rd/4th element classes, each on its own clock, drawn in
     //    absolute screen space (independent of the motif — the original parents nothing). ──
