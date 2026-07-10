@@ -1311,7 +1311,12 @@
       tt = u * 2 - 1; // -1..1 — full length THROUGH the centre
     var stp = Math.floor(lastT / 0.045); // quantized rotation clock (distinct ray deposits)
     var ang = line ? stp * 0.075 + 1.3 : stp * 0.105; // two speeds, same direction (user)
-    var rr = tt * (a.q5 || 0.4) * 1.35;
+    // ★ FULL-FRAME rotors (user 2026-07-10 screenshot round: "these rotating lines should
+    // cover the entire screen … always cross the borders on either side, even on widescreen").
+    // Wave-unit frame half-diagonal maxes at 0.707 (square pane; wide/tall panes need LESS
+    // because the long axis is exactly 1.0 unit) + the ±0.12 hub wander → 0.95 always crosses.
+    // The beat-puff q5 stays only as an exceed (its flash lives in q4 brightness anyway).
+    var rr = tt * Math.max(0.95, (a.q5 || 0.4) * 1.35);
     // fine chevron ripple keyed to RADIUS (measured 480p: λ≈12-15px, amp 2-3px ≈ 0.033/
     // 0.0045 UV) — phase-aligns across the swept copies into concentric zigzag wavefronts
     var tri = Math.abs(((Math.abs(rr) / 0.033) % 1) * 2 - 1) * 2 - 1;
@@ -1383,7 +1388,9 @@
       : -0.7854 + 0.55 * Math.sin((a.q9 || 0) * 15.0);
     var ct = Math.cos(ang),
       st = Math.sin(ang);
-    var len = (a.q5 || 0.4) * 1.9; // scene-scale q5 → edge-to-edge lines
+    // min-clamped like fMoth's rotors: q5 breathes calm (~0.33 → len 0.62, short of a square
+    // pane's 0.71 half-diagonal + hub wander) but the arms must ALWAYS cross the borders
+    var len = Math.max(0.95, (a.q5 || 0.4) * 1.9);
     var wav = 0.006 * Math.sin(u * 40.0 + (a.q9 || 0) * 30.0) + (a.value1 || 0) * 0.006;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
@@ -1747,9 +1754,9 @@
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
-    if (m === 20) return 0.26; // moth: the two rotor lines span ~55-60% and the radial-out
-    // stream carries their trail to the ref's ~80% (the SOLID-ball read, not span, was the
-    // "unusually big" problem — fixed by the rotor rebuild + airy trail fill)
+    if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
+    // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
+    // cross the frame borders on either side)
     return m === 0 ? 0.17 : 0.18; // the compact morphing-flower tier (still the smallest class)
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly — the compact radial
