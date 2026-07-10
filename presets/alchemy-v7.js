@@ -370,7 +370,14 @@
       "    float shd = smoothstep(1.0, 0.35, length(shp)) * 0.35 * clamp(q4, 0.0, 1.0);\n" +
       "    ground *= 1.0 - shd;\n" +
       "  }\n" +
-      "  vec3 col = ground + trail * 1.15 + glow * 0.55;\n" +
+      // ── STAR-DIVE GROUND DUCK (user, ref 1:36-1:40: during the dive the WHOLE screen is the
+      //    streaming colour field — no background scene visible behind it). q15 > 0.009 is the
+      //    dive's unique signature (the persistent magnify couplings cap at 0.008), so the comp
+      //    reads it directly instead of spending a new q channel: fade the ground (and boost the
+      //    trail a touch) as the dive engages. ──
+      "  float diveDuck = smoothstep(0.009, 0.0125, q15);\n" +
+      "  ground *= 1.0 - 0.9 * diveDuck;\n" +
+      "  vec3 col = ground + trail * (1.15 + 0.25 * diveDuck) + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
       //    luminance-preserving resaturate toward the measured ~0.45 + a darks-deepen so the dark ground
@@ -2891,7 +2898,8 @@
     //    size was flat for the dwell, and hue only stepped with the motif clock. ──
     if (STAR_FAM[mEff]) {
       if (s12T0 < 0) s12T0 = time;
-      s12Spin += dt * 0.55; // ~31°/s continuous rotation (user round 2: 26°/s read too slow)
+      s12Spin += dt * 0.9; // ~52°/s (MEASURED round 3: the ref's freshest copy jumps 10-15°
+      // per 0.25s frame-pair at 1:34; 26°/s and 31°/s both read too slow to the user)
       s12Hue += dt * 0.125; // continuous wheel (~8s) ON TOP of the stepped q8 walk
     } else {
       if (s12T0 >= 0) s12ZoomT0 = time; // dwell exit → fire the dive-into-centre pulse
@@ -3072,11 +3080,14 @@
       mFin = Math.floor(window.__ALC_FORCE.q30 + 0.5);
     if (POLY_RADK[mFin]) {
       var aspW = typeof window !== "undefined" && window.__VIZ_ASPECT > 1 ? window.__VIZ_ASPECT : 1;
+      if (STAR_FAM[mFin] && s12T0 >= 0) {
+        // STEADY size (user round 3: the refs' star constructions do NOT breathe with the
+        // beat) — rebuild q5 from the tier base, dropping the bass/pulse/bloomMul terms; the
+        // only size animation is the one-shot BLOOM ramp (wreath→peak ~2.5x over ~2.5s).
+        t.q5 = scaleFor(mFin) * 0.95 * (0.34 + 0.66 * Math.min(1, (time - s12T0) / 2.6));
+      }
       t.q5 = Math.min(t.q5, 0.36 / aspW / POLY_RADK[mFin]);
     }
-    // STAR-family BLOOM growth (ref: wreath→peak ~2.5x over ~2.5s). Applied AFTER the height
-    // cap so the ramp scales the capped size; dwell only (s12T0 — sketchbook stamps stay static).
-    if (STAR_FAM[mFin] && s12T0 >= 0) t.q5 *= 0.34 + 0.66 * Math.min(1, (time - s12T0) / 2.6);
 
     // ── PER-SCENE TRAIL-DISPLACEMENT FIELDS (doc 01 C2). The refs schedule the feedback warp
     //    per scene; v7 ran ONE program always. Each field is an eased scene-gated modulation of
@@ -3163,12 +3174,15 @@
     //    streaming; this is a one-shot), diffusion boost, decay hold, hub pinned to the motif
     //    centre so the plunge is centred on the dissolving star. Runs AFTER the freeze/radial
     //    q15 couplings so the event wins. ──
-    var dvL = (time - s12ZoomT0) / 3.2;
+    // 4.2s beat, fast attack + SUSTAINED plateau (round 3: the sin() envelope spent too little
+    // time at peak — the ref's colour waves keep streaming for seconds, filling the screen).
+    var dvL = (time - s12ZoomT0) / 4.2;
     if (dvL >= 0 && dvL < 1) {
-      var dv = Math.sin(dvL * 3.14159);
-      t.q15 = Math.max(t.q15, 0.009 * dv); // forward plunge (old buffer swells outward)
-      t.q28 = Math.min(0.85, (t.q28 || 0.4) + 0.3 * dv); // diffusion up — the wet-on-wet melt
-      t.q1 = Math.max(t.q1, 0.968); // hold the dissolving wisps alive through the dive
+      var dv = Math.min(1, dvL / 0.15) * (dvL > 0.75 ? 1 - (dvL - 0.75) / 0.25 : 1);
+      t.q15 = Math.max(t.q15, 0.013 * dv); // strong forward plunge — the star's colours stream
+      // outward as whole-screen waves (round 3: 0.009 stayed a local melt, never filled)
+      t.q28 = Math.min(0.85, (t.q28 || 0.4) + 0.45 * dv); // HEAVY diffusion — wet-on-wet melt
+      t.q1 = Math.max(t.q1, 0.972); // hold the streaming colour alive through the dive
       t.q20 += (t.q2 - t.q20) * 0.8 * dv; // plunge centred on the motif
       t.q27 += (t.q3 - t.q27) * 0.8 * dv;
       t.q18 *= 1 - 0.85 * dv; // no lateral pan mid-dive
