@@ -4091,10 +4091,14 @@
           a.x = phx + Math.cos(pang) * pp;
           a.y = phy + Math.sin(pang) * pp;
           var hp = (a.q8 || 0) + 0.2;
-          a.r = orbCol(hp, 0) * 0.5 * accVis; // dimmer (0.75→0.5) so it reads as a soft fan, not a wall
-          a.g = orbCol(hp, 0.33) * 0.5 * accVis;
-          a.b = orbCol(hp, 0.67) * 0.5 * accVis;
-          a.a = (up < 0.03 ? 0 : 0.4) * accVis;
+          // dimmed AGAIN 0.5→0.3 / alpha 0.4→0.26 (user screenshots 2026-07-10 evening: since the
+          // opaque-wave switch the 60fps swept fill reads as a giant SOLID 16-blade star behind
+          // the motif; the ref's 0:39-0:45 windmill is a pale translucent wash, wedges barely
+          // above the ground)
+          a.r = orbCol(hp, 0) * 0.3 * accVis;
+          a.g = orbCol(hp, 0.33) * 0.3 * accVis;
+          a.b = orbCol(hp, 0.67) * 0.3 * accVis;
+          a.a = (up < 0.03 ? 0 : 0.26) * accVis;
           mutRGB(a); // D13
           return a;
         }
