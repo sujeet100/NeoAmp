@@ -2296,8 +2296,14 @@
   // shape does not exist in the original"). Our fCocoon renders geodesic latitude/meridian ELLIPSE
   // rings = concentric ovals, which is not how the ref's 0:13 cocoon looks (a MESH). Its two slots →
   // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
+  // fFluffBall/pompom (16) DROPPED (user 2026-07-10 night, 3 screenshots: "these ugly motifs —
+  // croissant or prawns — get rid of them"). BOTH its forms (apex dahlia + plain chenille) render
+  // as the same nested zigzag-petal wheel that the ink-spread field smears into a croissant; the
+  // dark-core-hole apex was the worst offender. Its three slots → jelly(9)/anemone(0)/tri-mandala(15)
+  // (clean symmetric organics + the accepted star family). fn + FORCE._pompApex pin kept for a
+  // future faithful rebuild of the ref's 0:34-0:40 pompom.
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
+    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
     17, 19, 20, 21, 21, 22, 23, 23,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
@@ -2306,11 +2312,11 @@
   //    Disfavoured combos still pass at ~35% (weight, never forbid). ──
   var FEAT_PAIRING = true;
   var PAIR = {
-    4: [15, 16, 14, 17], // bars → mandala/fluff/mountains/dahlia (stem-standing; tangle dropped)
+    4: [15, 14, 17], // bars → mandala/mountains/spiro (stem-standing; tangle + pompom dropped)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
     1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
-    5: [16, 9], // flat wash → ONE dominant organic ball (tangle + cocoon dropped)
-    6: [16, 15], // bands → small centre motif (tangle dropped)
+    5: [9, 0], // flat wash → ONE dominant organic ball (tangle/cocoon/pompom dropped)
+    6: [15, 10], // bands → small centre motif (tangle + pompom dropped)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
   function acceptMotif(idx) {
