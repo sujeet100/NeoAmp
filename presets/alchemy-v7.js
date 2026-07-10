@@ -1339,6 +1339,36 @@
     if (s < 0.02 || s > 0.98) a.a = 0; // hide column-to-column connector
     return a;
   }
+  // SCISSOR FAN (user, 2026-07-10, from the 480p 0:39-0:45 frame-check): TWO full-frame
+  // straight lines crossing at the centre, separated by a SMALL angle that keeps changing,
+  // both rotating together — their swept traces build the giant crossing fan whose coloured
+  // wedges FILL the background ("that's how that busy background feel is achieved in many
+  // places"). A slight clocked ripple gives the traces the ref's pleated-sheet texture; the
+  // wedge colours change with the stepped motif hue clock. A mode-23 coupling in frame()
+  // lengthens the trail + damps the pan so the fan stays registered while it sweeps.
+  function fScissorFan(a) {
+    var s = a.sample || 0;
+    var line = s < 0.5 ? 0 : 1,
+      u = (s - line * 0.5) * 2,
+      tt = u * 2 - 1; // -1..1 along the line — full length THROUGH the centre
+    var rot = (a.q9 || 0) * 8.0; // q9=time*0.06 → ~27°/s continuous sweep
+    var sep = 0.28 + 0.22 * Math.sin((a.q9 || 0) * 4.7 + 1.0); // separation 0.06-0.5 rad, always changing
+    var ang = rot + (line ? 0.5 : -0.5) * sep;
+    var ct = Math.cos(ang),
+      st = Math.sin(ang);
+    var len = (a.q5 || 0.4) * 1.9; // scene-scale q5 → edge-to-edge lines
+    var wav = 0.006 * Math.sin(u * 40.0 + (a.q9 || 0) * 30.0) + (a.value1 || 0) * 0.006;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + tt * len * ct - wav * st;
+    a.y = cy + tt * len * st + wav * ct;
+    var h = (a.q8 || 0) + (line ? 0.14 : 0) + 0.1 * u; // analogous line pair, slight ramp
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
+    return a;
+  }
   // SPIROGRAPH PETAL FLOWER family (480p 27.5-30/35.3/49.8/51-56 · 1080p 83.5-86 · A1):
   // k petal LOOPS traced as ONE closed stroke from a hollow centre; construction identity
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
@@ -1635,6 +1665,7 @@
     fMoth, // id 20 (doc 13 A7 compass-moth)
     fSpinner, // id 21 (doc 14 A20 oblate spinner disc)
     fSwimmer, // id 22 (doc 15 A11 swimmer stalks)
+    fScissorFan, // id 23 (user 2026-07-10: the 0:39-0:45 rotating scissor fan)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1668,6 +1699,7 @@
     0.5, // moth (20): 20 fine rays — the fan MASS comes from the radial-out trail, keep the emitter light
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
     0.55, // swimmer (22): two slinky outlines — outline-class
+    0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -1675,7 +1707,7 @@
     // The compact clamp was meant for the MORPHING FLOWER, but q5 scales every mode, so it
     // also shrank the SCENE-scale classes that were live-tuned at q5≈0.4 — terrain rows
     // became small piles, the valley bow-tie halved, ribbons stopped crossing the frame:
-    if (m === 3 || m === 12 || m === 14) return 0.4; // scene-scale: X-ribbons / valley / terrain (near full-frame, the pre-clamp tuned value)
+    if (m === 3 || m === 12 || m === 14 || m === 23) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan (near full-frame)
     if (m === 7) return 0.26; // wireframe net dome — a big scene object in the ref
     if (m === 9 || m === 16 || m === 21) return 0.22; // organic balls (ref 40-60% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.24; // stars/n-gons/mandalas/petal-flowers (ref ~40%)
@@ -1902,6 +1934,7 @@
     sagAmt = 0, // bgMode 4/6 bars/bands → gentle DOWNWARD trail stream (doc 01 C2 field 2)
     washAmt = 0, // bgMode 5 flat wash → DEPOSIT-HOLDING ground (doc 05 C10: stains live 3-6s)
     radialAmt = 0, // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
+    fanAmt = 0, // motif 23 scissor-fan → trail hold (the swept wedges must persist + register)
     eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
     eyeY = 0.3,
@@ -2122,7 +2155,7 @@
   // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
-    17, 19, 20, 21, 21, 22,
+    17, 19, 20, 21, 21, 22, 23, 23,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2864,6 +2897,15 @@
       t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
       t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
       t.q19 *= 1 - 0.8 * radialAmt;
+    }
+    // SCISSOR-FAN hold (mode 23): the sweeping lines' traces must LIVE long enough to build
+    // the full crossing fan that fills the bg (480p 0:39-0:45 — at the default 0.957 decay a
+    // 27°/s sweep only retains a ~40° wedge). Longer trail + damped pan keep it registered.
+    fanAmt += ((mCur === 23 ? 1 : 0) - fanAmt) * Math.min(1, dt * 0.6);
+    if (fanAmt > 0.01) {
+      t.q1 += (0.978 - t.q1) * fanAmt;
+      t.q18 *= 1 - 0.7 * fanAmt;
+      t.q19 *= 1 - 0.7 * fanAmt;
     }
     // SWIRL-EYE (field 4): vortex scenes rotate the trail about an off-centre eye — the dark
     // "eye" is just the un-fed centre of rotation (p3 §3.1 at (33%,8%); p0 rotation-smear).
