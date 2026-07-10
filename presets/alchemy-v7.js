@@ -1800,6 +1800,10 @@
     scRowOff = 0, // doc 02 A10: scallop emitter row height (walks the band over ~10s)
     scRowT = -9, // last row re-seat
     scalAmt = 0, // mode-19 engagement: orb parking + the warp's q12<0 scallop y-flow
+    mothAmt = 0, // mode-20 engagement (doc 13): O10 vertical orb pair + scene clock
+    mothT0 = -99, // moth dwell birth — the crimson-accent window keys off it
+    mothSnapT = -9, // O10 core-hue step clock (~1s/step, green→gold→white→pink read)
+    mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
     accTerrVis = 1, // accessory fade under terrain motifs 14/19 (frozen-ray-spray guard)
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
@@ -2718,7 +2722,8 @@
         mCur === 8 ||
         mCur === 10 ||
         mCur === 12 ||
-        mCur === 13;
+        mCur === 13 ||
+        mCur === 20; // moth: an every-frame streaming radial fan piles under the wash hold
       var wh = washAmt * (1 - 0.55 * sketchAmt) * (sprawl ? 0.35 : 1);
       t.q1 += (0.988 - t.q1) * wh; // 10% at ~3.2s (was 0.957: stains dead in ~0.9s)
       t.q28 += (0.18 - t.q28) * wh; // stains blur SLOWLY, stay legible — not the instant bleed
@@ -2814,11 +2819,15 @@
     // two competing busy layers read as clutter (user, 6.33.07 screenshot: tangle + bundle) —
     // the original never stacks two sprawling organics; fade the bundle under net/vortex/tangle
     accBundleVis +=
-      ((mCur === 7 || mCur === 8 || mCur === 13 ? 0 : 1) - accBundleVis) * Math.min(1, dt * 1.5);
+      ((mCur === 7 || mCur === 8 || mCur === 13 || mCur === 20 ? 0 : 1) - accBundleVis) *
+      Math.min(1, dt * 1.5); // moth's dense streaming fan counts as a sprawling organic too
     // TERRAIN scenes are motif-dominant (user screenshot 2026-07-09: a pinwheel under the FREEZE
     // field froze its rays into a permanent blue star over the mountains — the ref terrain scenes
     // have no crossing accessory lines). Fade ALL accessory lines under mountains/scallop.
-    accTerrVis += ((mCur === 14 || mCur === 19 ? 0 : 1) - accTerrVis) * Math.min(1, dt * 1.5);
+    // (+ moth 20: the radial-out field advects any accessory stroke into frame-wide diagonal
+    //  stripe pileup — the ref's S8 moth scene has no crossing accessory)
+    accTerrVis +=
+      ((mCur === 14 || mCur === 19 || mCur === 20 ? 0 : 1) - accTerrVis) * Math.min(1, dt * 1.5);
     accVis *= accTerrVis;
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
@@ -3093,6 +3102,37 @@
       t.q24 += (0.62 - t.q24) * 0.8 * sa;
       t.q25 = Math.max(t.q25, 0.9 * sa); // both terminal orbs present
       t.q14 = Math.max(t.q14, 0.9 * sa);
+    }
+    // ── MOTH scene coupling (doc 13 steps 4-5, ADAPTED; post-FORCE like the eyes so a q30 pin
+    //    exercises it): the ref's O10 rose-bullseye pair is a vertical "8" of two ringed orbs
+    //    at the hub, core hue stepping ~1s (green→gold→white→pink). The waves[3] ring
+    //    accessories were PULLED (hollow ring ghosts, 2026-07-10) — so O10 ships as the ORB
+    //    PAIR itself: parked stacked through the hub, forced visible, accent ink stepping ~1s.
+    //    The dumbbell stamps (step 5) come free: doc-03 tether events fire between the parked
+    //    pair while the fan keeps streaming (layer independence, C1). ──
+    var mothEff = Math.floor((t.q30 || 0) + 0.5) === 20 ? 1 : 0;
+    if (mothEff && mothAmt < 0.02) {
+      mothT0 = time; // scene clock (step-6 crimson window reads it)
+      // SPAWN IN PLACE (C1 — no glide-in): posts snap to the vertical pair at entry
+      stgAx = 0.5;
+      stgAy = 0.42;
+      stgBx = 0.5;
+      stgBy = 0.56;
+      stgNext = Math.max(stgNext, time + 6);
+    }
+    mothAmt += (mothEff - mothAmt) * Math.min(1, dt * 0.6);
+    if (mothAmt > 0.01) {
+      var mam = mothAmt * (1 - corridorAmt);
+      t.q21 += (t.q2 - t.q21) * 0.8 * mam; // stacked "8" through the hub
+      t.q22 += (t.q3 - 0.07 - t.q22) * 0.8 * mam;
+      t.q23 += (t.q2 - t.q23) * 0.8 * mam;
+      t.q24 += (t.q3 + 0.07 - t.q24) * 0.8 * mam;
+      t.q25 = Math.max(t.q25, 0.9 * mam);
+      t.q14 = Math.max(t.q14, 0.9 * mam);
+      if (time - mothSnapT > 1.0) {
+        mothSnapT = time; // O10: the core/ring ink STEPS ~1s/step while the pair is up
+        accentHue += (Math.random() < 0.5 ? -1 : 1) * 0.14;
+      }
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
