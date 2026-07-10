@@ -14,6 +14,17 @@
 > **Un-judged live:** everything here awaits the user's next look; per-step pins in §4 still work
 > (`_balloon`/`_stage`/`_anatA`/`_anatB`/`_acc3`/`_mushroom` via the underscore closure-pin
 > channel added to `__ALC_FORCE`).
+>
+> **★ TAIL CLOSED 2026-07-10 night (commits 751e158 + ee23aab).** The telescope column was
+> REDESIGNED FILLED/GLASSY after the hollow-outline pull (154ee6c): each bead is now a tight
+> 4-turn SPIRAL whose ~6px pitch fuses under the 2.5px comp dilate into a solid glassy disc
+> (milky-bright core → darker saturated rim, tip bead still brightest) — zero extra slots, same
+> waves[3] branch. The column stays OUT of the natural accessory bag (the user pulled all
+> orb-anchored ring accessories); it exists for the A18 mushroom + the `_acc3` pin. **A18 is
+> UN-PINNED:** a self-contained natural roll (calm energy on fluid/wash, no rail/kaleido, ≥90s
+> apart, λ≈1/45s eligible, never before t=45) SUMMONS its own filled-bead column at event start
+> — the old gate needed a natural type-2 roll that could no longer happen. Verified via
+> `_mushroom` pin: two mirror figures, cap orbs atop rising bead-trail bodies.
 
 **Matrix items:** A16 (orb anatomy vocabulary, P1) · D2 (balloon events + base size, P1) · D15 (posts/rail staging, P1) · A4 (ring-stack / telescope / cone columns, P1) · D9 (bead-chain taper + attachment, P3) · A18 (mushroom figures, P3) · **Priority:** P1 core (A16/D2/D15/A4), P3 tail (D9/A18) · **Risk flags:** (1) budget routing — all 4 shape slots committed, ring-only variants must route via waves; filled beads were user-rejected before · (4) prior-revert territory — D2's base-size fix was reverted with the rejected motion rework; D15's snake wobble shipped with the user's eyes in 9b5ea11 · **Confirmation needed:** **yes** —
 1. **A4 columns:** filled *glassy-sphere* bead stacks (p0 O6) need a filled-shape renderer, and all 4 shape slots are taken by the 2 orbs × (fill + halo). The plan ships columns as **hollow-RING stacks** drawn in the often-idle waves[3] slot (ring outlines only — faithful to p1 O7/p3 D-ORB.4, which are ring/disc *outlines*). OK to ship ring-only columns, or would you rather sacrifice orb B's additive halo slot to get filled glassy beads?

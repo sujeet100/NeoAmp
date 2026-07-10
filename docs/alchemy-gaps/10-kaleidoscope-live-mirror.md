@@ -1,5 +1,15 @@
 # 10 — Kaleidoscope lattice variants, region-by-region colour floods, and live-geometry mirroring
 
+> **★ LANDED IN FULL.** Steps 1+2 landed 2026-07-10 (region-flood LUT + the q13-packed lattice
+> variants; a live round then pulled the B10 quad-fold spike and the user chose Q1's default —
+> Pastel stays muted). **Step 3 (B8) landed 2026-07-10 night (commit 9e5590c, Q2 answered yes):**
+> the orb posts SNAP into the fold window at kaleido entry (per-visit pair offset 0.11 about
+> centre, C1 pop grammar, LAST coupling so it wins rail/moth/swimmer parks; keyed off effective
+> q29 so a `{q29:1}` pin exercises it) and render as the refs' 4x-mirrored mini orbs — verified
+> in a pinned self-render (4 quadrant copies, no stray X). The tether + rail are GATED OFF via
+> an early `a.a=0` in waves[2] under q29≈1 (the un-mirrored-diagonal exception is a documented
+> ceiling of the uniform fold). Step 4 (vivid flood peak in Pastel) NOT built — Q1 = keep muted.
+
 **Matrix items:** C5 (kaleido lattice variants + region floods, **P1**) · B8 (kaleido mirrors LIVE geometry, **P2**) · **Priority:** P1 (C5 dominates the slice; B8 rides along on the same COMP branch) · **Risk flags:** C5 = (6) _permissive_ — the kaleidoscope is the ONE sanctioned vivid zone (memory `alchemy-measured-color-facts`); B8 = _budget-honesty_ — one uniform COMP fold cannot selectively exempt an emitter. · **Confirmation needed:** YES — two questions:
 
 > **Q1 (C5 vivid).** Pastel today deliberately DESATURATES the kaleido (`ksat` 0.38, alchemy-v7.js L1346, comment "was reading too vivid in pastel"). The measured refs + memory sanction a _vivid red/green_ kaleido as the single muted-rule exception. During a region-flood PEAK (~1–1.5 s), may Pastel spike toward vivid (raise effective `ksat`→~0.8) per D13 "one-vivid-accent", or keep Pastel's kaleido uniformly muted and let only Vivid pop? **Default if no answer: keep Pastel muted; ship the flood mechanism desaturated in Pastel, vivid in Vivid.**

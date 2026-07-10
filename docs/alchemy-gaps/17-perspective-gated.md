@@ -1,5 +1,22 @@
 # Perspective devices & valley dolly (confirmation-gated)
 
+> **★ RESOLVED 2026-07-10 night — every §4 question now has an explicit answer and the approved
+> items are BUILT (commits 99a2f75 + 282cb40).**
+> **Q1 valley dolly = YES (remove):** done early, out of band — the dolly (q15 magnify) was
+> deleted in the 84s-clip round (e759d46 era) with the decay bump kept per Q1b. D14 CLOSED.
+> **Q2 floor reflections = NO:** closed as omitted (answered README Q20; fSwimmer's comment
+> records the deliberate omission).
+> **Q3 receding rows / VP string fans = YES (README Q22):** built as **accLine 9** — ONE live
+> 1-2px string from an OFF-FRAME vanishing point (x=-0.08 or 1.08, y 0.3-0.7), re-AIMED in
+> stamped snaps every 0.5-1s; the receding fan is the trail's ~1.5s fading strands (h0 M2's
+> "old fan fades in ~1s" — deliberately NO freeze coupling, unlike swath/lighthouse). Cyan/red
+> duo alternates per re-aim. Bag weight .06 carved from "none"; pin `FORCE.accLine:9`.
+> Bounded to fans/rows — the floor GRID stays rejected.
+> **Q4 contact shadow = YES (README Q23):** comp-only dim dark ellipse on the GROUND below the
+> motif centre (never the trail — birth-hue law), gated to the tilted-disc modes jelly(9)/
+> spiro(17)/spinner(21), fading with q4. Subtle by design; live-watch item (it sits under the
+> motif's own trail on busy scenes). GLSL locals shGate/shp/shd.
+
 **Matrix items:** C9, D14 · **Priority:** P3 · **Risk flags:** (2)(3)(4)(5) · **Confirmation needed:** YES — this whole doc is gated
 
 This is a **decision dossier, not an implementation plan.** Both items sit on territory the

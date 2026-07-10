@@ -1,5 +1,16 @@
 # 11 — Pompom-on-wire, dahlia drip-stems, filament crimp texture & radial hue fronts
 
+> **★ LANDED IN FULL (2026-07-10/11).** Step 1 (alcCrimp wavelet + tip jitter) landed 2026-07-07
+> with doc 11a. Step 2 = verification-only (doc 05's radial front covers modes 0/2/8/9; mode 16
+> then MOVED to its own front — see step 4). Steps 3-5 landed 2026-07-10 night (commits
+> 00edb3a/ce76bf3/5e84400): apex bloom = per-dwell `pompApex` roll (~40%; dark core hole at
+> rr<0.22R + 7-lobe tuft modulation; chenille form keeps a subtle 3-lobe waver; pin
+> `FORCE._pompApex`) · bottom-up ~4s hue front on mode 16 (numerically verified: fresh-hue points
+> avg y 0.39 vs held 0.53) · threading = option (b) as recommended — the doc-06 RAIL: while a
+> rail lives and 16 is the motif, q2/q3 ease to the rail midpoint (pin `{rail:1,q30:16}`).
+> Step 6 drip-stem stays a cross-ref: the doc-01 sag field (bg 4/6) + doc-02 sink impulse already
+> provide the down-bias; no dedicated pompom→field coupling was built. NOT yet live-judged.
+
 **Matrix items:** A8 (elements threaded on wires/rings + dahlia drip-stems) · D6 (radial filament crimp texture + travelling hue front) · **Priority:** D6 = **P1**, A8 = P2 · **Risk flags:** (1) filled beads-on-wire out of scope → deferred to D9/doc 09 · (4) threading re-anchors the user-tuned motif centre → one incremental step · (5) drip-stem must be a trail DEPOSIT, never invented drawn geometry · (6) Pastel stays muted (hue-only changes) · **Confirmation needed:** NO for the core geometry/colour slices (Steps 1–4, all zero-slot changes on existing `waves[0]`). ONE question gates Step 5 (threading): _"The chenille pompom threads onto the telephone-cord tether, but our tether is beat-gated and transient (flashes only when both orbs are visible — doc 06). Should the threaded pompom (a) ride the tether so it appears only when the tether does, or (b) get a dedicated low-key persistent wire (the doc-06 Step-5 rail chord) so it can stand alone? I recommend (b), reusing doc 06's rail."_
 
 ---
