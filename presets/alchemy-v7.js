@@ -1193,7 +1193,7 @@
     var strand = s < 0.5 ? 0 : 1, // 2 strands × 256 samples (p2 draws bundles; L/R stereo)
       u = (s - strand * 0.5) * 2;
     var R = a.q5 || 0.4,
-      W = R * 2.4;
+      W = R * 3.0; // 2.4→3.0: the ref's terrain rows run edge-to-edge (recording round 2)
     var ct = Math.cos(mtTilt),
       st = Math.sin(mtTilt);
     var pinch = Math.abs(Math.sin(u * 3.14159 * 3.5 + mtPinchPhase)); // amplitude pinched → triangular peaks (p2 2.7)
@@ -1670,13 +1670,16 @@
     0.55, // swimmer (22): two slinky outlines — outline-class
   ];
   function scaleFor(m) {
-    // TWO size classes (refined from the user's 2026-07-10 recording review vs the full 480p):
-    // — the morphing FLOWER/wheel/star class stays COMPACT (~15-25% dia, the 0:50-0:55 rule);
-    // — the ORGANIC-BALL class (jelly 9 / fluff 16 / spinner 21) runs bigger, like the ref's
-    //   40-60% pompoms/fluffballs (0:28-0:38, 0:70-0:75) — the uniform compact clamp had made
-    //   every scene read small + empty.
-    if (m === 9 || m === 16 || m === 21) return 0.22;
-    return m === 0 ? 0.14 : 0.15;
+    // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
+    // MEASURED: the original keeps a median 43% of the frame carrying structure vs our 24%).
+    // The compact clamp was meant for the MORPHING FLOWER, but q5 scales every mode, so it
+    // also shrank the SCENE-scale classes that were live-tuned at q5≈0.4 — terrain rows
+    // became small piles, the valley bow-tie halved, ribbons stopped crossing the frame:
+    if (m === 3 || m === 12 || m === 14) return 0.4; // scene-scale: X-ribbons / valley / terrain (near full-frame, the pre-clamp tuned value)
+    if (m === 7) return 0.26; // wireframe net dome — a big scene object in the ref
+    if (m === 9 || m === 16 || m === 21) return 0.22; // organic balls (ref 40-60% pompoms)
+    if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.24; // stars/n-gons/mandalas/petal-flowers (ref ~40%)
+    return m === 0 ? 0.14 : 0.15; // the compact morphing-flower tier (the 0:50-0:55 rule)
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
   // radial discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
@@ -2571,8 +2574,11 @@
     if (FORCE && FORCE.cometForce && time - cometT0 > 3.3) cometT0 = time - 1.1; // pin: mid-traverse
     var cp = (time - cometT0) / 3.3;
     var cometAmt = cp >= 0 && cp <= 1 ? Math.sin(cp * 3.14159) : 0;
-    var lisX = 0.5 + 0.12 * Math.sin(time * 0.045) + 0.05 * Math.sin(time * 0.017 + 1.0);
-    var lisY = 0.5 + 0.09 * Math.cos(time * 0.038) + 0.05 * Math.sin(time * 0.021 + 2.0);
+    // roam WIDENED ±0.17→±0.25 (recording round 2: our motif lived in the central ~34% of the
+    // frame; the ref's wanders wide — fluffballs near edges — and its trail history is what
+    // fills the canvas). Range now ~0.19-0.81 x / 0.25-0.75 y.
+    var lisX = 0.5 + 0.19 * Math.sin(time * 0.045) + 0.06 * Math.sin(time * 0.017 + 1.0);
+    var lisY = 0.5 + 0.15 * Math.cos(time * 0.038) + 0.06 * Math.sin(time * 0.021 + 2.0);
     anchorAmt *= Math.exp(-dt * 0.25); // release toward the free path over ~4-6s (B4b)
     t.q2 = lisX + (anchorX - lisX) * anchorAmt;
     t.q3 = lisY + (anchorY - lisY) * anchorAmt;
@@ -2682,7 +2688,7 @@
           var cdx = cxr - kpx,
             cdy = cyr - kpy,
             cd = Math.sqrt(cdx * cdx + cdy * cdy);
-          if (cd > 0.4 && cd < 0.7) {
+          if (cd > 0.4 && cd < 0.78) {
             npx = cxr;
             npy = cyr;
             break;
