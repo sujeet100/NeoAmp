@@ -1365,24 +1365,34 @@
   // travel), orb heads re-anchored on the column tops (coupling in frame(); the doc-07
   // anatomy bag gives the head-morph). Floor reflections deliberately OMITTED (risk 2 /
   // answered Q20). Live jag rides the upper coils lightly (the head's waveform sprigs).
+  // ★ REBUILT TRAIL-BUILT (user 2026-07-10 — "it's created using pulsing orbs moving upward
+  // leaving trace... also a line rotating between orbs around center"; frame-stepped
+  // Alchemy-orig-reference-19s.mp4 8-16s @8fps. 4th trail-built correction — the rule in
+  // [[alchemy-design-language-trail-built]]). LIVE = the two pulsing ORB heads, driven upward
+  // in the frame() coupling — their solid-colour wakes ARE the wavy stalks (solid near the
+  // head, diffusing floor-ward as they age; the vertical mirror of the corridor's flying
+  // heads) — plus THIS one straight line rotating slowly about a low pivot between the
+  // columns (~11°/s; its held copies build the ref's steep fan → later the near-horizontal
+  // harp). The old drawn 5-loop slinky C-arcs (the user's "ugly coils") are GONE — nothing
+  // draws the stalk any more.
   function fSwimmer(a) {
-    var COLS = 2,
-      fk = (a.sample || 0) * COLS,
-      col = Math.floor(fk),
-      s = fk - col;
-    var cx = (a.q2 !== undefined ? a.q2 : 0.5) + (col - (COLS - 1) / 2) * 0.22;
-    var cy = a.q3 !== undefined ? a.q3 : 0.5;
-    var ang = s * 6.2832 * 5; // 5-loop slinky
-    var sway = 0.05 * Math.sin(lastT * 1.9 + s * 3.0 + col * 2.4); // in-place S-flex (clock)
-    var ringR = (a.q5 || 0.4) * 0.35 * (0.85 + 0.15 * Math.sin(s * 9.4)); // gentle taper
-    a.x = cx + Math.cos(ang) * ringR + sway + (a.value1 || 0) * 0.012 * s;
-    // wave y is BOTTOM-UP (the comp-crosshair flip gotcha): s=1 = the HEAD end = the TOP
-    a.y = cy - 0.28 + s * 0.56 + Math.sin(ang) * ringR * 0.3; // squashed rings = the slinky
-    var h = (a.q8 || 0) + s * 0.12 + col * 0.07;
+    var u = a.sample || 0,
+      tt = u * 2 - 1; // -1..1 — one full strand through the pivot
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var ang = lastT * 0.19; // slow continuous sweep (ref: steep → horizontal over ~8s)
+    var wav = (a.value1 || 0) * 0.006 + 0.004 * Math.sin(u * 33.0 + lastT * 2.1);
+    var px = cx,
+      py = cy - 0.2; // pivot LOW between the columns (wave y is bottom-up)
+    var ct = Math.cos(ang),
+      st = Math.sin(ang);
+    a.x = px + tt * 0.7 * ct - wav * st;
+    a.y = py + tt * 0.7 * st + wav * ct;
+    var h = (a.q8 || 0) + 0.16;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (s < 0.02 || s > 0.98) a.a = 0; // hide column-to-column connector
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the wrap connector
     return a;
   }
   // SCISSOR FAN (user, 2026-07-10, from the 480p 0:39-0:45 frame-check): TWO full-frame
@@ -1758,7 +1768,7 @@
     0.45, // moth (20): TWO live rotor lines — the airy 40-60-ray fan is their trail
     // (480p 1:21-1:30; rebuilt per the user's rotating-lines read, 2026-07-11)
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
-    0.55, // swimmer (22): two slinky outlines — outline-class
+    0.55, // swimmer (22): ONE rotating line — the stalks are the orb heads' wakes
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
   ];
   function scaleFor(m) {
@@ -2108,7 +2118,9 @@
     accWormX = 0.3, // A21 worm head (doc 15): position + heading, advanced in frame()
     accWormY = 0.15,
     accWormAng = 0,
-    swimAmt = 0; // mode-22 swimmer engagement: orb heads parked on the column tops
+    swimAmt = 0, // mode-22 swimmer engagement: orb heads = the rising stalk emitters
+    swimT0 = -9, // mode-22 entry time (the heads' rise clock)
+    swimSeed = 0; // per-visit sway phase
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -3892,28 +3904,48 @@
       mothAmt > 0.5 && mcAge > 4.0 && mcAge < 5.5
         ? Math.min(1, Math.min(mcAge - 4.0, 5.5 - mcAge) / 0.25)
         : 0;
-    // ── SWIMMER heads (doc 15 step 4; post-FORCE like the eyes): both orbs re-anchor to the
-    //    two column TOPS while the stalks are up — the doc-07 anatomy bag supplies the ref's
-    //    morphing-head read. Spawn in place (C1). ──
+    // ── SWIMMER scene driver (mode 22) — ★ TRAIL-BUILT rework (user 2026-07-10; 19s-clip
+    //    frame-step 8-16s @8fps): the two PULSING orb heads RISE from the floor while swaying
+    //    (~1.8s S-period, ~0.02 UV amplitude) — their solid wakes ARE the wavy stalks (left
+    //    tall ~55%h @~4.5%h/s, right short ~30%h @~2.8%h/s), melting floor-ward under the
+    //    normal diffusion (the user's "solid colour which diffuses"). Balloons re-fire every
+    //    ~1.5-2s = the ref's pulse + the pagoda ring ghosts above the heads. Heads spawn AT
+    //    THE FLOOR in place (C1 pop — no glide). fSwimmer draws only the rotating line. ──
     var swimEff = Math.floor((t.q30 || 0) + 0.5) === 22 ? 1 : 0;
     if (swimEff && swimAmt < 0.02) {
+      swimT0 = time;
+      swimSeed = Math.random() * 6.28;
       stgAx = 0.39;
-      stgAy = 0.8; // spawn near the tops (+y = TOP, wave y is bottom-up)
+      stgAy = 0.2; // spawn at the FLOOR (wave y is bottom-up)
       stgBx = 0.61;
-      stgBy = 0.8;
-      stgNext = Math.max(stgNext, time + 6);
+      stgBy = 0.2;
+      stgNext = Math.max(stgNext, time + 8);
     }
     swimAmt += (swimEff - swimAmt) * Math.min(1, dt * 0.6);
     if (swimAmt > 0.01) {
       // FULL-strength blend (the D15 staging re-writes the posts every frame, so a partial
-      // blend never converges to the column tops — same reason the mushroom uses mu directly)
+      // blend never converges — same reason the mushroom uses mu directly)
       var swa = swimAmt * (1 - corridorAmt);
-      t.q21 += (t.q2 - 0.11 - t.q21) * swa;
-      t.q22 += (t.q3 + 0.3 - t.q22) * swa; // +y = TOP (wave y is bottom-up)
-      t.q23 += (t.q2 + 0.11 - t.q23) * swa;
-      t.q24 += (t.q3 + 0.3 - t.q24) * swa;
+      var swAge = Math.max(0, time - swimT0);
+      var riseA = Math.min(0.56, swAge * 0.045) - 0.3; // floor ≈ q3-0.30 → top ≈ q3+0.26
+      var riseB = Math.min(0.32, swAge * 0.028) - 0.3; // the short right column
+      var swayA = 0.022 * Math.sin(time * 3.4 + swimSeed);
+      var swayB = 0.02 * Math.sin(time * 3.0 + swimSeed + 2.1);
+      t.q21 += (t.q2 - 0.11 + swayA - t.q21) * swa;
+      t.q22 += (t.q3 + riseA + 0.012 * Math.sin(time * 2.2 + swimSeed) - t.q22) * swa;
+      t.q23 += (t.q2 + 0.11 + swayB - t.q23) * swa;
+      t.q24 += (t.q3 + riseB - t.q24) * swa;
       t.q25 = Math.max(t.q25, 0.9 * swa);
       t.q14 = Math.max(t.q14, 0.9 * swa);
+      // ref pulse cadence ~1.5-2s (fireBalloon's own limiter is 2-4s → pull it in)
+      if (swa > 0.5 && time > balloonNext) {
+        fireBalloon(time);
+        balloonNext = time + 1.4 + 0.8 * Math.random();
+      }
+      // stalk hold: the wake stays registered + solid a few seconds, then diffusion melts it
+      t.q1 = Math.max(t.q1, 0.955 + 0.023 * swa);
+      t.q18 *= 1 - 0.7 * swa;
+      t.q19 *= 1 - 0.7 * swa;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
