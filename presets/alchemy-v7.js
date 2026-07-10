@@ -1515,7 +1515,11 @@
     0.6, // scallop (19): one smooth two-strand line — outline-class
   ];
   function scaleFor(m) {
-    return m === 0 ? 0.36 : 0.4;
+    // COMPACT motif (user 2026-07-10, frame-checked 480p 0:50-0:55: the central motif stays a
+    // small tightly-centred object ~15-25% of frame that MORPHS shape in place — never the
+    // frame-filling sprawl ours had). Was 0.36/0.4 (rest radius ~0.33 ≈ 66% diameter); now
+    // ~0.15 → rest diameter ~25%, beat-puff ~38%.
+    return m === 0 ? 0.14 : 0.15;
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
   // radial discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
