@@ -1310,6 +1310,31 @@
     if (u < 0.03) a.a = 0; // hide the hub connector spokes
     return a;
   }
+  // SWIMMER STALKS (doc 15 step 4 A11; r0 2.3 t=8.2-12.6): two vertical slinky COIL columns
+  // (~56% frame tall, ring width ~0.07 UV) that SWAY IN PLACE (S-flex ~1.5-2s clock — no
+  // travel), orb heads re-anchored on the column tops (coupling in frame(); the doc-07
+  // anatomy bag gives the head-morph). Floor reflections deliberately OMITTED (risk 2 /
+  // answered Q20). Live jag rides the upper coils lightly (the head's waveform sprigs).
+  function fSwimmer(a) {
+    var COLS = 2,
+      fk = (a.sample || 0) * COLS,
+      col = Math.floor(fk),
+      s = fk - col;
+    var cx = (a.q2 !== undefined ? a.q2 : 0.5) + (col - (COLS - 1) / 2) * 0.22;
+    var cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var ang = s * 6.2832 * 5; // 5-loop slinky
+    var sway = 0.05 * Math.sin(lastT * 1.9 + s * 3.0 + col * 2.4); // in-place S-flex (clock)
+    var ringR = (a.q5 || 0.4) * 0.35 * (0.85 + 0.15 * Math.sin(s * 9.4)); // gentle taper
+    a.x = cx + Math.cos(ang) * ringR + sway + (a.value1 || 0) * 0.012 * s;
+    // wave y is BOTTOM-UP (the comp-crosshair flip gotcha): s=1 = the HEAD end = the TOP
+    a.y = cy - 0.28 + s * 0.56 + Math.sin(ang) * ringR * 0.3; // squashed rings = the slinky
+    var h = (a.q8 || 0) + s * 0.12 + col * 0.07;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (s < 0.02 || s > 0.98) a.a = 0; // hide column-to-column connector
+    return a;
+  }
   // SPIROGRAPH PETAL FLOWER family (480p 27.5-30/35.3/49.8/51-56 · 1080p 83.5-86 · A1):
   // k petal LOOPS traced as ONE closed stroke from a hollow centre; construction identity
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
@@ -1605,6 +1630,7 @@
     fScallop, // id 19 (doc 02 A10 — the README registry's "MODES.length at landing" rule)
     fMoth, // id 20 (doc 13 A7 compass-moth)
     fSpinner, // id 21 (doc 14 A20 oblate spinner disc)
+    fSwimmer, // id 22 (doc 15 A11 swimmer stalks)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1637,6 +1663,7 @@
     0.6, // scallop (19): one smooth two-strand line — outline-class
     0.5, // moth (20): 20 fine rays — the fan MASS comes from the radial-out trail, keep the emitter light
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
+    0.55, // swimmer (22): two slinky outlines — outline-class
   ];
   function scaleFor(m) {
     // COMPACT motif (user 2026-07-10, frame-checked 480p 0:50-0:55: the central motif stays a
@@ -1901,7 +1928,8 @@
     accLhPiv = 2, // D10 lighthouse pivot kind: 0 orb A · 1 tether mid-span · 2 motif hub
     accWormX = 0.3, // A21 worm head (doc 15): position + heading, advanced in frame()
     accWormY = 0.15,
-    accWormAng = 0;
+    accWormAng = 0,
+    swimAmt = 0; // mode-22 swimmer engagement: orb heads parked on the column tops
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -2083,7 +2111,7 @@
   // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
-    17, 19, 20, 21, 21,
+    17, 19, 20, 21, 21, 22,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -3362,6 +3390,29 @@
       mothAmt > 0.5 && mcAge > 4.0 && mcAge < 5.5
         ? Math.min(1, Math.min(mcAge - 4.0, 5.5 - mcAge) / 0.25)
         : 0;
+    // ── SWIMMER heads (doc 15 step 4; post-FORCE like the eyes): both orbs re-anchor to the
+    //    two column TOPS while the stalks are up — the doc-07 anatomy bag supplies the ref's
+    //    morphing-head read. Spawn in place (C1). ──
+    var swimEff = Math.floor((t.q30 || 0) + 0.5) === 22 ? 1 : 0;
+    if (swimEff && swimAmt < 0.02) {
+      stgAx = 0.39;
+      stgAy = 0.8; // spawn near the tops (+y = TOP, wave y is bottom-up)
+      stgBx = 0.61;
+      stgBy = 0.8;
+      stgNext = Math.max(stgNext, time + 6);
+    }
+    swimAmt += (swimEff - swimAmt) * Math.min(1, dt * 0.6);
+    if (swimAmt > 0.01) {
+      // FULL-strength blend (the D15 staging re-writes the posts every frame, so a partial
+      // blend never converges to the column tops — same reason the mushroom uses mu directly)
+      var swa = swimAmt * (1 - corridorAmt);
+      t.q21 += (t.q2 - 0.11 - t.q21) * swa;
+      t.q22 += (t.q3 + 0.3 - t.q22) * swa; // +y = TOP (wave y is bottom-up)
+      t.q23 += (t.q2 + 0.11 - t.q23) * swa;
+      t.q24 += (t.q3 + 0.3 - t.q24) * swa;
+      t.q25 = Math.max(t.q25, 0.9 * swa);
+      t.q14 = Math.max(t.q14, 0.9 * swa);
+    }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
     if (railAmt > 0.01) {
