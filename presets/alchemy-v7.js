@@ -896,43 +896,67 @@
   // older {13/5} star-art spray was rejected as chaotic — this is the measured middle: ordered
   // parallel strands, but each strand BOWS with its own slowly-drifting curvature.
   function fNet(a) {
-    // ★ REBUILT TRAIL-BUILT (2026-07-11; user: "this mesh existed even before v7" — correct,
-    // the old fNet DREW a 14-rail woven grid every frame, the drawn-N-strands violation).
-    // Frame-step 1080p 0:28.5-0:32.5 @2fps: the ref "net" is TWO families of fine parallel
-    // curved hairlines on a dark ground — each family is the ~1s TRAIL of ONE bowed full-width
-    // strand SWEEPING transversely (sweep time-quantized here so copies land ~8px apart as the
-    // ref's discrete comb lines); the weave is only the transient crossing of the two sweeps,
-    // never a static grid. Live per frame = just the two strands.
-    var half = (a.sample || 0) < 0.5 ? 0 : 1;
-    var u = half ? ((a.sample || 0) - 0.5) * 2.0 : (a.sample || 0) * 2.0; // 0..1 along the strand
-    var p = u * 2.0 - 1.0;
-    var R = (a.q5 || 0.4) * 1.1;
-    // quantized sweep clock: hold ~160ms per pose → per-pose trail copies ≈ 0.013 UV apart
-    // (the ref's ~9px comb-line spacing at constant speed)
-    var tq = Math.floor(lastT / 0.16) * 0.16;
-    // family angles: one near-horizontal, one crossing ~35° over it, both drifting slowly
-    var fa = half ? 0.55 + 0.1 * Math.sin(tq * 0.13 + 2.0) : -0.08 + 0.1 * Math.sin(tq * 0.1);
-    // transverse SWEEP (the comb builder): CONSTANT-speed triangle wave ±~38% frame (~0.08
-    // UV/s — a sine stalls at its extremes and piles copies instead of combing them)
-    var ph0 = (tq * 0.052) % 1;
-    var ph1 = (tq * 0.0625 + 0.37) % 1;
-    var sw = half ? 0.36 * (Math.abs(ph1 * 2 - 1) * 2 - 1) : 0.4 * (Math.abs(ph0 * 2 - 1) * 2 - 1);
-    // bowed profile, amplitude breathing slowly + gentle live-waveform jag
-    var bow = (0.12 + 0.1 * Math.sin(tq * 0.17 + half * 2.4)) * R * (1 - p * p);
-    var lx = p * R,
-      ly = sw + bow + (a.value1 || 0) * (a.q6 || 0.05) * 0.3;
-    var ca = Math.cos(fa),
-      sa = Math.sin(fa);
+    // ★ 3D RULED SHEET (2026-07-11 v3 — user: "parallel curved lines rotating and warping in
+    // 3d space creating the mesh-like structure"; frame-step 1080p 0:28-0:33 @7fps CONFIRMS:
+    // the WHOLE family is live each frame — uniform crispness, coherent motion — a string-art
+    // sheet of ~14 curved lines strung between two RAILS tumbling slowly in 3D. The fan
+    // converges when a rail's spread collapses toward a point; lines cross in projection
+    // where the sheet twists; the "two crossing fans" moments are the fresh family over its
+    // own differently-hued ~1.5s trail ghost (the hue steps, the trail keeps the old one) —
+    // so trail retention stays DEFAULT. Same live-whole-construction class as the spiro
+    // flower (the diff/brightness test is what separates live from trail).
+    var N = 14;
+    var fk = (a.sample || 0) * N,
+      li = Math.floor(fk),
+      u = fk - li;
+    if (li >= N) {
+      li = N - 1;
+      u = 1;
+    }
+    var w = li / (N - 1); // 0..1 across the family
+    var tt = lastT;
+    // RAILS: left/right edges of the sheet. Each rail's vertical SPREAD + shift breathe on
+    // slow clocks — spread→small = the ref's converged fan/pencil; spread wide = parallel
+    // sheet. Rails bow in depth (z) so the rulings are CURVED, and the bows warp slowly.
+    var spreadA = 0.9 * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 0.13)));
+    var spreadB = 0.9 * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 0.09 + 2.3)));
+    var shiftA = 0.3 * Math.sin(tt * 0.07 + 1.0),
+      shiftB = 0.3 * Math.sin(tt * 0.055 + 3.1);
+    var aY = (w - 0.5) * 2.0 * spreadA + shiftA,
+      bY = (w - 0.5) * 2.0 * spreadB + shiftB;
+    var aZ = 0.5 * Math.sin(w * 3.14159 + tt * 0.12),
+      bZ = -0.5 * Math.sin(w * 3.14159 + tt * 0.1 + 0.8);
+    // the ruling: straight line A→B + a slight breathing sag → "parallel curved lines"
+    var sag = 0.3 * Math.sin(u * 3.14159) * Math.sin(tt * 0.08 + w * 2.2);
+    var px = -1.0 + 2.0 * u,
+      py = aY + (bY - aY) * u + sag * 0.35,
+      pz = aZ + (bZ - aZ) * u + sag;
+    // slow 3D TUMBLE of the whole sheet — BOUNDED oscillations (a continuous yaw swept the
+    // sheet through edge-on poses where all rulings fuse into one bright cone; the ref fans
+    // always stay readable as separate lines, so the pose never leaves ±~45°)
+    var ryA = 0.75 * Math.sin(tt * 0.09),
+      rxA = 0.45 * Math.sin(tt * 0.14 + 0.6);
+    var c2 = Math.cos(ryA),
+      s2 = Math.sin(ryA);
+    var x1 = px * c2 + pz * s2,
+      z1 = -px * s2 + pz * c2;
+    var c1 = Math.cos(rxA),
+      s1 = Math.sin(rxA);
+    var y1 = py * c1 - z1 * s1,
+      z2 = py * s1 + z1 * c1;
+    var persp = 1.7 / (2.7 + z2); // mild perspective — the 3D foreshorten/warp read
+    var S = (a.q5 || 0.4) * 1.35;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + lx * ca - ly * sa;
-    a.y = cy + lx * sa + ly * ca;
-    // the two families carry DISTINCT hues (1080p: green/gold families over near-black)
-    var h = (a.q8 || 0) + 0.12 + (half ? 0.22 : 0);
+    a.x = cx + x1 * S * persp + (a.value1 || 0) * 0.004; // whisper of live jag
+    a.y = cy + y1 * S * persp;
+    // ONE hue family with a gentle across-sheet gradient; the family hue walks with the
+    // stepped motif clock, so the trail ghost fan keeps the previous colour (ref two-tone)
+    var h = (a.q8 || 0) + 0.12 + w * 0.1;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02 || u > 0.98) a.a = 0; // hide the strand-to-strand connector
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
     return a;
   }
   // SPIRAL VORTEX / whirlpool (survey gap, 1:05-1:16): radial filaments whose angle GROWS with radius →
@@ -3045,12 +3069,11 @@
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
     }
-    // NET comb hold (rebuilt fNet, 2026-07-11): the two sweeping strands need ~2.5s of visible
-    // copies to build the ref's 15-20-line combs (1080p 0:28.5-0:32.5); milder than the removed
-    // scissor-fan hold, and only two bounded families exist, so no woven-mesh risk.
+    // NET pan damp (v3 ruled sheet, 2026-07-11): the whole family is LIVE per frame, so NO
+    // decay hold (retention beyond the default ~1.5s ghost re-weaves the mesh); only keep the
+    // sheet registered against the pan while it tumbles.
     netAmt += ((mCur === 7 ? 1 : 0) - netAmt) * Math.min(1, dt * 0.6);
     if (netAmt > 0.01) {
-      t.q1 += (0.972 - t.q1) * netAmt;
       t.q18 *= 1 - 0.6 * netAmt;
       t.q19 *= 1 - 0.6 * netAmt;
     }
