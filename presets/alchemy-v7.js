@@ -1386,11 +1386,12 @@
     // ROCKING sweep, measured 12-16s @8fps: ~2-4°/frame ≈ 20-30°/s peak, oscillating between
     // ~-15° and ~+75° (never a full rotation — the mesh-lesson bound). Was 11°/s continuous.
     var ang = 0.5 + 0.75 * Math.sin(lastT * 0.6);
-    var wav = (a.value1 || 0) * 0.006 + 0.004 * Math.sin(u * 33.0 + lastT * 2.1);
     var ct = Math.cos(ang),
       st = Math.sin(ang);
-    a.x = px + tt * 0.7 * ct - wav * st;
-    a.y = py + tt * 0.7 * st + wav * ct;
+    // DEAD STRAIGHT (user round 5; the ref stills show ruler-straight parallel copies —
+    // the old wobble term bent the combs)
+    a.x = px + tt * 0.7 * ct;
+    a.y = py + tt * 0.7 * st;
     var h = (a.q8 || 0) + 0.16;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
@@ -3938,24 +3939,41 @@
       accentHue = Math.random() < 0.55 ? 0.07 + 0.08 * Math.random() : Math.random();
     }
     swimAmt += (swimEff - swimAmt) * Math.min(1, dt * 0.6);
+    // the swimmer scene OWNS its ground (round 5 probe: a naturally-rolled corridor bg kept
+    // corridorAmt≈1, which zeroed swa and silently disabled the whole scene incl. the floor
+    // force — chicken-and-egg). While the motif is up, the corridor disengages.
+    if (swimEff) corridorAmt += (0 - corridorAmt) * Math.min(1, dt * 1.5);
     if (swimAmt > 0.01) {
       // FULL-strength blend (the D15 staging re-writes the posts every frame, so a partial
       // blend never converges — same reason the mushroom uses mu directly)
       var swa = swimAmt * (1 - corridorAmt);
       var swAge = Math.max(0, time - swimT0);
-      // rise sped up (user round 2: "orbs should move upwards in y axis" — the y-translation
-      // must dominate the balloon pulse, not read as z-scaling)
-      var riseA = Math.min(0.56, swAge * 0.06) - 0.3; // floor ≈ q3-0.30 → top ≈ q3+0.26 in ~9s
-      var riseB = Math.min(0.32, swAge * 0.04) - 0.3; // the short right column
-      var swayA = 0.022 * Math.sin(time * 3.4 + swimSeed);
-      var swayB = 0.02 * Math.sin(time * 3.0 + swimSeed + 2.1);
-      t.q21 += (t.q2 - 0.24 + swayA - t.q21) * swa; // wide pair (~half the frame apart)
-      // bob 0.012→0.03 (round 3): after the rise caps the heads must KEEP painting the stalk
-      t.q22 += (t.q3 + riseA + 0.03 * Math.sin(time * 2.2 + swimSeed) - t.q22) * swa;
-      t.q23 += (t.q2 + 0.24 + swayB - t.q23) * swa;
-      t.q24 += (t.q3 + riseB + 0.024 * Math.sin(time * 1.7 + swimSeed + 1.1) - t.q24) * swa;
+      // ★ Round 5 (user + close-up ref stills): heads move on ONE AXIS ONLY (no sway, no
+      // bob — the stalk's S-wave lives in the warp FIELD, the scallop principle), ~2x
+      // faster, crossing the FULL frame and RESPAWNING at the floor (corridor passes,
+      // vertical) with staggered phases — one head near the top while the other follows
+      // from the bottom.
+      var spanV = 0.64; // floor (q3-0.32) → above the frame top, then wrap
+      var yA = -0.32 + ((swAge * 0.11 + swimSeed * 0.1) % spanV);
+      var yB = -0.32 + ((swAge * 0.085 + swimSeed * 0.1 + spanV * 0.5) % spanV);
+      var tgtAy = t.q3 + yA,
+        tgtBy = t.q3 + yB;
+      // respawn SNAP (the corridor lesson: lerping back deposits a diagonal streak)
+      if (t.q22 - tgtAy > 0.3) t.q22 = tgtAy;
+      if (t.q24 - tgtBy > 0.3) t.q24 = tgtBy;
+      t.q21 += (t.q2 - 0.26 - t.q21) * swa; // fixed x — single-axis motion
+      t.q22 += (tgtAy - t.q22) * swa;
+      t.q23 += (t.q2 + 0.26 - t.q23) * swa;
+      t.q24 += (tgtBy - t.q24) * swa;
       t.q25 = Math.max(t.q25, 0.9 * swa);
       t.q14 = Math.max(t.q14, 0.9 * swa);
+      // CLOSE-UP scale (ref stills: head dia ~15-18% of the frame): orb base radius up
+      t.q7 = Math.max(t.q7 || 0.048, 0.048 + 0.03 * swa);
+      // stalk S-wave from the FIELD: gentle drifting sawtooth x-shear (q12>0 channel; the
+      // heads themselves stay dead-straight) — Math.max composes with the C4 chevron writer.
+      // 0.3 bent the wakes into giant zigzags (the shear COMPOUNDS on the held trail every
+      // frame); 0.035 ≈ the ref's ~15-25px wiggle over the stalk's life.
+      t.q12 = Math.max(t.q12, 0.035 * swa);
       // ref pulse cadence ~1.5-2s (fireBalloon's own limiter is 2-4s → pull it in)
       if (swa > 0.5 && time > balloonNext) {
         fireBalloon(time);
@@ -3970,17 +3988,16 @@
       t.q28 += (0.32 - t.q28) * 0.7 * swa;
       t.q18 *= 1 - 0.7 * swa;
       t.q19 *= 1 - 0.7 * swa;
-      // CAMERA CHASE (round 4 — user: "the camera should be facing their side, moving up
-      // WITH them"; the corridor chase-pan lesson, vertical): while the heads climb, the
-      // trail buffer streams DOWN (−q19 = down) at ~half the rise speed, so the painted
-      // stalks + floor slide past and the view reads as ascending alongside the heads.
-      // Eases out when the rise caps (the ref's 8-16s camera is still).
-      if (riseA < 0.25) t.q19 = Math.min(t.q19, -0.00045 * swa);
+      // CAMERA CHASE (round 4/5 — user: "the camera should ONLY move upwards"): a steady
+      // down-stream of the trail (−q19 = down) for the whole dwell — heads always have a
+      // climbing phase now (respawn passes), and a constant one-directional stream never
+      // reads as descent the way the old rise-gated ease-out did.
+      t.q19 = Math.min(t.q19, -0.0005 * swa);
       // FLOOR + HORIZON (round 4): the ref scene ALWAYS stands its columns on a bright floor
       // band — the strongest side-view cue. Force the floor-band ground (regime 11) as this
       // scene's composed set-piece (B11 grammar). Guarded so an explicit FORCE q29 pin wins
       // (the FORCE q-copy runs BEFORE this coupling).
-      if (swa > 0.6 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 11;
+      if (swimAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 11;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
