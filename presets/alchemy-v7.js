@@ -3299,30 +3299,36 @@
         acc3.t0 = time;
         acc3Fading = false;
         acc3Next = time + 6 + Math.random() * 8;
-        // ── A18 MUSHROOM eligibility (doc 07 step 8): a fresh COLUMN on a calm fluid/wash
-        //    ground rarely opens the scripted rise event (h2 2.14-2.15), ≥90s apart.
-        //    NOTE: with the column pulled from the bag (empty-rings round) type 2 never rolls
-        //    naturally, so the event is PIN-ONLY (_mushroom) until the column is redesigned. ──
-        if (
-          acc3.type === 2 &&
-          (bgMode === 0 || bgMode === 5) &&
-          energy < 1.15 &&
-          railAmt < 0.01 &&
-          time - mushLast > 90 &&
-          Math.random() < 0.15
-        ) {
-          mushT0 = time;
-          mushLast = time;
-          // SPAWN IN PLACE (user: "an orb with a line moved in rapidly" — the capture lerp was
-          // dragging visible orbs+tube across the screen; events pop at their posts, C1)
-          stgAx = 0.4;
-          stgAy = 0.45;
-          stgBx = 0.6;
-          stgBy = 0.47;
-          stgNext = Math.max(stgNext, time + 6); // no re-cast mid-event
-        }
       }
     } else if (acc3.type > 0) acc3Env = Math.min(1, acc3Env + dt / 0.4);
+    // ── A18 MUSHROOM natural roll (doc 07 step 8 — UN-PINNED after the filled-bead column
+    //    redesign): a rare scripted rise event (h2 2.14-2.15) on a calm fluid/wash ground,
+    //    ≥90s apart. The column no longer rolls from the accessory bag (the empty-rings pull),
+    //    so the event SUMMONS its own filled-bead column for the ride; the mushAmt gate above
+    //    keeps the director from swapping it out mid-event. SPAWN IN PLACE (C1 pop grammar —
+    //    the old capture lerp dragged visible orbs+tube across the screen). ──
+    if (
+      time > 45 &&
+      (bgMode === 0 || bgMode === 5) &&
+      energy < 1.15 &&
+      railAmt < 0.01 &&
+      kalOrbAmt < 0.01 &&
+      time - mushLast > 90 &&
+      Math.random() < dt * 0.022 // λ ≈ one per ~45s of eligibility
+    ) {
+      mushT0 = time;
+      mushLast = time;
+      stgAx = 0.4;
+      stgAy = 0.45;
+      stgBx = 0.6;
+      stgBy = 0.47;
+      stgNext = Math.max(stgNext, time + 6); // no re-cast mid-event
+      if (acc3.type !== 2) {
+        acc3 = rollAcc3(2);
+        acc3.t0 = time;
+        acc3Fading = false;
+      }
+    }
     if (FORCE && FORCE._mushroom && time - mushT0 > 6) {
       // debug pin: force the event (and the column it rides on) now
       mushT0 = time;
