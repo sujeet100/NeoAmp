@@ -1707,11 +1707,14 @@
     // The compact clamp was meant for the MORPHING FLOWER, but q5 scales every mode, so it
     // also shrank the SCENE-scale classes that were live-tuned at q5≈0.4 — terrain rows
     // became small piles, the valley bow-tie halved, ribbons stopped crossing the frame:
+    // ZOOM pass (user, recording round 3: "motif covers larger part in the original — zoom
+    // onto the motifs"; frame-checked 0:34-0:40: the pompom fills ~75% with the orbs INSIDE):
     if (m === 3 || m === 12 || m === 14 || m === 23) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan (near full-frame)
-    if (m === 7) return 0.26; // wireframe net dome — a big scene object in the ref
-    if (m === 9 || m === 16 || m === 21) return 0.22; // organic balls (ref 40-60% pompoms)
-    if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.24; // stars/n-gons/mandalas/petal-flowers (ref ~40%)
-    return m === 0 ? 0.14 : 0.15; // the compact morphing-flower tier (the 0:50-0:55 rule)
+    if (m === 7) return 0.3; // wireframe net dome — a big scene object in the ref
+    if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
+    if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
+    if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
+    return m === 0 ? 0.17 : 0.18; // the compact morphing-flower tier (still the smallest class)
   }
   // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
   // radial discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
@@ -2716,12 +2719,20 @@
         var npx = 1 - kpx,
           npy = 1 - kpy; // fallback: mirror across centre
         for (var ci = 0; ci < 8; ci++) {
-          var cxr = 0.12 + Math.random() * 0.76,
+          // ~half the casts are CORNER-biased (user, 480p 1:10-1:30: dumbbell orbs park out
+          // toward the corners/edges with the fan strung between) — the rest roam free
+          var cxr, cyr;
+          if (Math.random() < 0.5) {
+            cxr = Math.random() < 0.5 ? 0.08 + Math.random() * 0.2 : 0.72 + Math.random() * 0.2;
+            cyr = Math.random() < 0.5 ? 0.08 + Math.random() * 0.2 : 0.72 + Math.random() * 0.2;
+          } else {
+            cxr = 0.12 + Math.random() * 0.76;
             cyr = 0.12 + Math.random() * 0.76;
+          }
           var cdx = cxr - kpx,
             cdy = cyr - kpy,
             cd = Math.sqrt(cdx * cdx + cdy * cdy);
-          if (cd > 0.4 && cd < 0.78) {
+          if (cd > 0.4 && cd < 1.05) {
             npx = cxr;
             npy = cyr;
             break;
