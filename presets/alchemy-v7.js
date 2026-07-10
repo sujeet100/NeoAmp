@@ -2290,7 +2290,10 @@
   // floor/strata/wallpaper/chevron) append here as each lands.
   // kaleido weight 2→1 (user's 2026-07-10 recording: ~34% of 172s was fold scenes vs the
   // original's ~20-25% mirrored duty; back-to-back picks also rejected via acceptBg below)
-  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
+  // radial-tunnel (2) PULLED from the bag (user 2026-07-10: the uniform static 40-spoke
+  // starburst ground has NO ref equivalent — full-480p scan; the ref's ray fans are all
+  // trail-built and woven into the scene. Shader branch + FORCE q29:2 pin kept.)
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel(pulled) · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper(pulled) · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
