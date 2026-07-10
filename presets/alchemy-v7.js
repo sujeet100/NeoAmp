@@ -3007,6 +3007,26 @@
       stampGain = time - restStampT0 < 0.3 ? 1 : 0; // crisp blink, then only the fading ghost
     }
 
+    // ── POLYGON-CLASS HEIGHT CAP (user 2026-07-10 "why so big": hexagram/tri-mandala points
+    //    cropped off-frame). q5 sizes motifs in wave units = fraction of the frame's LONG axis,
+    //    so on widescreen a 0.23-0.39 circumradius (×radK) overflows the height (visible height
+    //    is only ~0.56 units at 16:9). Ref check (1080p): the 12-star bloom peaks ~55% width /
+    //    ~85% height (t=93-96) and the t=57 hexagram stamp ~55% width — points ALWAYS inside
+    //    the frame. Cap the effective radius at 0.36 of the visible height (diameter ≤72%,
+    //    the refs' typical span) — leaves room for the ±0.09-unit hub Lissajous so a point
+    //    never leaves the frame even with the hub at its wander extreme.
+    //    radK = each mode's internal radius multiple on q5 (alcTriangle/alcTriMandala 1,
+    //    star-net len 0.9, 12-star 0.6, square alcNgon 0.3). Placed after the sketchbook block
+    //    (final t.q30); honours the __ALC_FORCE q30 pin like the mEff block above. ──
+    var POLY_RADK = { 1: 0.9, 4: 1, 5: 0.3, 6: 1, 10: 0.6, 15: 1 };
+    var mFin = Math.floor((t.q30 || 0) + 0.5);
+    if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
+      mFin = Math.floor(window.__ALC_FORCE.q30 + 0.5);
+    if (POLY_RADK[mFin]) {
+      var aspW = typeof window !== "undefined" && window.__VIZ_ASPECT > 1 ? window.__VIZ_ASPECT : 1;
+      t.q5 = Math.min(t.q5, 0.36 / aspW / POLY_RADK[mFin]);
+    }
+
     // ── PER-SCENE TRAIL-DISPLACEMENT FIELDS (doc 01 C2). The refs schedule the feedback warp
     //    per scene; v7 ran ONE program always. Each field is an eased scene-gated modulation of
     //    the EXISTING engine channels — emitters never move, only the trail buffer's motion

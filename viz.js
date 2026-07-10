@@ -363,6 +363,9 @@
     var ch = canvas.clientHeight || window.innerHeight || 360;
     canvas.width = Math.max(1, Math.round(cw * dpr));
     canvas.height = Math.max(1, Math.round(ch * dpr));
+    // Presets read this to size motifs vs the frame HEIGHT: wave units span the LONG axis,
+    // so on widescreen a fixed radius overflows the height (Alchemy polygon-cap fix).
+    window.__VIZ_ASPECT = cw / ch;
     return { bw: canvas.width, bh: canvas.height };
   }
   function sizeCanvas() {
