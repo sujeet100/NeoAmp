@@ -2016,6 +2016,9 @@
     accLineY = 0.5,
     accLineDrift = 0,
     accLinePickT = 0, // pinwheel rotation reference (steady windmill, 480p 0:39-0:45)
+    accFanNext = -9, // C9 VP string-fan re-aim clock (stamped snaps every 0.5-1s, doc 17)
+    accFanAim = 0, // current aim angle (into the frame from the off-frame vanishing point)
+    accFanCount = 0, // re-aim counter → alternates the cyan/red string families (h0 M2)
     evNextT = 0, // TYPED BEAT-EVENT SCHEDULER (doc 03 B2): earliest next fire
     evTetherT0 = -9, // tether-spawn event birth
     evTetherLife = 0, // this spawn's life: 0.4-2s burst, or a LONG 3.5-10s session (user)
@@ -3061,24 +3064,26 @@
       // pinwheel (4) made RARER (user): ~0.26→~0.15, freed weight → "none" (calmer, motif-only)
       // HARP SWATH (5, doc 02 A3) carved ~.16 from curtain/bundle/pinwheel; "none" keeps .40:
       // A15 sawtooth rod (8, doc 16) + A21 worm (6) + A19 sail (7, doc 15) carved from "none"
-      // — all RARE (P3): none .23 / worm .06 / sail .06 / rod .05 / lighthouse .10 / swath .16
-      // / bundle .21 / pinwheel .13
+      // + C9 VP string-fan (9, doc 17) carved .06 more — all RARE (P3): none .17 / vp-fan .06
+      // / worm .06 / sail .06 / rod .05 / lighthouse .10 / swath .16 / bundle .21 / pinwheel .13
       accLine =
-        rl < 0.23
+        rl < 0.17
           ? 0
-          : rl < 0.29
-            ? 6
-            : rl < 0.35
-              ? 7
-              : rl < 0.4
-                ? 8
-                : rl < 0.5
-                  ? 1
-                  : rl < 0.66
-                    ? 5
-                    : rl < 0.87
-                      ? 2
-                      : 4;
+          : rl < 0.23
+            ? 9
+            : rl < 0.29
+              ? 6
+              : rl < 0.35
+                ? 7
+                : rl < 0.4
+                  ? 8
+                  : rl < 0.5
+                    ? 1
+                    : rl < 0.66
+                      ? 5
+                      : rl < 0.87
+                        ? 2
+                        : 4;
       if (accLine === 6) {
         // worm spawn: near the frame top/edges (h2 2.6), heading mostly horizontal
         accWormX = 0.2 + Math.random() * 0.6;
@@ -3109,6 +3114,13 @@
             : accLhPiv === 1
               ? ((t.q22 || 0.5) + (t.q24 || 0.5)) / 2
               : t.q3 || 0.5;
+      }
+      if (accLine === 9) {
+        // C9 VP STRING FAN (doc 17, answered Q22=yes): the vanishing point sits OFF-FRAME
+        // left or right at mid-height (h0 M2: off-frame left, y≈300/480)
+        accLineX = Math.random() < 0.5 ? -0.08 : 1.08;
+        accLineY = 0.3 + Math.random() * 0.4;
+        accFanNext = time; // first aim stamps immediately
       }
       accLineDrift = (Math.random() < 0.5 ? -1 : 1) * (0.008 + 0.02 * Math.random());
       accLinePickT = time;
@@ -3152,6 +3164,16 @@
         accLineAng +
         (time - accLinePickT) * 0.26 * (accLineDrift < 0 ? -1 : 1) +
         0.15 * Math.sin(time * 0.5);
+    } else if (accLine === 9) {
+      // C9 VP string fan (doc 17): the string RE-AIMS in stamped snaps every 0.5-1s (h0 M2:
+      // "the fan re-aims every ~0.5-1s, old fan fades in ~1s" — the trail's natural ~1.5s
+      // life IS that fade, so no freeze coupling; deliberately unlike the swath/lighthouse).
+      if (time >= accFanNext) {
+        accFanNext = time + 0.5 + Math.random() * 0.5;
+        accFanCount++;
+        accFanAim = (accLineX < 0 ? 0 : 3.14159) + (Math.random() - 0.5) * 1.3; // into the frame
+      }
+      accLineRot = accFanAim;
     } else {
       // D10 lighthouse: the free end sweeps continuously ~10-20°/s (p0 M10: 15-25°/s while
       // the pinch clump stays pinned), with a slow wander like the swath
@@ -3858,6 +3880,24 @@
           a.b = orbCol(hR, 0.67) * briR;
           a.a = (uR < 0.02 || uR > 0.98 ? 0 : part === 2 ? 0.6 : 0.5) * accVis;
           mutRGB(a); // D13: the red core is a muted contrast hue, not neon
+          return a;
+        }
+        if (accLine === 9) {
+          // C9 VP STRING FAN (doc 17, answered Q22=yes; h0 M2 5.2-8s): ONE live 1-2px string
+          // from the OFF-FRAME vanishing point, re-aimed in stamped snaps — the receding-fan
+          // read is the trail's fading strands (the SAME accepted device as the corridor
+          // dot-row foreshorten, explicitly NOT the rejected floor grid). Cyan/red string
+          // families alternate per re-aim (h0: cyan/red 1-2px strings).
+          var uF = a.sample || 0;
+          var jagF = (a.value1 || 0) * 0.004; // near-straight strings — a whisper of live jag
+          a.x = accLineX + Math.cos(accLineRot) * uF * 1.5 - Math.sin(accLineRot) * jagF;
+          a.y = accLineY + Math.sin(accLineRot) * uF * 1.5 + Math.cos(accLineRot) * jagF;
+          var hF = (a.q8 || 0) + ((accFanCount & 1) === 1 ? 0.55 : 0.06);
+          a.r = orbCol(hF, 0) * 0.75;
+          a.g = orbCol(hF, 0.33) * 0.75;
+          a.b = orbCol(hF, 0.67) * 0.75;
+          a.a = (uF < 0.02 ? 0 : 0.5) * accVis;
+          mutRGB(a); // D13
           return a;
         }
         if (accLine === 2) {
