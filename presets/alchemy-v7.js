@@ -1771,6 +1771,10 @@
   // h2 has it re-tinting whole-cluster per stamp (its own walk), never as a front. The pompom
   // (16) moved to its own BOTTOM-UP front (doc 11 step 4, below).
   var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1 };
+  // STAR FAMILY — the closed-polygon constructions (tri/square/hexagram/12-star/tri-mandala).
+  // All share the ref's bloom kinematics (1080p 1:30-1:40): continuous rotation + hue sweep +
+  // growth + the dive-into-centre exit. (Star-net 1 excluded: diameter rays, sketchbook class.)
+  var STAR_FAM = { 4: 1, 5: 1, 6: 1, 10: 1, 15: 1 };
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
     if (m < 0) m = 0;
@@ -1780,6 +1784,17 @@
     // hue walks (offsets on a.q8) ride it unchanged. Sketchbook pages keep the global clock
     // (+restStampHue) — that user-verified look predates this clock.
     if (sketchAmt < 0.5) a.q8 = motifHue;
+    // STAR-FAMILY bloom kinematics (user + ref 1080p 1:30-1:40): the kit polygon factories
+    // (alcTriangle/alcNgon/alcTriMandala) read a.q9 for spin and a.q8 for hue — add the dwell
+    // driver's continuous rotation + hue sweep here (LOCAL point-object override, the D12
+    // pattern). Mode 10 applies s12Spin/s12Hue inside f12Star instead (its q9 factor differs);
+    // sketchbook pages stay static (the sketchAmt gate matches the driver's).
+    if (sketchAmt < 0.5 && (m === 4 || m === 5 || m === 6 || m === 15)) {
+      // SET q9 absolutely (base = frame()'s time*0.06 via lastT): the point object is REUSED
+      // across all 512 samples with no per-point q reset, so `+=` would compound per point
+      a.q9 = lastT * 0.06 + s12Spin;
+      a.q8 += s12Hue; // safe: the D12 line above re-SETS q8 every point under the same gate
+    }
     MODES[m](a);
     // D12 RADIAL FRONT (doc 05 step 4): for ~1.8s after a hue step the NEW hue occupies the
     // disc centre-out; the OLD hue persists longest at the rim (h2 §2.8: "a travelling front,
@@ -2874,13 +2889,19 @@
     //    ref's two-generation red-orange-under-teal look), then dissolves as the camera DIVES
     //    into the dark centre. Our old f12Star spin (q9*0.12 ≈ 0.4°/s) was effectively static,
     //    size was flat for the dwell, and hue only stepped with the motif clock. ──
-    if (mEff === 10) {
+    if (STAR_FAM[mEff]) {
       if (s12T0 < 0) s12T0 = time;
-      s12Spin += dt * 0.45; // ~26°/s continuous rotation
+      s12Spin += dt * 0.55; // ~31°/s continuous rotation (user round 2: 26°/s read too slow)
       s12Hue += dt * 0.125; // continuous wheel (~8s) ON TOP of the stepped q8 walk
     } else {
-      if (s12T0 >= 0) s12ZoomT0 = time; // dwell exit → fire the dive pulse
+      if (s12T0 >= 0) s12ZoomT0 = time; // dwell exit → fire the dive-into-centre pulse
       s12T0 = -1;
+    }
+    // debug pin: FORCE._dive schedules the exit dive N seconds from boot even while q30 stays
+    // pinned (a pinned dwell never exits, so the pulse would otherwise be untestable)
+    if (FORCE && FORCE._dive) {
+      s12ZoomT0 = time + +FORCE._dive;
+      FORCE._dive = 0;
     }
 
     // ── POMPOM apex-form roll (doc 11 step 3): one form per mode-16 dwell — ~40% of dwells
@@ -3053,19 +3074,9 @@
       var aspW = typeof window !== "undefined" && window.__VIZ_ASPECT > 1 ? window.__VIZ_ASPECT : 1;
       t.q5 = Math.min(t.q5, 0.36 / aspW / POLY_RADK[mFin]);
     }
-    // 12-star BLOOM growth (ref: wreath→peak ~2.5x over ~2.5s). Applied AFTER the height cap
-    // so the ramp scales the capped size; dwell only (s12T0 — sketchbook stamps stay static).
-    if (mFin === 10 && s12T0 >= 0) t.q5 *= 0.34 + 0.66 * Math.min(1, (time - s12T0) / 2.6);
-    // 12-star dwell EXIT (user: "towards the end the camera zooms in the center"; ref 1:36-1:38:
-    // the star dissolves and the trail field streams outward around a dark core = a forward
-    // dive). A ~1.6s magnify pulse within the ≤0.008 q15 cap + a decay hold so the dissolving
-    // star's wisps stay alive through the dive.
-    var dvL = (time - s12ZoomT0) / 1.6;
-    if (dvL >= 0 && dvL < 1) {
-      var dv = Math.sin(dvL * 3.14159);
-      t.q15 = Math.min(0.008, t.q15 + 0.006 * dv);
-      t.q1 = Math.max(t.q1, 0.965);
-    }
+    // STAR-family BLOOM growth (ref: wreath→peak ~2.5x over ~2.5s). Applied AFTER the height
+    // cap so the ramp scales the capped size; dwell only (s12T0 — sketchbook stamps stay static).
+    if (STAR_FAM[mFin] && s12T0 >= 0) t.q5 *= 0.34 + 0.66 * Math.min(1, (time - s12T0) / 2.6);
 
     // ── PER-SCENE TRAIL-DISPLACEMENT FIELDS (doc 01 C2). The refs schedule the feedback warp
     //    per scene; v7 ran ONE program always. Each field is an eased scene-gated modulation of
@@ -3143,6 +3154,25 @@
       t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
       t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
       t.q19 *= 1 - 0.8 * radialAmt;
+    }
+    // ── STAR-family dwell EXIT: the DIVE INTO THE CENTRE (user + ref 1080p 1:36-1:40, incl.
+    //    the paused 1:36 frame: the star dissolves, the trail streams outward, the CENTRE
+    //    empties into a big soft core ~30% width, and DIFFUSION visibly increases — the whole
+    //    field melts wet-on-wet while the camera reads as plunging forward). A ~3.2s scene
+    //    beat: magnify to the 0.008-0.009 event ceiling (the ≤0.008 note guards PERSISTENT
+    //    streaming; this is a one-shot), diffusion boost, decay hold, hub pinned to the motif
+    //    centre so the plunge is centred on the dissolving star. Runs AFTER the freeze/radial
+    //    q15 couplings so the event wins. ──
+    var dvL = (time - s12ZoomT0) / 3.2;
+    if (dvL >= 0 && dvL < 1) {
+      var dv = Math.sin(dvL * 3.14159);
+      t.q15 = Math.max(t.q15, 0.009 * dv); // forward plunge (old buffer swells outward)
+      t.q28 = Math.min(0.85, (t.q28 || 0.4) + 0.3 * dv); // diffusion up — the wet-on-wet melt
+      t.q1 = Math.max(t.q1, 0.968); // hold the dissolving wisps alive through the dive
+      t.q20 += (t.q2 - t.q20) * 0.8 * dv; // plunge centred on the motif
+      t.q27 += (t.q3 - t.q27) * 0.8 * dv;
+      t.q18 *= 1 - 0.85 * dv; // no lateral pan mid-dive
+      t.q19 *= 1 - 0.85 * dv;
     }
     // SCISSOR-FAN hold (mode 23): the sweeping lines' traces must LIVE long enough to build
     // the full crossing fan that fills the bg (480p 0:39-0:45 — at the default 0.957 decay a
