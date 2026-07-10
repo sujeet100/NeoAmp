@@ -799,25 +799,37 @@
     a.b = orbCol(h, 0.67);
     return a;
   }
-  // CROSSED-X — two iridescent live-waveform BEAMS crossing at ±45° (the 2:24-2:31 camera scene).
+  // CROSSED-X → A9 ZIGZAG RIBBON SCISSOR-X (doc 16 steps 1-2; h1 M8/S9 t=121.8-127): two
+  // coarse zigzag ribbons crossing near centre. TWO displacement scales (the key measured
+  // trait): a coarse triangle CLOCK envelope (~7 apexes, FIXED spatial pitch — deliberately
+  // not audio, per the ref) whose apex heights breathe with bass via q5, plus the fine LIVE
+  // jag riding on top. Per-ribbon DUO hues (green / red-pink class), never a per-sample
+  // rainbow. The ribbons SCISSOR about the shared node (~±20°, ~1 swing / few seconds) —
+  // the pivot sweep's trail copies are the ref's "folding-screen" stamp fan (doc-03 cadence).
   function fCrossX(a) {
-    var half = (a.sample || 0) < 0.5 ? 0 : 1,
-      u = ((a.sample || 0) - half * 0.5) * 2.0,
-      s = u * 2 - 1;
-    var ang = half ? 0.7854 : -0.7854;
+    var NRIB = 2,
+      fk = (a.sample || 0) * NRIB,
+      rib = Math.floor(fk),
+      u = fk - rib;
+    var s = u * 2 - 1;
+    var swing = 0.35 * Math.sin((a.q9 || 0) * 3.2); // scissor open/close (q9 = time*0.06)
+    var ang = (rib ? 1 : -1) * (0.7854 + swing);
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     var len = (a.q5 || 0.4) * 1.6;
-    var jag = (a.value1 || 0) * (a.q6 || 0.05) * 2.2;
+    var tri = Math.abs(((u * 7) % 1) * 2 - 1) * 2 - 1; // triangle CLOCK, 7 apexes, -1..1
+    var coarse = tri * (a.q5 || 0.4) * 0.28; // apex heights ride q5 → breathe with bass
+    var fine = (a.value1 || 0) * (a.q6 || 0.05) * 1.4; // fine live jag on top
+    var perp = coarse + fine;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + s * len * ct - jag * st;
-    a.y = cy + s * len * st + jag * ct;
-    var h = (a.q8 || 0) + a.sample * 0.25;
+    a.x = cx + s * len * ct - perp * st;
+    a.y = cy + s * len * st + perp * ct;
+    var h = (a.q8 || 0) + (rib ? 0.42 : 0.0); // per-ribbon DUO hue, muted
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02) a.a = 0;
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the ribbon-to-ribbon connector + tips
     return a;
   }
   // ── N-GON MOTIFS (the user asked: "square, triangle, double triangle, mandala using triangles"). The
@@ -2027,7 +2039,12 @@
     cocFlavour = 0; // 0 dreamcatcher · 1 crumple-cocoon · 2 geodesic sphere (step 4)
   // h1 M7: the tangle stamps in ONE hue every 1.3-2s, crisp ~1-1.5s, then only trail; more
   // modes can join this table later (r0's 0.2-0.3s fast tier already lives in the cocoon block)
-  var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
+  var STAMP_MODES = {
+    13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 },
+    // A9 folding-screen fan (doc 16 step 3): the scissor sweep stamps crisp copies every
+    // ~0.35-0.55s (h1: 12-20 discrete copies, each living ~0.3-0.5s in the trail)
+    3: { gapMin: 0.35, gapMax: 0.55, crisp: 0.3 },
+  };
   // doc 06 A5 construction bag — chord dominant (0 chord ·1 helix ·2 staircase ·3 lightning
   // ·4 rope ·5 kite ·6 cascade); pearl-chain SKIPPED per the answered README Q8
   // ★ SIMPLE PLAIN CHORD DOMINATES (user 2026-07-10, confirmed vs the 480p: the simple jagged
