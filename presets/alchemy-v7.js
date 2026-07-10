@@ -1383,9 +1383,9 @@
     // the heads rise. q21-24 are the live orb posts, propagated to wave points.
     var px = ((a.q21 !== undefined ? a.q21 : 0.4) + (a.q23 !== undefined ? a.q23 : 0.6)) / 2,
       py = ((a.q22 !== undefined ? a.q22 : 0.5) + (a.q24 !== undefined ? a.q24 : 0.5)) / 2;
-    // ROCKING sweep, measured 12-16s @8fps: ~2-4°/frame ≈ 20-30°/s peak, oscillating between
-    // ~-15° and ~+75° (never a full rotation — the mesh-lesson bound). Was 11°/s continuous.
-    var ang = 0.5 + 0.75 * Math.sin(lastT * 0.6);
+    // CONTINUOUS rotation (user round 6: "rotates faster and continuously — it does not
+    // stop, reverse direction, or disappear/reappear"): steady ~29°/s, never modulated.
+    var ang = lastT * 0.5;
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     // DEAD STRAIGHT (user round 5; the ref stills show ruler-straight parallel copies —
@@ -1886,7 +1886,10 @@
     // corridor forces the plain chord too: a cascade/helix strung between the FAST-flying
     // heads deposits a lollipop train (ring + hanging stem per wake copy — user's 7s render)
     var corOn = Math.abs((a.q29 || 0) - 3) < 0.5;
-    var tk = railOn || corOn ? 0 : tetherKind;
+    // swimmer scene (mode 22): ALWAYS the simple chord (user round 6 — the ref's between-orb
+    // line in this scene is always the plain jagged waveform, never a construction)
+    var swimOn = Math.abs((a.q30 || 0) - 22) < 0.5;
+    var tk = railOn || corOn || swimOn ? 0 : tetherKind;
     var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
@@ -2126,7 +2129,9 @@
     accWormAng = 0,
     swimAmt = 0, // mode-22 swimmer engagement: orb heads = the rising stalk emitters
     swimT0 = -9, // mode-22 entry time (the heads' rise clock)
-    swimSeed = 0; // per-visit sway phase
+    swimSeed = 0, // per-visit sway phase
+    swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
+    swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
   // ── ACCESSORY LAYERS + REST BREATHING (survey 2026-07: the original runs 3-5 simultaneous
   // element classes — motif + orbs/tether + a bead row/chain + a sweeping ray curtain — and
   // empties to 1-2 classes for a few seconds every 8-12s). Accessory state lives in the
@@ -3921,18 +3926,20 @@
     if (swimEff && swimAmt < 0.02) {
       swimT0 = time;
       swimSeed = Math.random() * 6.28;
-      stgAx = 0.26; // ref round 2: the columns sit near the two SIDES (~1/4 and ~3/4 width)
-      stgAy = 0.2; // spawn at the FLOOR (wave y is bottom-up)
-      stgBx = 0.74;
-      stgBy = 0.2;
+      // SNAP the live posts in place at the PARKED heights (spawn-in-place, C1; round 6 —
+      // heads never travel on screen, so they spawn where they'll live): without the snap
+      // the eased blend glides the orbs over, depositing a stray diagonal ghost column.
+      swimHubX = t.q2; // capture — the live hub roam must NOT drag the standing columns
+      swimHubY = t.q3;
+      t.q21 = swimHubX - 0.26; // ref round 2: columns near the two SIDES (~1/4 and ~3/4)
+      t.q22 = swimHubY + 0.14; // upper head
+      t.q23 = swimHubX + 0.26;
+      t.q24 = swimHubY - 0.12; // the follower, lower on screen
+      stgAx = t.q21;
+      stgAy = t.q22;
+      stgBx = t.q23;
+      stgBy = t.q24;
       stgNext = Math.max(stgNext, time + 8);
-      // SNAP the live posts too (spawn-in-place, C1): the eased blend below starts near 0 at
-      // entry, so without this the orbs GLIDE from wherever they were to the floor spawn,
-      // depositing a stray diagonal ghost column (seen in the round-4 self-render).
-      t.q21 = stgAx;
-      t.q22 = stgAy;
-      t.q23 = stgBx;
-      t.q24 = stgBy;
       // ref colours are DISTINCT per column incl. gold/brown families (user round 2; the
       // 19s clip shows orange-gold vs violet stalks): re-anchor the accent ink per visit,
       // warm-biased — orb B's standing +0.35 offset supplies the second family.
@@ -3948,22 +3955,18 @@
       // blend never converges — same reason the mushroom uses mu directly)
       var swa = swimAmt * (1 - corridorAmt);
       var swAge = Math.max(0, time - swimT0);
-      // ★ Round 5 (user + close-up ref stills): heads move on ONE AXIS ONLY (no sway, no
-      // bob — the stalk's S-wave lives in the warp FIELD, the scallop principle), ~2x
-      // faster, crossing the FULL frame and RESPAWNING at the floor (corridor passes,
-      // vertical) with staggered phases — one head near the top while the other follows
-      // from the bottom.
-      var spanV = 0.64; // floor (q3-0.32) → above the frame top, then wrap
-      var yA = -0.32 + ((swAge * 0.11 + swimSeed * 0.1) % spanV);
-      var yB = -0.32 + ((swAge * 0.085 + swimSeed * 0.1 + spanV * 0.5) % spanV);
-      var tgtAy = t.q3 + yA,
-        tgtBy = t.q3 + yB;
-      // respawn SNAP (the corridor lesson: lerping back deposits a diagonal streak)
-      if (t.q22 - tgtAy > 0.3) t.q22 = tgtAy;
-      if (t.q24 - tgtBy > 0.3) t.q24 = tgtBy;
-      t.q21 += (t.q2 - 0.26 - t.q21) * swa; // fixed x — single-axis motion
+      // ★ Round 6 (user: "in the original the orbs CONTINUOUSLY move up — ours restart from
+      // the bottom and the camera does not move with them"): TRUE camera-follow. The heads
+      // never wrap — they PARK at staggered screen heights (one high, one lower, the ref's
+      // "one towards the top, the other following from the bottom") and the ENTIRE climb
+      // speed lives in the downward world-stream (q19 sink below): on screen the orb holds
+      // still while its wake and the world slide down past it = continuous ascent with the
+      // camera riding alongside. No respawn, no wrap, nothing ever moves down.
+      var tgtAy = swimHubY + 0.14, // upper head (captured hub — the columns stand still)
+        tgtBy = swimHubY - 0.12; // the follower, lower on screen
+      t.q21 += (swimHubX - 0.26 - t.q21) * swa; // fixed x — single-axis motion
       t.q22 += (tgtAy - t.q22) * swa;
-      t.q23 += (t.q2 + 0.26 - t.q23) * swa;
+      t.q23 += (swimHubX + 0.26 - t.q23) * swa;
       t.q24 += (tgtBy - t.q24) * swa;
       t.q25 = Math.max(t.q25, 0.9 * swa);
       t.q14 = Math.max(t.q14, 0.9 * swa);
@@ -3988,11 +3991,10 @@
       t.q28 += (0.32 - t.q28) * 0.7 * swa;
       t.q18 *= 1 - 0.7 * swa;
       t.q19 *= 1 - 0.7 * swa;
-      // CAMERA CHASE (round 4/5 — user: "the camera should ONLY move upwards"): a steady
-      // down-stream of the trail (−q19 = down) for the whole dwell — heads always have a
-      // climbing phase now (respawn passes), and a constant one-directional stream never
-      // reads as descent the way the old rise-gated ease-out did.
-      t.q19 = Math.min(t.q19, -0.0005 * swa);
+      // CAMERA FOLLOW (round 6): the WHOLE climb speed is the world-stream — the trail
+      // sinks at ~0.066 UV/s (≈12% frame height/s), so each parked head continuously grows
+      // its wake downward = the orb climbs forever with the camera locked on.
+      t.q19 = Math.min(t.q19, -0.0011 * swa);
       // FLOOR + HORIZON (round 4): the ref scene ALWAYS stands its columns on a bright floor
       // band — the strongest side-view cue. Force the floor-band ground (regime 11) as this
       // scene's composed set-piece (B11 grammar). Guarded so an explicit FORCE q29 pin wins
