@@ -3241,7 +3241,13 @@
       t.q15 = Math.max(t.q15, 0.013 * dv); // strong forward plunge — the star's colours stream
       // outward as whole-screen waves (round 3: 0.009 stayed a local melt, never filled)
       t.q28 = Math.min(0.85, (t.q28 || 0.4) + 0.45 * dv); // HEAVY diffusion — wet-on-wet melt
-      t.q1 = Math.max(t.q1, 0.972); // hold the streaming colour alive through the dive
+      // DISSOLVE (user 2026-07-10: the enlarging residue survived the dive as a sharp giant
+      // star behind the NEXT motif; ref 1080p 1:36-1:40 melts it into WAVY shapeless ink):
+      // bend the residue with the q12<0 per-column y-flow (the scallop field — Math.min
+      // composes with a later scallop write) and RELEASE the decay hold after the plateau so
+      // the ghost fades while it melts instead of outliving the dive.
+      t.q12 = Math.min(t.q12, -0.85 * dv);
+      t.q1 = Math.max(t.q1, 0.972 - Math.max(0, dvL - 0.55) * 0.038); // hold, then release → ~default by dvL=1
       t.q20 += (t.q2 - t.q20) * 0.8 * dv; // plunge centred on the motif
       t.q27 += (t.q3 - t.q27) * 0.8 * dv;
       t.q18 *= 1 - 0.85 * dv; // no lateral pan mid-dive
