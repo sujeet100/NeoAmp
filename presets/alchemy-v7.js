@@ -1723,10 +1723,11 @@
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
     return m === 0 ? 0.17 : 0.18; // the compact morphing-flower tier (still the smallest class)
   }
-  // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly/fluff — the compact
-  // radial discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
-  // h2 has it re-tinting whole-cluster per stamp (its own walk), never as a front.
-  var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1, 16: 1 };
+  // D12 radial-front modes (doc 05 step 4): anemone/urchin/vortex/jelly — the compact radial
+  // discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
+  // h2 has it re-tinting whole-cluster per stamp (its own walk), never as a front. The pompom
+  // (16) moved to its own BOTTOM-UP front (doc 11 step 4, below).
+  var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1 };
   function centralDraw(a) {
     var m = Math.floor((a.q30 || 0) + 0.5);
     if (m < 0) m = 0;
@@ -1750,6 +1751,20 @@
       if (rr > fr) {
         a.q8 = motifHueOld;
         MODES[m](a); // outside the front: redraw the point's COLOUR in the old hue
+      }
+    }
+    // A8 BOTTOM-UP hue front for the pompom/dahlia (doc 11 step 4; p1 S15: the bloom recolours
+    // bottom→top over ~4s — pink→green→gold→red climb, the TOP holding the previous hue). Wave
+    // y is BOTTOM-UP, so the front sweeps from small a.y upward. Slower than the radial front
+    // and vertical — the dahlia's signature (its sinking stem trail keeps the older hue free).
+    var frv = (lastT - motifStepT) / 4.0;
+    if (m === 16 && sketchAmt < 0.5 && frv >= 0 && frv < 1) {
+      var pcy = a.q3 !== undefined ? a.q3 : 0.5;
+      var Rb = (a.q5 || 0.4) * 0.62;
+      var vy = 0.5 + (a.y - pcy) / (2 * Rb); // 0 at bloom bottom → 1 at top
+      if (vy > frv) {
+        a.q8 = motifHueOld;
+        MODES[16](a); // above the front: old hue
       }
     }
     mutRGB(a); // D13: the motif is NOT the accent — mild emit-time desaturate
