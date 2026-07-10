@@ -340,6 +340,20 @@
       // gaps between the static bars (the bar mask dims the trail ON the bars); elsewhere 1.0.
       "  float barGap = (m > 3.5 && m < 4.5) ? (0.35 + 0.65 * (1.0 - pow(0.5 + 0.5 * cos(uv.x * 10.0 * 6.2832), 1.3))) : 1.0;\n" +
       "  trail *= barGap;\n" +
+      // ── A7 CROSSHAIR AXES (doc 13 step 3; p1 S8 L112-114): during the compass-moth scene a
+      //    literal ~1.5px cyan horizontal line spans the full width + a vertical partner through
+      //    the motif centre (q2,q3), flashing/jittering LIVE with the highs. Added into glow so
+      //    the Reinhard tone-map compresses it — muted cyan, never blown white. Zero slots.
+      //    (locals named mothM/pxw/lnh/lnv — never ang/rad, the predeclared builtins.) ──
+      "  float mothM = step(19.5, q30) * step(q30, 20.5);\n" +
+      "  if (mothM > 0.5) {\n" +
+      "    float pxw = 1.5 / resolution.y;\n" +
+      "    float lnh = smoothstep(pxw, 0.0, abs((1.0 - uv.y) - q3));\n" + // comp uv.y is top-down vs wave y (floor-band gotcha)
+      "    float lnv = smoothstep(pxw, 0.0, abs(uv.x - q2) * asp);\n" +
+      "    float mfl = 0.35 + 0.65 * clamp(treb_att, 0.0, 1.5);\n" +
+      "    float mjit = 0.85 + 0.15 * sin(time * 47.0);\n" +
+      "    glow += vec3(0.35, 0.85, 0.95) * (lnh + lnv) * mfl * mjit * 0.5;\n" +
+      "  }\n" +
       "  vec3 col = ground + trail * 1.15 + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
