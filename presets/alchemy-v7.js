@@ -1662,8 +1662,10 @@
     }
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
-    if (tk === 0 && !railOn) {
-      // mid-span scribble KNOT (h2: ~80-120px cluster roaming around mid-span, re-shuffling live)
+    if (tk === 0 && !railOn && knotOn) {
+      // mid-span scribble KNOT (h2: ~80-120px cluster roaming around mid-span, re-shuffling live).
+      // knotOn gates it to a RARE per-spawn flag (user 2026-07-10: in the original the simple plain
+      // tether dominates; the "motif in the centre" knot variant appears only rarely).
       var kp = knotPos + 0.05 * Math.sin((a.q9 || 0) * 11.7);
       var ku = (tt - kp) / 0.05;
       if (ku > -1 && ku < 1) {
@@ -1794,6 +1796,7 @@
     envNext = 0,
     envRefresh = false,
     knotPos = 0.5, // kind-0 mid-span scribble knot centre (re-rolled per spawn, roams slowly)
+    knotOn = false, // kind-0 knot is a RARE variant (most kind-0 spawns = the plain simple chord)
     railAmt = 0, // doc 06 step 5: PERSISTENT rail-chord (rare, 15-30s, survives scene changes)
     railWant = 0,
     railT0 = -99,
@@ -1904,7 +1907,11 @@
   var STAMP_MODES = { 13: { gapMin: 1.3, gapMax: 2.0, crisp: 1.0 } };
   // doc 06 A5 construction bag — chord dominant (0 chord ·1 helix ·2 staircase ·3 lightning
   // ·4 rope ·5 kite ·6 cascade); pearl-chain SKIPPED per the answered README Q8
-  var TETHER_BAG = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 5, 6];
+  // ★ SIMPLE PLAIN CHORD DOMINATES (user 2026-07-10, confirmed vs the 480p: the simple jagged
+  // tether line appears most of the time; the coil/chain/motif-centre constructions are RARE). Was
+  // [0,0,0,0,1,1,2,2,3,4,5,5,6] (constructions ~69%). Now kind 0 ~68%, each construction ~5%.
+  // 0 chord · 1 helix(coil) · 2 staircase(chain) · 3 lightning · 4 rope · 5 kite · 6 cascade.
+  var TETHER_BAG = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6];
   var REST_CYCLE = [1, 7, 10, 15]; // sketchbook constructions: star-net / net / 12-star / tri-mandala
   var beat = alcBeatFlash({ rise: 1.22 });
   // WEIGHTED bags — DOMINANT = dark wavy-fluid ground; kaleidoscope + radial-tunnel are ACCENTS.
@@ -2093,6 +2100,7 @@
             Math.random() < 0.8 ? 0.25 + Math.random() * 0.25 : 1.6 + Math.random() * 0.6;
         else evTetherLife = 1.2 + Math.random();
         knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
+        knotOn = Math.random() < 0.12; // RARE: only ~12% of chord spawns get the mid-span knot
       } else {
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
