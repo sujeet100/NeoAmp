@@ -1190,6 +1190,33 @@
     if (u < 0.04) a.a = 0;
     return a;
   }
+  // COMPASS-MOTH corrugated ray fan (doc 13 A7; 480p S8 t=82.9-89.5): ~20 fine rays from the
+  // hub, each carrying a REGULAR chevron ripple — a fixed-pitch CLOCK texture per the ref's
+  // ~12-15px corrugation (the live jag rides the TIPS only, alc-waveform-rule-scope) — in 3
+  // analogous pale families, precessing clockwise ~17°/s. The ref's dense 40-60-ray fill is
+  // TRAIL-STREAMED: frame() gates the radial-out field (doc 01 field 3) to this mode, so the
+  // feedback advects the crisp emitter copies outward — never draw more rays here.
+  function fMoth(a) {
+    var R = 20,
+      fk = (a.sample || 0) * R,
+      k = Math.floor(fk),
+      u = fk - k;
+    var pang = k * (6.2832 / R) + (a.q9 || 0) * 5.0; // q9=time*0.06 → ~0.3 rad/s precession
+    var rr = u * (a.q5 || 0.4) * 1.4;
+    // chevron: triangle CLOCK along the ray (~5 apexes over the compact emitter) + tip jitter
+    var tri = Math.abs(((u * 5.0) % 1) * 2 - 1) * 2 - 1;
+    var corr = tri * 0.009 + (a.value1 || 0) * 0.012 * (u * u);
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + Math.cos(pang) * rr - Math.sin(pang) * corr;
+    a.y = cy + Math.sin(pang) * rr + Math.cos(pang) * corr;
+    var h = (a.q8 || 0) + Math.floor(k / 7) * 0.12; // 3 analogous families, muted tier
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.03) a.a = 0; // hide the hub connector spokes
+    return a;
+  }
   // SPIROGRAPH PETAL FLOWER family (480p 27.5-30/35.3/49.8/51-56 · 1080p 83.5-86 · A1):
   // k petal LOOPS traced as ONE closed stroke from a hollow centre; construction identity
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
@@ -1483,6 +1510,7 @@
     fSpiro, // id 17 (doc 08 A1; first new-motif doc to land → MODES.length was 17)
     fCocoon, // id 18 (doc 09 A2)
     fScallop, // id 19 (doc 02 A10 — the README registry's "MODES.length at landing" rule)
+    fMoth, // id 20 (doc 13 A7 compass-moth)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1513,6 +1541,7 @@
     0.4, // spiro (17): lowered 0.58→0.4 (user: finer/less bloom — the ref is a thin delicate rosette)
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
     0.6, // scallop (19): one smooth two-strand line — outline-class
+    0.5, // moth (20): 20 fine rays — the fan MASS comes from the radial-out trail, keep the emitter light
   ];
   function scaleFor(m) {
     // COMPACT motif (user 2026-07-10, frame-checked 480p 0:50-0:55: the central motif stays a
@@ -1938,7 +1967,7 @@
   // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
-    17, 19,
+    17, 19, 20,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
