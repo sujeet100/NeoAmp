@@ -2584,6 +2584,11 @@
     // the persistent rail is the other long straight line the moth's radial-out field smears
     // into the ladder — it survives everything EXCEPT this scene (FORCE.rail pin still wins)
     if (railWant && mothAmt > 0.5 && !(FORCE && FORCE.rail)) railWant = 0;
+    // …and except the CORRIDOR (round-5 "tadpole" render): a rail alive at corridor entry
+    // kept OVERRIDING the flying-head anchors (its q21-24 write runs after the corridor's),
+    // pinning ring+orb+thread to the frozen diagonal chord — which the chase-pan then
+    // deposited as a repeating tadpole train. New rails already can't spawn here.
+    if (railWant && corridorAmt > 0.3 && !(FORCE && FORCE.rail)) railWant = 0;
     railAmt += ((railWant ? 1 : 0) - railAmt) * Math.min(1, dt * 2);
     if (railAmt > 0.01) {
       var rmx = (railAx + railBx) / 2,
@@ -3515,6 +3520,10 @@
     accTerrVis +=
       ((mCur === 14 || mCur === 19 || mCur === 20 ? 0 : 1) - accTerrVis) * Math.min(1, dt * 1.5);
     accVis *= accTerrVis;
+    // corridor: NO standing accessories (ref 0:06-0:16 shows only heads/wake-rows/net; the
+    // strong chase-pan drags any stationary rod/curtain into a repeated-copy train — the
+    // round-3 "hanger" artifacts were the sawtooth rod's dragged deposits)
+    accVis *= 1 - corridorAmt;
 
     // VORTEX-ish swirl on the radial-tunnel ground for a little inward churn
     if (bgMode === 2) t.q17 = 0.04 + 0.02 * (bassA - 1);
@@ -3530,7 +3539,12 @@
       // fade the central motif during the corridor — EXCEPT the wireframe NET (mode 7): keeping the net
       // visible over the void with the orbs + marching wake-row IS the opening-signature look (0:06-0:12).
       if (mCur !== 7) t.q4 *= 1 - 0.94 * co;
-      t.q18 += (0.0065 - t.q18) * co; // strong RIGHTWARD pan (camera/motifs move right)
+      // CAMERA CHASES the flying heads (user round 2: "it's speeding more than the camera —
+      // the camera should move with it at almost the same speed"): pan raised 0.0065→0.021
+      // (~1.3 widths/s @60fps ≈ half the head speed) so the whole scene — wake rows, net,
+      // everything — streams rightward WITH the orbs; the head-minus-pan relative speed
+      // (~1.5-2.3 widths/s) still spaces the wake deposits into discrete beads.
+      t.q18 += (0.021 - t.q18) * co;
       t.q19 += (0.0 - t.q19) * co; // kill the vertical drift
       t.q15 += (0.0 - t.q15) * co; // kill the magnify (a clean recede, not a watercolour bloom)
       // ★ TRAIL-BUILT ROW (user frame-check 2026-07-10 night, 1080p 7.0-8.0 + 12.5-13.5 @15fps:
@@ -3545,16 +3559,22 @@
         // respawn a fresh pass: new row height / speed / pair-ness / hue family
         corX = -0.06;
         corY = 0.34 + Math.random() * 0.3;
-        corSpeed = 1.7 + Math.random() * 1.5;
+        corSpeed = 2.8 + Math.random() * 0.8; // ~half of it is matched by the camera pan
         corTwo = Math.random() < 0.45 ? 1 : 0;
-        corGap = 0.16 + Math.random() * 0.12;
+        corGap = 0.3 + Math.random() * 0.15; // wide pair — the ref thread is LONG + near-horizontal
         accentHue += 0.23 + Math.random() * 0.3;
+        // SNAP the anchors to the fresh spawn — lerping them back across the frame swept a
+        // visible diagonal deposit streak (the round-2 "lollipop" render: ring + stem trails)
+        t.q21 = corX;
+        t.q22 = corY;
+        t.q23 = corX - corGap;
+        t.q24 = corY + 0.008;
       }
       corX += dt * corSpeed;
       t.q21 += (corX - t.q21) * co; // head A owns the orb/tether anchor
       t.q22 += (corY + 0.015 * Math.sin(corX * 9.0) - t.q22) * co;
       t.q23 += (corX - corGap - t.q23) * co; // head B trails on pair passes
-      t.q24 += (corY + 0.035 - t.q24) * co;
+      t.q24 += (corY + 0.008 - t.q24) * co; // SAME row as head A (the round-4 0.035 offset read as a tadpole stamp, not the ref's flat long thread)
       t.q25 = Math.max(t.q25, co); // head A always up
       t.q14 = Math.max(t.q14, corTwo * co); // head B only on pair passes
       t.q7 *= 1 - 0.35 * co; // SMALL fast heads — the ref wake-beads are small (was 1.4x anchors)
