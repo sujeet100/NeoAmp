@@ -1995,8 +1995,8 @@
     netAmt = 0, // motif 7 net → slow-decay hold + pan damp (v4 rotating line groups)
     netAng = 0.6, // net group pose (rotates in discrete steps)
     netPoseT = -9, // last pose step (~0.5s holds → the ref's wide-spaced copies)
-    netGroupT0 = -1, // group birth (-1 = not entered; new group every 6-9s = new colour set)
-    netGroupLen = 7,
+    netGroupT0 = -1, // group birth (-1 = not entered; a group = ONE full rotation ≈ 1s)
+    netSwept = 0, // accumulated rotation this group (2π → roll the next colour set)
     netStep = 0.09, // pose step ~4-6° (sign = rotation direction)
     netFan = 0.07, // fan gap between the 5 live lines (~3-5°)
     netPivX = 1.02, // pivot near a frame edge (the ref's bead-anchor cluster)
@@ -2823,27 +2823,28 @@
     //    the sparse two-generation crossings are the ref's mesh. mEff-keyed so a q30:7 pin
     //    exercises it. ──
     if (mEff === 7) {
-      if (netGroupT0 < 0 || time - netGroupT0 > netGroupLen) {
+      if (netGroupT0 < 0 || netSwept >= 6.283) {
+        // ★ group = exactly ONE FULL ROTATION (user round 3: "1 rotation in 1 second or
+        // less, and new lines painted after the first set completes 1 complete rotation")
         netGroupT0 = time;
-        netGroupLen = 5 + Math.random() * 3;
-        // rotation CENTRE stays near the screen centre (user: "in original they rotate at
-        // center axis") — the next group repaints the SAME region over the old group's decay
-        netPivX = 0.5 + (Math.random() - 0.5) * 0.16;
+        netSwept = 0;
+        netPivX = 0.5 + (Math.random() - 0.5) * 0.16; // centre axis (round-1 fix)
         netPivY = 0.5 + (Math.random() - 0.5) * 0.16;
         netAng = Math.random() * 3.14159;
-        // FAST sweep (user round 2: "original speed is very fast"): ~35-60°/s in 0.25s steps
-        netStep = (0.15 + Math.random() * 0.11) * (Math.random() < 0.5 ? -1 : 1);
-        netFan = 0.09 + Math.random() * 0.05; // PARALLEL gap ~0.09-0.14 UV (was ~0.05 rad fan)
+        netStep = 0.21 * (Math.random() < 0.5 ? -1 : 1); // 12°/tick @30Hz ≈ 360°/s
+        netFan = 0.09 + Math.random() * 0.05; // PARALLEL gap ~0.09-0.14 UV
         netCurv = (0.08 + Math.random() * 0.1) * (Math.random() < 0.5 ? -1 : 1);
-        netHue += 0.22 + Math.random() * 0.35; // fresh family at each group start too
+        netHue += 0.22 + Math.random() * 0.35; // the NEW set paints in a fresh colour
         netPoseT = time;
       }
-      if (time - netPoseT > 0.25) {
-        netPoseT = time; // discrete pose step → wide-spaced trail copies (the ref fan)
+      // fps-independent 30Hz pose clock (catch-up loop: live 60fps deposits every other
+      // frame ≈ the ref's per-frame copies; headless low fps still sweeps at true speed)
+      var netGuard = 0;
+      while (time - netPoseT > 0.0333 && netGuard++ < 20) {
+        netPoseT += 0.0333;
         netAng += netStep;
-        // colour steps on EVERY redraw (user round 2 + the ref zooms: consecutive poses in
-        // the same fan alternate green/white/gold — the decaying rainbow IS the mesh look)
-        netHue += 0.05 + Math.random() * 0.08;
+        netSwept += 0.21;
+        netHue += 0.022; // gentle drift within the rotation (green→white→gold interleave)
       }
     } else {
       netGroupT0 = -1;
@@ -3087,12 +3088,11 @@
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
     }
-    // NET hold (v5): the old group must DECAY SLOWLY and stay visible under the NEXT group
-    // (user's recording: "they don't leave enough trail or decay behind") — ~5-6s of visible
-    // wide-spaced copies; pan damped so the grating stays registered. 5 sparse lines only.
+    // NET hold (v6): at ~1 rotation/s the old set must survive ~1-2 rotations under the new
+    // colour (5s retention stacked FIVE rotations into a pile) — ~2s of visible copies.
     netAmt += ((mCur === 7 ? 1 : 0) - netAmt) * Math.min(1, dt * 0.6);
     if (netAmt > 0.01) {
-      t.q1 += (0.985 - t.q1) * netAmt;
+      t.q1 += (0.975 - t.q1) * netAmt;
       t.q18 *= 1 - 0.6 * netAmt;
       t.q19 *= 1 - 0.6 * netAmt;
     }
