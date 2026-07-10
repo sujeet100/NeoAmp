@@ -2858,7 +2858,9 @@
       // fan — long lines through an off-centre hub, rotating steadily for the whole dwell)
       // pinwheel (4) made RARER (user): ~0.26→~0.15, freed weight → "none" (calmer, motif-only)
       // HARP SWATH (5, doc 02 A3) carved ~.16 from curtain/bundle/pinwheel; "none" keeps .40:
-      accLine = rl < 0.4 ? 0 : rl < 0.5 ? 1 : rl < 0.66 ? 5 : rl < 0.87 ? 2 : 4;
+      // A15 sawtooth rod (8, doc 16) carved ~.05 from "none" — RARE (P3): none .35 / rod .05 /
+      // lighthouse .10 / swath .16 / bundle .21 / pinwheel .13
+      accLine = rl < 0.35 ? 0 : rl < 0.4 ? 8 : rl < 0.5 ? 1 : rl < 0.66 ? 5 : rl < 0.87 ? 2 : 4;
       if (accLine === 5 && corridorAmt > 0.1) accLine = 1; // corridor forces its own pan — no swath there
       accLineNext = time + 5 + Math.random() * 6;
       accLineArm = false; // D10: the one-shot beat-armed curtain became the persistent lighthouse
@@ -3470,6 +3472,46 @@
           a.b = orbCol(h1, 0.67) * bri;
           a.a = (uL < 0.03 ? 0 : 0.55) * accLineEnv * accVis;
           mutRGB(a); // D13
+          return a;
+        }
+        if (accLine === 8) {
+          // A15 SAWTOOTH ROD (doc 16 step 4; h2 2.9, t≈143-145): a straight ~55° ribbon
+          // TRANSLATING diagonally through the scene — counter-motion against the static
+          // motif. Body = two mint edge hairlines; core = a RED square-wave CLOCK bouncing
+          // edge-to-edge (regular fixed pitch — explicitly NOT audio, per the ref). The
+          // serrated X (h2 2.10) accumulates from the rod's translation into the feedback
+          // trail — never drawn separately.
+          var sR = a.sample || 0;
+          var part = sR < 0.25 ? 0 : sR < 0.5 ? 1 : 2;
+          var uR = part === 0 ? sR * 4 : part === 1 ? (sR - 0.25) * 4 : (sR - 0.5) * 2;
+          var ctR = Math.cos(0.96),
+            stR = Math.sin(0.96);
+          var tR = uR * 2 - 1;
+          // ONE traverse only (~6.5s), then the emitter goes silent and the stacked copies
+          // decay out (h2: "rare, ~2s crisp then stacked sinking copies ~2s more")
+          var prog = (lastT - accLinePickT) * 0.18;
+          if (prog > 1.2) {
+            a.a = 0;
+            return a;
+          }
+          var slide = prog - 0.6;
+          var perp;
+          if (part === 2) {
+            perp = (Math.floor(uR * 24) % 2 ? 1 : -1) * 0.011; // square-wave CLOCK core
+          } else {
+            perp = (part ? 1 : -1) * 0.013; // the two ribbon edges (~25px apart)
+          }
+          var cxR = 0.5 - slide * stR,
+            cyR = 0.5 + slide * ctR;
+          a.x = cxR + tR * 0.9 * ctR - perp * stR;
+          a.y = cyR + tR * 0.9 * stR + perp * ctR;
+          var hR = (a.q8 || 0) + (part === 2 ? 0.5 : 0.0); // red-contrast core vs mint edges
+          var briR = part === 2 ? 0.85 : 0.7;
+          a.r = orbCol(hR, 0) * briR;
+          a.g = orbCol(hR, 0.33) * briR;
+          a.b = orbCol(hR, 0.67) * briR;
+          a.a = (uR < 0.02 || uR > 0.98 ? 0 : part === 2 ? 0.6 : 0.5) * accVis;
+          mutRGB(a); // D13: the red core is a muted contrast hue, not neon
           return a;
         }
         if (accLine === 2) {
