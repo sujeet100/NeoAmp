@@ -375,7 +375,10 @@
       //    dive's unique signature (the persistent magnify couplings cap at 0.008), so the comp
       //    reads it directly instead of spending a new q channel: fade the ground (and boost the
       //    trail a touch) as the dive engages. ──
-      "  float diveDuck = smoothstep(0.009, 0.0125, q15);\n" +
+      //    Widened round 4: the star DWELL's ink-spread runs q15≈0.0075 (every other persistent
+      //    mode stays ≤0.005), so the ground partially ducks through the dwell — the flowing ink
+      //    owns the frame — and fully during the dive's 0.013.
+      "  float diveDuck = smoothstep(0.006, 0.0125, q15);\n" +
       "  ground *= 1.0 - 0.9 * diveDuck;\n" +
       "  vec3 col = ground + trail * (1.15 + 0.25 * diveDuck) + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
@@ -2060,6 +2063,7 @@
     s12Spin = 0, // 12-star CONTINUOUS rotation angle (ref 1080p 1:33.5-1:36: ~25°/s)
     s12Hue = 0, // 12-star continuous hue sweep (~full wheel / 8s; trail keeps older hues)
     s12ZoomT0 = -99, // dwell exit → the ~1.6s dive-into-the-centre magnify pulse
+    starAmt = 0, // eased star-dwell engagement → the persistent ink-spread field
     mothSnapT = -9, // O10 core-hue step clock (~1s/step, green→gold→white→pink read)
     mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
     spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
@@ -3174,6 +3178,20 @@
     //    streaming; this is a one-shot), diffusion boost, decay hold, hub pinned to the motif
     //    centre so the plunge is centred on the dissolving star. Runs AFTER the freeze/radial
     //    q15 couplings so the event wins. ──
+    // ── STAR-DWELL INK SPREAD (user round 4, live shot: the trail must flow outward like
+    //    ink/watercolour FILLING THE ENTIRE SCREEN while the construction stays sharp — the
+    //    live strokes are re-deposited every frame, so centre crispness is free). Persistent
+    //    for the whole star dwell: outward advection (within the ≤0.008 persistent q15 cap),
+    //    heavy diffusion (the wet bleed), a LONG decay so the ink survives the ~2s journey to
+    //    the frame edges, and the hub pinned to the star so the flow is star-centred. ──
+    starAmt += ((STAR_FAM[mEff] ? 1 : 0) - starAmt) * Math.min(1, dt * 0.5);
+    if (starAmt > 0.01) {
+      t.q15 = Math.max(t.q15, 0.0075 * starAmt); // strong outward flow (still < the 0.008 cap)
+      t.q28 = Math.min(0.85, (t.q28 || 0.4) + 0.35 * starAmt);
+      t.q1 = Math.max(t.q1, 0.957 + 0.023 * starAmt); // → ~0.98: the ink reaches the corners
+      t.q20 += (t.q2 - t.q20) * 0.7 * starAmt;
+      t.q27 += (t.q3 - t.q27) * 0.7 * starAmt;
+    }
     // 4.2s beat, fast attack + SUSTAINED plateau (round 3: the sin() envelope spent too little
     // time at peak — the ref's colour waves keep streaming for seconds, filling the screen).
     var dvL = (time - s12ZoomT0) / 4.2;
