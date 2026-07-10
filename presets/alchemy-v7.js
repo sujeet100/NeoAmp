@@ -2653,9 +2653,14 @@
     // RADIAL-OUT (field 3): urchin/fluff scenes stream the trail outward from the motif hub
     // (p1 moth fans t=83-89; h1 M6 2-4%/s; h0 M11 filaments radiate to the edges).
     // CAP q15 ≤0.008 — a big magnify is the rejected "spiky-burst over-fill" (see the q15 note).
-    radialAmt += ((mCur === 2 || mCur === 16 ? 1 : 0) - radialAmt) * Math.min(1, dt * 0.5);
+    radialAmt +=
+      ((mCur === 2 || mCur === 16 || mCur === 20 ? 1 : 0) - radialAmt) * Math.min(1, dt * 0.5);
     if (radialAmt > 0.01) {
-      t.q15 += (0.002 - t.q15) * radialAmt; // outward growth cut 0.006→0.002 (user "crisp": the strong outward stream scattered the symmetric urchin/fluff into thin radiating smears)
+      // moth (20) gets a STRONGER stream — the ref's 40-60-ray fan fill IS trail advection
+      // (doc 13 step 2; p1 83-89), and outward flow on a radial fan preserves its symmetry
+      // (the "crisp" de-distortion concern was scatter on urchin/fluff, which keep 0.002).
+      var radTgt = mCur === 20 ? 0.005 : 0.002;
+      t.q15 += (radTgt - t.q15) * radialAmt; // outward growth cut 0.006→0.002 (user "crisp": the strong outward stream scattered the symmetric urchin/fluff into thin radiating smears)
       t.q20 += (t.q2 - t.q20) * 0.7 * radialAmt; // hub = the motif centre (streaming is motif-centred)
       t.q27 += (t.q3 - t.q27) * 0.7 * radialAmt;
       t.q18 *= 1 - 0.8 * radialAmt; // damp the pan — outward flow IS the motion
