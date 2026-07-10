@@ -140,7 +140,11 @@
       "  trail = max(trail, texture2D(sampler_main, suv - vec2(dil, 0.0)).rgb);\n" +
       "  trail = max(trail, texture2D(sampler_main, suv + vec2(0.0, dil)).rgb);\n" +
       "  trail = max(trail, texture2D(sampler_main, suv - vec2(0.0, dil)).rgb);\n" +
-      "  vec3 glow = texture2D(sampler_blur1, suv).rgb + texture2D(sampler_blur2, suv).rgb * 0.8;\n" +
+      // blur2 0.8→0.4 (measured, user's 2026-07-10 recording): the original's strong edges are
+      // ~3x steeper than ours (gradP99 53 vs 16-18) — its look is CRISP live strokes over soft
+      // trails. The wide blur2 halo was washing local contrast off every stroke; the THICK
+      // dilate stays (dilation widens but keeps edges steep — the thickness the user liked).
+      "  vec3 glow = texture2D(sampler_blur1, suv).rgb + texture2D(sampler_blur2, suv).rgb * 0.4;\n" +
       // ── DARK WAVY-FLUID GROUND (the W scene). Domain-warped fbm → liquid wavy bands; 3 ANALOGOUS dusty
       //    tones; kept DARK (measured V~0.2) + desaturated so the trails carry the vivid colour. ──
       "  vec2 g = c * 1.25;\n" +
