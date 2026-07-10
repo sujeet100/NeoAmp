@@ -1395,7 +1395,9 @@
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
-    if (u < 0.02 || u > 0.98) a.a = 0; // hide the wrap connector
+    // faint stroke (round 3): the ref's fan combs are thin pale hairlines — at full alpha the
+    // held copies fused into big sail-sheets that read as z-perspective surfaces
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.42;
     return a;
   }
   // SCISSOR FAN (user, 2026-07-10, from the 480p 0:39-0:45 frame-check): TWO full-frame
@@ -3941,9 +3943,10 @@
       var swayA = 0.022 * Math.sin(time * 3.4 + swimSeed);
       var swayB = 0.02 * Math.sin(time * 3.0 + swimSeed + 2.1);
       t.q21 += (t.q2 - 0.24 + swayA - t.q21) * swa; // wide pair (~half the frame apart)
-      t.q22 += (t.q3 + riseA + 0.012 * Math.sin(time * 2.2 + swimSeed) - t.q22) * swa;
+      // bob 0.012→0.03 (round 3): after the rise caps the heads must KEEP painting the stalk
+      t.q22 += (t.q3 + riseA + 0.03 * Math.sin(time * 2.2 + swimSeed) - t.q22) * swa;
       t.q23 += (t.q2 + 0.24 + swayB - t.q23) * swa;
-      t.q24 += (t.q3 + riseB - t.q24) * swa;
+      t.q24 += (t.q3 + riseB + 0.024 * Math.sin(time * 1.7 + swimSeed + 1.1) - t.q24) * swa;
       t.q25 = Math.max(t.q25, 0.9 * swa);
       t.q14 = Math.max(t.q14, 0.9 * swa);
       // ref pulse cadence ~1.5-2s (fireBalloon's own limiter is 2-4s → pull it in)
@@ -3951,8 +3954,13 @@
         fireBalloon(time);
         balloonNext = time + 1.4 + 0.8 * Math.random();
       }
-      // stalk hold: the wake stays registered + solid a few seconds, then diffusion melts it
-      t.q1 = Math.max(t.q1, 0.955 + 0.023 * swa);
+      // stalk hold (round 3 — user: "still reads as z-motion"): CORRIDOR-grade persistence.
+      // At the old 0.978 the stalk died in ~2s → floating pulsing orbs (a z-read); the ref's
+      // columns STAND for the whole scene (side-on view cue). Lower blur so the line's copies
+      // stay discrete thin combs (the melted copies were sweeping big sail-sheets = the other
+      // z-read); the stalk still diffuses floor-ward, just slower.
+      t.q1 = Math.max(t.q1, 0.966 + 0.022 * swa); // → ~0.988
+      t.q28 += (0.32 - t.q28) * 0.7 * swa;
       t.q18 *= 1 - 0.7 * swa;
       t.q19 *= 1 - 0.7 * swa;
     }
