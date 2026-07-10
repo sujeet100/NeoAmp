@@ -896,16 +896,17 @@
   // older {13/5} star-art spray was rejected as chaotic — this is the measured middle: ordered
   // parallel strands, but each strand BOWS with its own slowly-drifting curvature.
   function fNet(a) {
-    // ★ 3D RULED SHEET (2026-07-11 v3 — user: "parallel curved lines rotating and warping in
-    // 3d space creating the mesh-like structure"; frame-step 1080p 0:28-0:33 @7fps CONFIRMS:
-    // the WHOLE family is live each frame — uniform crispness, coherent motion — a string-art
-    // sheet of ~14 curved lines strung between two RAILS tumbling slowly in 3D. The fan
-    // converges when a rail's spread collapses toward a point; lines cross in projection
-    // where the sheet twists; the "two crossing fans" moments are the fresh family over its
-    // own differently-hued ~1.5s trail ghost (the hue steps, the trail keeps the old one) —
-    // so trail retention stays DEFAULT. Same live-whole-construction class as the spiro
-    // flower (the diff/brightness test is what separates live from trail).
-    var N = 14;
+    // ★ v4 ROTATING LINE GROUPS (2026-07-11 — user, from paused-original zooms at ~0:29-0:31
+    // 1080p: "4-5 lines rotating around center leaving and decaying slowly; after the rotation
+    // is over a NEW set of lines in a different colour rotates on the decay of the old lines,
+    // creating the mesh"): LIVE = one GROUP of 5 wobbly full-frame hairlines fanned a few
+    // degrees apart off a pivot near a frame edge (the ref's bead-anchored strands), rotating
+    // in slow DISCRETE pose steps; the slowly-decaying wide-spaced pose copies are the fan,
+    // and the next group (new pivot/direction/HUE) sweeping over the old group's decay makes
+    // the sparse two-generation crossings — which IS the ref's mesh. v3's 14-line ruled sheet
+    // was too compact/tight/all-live (user: "no parallel lines like in original; lines should
+    // cover screen; much more distance between lines").
+    var N = 5;
     var fk = (a.sample || 0) * N,
       li = Math.floor(fk),
       u = fk - li;
@@ -913,46 +914,19 @@
       li = N - 1;
       u = 1;
     }
-    var w = li / (N - 1); // 0..1 across the family
-    var tt = lastT;
-    // RAILS: left/right edges of the sheet. Each rail's vertical SPREAD + shift breathe on
-    // slow clocks — spread→small = the ref's converged fan/pencil; spread wide = parallel
-    // sheet. Rails bow in depth (z) so the rulings are CURVED, and the bows warp slowly.
-    var spreadA = 0.9 * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 0.13)));
-    var spreadB = 0.9 * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(tt * 0.09 + 2.3)));
-    var shiftA = 0.3 * Math.sin(tt * 0.07 + 1.0),
-      shiftB = 0.3 * Math.sin(tt * 0.055 + 3.1);
-    var aY = (w - 0.5) * 2.0 * spreadA + shiftA,
-      bY = (w - 0.5) * 2.0 * spreadB + shiftB;
-    var aZ = 0.5 * Math.sin(w * 3.14159 + tt * 0.12),
-      bZ = -0.5 * Math.sin(w * 3.14159 + tt * 0.1 + 0.8);
-    // the ruling: straight line A→B + a slight breathing sag → "parallel curved lines"
-    var sag = 0.3 * Math.sin(u * 3.14159) * Math.sin(tt * 0.08 + w * 2.2);
-    var px = -1.0 + 2.0 * u,
-      py = aY + (bY - aY) * u + sag * 0.35,
-      pz = aZ + (bZ - aZ) * u + sag;
-    // slow 3D TUMBLE of the whole sheet — BOUNDED oscillations (a continuous yaw swept the
-    // sheet through edge-on poses where all rulings fuse into one bright cone; the ref fans
-    // always stay readable as separate lines, so the pose never leaves ±~45°)
-    var ryA = 0.75 * Math.sin(tt * 0.09),
-      rxA = 0.45 * Math.sin(tt * 0.14 + 0.6);
-    var c2 = Math.cos(ryA),
-      s2 = Math.sin(ryA);
-    var x1 = px * c2 + pz * s2,
-      z1 = -px * s2 + pz * c2;
-    var c1 = Math.cos(rxA),
-      s1 = Math.sin(rxA);
-    var y1 = py * c1 - z1 * s1,
-      z2 = py * s1 + z1 * c1;
-    var persp = 1.7 / (2.7 + z2); // mild perspective — the 3D foreshorten/warp read
-    var S = (a.q5 || 0.4) * 1.35;
-    var cx = a.q2 !== undefined ? a.q2 : 0.5,
-      cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + x1 * S * persp + (a.value1 || 0) * 0.004; // whisper of live jag
-    a.y = cy + y1 * S * persp;
-    // ONE hue family with a gentle across-sheet gradient; the family hue walks with the
-    // stepped motif clock, so the trail ghost fan keeps the previous colour (ref two-tone)
-    var h = (a.q8 || 0) + 0.12 + w * 0.1;
+    // one-sided from the pivot, long enough to cross the whole frame from any edge pivot
+    var d = u * 1.9;
+    // group pose + per-line fan offset (~4° between the 5 live lines) + gentle arc curvature
+    var pang = netAng + li * netFan + netCurv * d;
+    // live-waveform wobble like the ref hairlines (per-line phase comes free from the samples)
+    var jag = (a.value1 || 0) * 0.006;
+    var ca = Math.cos(pang),
+      sa = Math.sin(pang);
+    a.x = netPivX + ca * d - sa * jag;
+    a.y = netPivY + sa * d + ca * jag;
+    // per-GROUP hue (rolled at group start; the old group's trail keeps its colour → the
+    // ref's green-over-white / gold-over-pink two-tone mesh)
+    var h = netHue + li * 0.03;
     a.r = orbCol(h, 0);
     a.g = orbCol(h, 0.33);
     a.b = orbCol(h, 0.67);
@@ -2015,7 +1989,17 @@
     washAmt = 0, // bgMode 5 flat wash → DEPOSIT-HOLDING ground (doc 05 C10: stains live 3-6s)
     radialAmt = 0, // motifs 2/16 urchin/fluff → outward trail streaming from the hub (field 3)
     fanAmt = 0, // motif 23 scissor-fan → pan damp (the swept combs must stay registered)
-    netAmt = 0, // motif 7 net → MILD trail hold (~2.5s: the ref combs are ~15-20 lines wide)
+    netAmt = 0, // motif 7 net → slow-decay hold + pan damp (v4 rotating line groups)
+    netAng = 0.6, // net group pose (rotates in discrete steps)
+    netPoseT = -9, // last pose step (~0.5s holds → the ref's wide-spaced copies)
+    netGroupT0 = -1, // group birth (-1 = not entered; new group every 6-9s = new colour set)
+    netGroupLen = 7,
+    netStep = 0.09, // pose step ~4-6° (sign = rotation direction)
+    netFan = 0.07, // fan gap between the 5 live lines (~3-5°)
+    netPivX = 1.02, // pivot near a frame edge (the ref's bead-anchor cluster)
+    netPivY = 0.2,
+    netCurv = 0.15, // gentle arc curvature (rad per unit length)
+    netHue = 0.3, // per-GROUP hue — the old group's trail keeps its colour (two-tone mesh)
     eyeAmt = 0, // motif 8 vortex → trail rotation about an off-centre eye (field 4)
     eyeX = 0.35, // the eye — re-rolled each time the field engages (p3: (33%, 8%))
     eyeY = 0.3,
@@ -2830,6 +2814,32 @@
     } else if (mEff !== 21) {
       spinNext = -1; // fresh dwell restyles immediately
     }
+    // ── NET group driver (v4, user's paused-original read): a group = 5 fanned full-frame
+    //    hairlines rotating in discrete ~0.5s pose steps for 6-9s, then a NEW group (fresh
+    //    pivot / direction / curvature / COLOUR) begins over the old group's slow decay —
+    //    the sparse two-generation crossings are the ref's mesh. mEff-keyed so a q30:7 pin
+    //    exercises it. ──
+    if (mEff === 7) {
+      if (netGroupT0 < 0 || time - netGroupT0 > netGroupLen) {
+        netGroupT0 = time;
+        netGroupLen = 6 + Math.random() * 3;
+        netPivX = Math.random() < 0.5 ? -0.04 - Math.random() * 0.08 : 1.04 + Math.random() * 0.08;
+        netPivY = 0.1 + Math.random() * 0.8;
+        // aim INTO the frame from the pivot, ± some spread
+        netAng = Math.atan2(0.5 - netPivY, 0.5 - netPivX) + (Math.random() - 0.5) * 0.9;
+        netStep = (0.06 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1);
+        netFan = 0.05 + Math.random() * 0.035;
+        netCurv = (0.1 + Math.random() * 0.2) * (Math.random() < 0.5 ? -1 : 1);
+        netHue = Math.random(); // per-group colour — the mesh's two generations differ
+        netPoseT = time;
+      }
+      if (time - netPoseT > 0.5) {
+        netPoseT = time; // discrete pose step → wide-spaced trail copies (the ref fan)
+        netAng += netStep;
+      }
+    } else {
+      netGroupT0 = -1;
+    }
     // ── POMPOM apex-form roll (doc 11 step 3): one form per mode-16 dwell — ~40% of dwells
     //    render the dahlia APEX bloom (dark core hole + dense petal tufts), the rest the small
     //    chenille pompom (subtle 3-lobe tufting only). ──
@@ -3069,11 +3079,12 @@
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
     }
-    // NET pan damp (v3 ruled sheet, 2026-07-11): the whole family is LIVE per frame, so NO
-    // decay hold (retention beyond the default ~1.5s ghost re-weaves the mesh); only keep the
-    // sheet registered against the pan while it tumbles.
+    // NET hold (v4): the old group must DECAY SLOWLY (user: the new colour set rotates "on
+    // decay of old lines creating mesh") — ~3-4s of visible wide-spaced copies; pan damped
+    // so the fan stays registered. Only 5 sparse lines deposit, so no dense-mesh risk.
     netAmt += ((mCur === 7 ? 1 : 0) - netAmt) * Math.min(1, dt * 0.6);
     if (netAmt > 0.01) {
+      t.q1 += (0.978 - t.q1) * netAmt;
       t.q18 *= 1 - 0.6 * netAmt;
       t.q19 *= 1 - 0.6 * netAmt;
     }
