@@ -965,6 +965,67 @@
     if (u < 0.04) a.a = 0; // hide filament-to-filament jumps
     return a;
   }
+  // OBLATE SPINNER DISC (doc 14 A20; h0 M9 t=46.8-52): a tilted disc ~40% frame with a
+  // PINWHEEL core that visibly ROTATES (~3s/rev) + a rim fringe whose STYLE re-rolls every
+  // 1-2s (lash spokes → curly scribble → long spikes; spinStyle rolled in frame()). The
+  // marbled interior is TRAIL-BORNE (core strokes smeared by the compounding blur — nothing
+  // drawn); two-generation fringe tinting comes free from decay. Jelly (mode 9) is the plain
+  // cousin and stays untouched (variants-over-choosing). Tilt is FIXED mild — no oscillation
+  // (2026-07-10 crisp-symmetric rule; the ref disc holds one oblate pose per dwell).
+  function fSpinner(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var R = (a.q5 || 0.4) * 0.6;
+    var x, y;
+    if (s < 0.3) {
+      // CORE: 4-arm pinwheel spiral, rotating ~3s/rev — the burst_49.5 arm-angle change
+      var CA = 4,
+        fa = (s / 0.3) * CA,
+        arm = Math.floor(fa),
+        v = fa - arm;
+      var spin = (a.q9 || 0) * 35; // q9=time*0.06 → ~2.1 rad/s ≈ 3s period (ref 2-4s)
+      var rr = v * R * 0.45;
+      var ca = arm * (6.2832 / CA) + spin + v * 2.6; // spiral curl
+      x = Math.cos(ca) * rr;
+      y = Math.sin(ca) * rr;
+      if (v < 0.05) a.a = 0;
+    } else {
+      // RIM FRINGE: feathery strokes on the rim; style re-rolls every 1-2s in frame()
+      var NF = 36,
+        ff = ((s - 0.3) / 0.7) * NF,
+        fil = Math.floor(ff),
+        v2 = ff - fil;
+      var base = (fil * 2.399) % 6.2832;
+      var live = Math.abs(a.value1 || 0);
+      if (spinStyle === 0) {
+        // teal-lash: straight tangential spokes hugging the rim
+        var la = base + v2 * 0.5;
+        var lr = R * (0.85 + 0.3 * v2 + 0.12 * live);
+        x = Math.cos(la) * lr;
+        y = Math.sin(la) * lr;
+      } else if (spinStyle === 1) {
+        // curly scribble: loops woven around the rim
+        var sa = base + v2 * 1.2 + 0.35 * Math.sin(v2 * 12.6 + fil);
+        var sr = R * (0.9 + 0.18 * Math.sin(v2 * 9.4 + fil * 2.1) + 0.1 * live);
+        x = Math.cos(sa) * sr;
+        y = Math.sin(sa) * sr;
+      } else {
+        // spikes: longer radial rays (~2x the fringe), live length
+        var pr = R * (0.85 + (0.5 + 0.5 * live) * 0.9 * v2);
+        x = Math.cos(base) * pr;
+        y = Math.sin(base) * pr;
+      }
+      if (v2 < 0.05) a.a = 0;
+    }
+    a.x = cx + x;
+    a.y = cy + y * 0.62; // FIXED oblate tilt (ref ~520x300)
+    var h = (a.q8 || 0) + (s < 0.3 ? 0.05 + 0.2 * (s / 0.3) : 0.12); // warm core ramp · fringe family
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    return a;
+  }
   // 12-POINT STAR MANDALA (survey gap, 1:33): a {12/5} star polygon — finer/higher-order than the 6-arm
   // star-net. Pairs with the bullseye bg (q29=7) for the "12-point star over a bullseye iris" look.
   function f12Star(a) {
@@ -1531,6 +1592,7 @@
     fCocoon, // id 18 (doc 09 A2)
     fScallop, // id 19 (doc 02 A10 — the README registry's "MODES.length at landing" rule)
     fMoth, // id 20 (doc 13 A7 compass-moth)
+    fSpinner, // id 21 (doc 14 A20 oblate spinner disc)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1562,6 +1624,7 @@
     0.55, // cocoon (18): rim/spoke crossings pile up additively (outline-class)
     0.6, // scallop (19): one smooth two-strand line — outline-class
     0.5, // moth (20): 20 fine rays — the fan MASS comes from the radial-out trail, keep the emitter light
+    0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
   ];
   function scaleFor(m) {
     // COMPACT motif (user 2026-07-10, frame-checked 480p 0:50-0:55: the central motif stays a
@@ -1810,6 +1873,8 @@
     mothT0 = -99, // moth dwell birth — the crimson-accent window keys off it
     mothSnapT = -9, // O10 core-hue step clock (~1s/step, green→gold→white→pink read)
     mothCrim = 0, // brief crimson fan-family accent envelope (step 6, answered Q18)
+    spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
+    spinNext = -1, // fringe restyle clock (~1-2s, h0 M9)
     accTerrVis = 1, // accessory fade under terrain motifs 14/19 (frozen-ray-spray guard)
     swathAmt = 0, // doc 02 A3: harp-swath accessory (accLine 5) mini-freeze engagement
     accSwathTick = -9, // last discrete strand-copy stamp
@@ -1991,7 +2056,7 @@
   // fluff-ball(16)/spiro(17), flower-family forms. fn kept for a future faithful MESH rebuild.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 16, 16, 17, 17, 16,
-    17, 19, 20,
+    17, 19, 20, 21, 21,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2480,6 +2545,17 @@
     // second, then melts out — appear → connect the petals → disappear (not a steady circle).
     var ringTgt = mEff === 17 && spiroVar === 2 && time - spiroStampT < 0.9 ? 1 : 0;
     spiroRingAmt += (ringTgt - spiroRingAmt) * Math.min(1, dt * (ringTgt > spiroRingAmt ? 6 : 2.4));
+    // ── SPINNER fringe restyle (doc 14 A20; h0 M9: "teal lash → blue curly scribble →
+    //    orange/yellow spikes" every ~1-2s — the per-appearance re-roll grammar). Always a
+    //    DIFFERENT style; the old fringe's hue lingers under the new via decay (free). ──
+    if (mEff === 21 && time >= spinNext) {
+      var pvSp = spinStyle;
+      while (spinStyle === pvSp) spinStyle = Math.floor(Math.random() * 3);
+      if (FORCE && FORCE._spinStyle !== undefined) spinStyle = FORCE._spinStyle;
+      spinNext = time + 1 + Math.random(); // restyle every 1-2s
+    } else if (mEff !== 21) {
+      spinNext = -1; // fresh dwell restyles immediately
+    }
 
     // ── ORBS + TETHER — wide diagonal pair joined by a jagged waveform line (the Dance signature, A_93/
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──
