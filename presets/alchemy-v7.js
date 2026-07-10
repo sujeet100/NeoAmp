@@ -2101,7 +2101,9 @@
   // doc 12 D5: the flat WASH is the dominant REST ground in the refs (p1 B2, ≈half the runtime),
   // not the wavy-fluid — so wash(5)×4 + wavy(0)×3 now lead. New structured regimes 10-14 (curtain/
   // floor/strata/wallpaper/chevron) append here as each lands.
-  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
+  // kaleido weight 2→1 (user's 2026-07-10 recording: ~34% of 172s was fold scenes vs the
+  // original's ~20-25% mirrored duty; back-to-back picks also rejected via acceptBg below)
+  var BG_BAG = [5, 5, 5, 5, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14]; // 0 wavy-fluid · 1 kaleido · 2 radial-tunnel · 3 corridor · 4 vertical-bars · 5 flat-wash(dominant rest) · 6 horizontal-bands · 7 bullseye · 8 caustic · 9 treadmill · 10 curtain · 11 floor-band · 12 strata · 13 wallpaper · 14 chevron
   // polygon-flower family boosted (user: "mostly single triangle or square, never saw the
   // 2-triangle star or many-triangle flower"): hexagram ×2 + tri-mandala ×2 + fluff ball ×2.
   // D8 dedupe (doc 14a Step 1): star-net (1) cut 3→2 and the freed slot moved to valley (12), so
@@ -2140,7 +2142,12 @@
     for (var i = 0; i < fav.length; i++) if (fav[i] === id) return true;
     return Math.random() < 0.35;
   }
-  var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0);
+  // never two kaleido dwells back-to-back (the recording had 16-26s fold stretches — longer
+  // than one max dwell, i.e. consecutive picks; the ref treats the fold as an occasional event)
+  function acceptBg(idx) {
+    return !(BG_BAG[idx] === 1 && curBgMode === 1);
+  }
+  var bgPick = makePicker(BG_BAG.length, 7, 12, 3.0, acceptBg);
   var motifPick = makePicker(MOTIF_BAG.length, 6, 11, 2.0, acceptMotif);
   var panDir = makeSnapDir(3.0, 6.0); // ABRUPT-snap pan direction (the 2:24-2:31 camera)
   // ── ORB BALLOON EVENTS (doc 07 D2a). The refs' orb pops are BALLISTIC one-shot events —
