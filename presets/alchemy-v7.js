@@ -1376,9 +1376,15 @@
     var line = s < 0.5 ? 0 : 1,
       u = (s - line * 0.5) * 2,
       tt = u * 2 - 1; // -1..1 along the line — full length THROUGH the centre
-    var rot = (a.q9 || 0) * 8.0; // q9=time*0.06 → ~27°/s continuous sweep
-    var sep = 0.28 + 0.22 * Math.sin((a.q9 || 0) * 4.7 + 1.0); // separation 0.06-0.5 rad, always changing
-    var ang = rot + (line ? 0.5 : -0.5) * sep;
+    // ★ REANALYSED (user "mesh-like motif does not exist in original", 2026-07-11; frame-step
+    // 480p 0:38.5-0:45.5 @15fps): the original is a slow SCISSORING X — two near-perpendicular
+    // full-frame arms (~±45°) swinging back and forth on independent slow clocks. Each arm's
+    // strand leaves only ~0.3-0.5s of crisp per-frame copies (the feathered COMB behind it);
+    // older copies DIFFUSE into the busy wash. The old continuous 27°/s co-rotation + the 4s
+    // crisp fanAmt hold wove the full-frame wireframe MESH the user flagged — both removed.
+    var ang = line
+      ? 0.7854 + 0.5 * Math.sin((a.q9 || 0) * 11.7 + 1.3)
+      : -0.7854 + 0.55 * Math.sin((a.q9 || 0) * 15.0);
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     var len = (a.q5 || 0.4) * 1.9; // scene-scale q5 → edge-to-edge lines
@@ -3037,7 +3043,9 @@
     // 27°/s sweep only retains a ~40° wedge). Longer trail + damped pan keep it registered.
     fanAmt += ((mCur === 23 ? 1 : 0) - fanAmt) * Math.min(1, dt * 0.6);
     if (fanAmt > 0.01) {
-      t.q1 += (0.978 - t.q1) * fanAmt;
+      // NO decay hold any more (the 0.978 hold kept crisp line copies ~4s → the woven MESH the
+      // user flagged; ref combs are ~0.3-0.5s crisp then diffuse into the wash at the default
+      // decay+blur). Keep only the pan damp so the short-lived combs stay registered.
       t.q18 *= 1 - 0.7 * fanAmt;
       t.q19 *= 1 - 0.7 * fanAmt;
     }
