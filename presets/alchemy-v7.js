@@ -1266,10 +1266,17 @@
     var h0 = (seg * 2.399) % 6.2832; // golden-angle scatter
     var r0 = R * (0.1 + 0.8 * ((seg * 0.617) % 1));
     var len = R * (0.3 + 0.25 * Math.abs(a.value1 || 0));
+    // A8 apex bloom (doc 11 step 3): azimuthal petal-tuft lobing — the dahlia apex form gets
+    // 7 pronounced tuft lobes (p1 S15 "petal tufts"), the small chenille pompom a subtle 3-lobe
+    // waver so it stays a near-uniform fuzzball.
+    len *= pompApex ? 0.65 + 0.55 * Math.abs(Math.sin(h0 * 3.5)) : 0.88 + 0.12 * Math.sin(h0 * 3.0);
     // curl direction alternates per filament -> FUZZY fluff, not a coherent swirl donut
     var ang = h0 + (a.q9 || 0) * 0.6 + u * 1.0 * (seg & 1 ? 1 : -1);
     var rr = r0 + len * u;
     ang += alcCrimp(u, rr, a.value1); // D6 crimp/wavelet texture + tip jitter
+    // dark core HOLE (apex form only, p1 M6 "dark core hole + inner disc"): hide the innermost
+    // strand run so the bloom reads as petals around a void, not a solid tuft
+    if (pompApex && rr < R * 0.22) a.a = 0;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     a.x = cx + Math.cos(ang) * rr;
@@ -2108,6 +2115,11 @@
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
+  // POMPOM apex-bloom state (doc 11 step 3, A8): mode 16 renders either the small chenille
+  // pompom or the DAHLIA APEX FORM (p1 M6/S15: denser petal tufts + a dark core hole + ~28-32%
+  // dia). Rolled once per dwell — the ref holds one form for the whole appearance.
+  var pompApex = 0, // 0 chenille pompom · 1 dahlia apex bloom
+    pompEntered = false; // dwell-entry edge (re-roll only on a fresh mode-16 visit)
   // MESH COCOON per-stamp state (doc 09 A2) — fCocoon + the frame-side eye/stamp blocks read these;
   // no q-var (all 32 taken; no shader wants cocoon state).
   var cocSeed = 0, // hash seed → node graph; re-rolled per stamp (step 3)
@@ -2714,6 +2726,16 @@
     } else if (mEff !== 21) {
       spinNext = -1; // fresh dwell restyles immediately
     }
+    // ── POMPOM apex-form roll (doc 11 step 3): one form per mode-16 dwell — ~40% of dwells
+    //    render the dahlia APEX bloom (dark core hole + dense petal tufts), the rest the small
+    //    chenille pompom (subtle 3-lobe tufting only). ──
+    if (mEff === 16) {
+      if (!pompEntered) {
+        pompEntered = true;
+        pompApex = Math.random() < 0.4 ? 1 : 0;
+      }
+      if (FORCE && FORCE._pompApex !== undefined) pompApex = +FORCE._pompApex;
+    } else pompEntered = false;
 
     // ── ORBS + TETHER — wide diagonal pair joined by a jagged waveform line (the Dance signature, A_93/
     //    W_103). Staging: orb A near-persistent, orb B comes & goes; tether gated to both-present + beat. ──
