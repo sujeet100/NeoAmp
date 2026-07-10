@@ -3905,9 +3905,11 @@
   // PASTEL = the accurate WMP look (480p + the orig-19s clip both measure muted/dusty/pastel, true blacks):
   // lower saturation, lifted softer washes, milky low-contrast, a faint mauve/sage cast.
   var PROFILE_PASTEL = {
-    gboost: 1.1, // was 1.32/1.7 — user 2026-07-10 "backgrounds too milky/faded"; the ref has TRUE
-    // blacks, so darken the DARK GROUND (gboost multiplies only `ground`, never the trail/glow —
-    // the geometry keeps its presence while the empty/dark regions deepen).
+    gboost: 2.2, // MEASURED correction (user's 2026-07-10 recording vs the 480p): the original
+    // keeps ~93% of the frame lit above luma 60 (median frame luma 85) — a full coloured
+    // mid-tone wash nearly everywhere; ours measured 26%/48 (headless: 6-12%/35-43). The 1.1
+    // de-milk overshot: the earlier "milky veil" complaint was the LIFT (grey additive floor,
+    // stays 0) + low sat, not ground LEVEL. gboost multiplies only `ground`, never trail/glow.
     kbold: 0.85,
     ksat: 0.38, // kaleidoscope diamonds DESATURATED → soft pastel (they were reading too vivid in pastel)
     tonek: 0.68,
