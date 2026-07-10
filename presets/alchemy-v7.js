@@ -3630,11 +3630,12 @@
             strK = Math.floor(fkK),
             uK = fkK - strK;
           var baseX = accLineX,
-            baseY = 0.9; // fan converges at a bottom point
+            baseY = 0.1; // fan converges at a BOTTOM point (wave y is bottom-up — the user's
+          // 2026-07-10 recording caught the first cut hanging upside-down from the top edge)
           var topX = baseX + (smoke ? 0.16 : 0.1) * (strK / SK - 0.5);
           var flexK = 0.06 * Math.sin(lastT * 0.9 + strK * 0.35); // kelp CLOCK flex, ~0.3Hz class
           a.x = baseX + (topX - baseX) * uK + flexK * uK;
-          a.y = baseY + (0.12 - baseY) * uK; // ~78% tall
+          a.y = baseY + (0.88 - baseY) * uK; // ~78% tall, tip at the top
           var hg = (a.q8 || 0) + 0.15 + 0.35 * uK; // GRADIENT along length (green base→pale top)
           a.r = orbCol(hg, 0) * 0.75;
           a.g = orbCol(hg, 0.33) * 0.75;
