@@ -3987,9 +3987,15 @@
           return a;
         }
         if (ty === 2) {
-          // TELESCOPE / RING-STACK COLUMN (p0 O6/O7, p1 O7): 4-9 hollow ellipse rings tapering
+          // TELESCOPE / RING-STACK COLUMN (p0 O6/O7, p1 O7): 4-9 GLASSY FILLED beads tapering
           // ~3:1 along an axis off the orb; extends/retracts ±9% (T 2-3s), sways (~1s) with a
-          // slight stalk CURVE (the 480p 14-23s stalks bend); tip ring brightest (snaps first).
+          // slight stalk CURVE (the 480p 14-23s stalks bend); tip bead brightest (snaps first).
+          // ★ FILLED redesign (doc 07 tail): the hollow ellipse OUTLINES ghosted into floating
+          // empty coils under the thick-line comp + feedback (the 154ee6c pull; same failure as
+          // the removed ring accessories). Each bead is now a tight SPIRAL — the 2.5px comp
+          // dilate fuses the ~5px turn gaps into a solid glassy disc (bright milky core, darker
+          // rim = p0 O6's "glassy spheres") with zero extra slots. Natural-bag weight stays 0;
+          // the bead column exists for the A18 mushroom event + the _acc3 pin.
           var N = acc3.nCol;
           var fk = (a.sample || 0) * N,
             seg = Math.min(Math.floor(fk), N - 1),
@@ -4023,24 +4029,30 @@
           var rr = (a.q7 || 0.048) * 0.72 * (1 - taperEff * frac);
           var bx2 = ox + Math.cos(axA) * d2,
             by2 = oy + Math.sin(axA) * d2;
-          var th = u * 6.2832;
-          var exx = Math.cos(th) * rr,
-            eyy = Math.sin(th) * rr * 0.38; // squash ALONG the axis → foreshortened 3D stack
+          // FILLED bead: a 4-turn spiral from core to rim (linear pitch ≈ rr/4 ≈ 6px — inside
+          // the dilate+blur fuse range), squashed 0.38 along the axis → foreshortened 3D stack
+          var th = u * 6.2832 * 4.0;
+          var rs = rr * u;
+          var exx = Math.cos(th) * rs,
+            eyy = Math.sin(th) * rs * 0.38;
           a.x = bx2 + exx * Math.sin(axA) + eyy * Math.cos(axA);
           a.y = by2 - exx * Math.cos(axA) + eyy * Math.sin(axA);
           var h2 = accentHue + segEff * 0.03;
-          a.r = orbCol(h2, 0);
-          a.g = orbCol(h2, 0.33);
-          a.b = orbCol(h2, 0.67);
+          // GLASSY shading: milky-bright core falling to a darker saturated rim (p0 O6)
+          var glas = 1 - u;
+          var briC = 0.62 + 0.55 * glas;
+          a.r = Math.min(1, (orbCol(h2, 0) + 0.5 * glas) * briC);
+          a.g = Math.min(1, (orbCol(h2, 0.33) + 0.5 * glas) * briC);
+          a.b = Math.min(1, (orbCol(h2, 0.67) + 0.5 * glas) * briC);
           if (segEff === Nn - 1) {
-            a.r = Math.min(1, a.r * 1.3 + 0.15); // the TIP ring is brighter (p1: tip snaps)
+            a.r = Math.min(1, a.r * 1.3 + 0.15); // the TIP bead is brighter (p1: tip snaps)
             a.g = Math.min(1, a.g * 1.3 + 0.15);
             a.b = Math.min(1, a.b * 1.3 + 0.15);
           }
           mutRGB(a);
-          // discrete rings — hide ring-to-ring connectors; during the mushroom the parity split
+          // discrete beads — hide bead-to-bead connectors; during the mushroom the parity split
           // makes EVERY seg boundary jump between the two figures, so hide BOTH seg ends wide
-          a.a = u < (mush ? 0.12 : 0.05) || (mush && u > 0.94) ? 0 : 0.6 * gate;
+          a.a = u < (mush ? 0.12 : 0.03) || u > (mush ? 0.94 : 0.985) ? 0 : 0.6 * gate;
           return a;
         }
         if (ty === 3) {
