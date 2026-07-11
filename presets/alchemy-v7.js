@@ -2645,6 +2645,8 @@
     // music instead of a fixed 14Hz (ref: the 3:50 mandala barely quivers on the quiet
     // bed; the 0:43 hairball thrashes on the loud section)
     bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
+    bloomSizeM = 1, // ★ per-APPEARANCE size class (user 2026-07-11: "the original has the flower
+    // in ALL sizes — small, medium, large — not only big"). Rolled on fresh entry to mode 25.
     bloomNext = -1, // next leg roll time (-1 = not in dwell)
     bloomDur = 1.2, // current leg duration
     bloomMorph = 1, // 0..1 leg progress
@@ -3364,7 +3366,7 @@
     if (mEff === 25) {
       t.q2 = 0.5;
       t.q3 = 0.5;
-      t.q5 = scaleFor(25) * 0.97 * bloomMul; // steady — no bass term (nested-ring stacking)
+      t.q5 = scaleFor(25) * 0.97 * bloomMul * bloomSizeM; // × per-appearance size class (small/med/large)
       // DISTINCT trail (user round 9, MEASURED 25fps 3:56-3:59: the ghost is a CRISP
       // superimposed COPY of the motif — old + new line-work overlay unblurred ~0.5-1s;
       // heavier scenes run seconds). Our watercolour blur was what made trails soft and
@@ -3907,6 +3909,14 @@
         Math.random() < 0.4 ? 0 : (Math.random() < 0.5 ? 1 : -1) * (0.6 + 0.18 * Math.random());
       mtPinchPhase = Math.random() * 6.2832;
       mtHueStep = 0;
+    }
+    // ★ SIZE CLASS per flower APPEARANCE (user: the ref shows small/medium/large blooms, not just
+    // big). Roll on fresh entry to mode 25: ~40% small · 35% medium · 25% large. Held for the whole
+    // appearance so form-morph legs keep the size; a new size comes only when the bloom re-appears.
+    if (mCur === 25 && lastMotif !== 25) {
+      var szr = Math.random();
+      bloomSizeM = szr < 0.4 ? 0.52 : szr < 0.75 ? 0.74 : 1.0;
+      if (FORCE && FORCE._bloomSize !== undefined) bloomSizeM = FORCE._bloomSize;
     }
     lastMotif = mCur;
     if (mCur === 14 && mtStampT === time)
