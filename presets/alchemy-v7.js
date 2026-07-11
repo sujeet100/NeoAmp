@@ -2533,8 +2533,7 @@
     // ── mode-26 MARCHING scene (Abide 720p 0:33-0:40): a fBloom flower + two rotating lines
     //    drift RIGHTWARD together over a flat teal ground (user 2026-07-11). ──
     marchAmt = 0, // eased engagement
-    marchT0 = -9, // dwell entry (resets the rightward drift + line-fade stage)
-    marchX = 0.28, // flower hub X — drifts right across the dwell (the "march")
+    marchT0 = -9, // dwell entry (stages the line fade-in)
     marchLineAmt = 0, // rotating-line entrance envelope (read by fMarchFan)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
@@ -4878,54 +4877,44 @@
       // field itself. Guarded so an explicit FORCE q29 pin wins.
       if (rippleAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
-    // ── MODE-26 MARCHING scene (Abide 720p 0:33-0:40): the fBloom flower + two rotating lines
-    //    drift RIGHTWARD together over a flat teal ground. On entry the hub resets to the left and
-    //    drifts right across the dwell; the lines fade in ~0.8s after the flower (staged like 24). ──
+    // ── MODE-26 MARCHING scene (Abide 720p 0:33-0:40): the fur-ball flower + two rotating lines +
+    //    orbs stay PARKED on screen and the CAMERA FOLLOWS them while the WORLD STREAMS rightward
+    //    past — exactly the corridor marching-orbs principle (CLAUDE.md Alchemy rule 2: camera-follow
+    //    = subject parked, world streams; NEVER a hub traversal + respawn wrap, which was the v1 bug).
+    //    The rightward pan streams every trail into the marching wake / bead-chain — the march IS the
+    //    streaming world, not a moving hub. ──
     var marEff = Math.floor((t.q30 || 0) + 0.5) === 26 ? 1 : 0;
-    if (marEff && marchAmt < 0.02) {
-      marchT0 = time;
-      marchX = 0.2; // enter from the left, then march right
-    }
+    if (marEff && marchAmt < 0.02) marchT0 = time;
     marchAmt += (marEff - marchAmt) * Math.min(1, dt * 0.7);
     marchLineAmt = marEff ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) : 0;
     if (marchAmt > 0.01) {
       var ma = marchAmt;
-      // rightward MARCH: drift the flower hub right (~0.05/s ≈ the ref's gentle travel); once it
-      // sails off the right it wraps back to the left so the march is continuous, not a one-shot.
-      marchX += dt * 0.05 * ma;
-      if (marchX > 1.18) marchX = -0.18;
-      t.q2 += (marchX - t.q2) * ma;
-      t.q3 += (0.52 - t.q3) * ma; // hub a touch above centre — the fan sweeps up from below
-      // The march comes ENTIRELY from the hub drifting right — the flower's own feedback wake
-      // (deposits left behind at old positions) reads as the rightward travel. NO world pan: a
-      // rightward pan dragged the rotating-line trails into messy horizontal smears (first render).
-      t.q18 *= 1 - ma;
-      t.q19 *= 1 - ma; // no vertical drift
+      // PARK the flower + lines a touch left-of-centre (the camera is locked to them) so the
+      // rightward-streaming wake has room to trail off to the right — the ref composition.
+      t.q2 += (0.4 - t.q2) * ma;
+      t.q3 += (0.5 - t.q3) * ma;
+      // ★ WORLD STREAMS RIGHT = the march (the camera pans right WITH the parked subject, like the
+      // corridor chase). This streams the flower's + orbs' + lines' feedback trails into the marching
+      // wake; nothing traverses the screen, so there is no restart pop.
+      t.q18 += (0.02 - t.q18) * ma;
+      t.q19 *= 1 - ma; // pure horizontal — no vertical drift
       t.q16 *= 1 - ma; // zero roll/swirl/growth — directional scene (rule 4)
       t.q17 *= 1 - ma;
       t.q15 *= 1 - 0.6 * ma;
-      // Medium decay (0.966): enough for the fur-ball's angular filament copies to build density
-      // and the rotating lines to fan out, but short enough that the marching orbs don't bloom into
-      // big blobs (0.972 did). Low blur keeps the filaments + fan legible.
-      t.q1 = Math.min(Math.max(t.q1, 0.966), 0.97);
+      // Medium decay (0.965): a long enough wake for the streaming bead-chain, short enough that the
+      // parked orbs don't bloom into big blobs. Low blur keeps the filaments + fan legible.
+      t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
       t.q28 = Math.min(t.q28, 0.05);
-      // dim the free accessory LINES (they cluttered the clean flower+fan), but keep the ORBS —
-      // they become the ref's marching bead-chain (below).
-      accVis *= 1 - 0.85 * ma;
-      // ★ MARCHING ORBS / bead-chain (user 2026-07-11): two orbs travel RIGHT along the flower's
-      // row, a bit ahead of it, wrapping — their feedback wakes string out into the ref's rightward
-      // bead-chain. Positions marched in lockstep with the flower's own rightward drift.
-      var orbRow = 0.52;
-      var oaX = marchX + 0.14,
-        obX = marchX + 0.32; // two beads leading the flower to the right
-      if (oaX > 1.15) oaX -= 1.33;
-      if (obX > 1.15) obX -= 1.33;
-      t.q21 += (oaX - t.q21) * ma;
-      t.q22 += (orbRow - t.q22) * ma;
-      t.q23 += (obX - t.q23) * ma;
-      t.q24 += (orbRow + 0.02 - t.q24) * ma;
-      t.q25 = Math.max(t.q25, 0.32 * ma); // orb A visible (small, quiet — not a big blob)
-      t.q14 = Math.max(t.q14, 0.32 * ma); // orb B visible
+      accVis *= 1 - 0.85 * ma; // dim the free accessory lines (kept the flower+fan clean)
+      // ORBS PARKED near the flower (single-axis rule): the rightward pan streams their wake into the
+      // ref's rightward bead-chain — the SAME mechanism as the corridor (parked orb + streaming wake
+      // = the bead row), NOT orbs traversing the screen.
+      t.q21 += (0.36 - t.q21) * ma;
+      t.q22 += (0.56 - t.q22) * ma;
+      t.q23 += (0.48 - t.q23) * ma;
+      t.q24 += (0.5 - t.q24) * ma;
+      t.q25 = Math.max(t.q25, 0.34 * ma); // orb A (small, quiet — the wake does the chain)
+      t.q14 = Math.max(t.q14, 0.34 * ma); // orb B
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
