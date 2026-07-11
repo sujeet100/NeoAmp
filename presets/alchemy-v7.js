@@ -2858,8 +2858,12 @@
     lastT = time;
     var energy = typeof alcEnergy === "function" ? alcEnergy(t) : bassA;
     var f = beat(t.bass || 1, dt);
-    // SMOOTHED beat envelope — size/exposure/orb pops ride THIS, not the raw flash (no strobe/jitter).
-    pulse += (f - pulse) * Math.min(1, dt * (f > pulse ? 12 : 2.6));
+    // BEAT "THUMP" envelope — size/exposure/orb pops ride THIS. Fast attack CATCHES the flash peak
+    // (was 12 → pulse never reached the spike, read as a flat medium hum) and a faster release
+    // RETURNS it toward 0 between beats so the motif goes near-still on rests and slams on hits —
+    // the MEASURED reference behaviour (Abide bloom fill swings ~30%→97% on beats, r=0.66 vs audio;
+    // per-scene onset→motion r=0.42). Still ~4-frame attack, so a thump, NOT a 1-frame strobe.
+    pulse += (f - pulse) * Math.min(1, dt * (f > pulse ? 22 : 5.0));
 
     // ── BACKGROUND — its own slow clock; 0 wavy-fluid (dominant) · 1 kaleidoscope · 2 radial-tunnel ──
     var bg = bgPick(time, dt, false);
