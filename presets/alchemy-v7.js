@@ -2518,6 +2518,9 @@
     //    drift RIGHTWARD together over a flat teal ground (user 2026-07-11). ──
     marchAmt = 0, // eased engagement
     marchT0 = -9, // dwell entry (stages the line fade-in)
+    marchPhase = 0, // ★ per-dwell phase: 0 = phase-1 (flower+lines+orbs) · 1 = phase-2 (big flower alone,
+    // NO lines). Rolled on fresh entry so each dwell is ONE clean consistent flow (user: "keep same flow
+    // per phase" + "I still see lines in phase 2" — a mid-dwell ramp didn't reliably clear them).
     marchLineAmt = 0, // rotating-line entrance envelope (read by fMarchFan)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
@@ -4868,18 +4871,19 @@
     //    The rightward pan streams every trail into the marching wake / bead-chain — the march IS the
     //    streaming world, not a moving hub. ──
     var marEff = Math.floor((t.q30 || 0) + 0.5) === 26 ? 1 : 0;
-    if (marEff && marchAmt < 0.02) marchT0 = time;
+    if (marEff && marchAmt < 0.02) {
+      marchT0 = time;
+      marchPhase = Math.random() < 0.45 ? 1 : 0; // ~45% of dwells are phase-2 (big flower alone)
+    }
     marchAmt += (marEff - marchAmt) * Math.min(1, dt * 0.7);
-    // ★ PHASE 2 (Abide 720p 0:41-0:50): the scene CONVERTS — the rotating cross-lines + orbs fade
-    // OUT and the flower GROWS to a big many-petal bloom, still marching the same way (user
-    // 2026-07-11). Ramps in over ~2.5s starting ~6s into the dwell. (FORCE._marchP2 pins it.)
-    var marchP2 = Math.max(0, Math.min(1, (time - marchT0 - 6) / 2.5));
-    marchP2 = marchP2 * marchP2 * (3 - 2 * marchP2);
+    // ★ PHASE (Abide 720p): 0 = phase-1 (flower + rotating lines + orbs) · 1 = phase-2 (0:41-0:50:
+    // big flower alone, NO lines/orbs). Held for the whole dwell so each is one clean flow; the pin
+    // FORCE._marchP2 overrides it.
+    var marchP2 = marchPhase;
     if (FORCE && FORCE._marchP2 !== undefined) marchP2 = FORCE._marchP2;
-    // lines fade in ~0.8s after entry, then fade back OUT as phase 2 takes over
-    marchLineAmt = marEff
-      ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) * (1 - marchP2)
-      : 0;
+    // lines fade in ~0.8s after entry — but ONLY in phase 1 (marchP2 0). Phase 2 → hard 0, no lines.
+    marchLineAmt =
+      marEff && marchP2 < 0.5 ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) : 0;
     if (marchAmt > 0.01) {
       var ma = marchAmt;
       // PARK the flower + lines a touch left-of-centre (the camera is locked to them) so the
@@ -4900,13 +4904,15 @@
       t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
       t.q28 = Math.min(t.q28, 0.05);
       accVis *= 1 - 0.85 * ma; // dim the free accessory lines (kept the flower+fan clean)
-      // ★ MANY-PETAL fur-ball with the SMALLEST hole (user): force high k + a tiny ring each frame
-      // (overrides the morph driver, which runs above) so fBloom's petals fill toward the centre —
-      // a dense flower, not the hollow petal ring. bloomTip small keeps the petal caps closed (dense).
-      bloomK += (32 - bloomK) * ma;
-      bloomRing += (0.06 - bloomRing) * ma;
+      // ★ FEWER, DISTINCT petals + SMALLEST hole (user 2026-07-11: "reduce number of petals" — 32
+      // packed into a blob; ~10 distinct petals read as a flower) and DO NOT ROTATE the flower
+      // (bloomRotV → 0 freezes the precession; user: "do not rotate the motif"). Tiny ring keeps
+      // the petals meeting near a small centre; closed tips keep them solid.
+      bloomK += (10 - bloomK) * ma;
+      bloomRing += (0.08 - bloomRing) * ma;
       bloomA = Math.max(bloomA, 0.55 * ma);
       bloomTip *= 1 - 0.7 * ma;
+      bloomRotV *= 1 - ma; // freeze the flower's spin (the rotating LINES still rotate; the flower does not)
       // STEADY size — user 2026-07-11: "reduce the pulsing for the motif". Override the general q5's
       // bass/pulse throb with a near-constant size (only a whisper of beat), and GROW it for phase 2
       // (still many-petal, tiny-hole) so the flower becomes the whole scene; medium in phase 1.
