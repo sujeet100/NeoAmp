@@ -3190,9 +3190,13 @@
       t.q2 = 0.5;
       t.q3 = 0.5;
       t.q5 = scaleFor(25) * 0.97 * bloomMul; // steady — no bass term (nested-ring stacking)
-      // ~1s soft ghost hugging the crisp lines: long enough that the open hairy tips fuzz
-      // the trail (the 0:43-0:52 signature), short enough to never stack nested copies
-      t.q1 = Math.min(t.q1, 0.945);
+      // DISTINCT trail (user round 9, MEASURED 25fps 3:56-3:59: the ghost is a CRISP
+      // superimposed COPY of the motif — old + new line-work overlay unblurred ~0.5-1s;
+      // heavier scenes run seconds). Our watercolour blur was what made trails soft and
+      // short-reading: diffusion ~off so ghost copies stay legible line-work, decay up
+      // 0.945 -> 0.968 (~1.5-2s visible fade at 60fps).
+      t.q1 = Math.min(Math.max(t.q1, 0.968), 0.972);
+      t.q28 = Math.min(t.q28, 0.06);
     }
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
