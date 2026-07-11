@@ -55,11 +55,12 @@
     // sweep outward for ~1s during the rare starburst finale. q13 belongs to the kaleido fold when
     // q29==1, so the ripple reads it ONLY outside kaleido (the event writer also never fires there).
     "  float rip = (abs(q29 - 1.0) < 0.5) ? 0.0 : q13;\n" +
-    // WATER branch (mode 24, user round 3 "2-3 big ripples like original"): the ripple-flower
-    // scene holds q13 on continuously, but the C8 event's λ≈5%-frame fast-swept bands read as
-    // MANY SMALL ripples — under q30 24 the same channel becomes ~2-3 BIG slow crests
-    // (λ≈18% frame, crest crawl ~0.05 UV/s) that compound tall waves onto the held trails.
-    "  float watr = (abs(q30 - 24.0) < 0.5) ? 1.0 : 0.0;\n" +
+    // WATER branch (modes 24 + 29): both scenes hold q13 on continuously so the vertical
+    // surface-wave below bends their rays into water ripples (mode 24 ripple-flower; mode 29
+    // vortex-cross — user 2026-07-11: "the lines are not diffused by the water surface"). The
+    // C8 event's λ≈5%-frame fast-swept bands read as MANY SMALL ripples — under this branch the
+    // same channel becomes ~2-3 BIG slow crests (λ≈18% frame) that compound onto the held trails.
+    "  float watr = (abs(q30 - 24.0) < 0.5 || abs(q30 - 29.0) < 0.5) ? 1.0 : 0.0;\n" +
     // ★ water displacement is VERTICAL, not radial (user round 5: "the rotating cross
     // lines are still not getting distorted"): every rotor passes THROUGH the hub, so a
     // radial push moves its points ALONG the line — it can never bend them. A surface
@@ -1492,10 +1493,12 @@
       tt = u * 2 - 1; // -1..1 THROUGH the centre — full length both ways
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    // TWO slow continuous rates, same sense: the pair crosses at a shallow angle that DRIFTS over
-    // ~60s (the rate difference), so the bowtie opens/closes like the ref. Slow enough that only
-    // ~1s of crisp copies survive the moderate decay → a narrow fan, never a full-circle mesh.
-    var ang = line ? lastT * 0.34 + 0.6 : lastT * 0.22;
+    // TWO FAST continuous rates, same sense (MEASURED off the ref 4:25-4:28 @10fps: the bowtie axis
+    // sweeps ~70° per 0.4s ≈ 175°/s ≈ 3.0 rad/s). The scene's 1/r swirl ADDS rotation near the hub,
+    // so the live line runs ~2.6 rad/s and the fan lands near the measured 3.0. The small rate
+    // difference (0.25) drifts the crossing angle slowly, so the bowtie opens/closes like the ref;
+    // the moderate decay keeps only ~0.5-0.7s of crisp copies → a ~90-120° fan, never a full mesh.
+    var ang = line ? lastT * 2.6 + 0.6 : lastT * 2.35;
     var ct = Math.cos(ang),
       st = Math.sin(ang);
     // min-clamped full-frame (line rule): the arms always cross the borders on both sides
@@ -5161,6 +5164,13 @@
       // diffusion (the wet ink bleed that softens the rays into the ref's watercolour spiral).
       t.q1 = Math.min(Math.max(t.q1, 0.96), 0.966);
       t.q28 = Math.max(t.q28, 0.45);
+      // ★ WATER-SURFACE distortion of the rays (user 2026-07-11: "the lines are not diffused by the
+      // water surface"): hold the ripple channel on so the WARP's radius-keyed vertical wave
+      // (pd.y += watr·q13·0.004·sin(pr·34 − time·1.6)) bends the straight rays into the ref's wavy
+      // water ripples as they cross the surface. watr is gated to q30≈29 in WARP_V7; the wave is
+      // zeroed near the hub (smoothstep 0.06→0.4) so the crossing eye stays registered. A touch
+      // stronger than mode-24's 0.14 so the fast-rotating rays visibly ride the surface.
+      t.q13 = Math.max(t.q13, 0.3);
       // the scene owns its ground: the wavy WATER fluid (q29=0). Guarded so a FORCE q29 pin wins.
       if (vortexAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0;
       // ORBS PARKED at the two EXTREME ENDS (left/right edges), slightly tilted like the ref.
