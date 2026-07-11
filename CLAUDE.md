@@ -83,12 +83,16 @@ principles (full design: **`docs/neoamp-ui/MULTI-PROVIDER-DESIGN.md`**):
    **Load unpacked** → select this folder. After editing the manifest, click the
    **reload** (↻) icon; after editing JS, reload the extension **and** the tab.
 2. Open <https://music.youtube.com>, play a track.
-3. Click the **◢◤ Visualizer** launcher (bottom-right) or press **Shift+V**.
-4. In the share dialog pick **this tab** and **tick "Also share tab audio"**
-   (required — no audio = frozen visuals; only the *Tab* option exposes the audio
-   checkbox, not Entire Screen).
-5. Click the favorite buttons to switch presets. Console logs are prefixed
-   `[WMP-viz]`.
+3. Start audio capture: click the **extension toolbar icon** (tabCapture needs a
+   user gesture in the worker context — no share dialog since the real-EQ ship).
+   No audio = frozen visuals.
+4. Click the **◢◤ Visualizer** launcher (bottom-right) or press **Shift+V**.
+5. Pick presets from the dropdown / ⏮⏭🎲. Console logs are prefixed `[WMP-viz]`.
+6. **Pin-testing Alchemy live:** DevTools console → switch context from `top` to
+   the **viz.html frame** → `window.__ALC_FORCE = {q30: <motifId>, accLine: 0}`
+   (add `q29:<bgId>` to pin a background — omit it for scenes that force their
+   own; `null` to release). Underscore keys (`_dive`, `_balloon`, …) are closure
+   event pins.
 
 We (Claude) **cannot see the live render** — iterate by asking the user for
 screenshots. Validate code with Node before asking them to reload (below).
@@ -96,15 +100,16 @@ screenshots. Validate code with Node before asking them to reload (below).
 ## Architecture & the load-bearing gotchas
 
 ```
+sw.js (service worker) — toolbar click (user gesture) → tabCapture.getMediaStreamId
+  → offscreen.js (offscreen document): AudioContext + EQ graph + AnalyserNode
+    (fftSize 1024) → base64 [time|freq] frames → SW → content.js
 content.js  (runs on music.youtube.com, page CSP applies)
-  getDisplayMedia({video,audio}) → keep audio track → AudioContext
-  → gain(1.8) → AnalyserNode(fftSize 1024) → muted gain → destination
-  → each frame: getByteTimeDomainData → postMessage(Uint8Array) ─┐
-                                                                  │ (1KB/frame)
-viz.html  (sandboxed extension page, loaded as a fullscreen <iframe>)
-  Butterchurn (needs unsafe-eval) ◄───── postMessage ◄───────────┘
+  relays FFT frames + track/transport state; creates the viz iframe ──┐
+                                                                      │ postMessage
+viz.html  (sandboxed extension page, loaded as a fullscreen <iframe>) │
+  Butterchurn (needs unsafe-eval) ◄───────────────────────────────────┘
   → render({ audioLevels: { timeByteArray, timeByteArrayL, timeByteArrayR } })
-  → WebGL <canvas> + the favorites control bar
+  → WebGL <canvas> + the preset dropdown
 ```
 
 **Why the sandboxed iframe (do not "simplify" this away):** Butterchurn compiles
@@ -115,10 +120,13 @@ that allows `unsafe-eval` is a **sandboxed extension page** (`manifest.sandbox`
 embedded as an iframe by the content script. `viz.html` + scripts are in
 `web_accessible_resources`.
 
-**Why getDisplayMedia (not the obvious approach):** `createMediaElementSource`
-on YouTube's `<video>` returns **all zeros** (cross-origin tainting). Tab capture
-via `getDisplayMedia` avoids that and keeps the tab audible. The audio analysis
-runs in the content script; only the FFT byte arrays cross into the iframe.
+**Why tabCapture in an offscreen document (not the obvious approach):**
+`createMediaElementSource` on YouTube's `<video>` returns **all zeros**
+(cross-origin tainting), and `getDisplayMedia` (the pre-EQ design) can't mute
+the original tab without muting our own replay. `chrome.tabCapture` mutes the
+tab and replays an EQ-shaped copy from the offscreen document — so the EQ
+shapes what you hear AND the same AnalyserNode feeds the viz. Only FFT byte
+arrays cross into the iframe.
 
 **Canvas sizing (caused a long "blurry/corner-cropped" bug):** This Butterchurn
 build (2.6.7) does **NOT** resize the `<canvas>` you pass it — it stays at the
@@ -132,7 +140,7 @@ in `viz.js`. Symptom if wrong: content fills only a corner and/or is blurry.
 | File | Role |
 | --- | --- |
 | `manifest.json` | MV3 manifest: content script on `music.youtube.com`, `sandbox` page, sandbox CSP (allows `unsafe-eval`/`wasm-unsafe-eval`), `web_accessible_resources`. |
-| `content.js` | Launcher button, `getDisplayMedia` capture, `AnalyserNode`, creates the iframe, pumps audio bytes via `postMessage`. |
+| `content.js` | Launcher button, FFT/track/transport relay (audio itself is captured in `offscreen.js` via `sw.js` tabCapture), creates the iframe, pumps audio bytes via `postMessage`. |
 | `viz.html` | Sandboxed page: `<canvas>` + control bar + script includes (vendor, `presets/*.js` in order, `viz.js`). |
 | `viz.js` | Butterchurn init, canvas sizing, favorites menu, keyboard, message handling, render loop. `FAVORITES` array defines the buttons. |
 | `presets/kit.js` | **Shared kit**, loaded first: helpers, GLSL constants, the `build()` factory, and every reusable `alc*` element/motif/background/orb factory. Its top-level declarations are shared globals the family files build on. |
@@ -192,7 +200,7 @@ for f in presets/*.js viz.js content.js; do node --check "$f" || break; done   #
 # browser's shared <script> scope — kit's top-level vars become globals the families use),
 # build every preset, run each frame_eqs (catches missing kit refs / throwing eqs):
 node -e 'const fs=require("fs"),vm=require("vm");global.window=global;
-  const cat=["kit","dance","alchemy","ambience","battery"].map(f=>fs.readFileSync("presets/"+f+".js","utf8")).join("\n;\n");
+  const cat=["kit","dance","alchemy-v7","ambience","battery"].map(f=>fs.readFileSync("presets/"+f+".js","utf8")).join("\n;\n");
   vm.runInThisContext(cat);
   let n=0; for(const [k,p] of Object.entries(window.WMP_PRESETS)){ if(p.frame_eqs) p.frame_eqs({time:2,bass:1.3,bass_att:1.1,mid:1,treb:1,treb_att:1}); n++; }
   console.log("ok", n, "presets");'
@@ -228,9 +236,9 @@ startup loads "Dance of the Freaky Circles" (known-good).
 and differ only in a `makeComp(PROFILE)` colour profile: **`P["Alchemy (Pastel)"]` (the DEFAULT — the
 accurate muted/dusty WMP colour, validated by measurement against the 480p reference) + `P["Alchemy (Vivid)"]`
 (punchier).** It is a single self-sequencing preset: a watercolour FEEDBACK engine (decay + compounding
-blur diffusion + tiny growth) over a dark wavy-fluid ground, with 15 motif modes (anemone/star/urchin/
-crossed-X/triangle/square/hexagram/wireframe-net/vortex/jellyfish/12-star/beaded-chain/valley/organic-
-tangle/mountains), 8 background regimes (wavy-fluid/kaleidoscope/tunnel/corridor/bars/wash/bands/bullseye),
+blur diffusion + tiny growth) over a dark wavy-fluid ground, with (as of 2026-07) **24 motif modes** and
+**15 background regimes** (see the `MODES` array + the `q29` comp branches in `alchemy-v7.js` — several
+were later PULLED from the bags for faithfulness: bead-chain, pompom, radial-tunnel, wallpaper),
 glowing pulsing orbs + a colour-cycling waveform tether, and an abrupt-snap-pan / valley-dolly camera.
 Two full reference videos were surveyed for gaps; colour was validated (the 480p is colour-accurate, the
 1080p is a washed/boosted re-encode — see memory `alchemy-measured-color-facts`). **All OLD versions were
@@ -240,9 +248,54 @@ REMOVED** (v1 `alchemy-random`, all v2 `alchemy-{scenes,eras,motifs}`, and the v
 `alchemy-measured-color-facts`.** Verify with `tools/selfrender.mjs` (+ the scratchpad `pinrender.mjs`
 which pins `window.__ALC_FORCE` q29 bg-mode / q30 motif).
 
-**★ NEXT (a fresh session): the BATTERY visualiser family** — the user wants to build out Battery next; it
-has a DIFFERENT character than Alchemy (see the `presets/battery.js` presets + the Battery colour notes
-below). Approach it like Alchemy: study its reference frames, measure colour, build/verify via self-render.
+**★ ACTIVE (2026-07): the Alchemy REFINEMENT pass** — element-by-element fidelity fixes driven by the
+user's live screenshots/recordings (see memory `alchemy-gap-docs-roadmap` for exactly where it stands).
+The proven loop: user screenshot → pin `q30`/`q29` to identify the layer → frame-check the reference
+window → ONE fix → self-render → commit. **The hard-won rules for this work are in "Alchemy preset
+principles" below — read them before ANY Alchemy change.** After Alchemy refinement: the BATTERY family
+rebuild (different character — see `presets/battery.js` + the Battery colour notes below; approach it
+like Alchemy: reference frames, measured colour, self-render).
+
+## Alchemy preset principles (★ HARD RULES — violations cost many correction rounds)
+
+Distilled from ~6 rebuilds the user had to demand repeatedly. Full history + per-rule war
+stories: memory `alchemy-design-language-trail-built`.
+
+1. **TRAIL-BUILT, never drawn.** The only LIVE geometry is one/two waveform strands or orb
+   emitters. Every apparent structure — braid, fan, zigzag ribbon, stalk, mesh, cascade,
+   terrain — is the FEEDBACK TRAIL of that emitter's motion (motion + decay does the
+   construction). Before implementing any element, ask: "what does ONE live emitter do per
+   frame so the trail builds this picture?" A drawn N-strand shape is wrong even when the
+   still looks right. (Violated 6×: harp swath, scallop, tether rope/helix, moth fan,
+   swimmer slinky coils, cross-X zigzag ribbons.)
+2. **Camera-follow = subject PARKED, world streams.** "X moves and the camera follows" means
+   X holds still on screen while the trail/background streams past (q18/q19). Never a
+   traversal with respawn wraps — a visible restart is proof the camera isn't following.
+   Always ask which frame of reference before coding motion.
+3. **Emitters move on ONE axis; waviness lives in the FIELD.** No sway/bob composites on the
+   emitter path — the wake's S-curve comes from the warp field (q12 shear / flow), which
+   COMPOUNDS on the held trail (0.035 = gentle wiggle, 0.3 = giant zigzags; pick per ref).
+4. **Directional scenes zero every other field channel.** Pan leak (q18), roll (q16), swirl
+   (q17), growth (q15). Roll pushes TANGENTIALLY about the pivot — emitters on opposite
+   sides get OPPOSITE lateral shoves (one wake straight, one sideways). Audit these four
+   whenever a wake bends off-axis.
+5. **MEASURE the reference; never guess speeds.** Frame-step the ref window (ffmpeg fps=8-10
+   tiles), track a feature across 0.1s frames: stream %height/s, rotation °/s. "Too slow"
+   can be a VISIBILITY bug — a dim live stroke leaves only its washed trail registering,
+   which reads slow at the correct speed. Reference rotations are CONTINUOUS (never
+   stop/reverse/oscillate — a rocking sin() stalls at its extremes and reads wrong).
+6. **A scene OWNS its set-piece.** Forced ground regime (check regime brightness first),
+   disengaged competing couplings (corridor priority once silently zeroed a whole scene),
+   plain-chord tether, captured/FIXED hub (the roaming scene hub drags parked emitters).
+   Guard scene forces so explicit `__ALC_FORCE` pins still win.
+7. **The pin test IDs layers.** An element that survives a `q30` motif pin is an independent
+   layer (accessory/background), not the motif. Use it FIRST when triaging "what is this
+   shape". Headless self-renders run ~7fps — per-frame world-streams appear at ~1/8 speed
+   and trails look thin; judge motion LIVE, geometry headless.
+8. **Faithfulness gate.** Only build what the original does (no invented elements — the
+   static 40-spoke tunnel bg was pulled for this); when the user names a timestamp, cite it
+   in the commit; muted colours per the 480p reference (never neon, tone-map additive
+   highlights).
 
 **Done & committed (`git log`):** Dance of the Freaky Circles (two orbiting
 waveform circles — the best one, use it as the reference pattern), and batch 1:
