@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NeoAmp — Music Player & Visualizer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A Winamp-style player with a real EQ + WMP/MilkDrop music visualizations, overlaid on YouTube Music and Spotify.",
   "permissions": ["storage", "tabCapture", "offscreen", "activeTab", "contextMenus"],
   "host_permissions": ["https://music.youtube.com/*", "https://open.spotify.com/*"],
