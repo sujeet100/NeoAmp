@@ -1461,19 +1461,20 @@
     var s = a.sample || 0;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    if (s < 0.68) {
-      // FLOWER: 14 strands, each traced root→tip
-      var fk = (s / 0.68) * 14,
+    if (s < 0.72) {
+      // FLOWER: 18 strands, each traced root→tip (user live round 1: "number of waveform
+      // strands could be more" — 14→18, share 0.68→0.72 keeps ~20 pts/strand ≈ 5/cycle)
+      var fk = (s / 0.72) * 18,
         strand = Math.floor(fk),
         u = fk - strand;
-      if (strand > 13) {
-        strand = 13;
+      if (strand > 17) {
+        strand = 17;
         u = 1;
       }
       // QUANTIZED fan rotation (fMoth's stepped-clock trick): 4° every 0.35s — the copies
       // land at DISTINCT angles, so the trail builds the ref's separated wavy spokes;
       // continuous rotation at 60fps would smear them into a solid bullseye (r3 render)
-      var baseAng = strand * 0.4488 + Math.floor(lastT / 0.35) * 0.0698;
+      var baseAng = strand * 0.3491 + Math.floor(lastT / 0.35) * 0.0698;
       var rr = 0.025 + u * (a.q5 || 0.4) * 0.62;
       // radius-keyed smooth ripple + a live waveform jag riding the outer half — transverse
       // offset ⇒ dAng = dPerp/rr (fMoth's crimp mechanism; the near-static spatial phase is
@@ -1491,12 +1492,19 @@
       a.r = Math.min(1, orbCol(h, 0) * lit);
       a.g = Math.min(1, orbCol(h, 0.33) * lit);
       a.b = Math.min(1, orbCol(h, 0.67) * lit);
-      // root ramp: 14 strands converge at the hub — without it the additive pileup blows
+      // PERSPECTIVE TILT (user live round 1: "the plane should be tilted a bit") — the
+      // ref's water surface is a plane seen at an angle: y foreshortened about the hub +
+      // a mild keystone (the far/upper edge narrows; wave y is BOTTOM-UP). The trails
+      // inherit it, so the ripple rings read as ellipses on a receding plane.
+      var rely = a.y - cy;
+      a.y = cy + rely * 0.75;
+      a.x = cx + (a.x - cx) * (1 - 0.16 * Math.max(0, Math.min(1, rely * 2.2)));
+      // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
       a.a = u < 0.04 ? 0 : 0.8 * Math.min(1, (u - 0.04) / 0.12);
     } else {
       // TWO ROTATING LINES — full-frame (the line rule), dead straight, pale
-      var ls = (s - 0.68) / 0.32;
+      var ls = (s - 0.72) / 0.28;
       var line = ls < 0.5 ? 0 : 1,
         u2 = (ls - line * 0.5) * 2,
         tt = u2 * 2 - 1; // -1..1 through the hub
@@ -1506,7 +1514,9 @@
       var len = Math.max(0.95, (a.q5 || 0.4) * 1.9);
       var fine = (a.value1 || 0) * 0.004; // whisper of live jag — the ref lines are straight
       a.x = cx + tt * len * ct - fine * st;
-      a.y = cy + tt * len * st + fine * ct;
+      // same plane tilt as the flower (y-squash only — the keystone would visibly BEND a
+      // full-frame line, and the ref's rotors stay dead straight)
+      a.y = cy + (tt * len * st + fine * ct) * 0.75;
       var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
       a.r = Math.min(1, orbCol(h2, 0) * 1.45);
       a.g = Math.min(1, orbCol(h2, 0.33) * 1.45);
@@ -1974,10 +1984,16 @@
     // swimmer scene (mode 22): ALWAYS the simple chord (user round 6 — the ref's between-orb
     // line in this scene is always the plain jagged waveform, never a construction)
     var swimOn = Math.abs((a.q30 || 0) - 22) < 0.5;
-    // ripple-flower scene (mode 24): plain chord too — a helix/staircase construction's
-    // trail would deposit foreign structure over the registered water rings
-    var ripOn = Math.abs((a.q30 || 0) - 24) < 0.5;
-    var tk = railOn || corOn || swimOn || ripOn ? 0 : tetherKind;
+    // ripple-flower scene (mode 24): NO tether at all — the chord between the parked orbs
+    // read as a "third small line" beside the two rotors (user live round 1); the ref
+    // window (1080p 1:40-1:42) shows no between-orb line
+    if (Math.abs((a.q30 || 0) - 24) < 0.5) {
+      a.x = 0.5;
+      a.y = 0.5;
+      a.a = 0;
+      return a;
+    }
+    var tk = railOn || corOn || swimOn ? 0 : tetherKind;
     var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
@@ -3217,7 +3233,10 @@
     //    hue, old stamps ghost-fade ~1s, centre static, NO music jag (clock-driven stamps).
     //    Existing constructions only (star-net / net / 12-star / tri-mandala). B2 events are
     //    already silent here (the rest gate). ──
-    var sketch = restAmt > 0.7 && bgMode === 5;
+    // ripple-flower (24) guard: the scene FORCES the wash ground, so a quiet stretch met
+    // this gate and the cycler stamped a foreign wireframe ring over the water (r5 render) —
+    // the scene owns its set-piece, no sketchbook takeover while it runs
+    var sketch = restAmt > 0.7 && bgMode === 5 && rippleAmt < 0.3;
     sketchAmt += ((sketch ? 1 : 0) - sketchAmt) * Math.min(1, dt * 2);
     if (sketch && time >= restStampNext) {
       restStampMode = REST_CYCLE[Math.floor(Math.random() * REST_CYCLE.length)];
@@ -4178,6 +4197,14 @@
       t.q16 *= 1 - ra;
       t.q17 *= 1 - ra;
       t.q12 *= 1 - 0.85 * ra;
+      // WATER-SURFACE FIELD (user live round 1: "the rotating lines should also get
+      // distorted because of the water-like surface — that's what creates the wave
+      // effect"): hold the C8 radial-ripple warp channel ON gently for the whole scene —
+      // a hub-centred concentric displacement (λ≈5% frame) that COMPOUNDS on every held
+      // trail, so the rotors' straight deposits wave up as they age (rule 3: the waviness
+      // lives in the FIELD). Math.max composes with the rare C8 event finale. The kaleido
+      // fold never owns q13 here (this scene forces q29=5).
+      t.q13 = Math.max(t.q13, 0.14 * ra);
       // the scene owns its ground: dim flat wash — the ref surface is entirely the trail
       // field itself. Guarded so an explicit FORCE q29 pin wins.
       if (rippleAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
