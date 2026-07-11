@@ -2508,7 +2508,10 @@
     bloomPh = 0, // petal-phase drift (slow internal motion between legs)
     bloomLPh = 0, // loop-pen phase drift
     bloomHue = 0, // per-leg hue step, riding the shared q8 motif clock
-    bloomDuo = 0.38, // hue gap between the two strands (ref: yellow+lavender, green+rose…)
+    bloomDuo = 0.38, // hue gap between the two strands — NOT always two-tone (user round 2):
+    // some scenes all petals one colour, some alternating; rolled + eased per leg below
+    bloomDuoF = 0.38,
+    bloomDuoT = 0.38,
     bloomOff = 0.5, // strand-1 rotation in petal fractions (0.5 interleave · ~0.3 X-tips)
     bloomTip = 0, // open-tip cut amount (0 closed · 1 wide fork) — eased like the rest
     bloomTipF = 0,
@@ -3199,7 +3202,7 @@
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
         bloomRotV = (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? -1 : 1);
-        bloomDuo = 0.3 + Math.random() * 0.2;
+        bloomDuoF = bloomDuoT = bloomDuo = 0.3 + Math.random() * 0.2;
         bloomKF = bloomKT = bloomK = 11 + Math.floor(Math.random() * 4);
         bloomMorph = 1;
       }
@@ -3258,6 +3261,10 @@
         // strand offset per leg: the X-crossing pose dominates (user: the 2 lines LOOSELY
         // MEET at petals — a clean half-petal interleave reads too tidy for the ref)
         bloomOff = Math.random() < 0.4 ? 0.5 : 0.22 + Math.random() * 0.2;
+        // colour mode per leg (user: NOT always two-tone — some scenes one colour, some
+        // alternating): ~40% MONO (gap eases to 0, both strands share the hue), else duo
+        bloomDuoF = bloomDuo;
+        bloomDuoT = Math.random() < 0.4 ? 0 : 0.28 + Math.random() * 0.22;
         bloomHue += 0.05 + Math.random() * 0.08;
         bloomMorph = 0;
         bloomDur = 0.8 + Math.random() * 1.1;
@@ -3276,6 +3283,7 @@
       bloomAsym = bloomAsF + (bloomAsT - bloomAsF) * bE;
       bloomK = bloomKF + (bloomKT - bloomKF) * bE;
       bloomTip = bloomTipF + (bloomTipT - bloomTipF) * bE;
+      bloomDuo = bloomDuoF + (bloomDuoT - bloomDuoF) * bE;
       bloomJagX = 1 + 1.2 * bumpB;
       bloomRot += dt * bloomRotV;
       bloomPh += dt * 0.15;
