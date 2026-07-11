@@ -1917,7 +1917,7 @@
       a.r = Math.min(1, orbCol(h2, 0) * 1.42);
       a.g = Math.min(1, orbCol(h2, 0.33) * 1.42);
       a.b = Math.min(1, orbCol(h2, 0.67) * 1.42);
-      var flash = 0.5 + 0.5 * Math.max(0, Math.min(1, (a.q32 || 1) - 1)); // pale but visible; crisp on hits
+      var flash = 0.7 + 0.3 * Math.max(0, Math.min(1, (a.q32 || 1) - 1)); // BRIGHT lines (ref fan is bold)
       a.a = (u2 < 0.02 || u2 > 0.98 ? 0 : flash) * marchLineAmt;
     }
     return a;
@@ -4894,6 +4894,13 @@
       accVis *= 1 - 0.85 * ma;
       t.q25 *= 1 - 0.8 * ma; // orb A
       t.q14 *= 1 - 0.88 * ma; // orb B
+      // ★ FUR-BALL flower (side-by-side vs ref 0:36: the ref centre is a DENSE fuzzy tuft, not
+      // fBloom's thin petal RING which read as a hollow scribble). Force MANY filaments (high k)
+      // + open hairy tips so the same fBloom motif renders as the ref's fur-ball. Overrides the
+      // morph driver's k each frame (this coupling runs after it).
+      bloomK += (30 - bloomK) * ma;
+      bloomTip = Math.max(bloomTip, 0.6 * ma);
+      bloomA = Math.max(bloomA, 0.5 * ma);
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
