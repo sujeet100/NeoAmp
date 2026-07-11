@@ -2690,9 +2690,14 @@
   // form rotation covers them (petal flowers, wheel, TRIANGLE family, spider). The fns stay
   // in MODES for pins + the REST_CYCLE sketchbook; the star-polygon outlines (4/5/6/10)
   // remain for now (a different construction class — migrate later if asked).
+  // Round 11: the star-polygon outlines (4 tri / 5 ngon / 6 hexagram / 10 12-star) ALSO
+  // retired from the bag (MEASURED 1080p 1:28-1:42: the ref's polygon stars are thin JAGGED
+  // lightning outlines stacking crisp rotated trail copies — the bloom language, not clean
+  // polygon strokes). Bloom form 5 now rolls 3-6 sides; the spike-star form covers the
+  // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
-    25, 25, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 25, 12, 12, 6, 10, 14, 25, 25, 9, 25, 25, 25,
-    25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
+    25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25,
+    25, 25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2702,9 +2707,9 @@
   var PAIR = {
     4: [25, 14], // bars → the bloom mandala / mountains (anemone+spiro retired round 10)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
-    1: [2, 10, 6, 25], // kaleido → radial motifs that mirror well (retired flowers removed)
+    1: [2, 25], // kaleido → radial motifs that mirror well (star polygons retired round 11)
     5: [9, 24, 25], // flat wash → ONE dominant organic ball / the ripple/bloom flowers (the Abide bloom sits on a flat green wash)
-    6: [25, 10], // bands → small centre motif (tri-mandala -> bloom, round 10)
+    6: [25], // bands → small centre motif (12-star retired round 11)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
   function acceptMotif(idx) {
@@ -3373,13 +3378,18 @@
           bloomLpT = 0;
           bloomTipT = 0.1 + Math.random() * 0.2;
         }
+        var polyR = Math.random();
         bloomKT =
           bloomForm === 4
             ? 3 + Math.floor(Math.random() * 4)
             : bloomForm === 5
-              ? Math.random() < 0.85
+              ? polyR < 0.5
                 ? 3
-                : 4
+                : polyR < 0.7
+                  ? 4
+                  : polyR < 0.85
+                    ? 5
+                    : 6
               : kBand;
         bloomPolyT = bloomForm === 5 ? 1 : 0;
         // hole HELD per dwell (user round 7); only the spider dips to its centre knot
