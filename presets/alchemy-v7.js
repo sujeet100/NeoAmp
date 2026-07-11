@@ -1716,11 +1716,21 @@
     var u = su * 6.2832 + bloomRot;
     var p = k * u + bloomPh;
     var c = Math.cos(p);
-    var shape = (c < 0 ? -1 : 1) * Math.pow(Math.abs(c), bloomSharp);
+    var s01 = Math.pow(Math.abs(c), bloomSharp);
     // NO beat swell on R: the ref figure's size is rock steady (a ±5% q32 breathe stacked
-    // nested ghost rings into a woolly band — first pin-render); the beat lives in the jag
-    var R = (a.q5 || 0.4) * 0.6;
-    var r = R * (1 + bloomA * (strand ? bloomAsym : 1) * shape);
+    // nested ghost rings into a woolly band — first pin-render); the beat lives in the jag.
+    // 0.95: R is now the TIP radius scale (the ring-fraction law below reaches ~R at the
+    // tips, not 1.55R like the old 1+A law — 0.6 shrank the figure to half the ref size)
+    var R = (a.q5 || 0.4) * 0.95;
+    // RADIUS LAW (user round 3: "hole is too big compared to petals") — explicit ring
+    // fraction: the hole edge sits at R·bloomRing and petals extend to ~R, so hole/tip =
+    // ring/(ring+(1-ring)·A) ≈ 0.4-0.55 like the ref (was 0.65). Negative lobes only weave
+    // slightly INSIDE the ring; the spider form's tiny ring puts the knot near the hub.
+    var ampl = bloomA * (strand ? bloomAsym : 1);
+    var r =
+      c >= 0
+        ? R * (bloomRing + (1 - bloomRing) * ampl * s01)
+        : R * bloomRing * (1 - 0.22 * Math.min(1, ampl) * s01);
     var lox = r * Math.cos(u),
       loy = r * Math.sin(u);
     // hypotrochoid pen: -(k-1) keeps k-fold symmetry with the loops chained INSIDE, at the
@@ -1730,13 +1740,17 @@
       lox += R * bloomLoop * Math.cos(lp);
       loy += R * bloomLoop * Math.sin(lp);
     }
-    // LIVE lightning jag at n-gon strength (user round 2: "in original the lines are like
-    // waveform... ours is smooth lines") — value1 radial + value2 tangential gives the 2D
-    // kink the ref's chunky polylines have; bloomJagX spikes it mid-transition (the collapse
-    // reads as the lines KINKING while they move, 25fps trans study).
-    // 0.55×q6 with a hard cap: full n-gon scale at full-scale audio dissolved the mandala
-    // into a fuzzball (pin-render r3) — the ref kink is ~±0.5-1% of frame, structure intact
-    var jm = Math.min(0.045, (a.q6 || 0.05) * 0.55 * bloomJagX * (1 + 0.8 * ((a.q32 || 1) - 1)));
+    // LIVE lightning jag (user round 3: "the strands in original move in wavy/lightning way
+    // with music, ours stay static") — the raw per-point sample alone reads as sub-pixel
+    // fuzz; a ~5-point SEGMENT envelope (hash drifting on the q9 clock, fSpiro's rag trick)
+    // chunks it into coherent kinks that visibly dance as the samples change per frame.
+    // Hard cap keeps full-scale audio from dissolving the mandala (fuzzball, r3).
+    var jseg = Math.floor((s * 512) / 5);
+    var rag = Math.sin(jseg * 12.9898 + (a.q9 || 0) * 55.0) * 43758.5453;
+    rag -= Math.floor(rag);
+    var jm =
+      Math.min(0.03, (a.q6 || 0.05) * 0.9 * bloomJagX * (1 + 0.9 * ((a.q32 || 1) - 1))) *
+      (0.45 + 0.9 * rag);
     var jr = (a.value1 || 0) * jm,
       jt = (a.value2 || 0) * jm * 0.5;
     lox += jr * Math.cos(u) - jt * Math.sin(u);
@@ -2516,6 +2530,9 @@
     bloomTip = 0, // open-tip cut amount (0 closed · 1 wide fork) — eased like the rest
     bloomTipF = 0,
     bloomTipT = 0,
+    bloomRing = 0.5, // hole-edge radius as a fraction of R (rolled per leg; spider ~0.12)
+    bloomRingF = 0.5,
+    bloomRingT = 0.5,
     bloomJagX = 1, // jag multiplier — spiked mid-transition (the collapse kink)
     bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
     bloomNext = -1, // next leg roll time (-1 = not in dwell)
@@ -3204,6 +3221,7 @@
         bloomRotV = (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? -1 : 1);
         bloomDuoF = bloomDuoT = bloomDuo = 0.3 + Math.random() * 0.2;
         bloomKF = bloomKT = bloomK = 11 + Math.floor(Math.random() * 4);
+        bloomRingF = bloomRingT = bloomRing = 0.46 + Math.random() * 0.12;
         bloomMorph = 1;
       }
       // ★ EVERY dwell target is a FLOWER (user round 2: "the motif almost all the time
@@ -3221,43 +3239,53 @@
         bloomAsF = bloomAsym;
         bloomKF = bloomK;
         bloomTipF = bloomTip;
+        bloomRingF = bloomRing;
         bloomAsT = 1;
-        var kBand = 11 + Math.floor(Math.random() * 4); // the mandala's petal band
+        // WIDE petal-count variation (user round 3: "there are many variations") — 8-15
+        // for the mandala band, weighted toward 10-13 by the double roll
+        var kBand = 8 + Math.floor((Math.random() + Math.random()) * 0.5 * 8);
+        // ★ tips ALWAYS open but the gap is SMALL (user round 3: "the ends should meet in
+        // such a way that they create a point, the gap should be very less") — the two
+        // free ends converge to a near-point; the X-cross pose supplies the meeting look
         if (bloomForm === 0) {
           // spiky star — deep narrow spikes, flat valleys hugging the ellipse
-          bloomAT = 0.38 + Math.random() * 0.17;
+          bloomAT = 0.7 + Math.random() * 0.3;
           bloomShT = 1.7 + Math.random() * 1.1;
           bloomLpT = 0;
-          bloomTipT = 0.2 + Math.random() * 0.6; // ★ tips ALWAYS open (never-joined rule)
+          bloomTipT = 0.08 + Math.random() * 0.2;
+          bloomRingT = 0.42 + Math.random() * 0.16;
         } else if (bloomForm === 1) {
           // wavy-petal flower (the ref's rounder sun, 085 — still clearly petalled)
-          bloomAT = 0.24 + Math.random() * 0.12;
+          bloomAT = 0.55 + Math.random() * 0.25;
           bloomShT = 0.9 + Math.random() * 0.4;
           bloomLpT = Math.random() < 0.4 ? 0.02 : 0;
-          bloomTipT = 0.15 + Math.random() * 0.45;
+          bloomTipT = 0.08 + Math.random() * 0.18;
+          bloomRingT = 0.46 + Math.random() * 0.14;
         } else if (bloomForm === 2) {
           // loop-base star (the user's own ref shots 2/6: full petals + base loop chain)
-          bloomAT = 0.3 + Math.random() * 0.15;
+          bloomAT = 0.6 + Math.random() * 0.3;
           bloomShT = 1.5 + Math.random() * 0.7;
-          bloomLpT = 0.045 + Math.random() * 0.03;
-          bloomTipT = 0.2 + Math.random() * 0.5;
+          bloomLpT = 0.028 + Math.random() * 0.022; // small base loops — bigger read as the rejected coil ring
+          bloomTipT = 0.08 + Math.random() * 0.2;
+          bloomRingT = 0.44 + Math.random() * 0.14;
         } else if (bloomForm === 3) {
           // ring+star — strand 1 collapses to a near-plain ellipse under strand 0's star
-          bloomAT = 0.4 + Math.random() * 0.15;
+          bloomAT = 0.75 + Math.random() * 0.25;
           bloomShT = 1.8 + Math.random() * 0.8;
           bloomLpT = 0;
           bloomAsT = 0.1 + Math.random() * 0.15;
-          bloomTipT = 0.15 + Math.random() * 0.35; // star strand open; the ring strand is amp-gated
+          bloomTipT = 0.08 + Math.random() * 0.16; // star strand open; the ring strand is amp-gated
+          bloomRingT = 0.44 + Math.random() * 0.14;
         } else {
           // SPARSE SPIDER (user: "the motif around 4:00... with lesser petals") — the SAME
-          // engine at k 3-5 with near-full amplitude: the inward lobes reach the hub, so it
-          // reads as 6-10 open lightning arms converging at a knot, no visible ring
-          bloomAT = 0.78 + Math.random() * 0.14;
+          // engine at k 3-6 with a TINY ring: the arms converge at a knot near the hub
+          bloomAT = 0.9 + Math.random() * 0.1;
           bloomShT = 2.2 + Math.random() * 1.0;
           bloomLpT = 0;
-          bloomTipT = 0.5 + Math.random() * 0.4;
+          bloomTipT = 0.15 + Math.random() * 0.25;
+          bloomRingT = 0.1 + Math.random() * 0.08;
         }
-        bloomKT = bloomForm === 4 ? 3 + Math.floor(Math.random() * 3) : kBand;
+        bloomKT = bloomForm === 4 ? 3 + Math.floor(Math.random() * 4) : kBand;
         // strand offset per leg: the X-crossing pose dominates (user: the 2 lines LOOSELY
         // MEET at petals — a clean half-petal interleave reads too tidy for the ref)
         bloomOff = Math.random() < 0.4 ? 0.5 : 0.22 + Math.random() * 0.2;
@@ -3279,10 +3307,11 @@
       bloomA = (bloomAF + (bloomAT - bloomAF) * bE) * (1 - 0.45 * bumpB);
       bloomSharp = bloomShF + (bloomShT - bloomShF) * bE;
       bloomSharp += (0.6 - bloomSharp) * 0.55 * bumpB;
-      bloomLoop = bloomLpF + (bloomLpT - bloomLpF) * bE + 0.05 * bumpB;
+      bloomLoop = bloomLpF + (bloomLpT - bloomLpF) * bE + 0.04 * bumpB;
       bloomAsym = bloomAsF + (bloomAsT - bloomAsF) * bE;
       bloomK = bloomKF + (bloomKT - bloomKF) * bE;
       bloomTip = bloomTipF + (bloomTipT - bloomTipF) * bE;
+      bloomRing = bloomRingF + (bloomRingT - bloomRingF) * bE;
       bloomDuo = bloomDuoF + (bloomDuoT - bloomDuoF) * bE;
       bloomJagX = 1 + 1.2 * bumpB;
       bloomRot += dt * bloomRotV;
