@@ -4904,14 +4904,18 @@
       t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
       t.q28 = Math.min(t.q28, 0.05);
       accVis *= 1 - 0.85 * ma; // dim the free accessory lines (kept the flower+fan clean)
-      // ★ FEWER, DISTINCT petals + SMALLEST hole (user 2026-07-11: "reduce number of petals" — 32
-      // packed into a blob; ~10 distinct petals read as a flower) and DO NOT ROTATE the flower
-      // (bloomRotV → 0 freezes the precession; user: "do not rotate the motif"). Tiny ring keeps
-      // the petals meeting near a small centre; closed tips keep them solid.
+      // ★ FROZEN, CONSISTENT flower for this scene (user 2026-07-11: "why does the flower change
+      // size midway… do not rotate the motif"). It is still the ONE morphing fBloom motif, but here
+      // we LOCK all its morph params to a fixed variant so it holds ONE shape/size for the whole
+      // dwell instead of easing between forms: ~10 distinct petals, small hole (0.08), rounded
+      // waveshape, no polygon/loop morph, no spin. (Variety lives ACROSS dwells, not within one.)
       bloomK += (10 - bloomK) * ma;
       bloomRing += (0.08 - bloomRing) * ma;
-      bloomA = Math.max(bloomA, 0.55 * ma);
-      bloomTip *= 1 - 0.7 * ma;
+      bloomSharp += (1.4 - bloomSharp) * ma; // fixed rounded petals — the size-changing morph was here
+      bloomA += (0.5 - bloomA) * ma; // fixed petal amplitude (length)
+      bloomPoly *= 1 - ma; // no triangle/square morph
+      bloomLoop *= 1 - ma; // no inner loop-chain morph
+      bloomTip *= 1 - 0.7 * ma; // petals stay solid/closed
       bloomRotV *= 1 - ma; // freeze the flower's spin (the rotating LINES still rotate; the flower does not)
       // STEADY size — user 2026-07-11: "reduce the pulsing for the motif". Override the general q5's
       // bass/pulse throb with a near-constant size (only a whisper of beat), and GROW it for phase 2
