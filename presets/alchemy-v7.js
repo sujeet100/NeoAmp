@@ -1764,8 +1764,11 @@
       // faster" — 55 ≈ 3.3 rad/s read too slow live; a full S-cycle now passes in ~0.75s)
       Math.sin(p * 2.6 + u * 1.7 + (a.q9 || 0) * 140.0 + strand * 2.1) *
       R *
-      0.045 *
-      (0.35 + 0.65 * s01) *
+      0.05 *
+      // CLAMPED-STRING envelope (user round 6: "wiggle while keeping ends relatively
+      // closer... if they move a lot the flower loses the petal shape") — 4·s01·(1-s01)
+      // peaks mid-edge and pins BOTH ends (tip s01≈1, ring base s01≈0) to a small residual
+      (0.15 + 0.85 * 4 * s01 * (1 - s01)) *
       (1 + 0.6 * ((a.q32 || 1) - 1));
     lox += jr * Math.cos(u) - (jt + wob) * Math.sin(u);
     loy += jr * Math.sin(u) + (jt + wob) * Math.cos(u);
