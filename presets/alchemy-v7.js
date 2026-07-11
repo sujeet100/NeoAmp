@@ -60,9 +60,11 @@
     // MANY SMALL ripples — under q30 24 the same channel becomes ~2-3 BIG slow crests
     // (λ≈18% frame, crest crawl ~0.05 UV/s) that compound tall waves onto the held trails.
     "  float watr = (abs(q30 - 24.0) < 0.5) ? 1.0 : 0.0;\n" +
-    // gain 0.012: at the scene's continuous q13 0.14 this COMPOUNDS every frame on the held
-    // trail — 0.04 accordioned the whole buffer into giant smeared arcs (r8 render)
-    "  pd *= 1.0 + mix(rip * 0.018 * sin(pr * 125.6 - time * 30.0), rip * 0.012 * sin(pr * 34.0 - time * 1.6), watr);\n" +
+    // water gain COMPOUNDS every frame on the held trail (0.04 flat accordioned the buffer
+    // into giant smeared arcs — r8 render). Radius-RAMPED (user round 4, ref stills): the
+    // hub zone stays registered/calm while the far field waves big — this is what bends the
+    // rotors' aged copies ("the cross rotating lines should be distorted with ripple effect").
+    "  pd *= 1.0 + mix(rip * 0.018 * sin(pr * 125.6 - time * 30.0), rip * 0.022 * sin(pr * 34.0 - time * 1.6) * smoothstep(0.08, 0.35, pr), watr);\n" +
     // MAGNIFY: q15>0 shrinks the sample offset → the old buffer appears slightly bigger each frame, so
     // every deposit GROWS as it ages (the "traces grow in size before disappearing" note). Small.
     "  pd *= (1.0 - q15);\n" +
@@ -1482,16 +1484,27 @@
       // land at DISTINCT angles, so the trail builds the ref's separated wavy spokes;
       // continuous rotation at 60fps would smear them into a solid bullseye (r3 render)
       var baseAng = strand * 0.3491 + Math.floor(lastT / 0.35) * 0.0698;
-      var rr = 0.025 + u * (a.q5 || 0.4) * 0.62;
-      // radius-keyed smooth ripple + a live waveform jag riding the outer half. λ≈0.175 UV
-      // → ~2-3 BIG crests across the surface (user round 3: "too many small ripples, we
-      // want 2-3 big ripples like original"; was λ≈0.055 = many small). The near-static
-      // spatial phase lets the crests register into concentric fronts; the small per-strand
-      // phase keeps the fronts wavy, never geometric bullseye rings.
-      var rip = Math.sin(rr * 36.0 + strand * 0.35) * 0.02 * u + (a.value1 || 0) * 0.007 * u;
-      // the crest displacement is mostly VERTICAL LIFT (added after the tilt below) so the
-      // waves read as HEIGHT seen from the tilted angle — only a little stays in-plane
-      var ang2 = baseAng + (rip * 0.4) / Math.max(rr, 0.045);
+      // LONG strands (user's ref screenshots at 1:41: the live spokes reach ~40% radius,
+      // filling the field; was 0.62 → tips ~22%). Min-clamped: a calm-audio q5 dip must
+      // not retract the tips out of the ripple zone (r10: straight-ray starburst).
+      // Per-strand golden-ratio length spread: equal tips piled into a bright elliptical
+      // RIM the ref doesn't have (r11)
+      var lv = 0.78 + 0.4 * ((strand * 0.618034) % 1);
+      var rr = 0.025 + u * Math.max(0.34, (a.q5 || 0.4) * 1.05) * lv;
+      // TWO-SCALE wave (the user's ref stills): a CALM hub zone, then 2-3 BIG slow crests
+      // whose amplitude GROWS with radius ("ripple height needs to be more, the ripples
+      // need to be a bit far away from the center") + a fine live-audio wiggle. The big
+      // crest is radius-keyed with near-static phase → concentric fronts; per-strand
+      // phase keeps them wavy, never bullseye rings.
+      var g = Math.max(0, Math.min(1, (rr - 0.08) / 0.14));
+      g = g * g * (3 - 2 * g); // smoothstep 0.08→0.22: calm hub zone ~ the ref's 10-15%
+      // radius, full wave over most of the strand (0.12→0.32 left the tips barely waving)
+      var big = Math.sin(rr * 36.0 + strand * 0.35) * 0.038 * g;
+      var jag = (a.value1 || 0) * 0.01 * u; // fine wiggle = the live waveform (no fixed-λ
+      // sine — ~20 pts/strand alias any λ short enough to read as fine texture)
+      // the big crest is mostly VERTICAL LIFT (added after the tilt below) so the waves
+      // read as HEIGHT seen from the tilted angle — only ~30% stays in-plane
+      var ang2 = baseAng + (big * 0.3 + jag) / Math.max(rr, 0.045);
       a.x = cx + Math.cos(ang2) * rr;
       a.y = cy + Math.sin(ang2) * rr;
       var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
@@ -1505,7 +1518,7 @@
       // is BOTTOM-UP), and the crest displacement re-added as out-of-plane VERTICAL LIFT
       // (never squashed) so the waves carry visible height above the receding plane.
       var rely = a.y - cy;
-      a.y = cy + rely * 0.5 + rip * 0.85;
+      a.y = cy + rely * 0.5 + big * 0.9;
       a.x = cx + (a.x - cx) * (1 - 0.24 * Math.max(0, Math.min(1, rely * 2.2)));
       // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
