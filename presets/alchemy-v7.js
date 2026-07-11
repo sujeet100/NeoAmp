@@ -1691,6 +1691,70 @@
     if (kill) a.a = 0;
     return a;
   }
+  // SPIRO-BLOOM MANDALA (mode 25 — Abide By Me 720p 3:50-4:00, frame-stepped @10fps; user
+  // 2026-07-11: "the flower motifs... created using waveform kind of lines which move to
+  // morph the motif into various shapes"): TWO interleaved thin waveform lines in muted duo
+  // hues, each the SAME closed polar curve around a clean elliptical hole, offset half a
+  // petal so every petal carries both colours crisscrossing. The petal WAVESHAPE morphs
+  // continuously between the ref's forms — spiky star / square-wave lattice / rounded
+  // scallop / inner loop-chain / ring+star — via a signed-pow cosine radial term (sharpness
+  // σ: ~0.2 square · ~1 sine · ~2.5 spike) plus an optional hypotrochoid loop pen for the
+  // inner loop chains. The ellipse is the widescreen aspect stretch of a circle in wave UV
+  // (measured ~1.64:1 vs 1.78 screen aspect — no extra squash needed); the figure precesses
+  // slowly (continuous, never oscillating) and the lines carry fine LIVE-waveform jag.
+  function fBloom(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    var strand = s < 0.5 ? 0 : 1;
+    var su = (s - strand * 0.5) * 2; // 0..1 around this strand's closed curve (256 pts)
+    var k = bloomK;
+    // both strands sweep the SAME parameter angle; strand 1's finished vector is ROTATED by
+    // a fraction of a petal below. (Adding the offset to u here was the first-cut bug: r is
+    // a function of screen angle, so a parameter shift re-starts the SAME curve — the two
+    // strands rendered coincident instead of interleaved.)
+    var u = su * 6.2832 + bloomRot;
+    var p = k * u + bloomPh;
+    var c = Math.cos(p);
+    var shape = (c < 0 ? -1 : 1) * Math.pow(Math.abs(c), bloomSharp);
+    // NO beat swell on R: the ref figure's size is rock steady (a ±5% q32 breathe stacked
+    // nested ghost rings into a woolly band — first pin-render); the beat lives in the jag
+    var R = (a.q5 || 0.4) * 0.6;
+    var r = R * (1 + bloomA * (strand ? bloomAsym : 1) * shape);
+    var lox = r * Math.cos(u),
+      loy = r * Math.sin(u);
+    // hypotrochoid pen: -(k-1) keeps k-fold symmetry with the loops chained INSIDE, at the
+    // base ring (the ref's loop-chain / web frames)
+    if (bloomLoop > 0.002) {
+      var lp = -(k - 1) * u + bloomLPh;
+      lox += R * bloomLoop * Math.cos(lp);
+      loy += R * bloomLoop * Math.sin(lp);
+    }
+    // fine live jag from the real samples (terminology rule: wavy line = audio waveform)
+    var jag = (a.value1 || 0) * (a.q6 || 0.05) * (0.35 + 0.35 * ((a.q32 || 1) - 1));
+    lox += jag * Math.cos(u);
+    loy += jag * Math.sin(u);
+    if (strand) {
+      // rotate the whole curve by bloomOff petals: 0.5 = clean interleave (ref 085's
+      // alternating blue/green petals), ~0.3 = the X-crossing tips (ref 025's star)
+      var del = (bloomOff * 6.2832) / Math.max(1, k);
+      var cd = Math.cos(del),
+        sd = Math.sin(del);
+      var rx = lox * cd - loy * sd;
+      loy = lox * sd + loy * cd;
+      lox = rx;
+    }
+    a.x = cx + lox;
+    a.y = cy + loy;
+    var h = (a.q8 || 0) + bloomHue + strand * bloomDuo;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    // ramped seam fade: hides the strand0→strand1 connector chord AND the closure mismatch
+    // while a non-integer k eases between petal-count targets
+    a.a = 0.9 * Math.min(1, su / 0.02, (1 - su) / 0.02);
+    return a;
+  }
   // MESH COCOON / NET-BALL / dreamcatcher (480p 8.5-15.5/59.6 · 19s clip 0-8 · p2 157 · A2):
   // a closed rounded wire CAGE — wobbly RIM + concentric inner rings + spokes + hooked rim spikes —
   // re-stamped over its own feedback ghost with per-frame node jitter and (step 3+) per-stamp
@@ -1868,6 +1932,7 @@
     fSwimmer, // id 22 (doc 15 A11 swimmer stalks)
     fScissorFan, // id 23 (user 2026-07-10: the 0:39-0:45 rotating scissor fan)
     fRippleFlower, // id 24 (user 2026-07-11: the 1080p 1:40-1:42 water-ripple flower + rotors)
+    fBloom, // id 25 (user 2026-07-11: the Abide 720p 3:50-4:00 morphing spiro-bloom mandala)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1904,6 +1969,7 @@
     0.55, // swimmer (22): ONE rotating line — the stalks are the orb heads' wakes
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
     0.5, // ripple flower (24): 14 additive strands pile up near the hub — dense-class alpha
+    0.7, // spiro-bloom (25): two thin closed lines, no pileup — outline-class
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -1919,6 +1985,7 @@
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
     if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
+    if (m === 25) return 0.34; // spiro-bloom: star tips reach ~±0.32 UV ≈ the ref's ~65% height
     if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
     // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
     // cross the frame borders on either side)
@@ -2416,6 +2483,34 @@
     spiroHue = 0, // per-stamp hue snap, riding the shared q8 clock
     spiroTilt = 1, // 1 face-on; <1 oblate y-squash (step 3)
     spiroNext = -1; // next stamp time (-1 = not entered)
+  // SPIRO-BLOOM per-leg state (mode 25) — fBloom reads these; the frame() morph driver
+  // below eases every parameter From→To per leg (the ref NEVER holds a static pose).
+  var bloomK = 12, // petal count (float — eases between integer targets)
+    bloomA = 0.45, // radial petal amplitude (fraction of R)
+    bloomSharp = 2.0, // waveshape exponent (square 0.2 · sine 1 · spike 2.5)
+    bloomLoop = 0, // hypotrochoid pen (fraction of R); >0 chains loops at the base ring
+    bloomAsym = 1, // strand-1 amplitude multiplier (<1 = the ring+star hybrid frames)
+    bloomRot = 0, // precession angle — advances continuously (rule 5: never oscillate)
+    bloomRotV = 0.06, // precession rate rad/s (rolled per dwell, either direction)
+    bloomPh = 0, // petal-phase drift (slow internal motion between legs)
+    bloomLPh = 0, // loop-pen phase drift
+    bloomHue = 0, // per-leg hue step, riding the shared q8 motif clock
+    bloomDuo = 0.38, // hue gap between the two strands (ref: yellow+lavender, green+rose…)
+    bloomOff = 0.5, // strand-1 rotation in petal fractions (0.5 interleave · ~0.3 X-tips)
+    bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
+    bloomNext = -1, // next leg roll time (-1 = not in dwell)
+    bloomDur = 1.2, // current leg duration
+    bloomMorph = 1, // 0..1 leg progress
+    bloomAF = 0.45,
+    bloomAT = 0.45,
+    bloomShF = 2,
+    bloomShT = 2,
+    bloomLpF = 0,
+    bloomLpT = 0,
+    bloomAsF = 1,
+    bloomAsT = 1,
+    bloomKF = 12,
+    bloomKT = 12;
   // POMPOM apex-bloom state (doc 11 step 3, A8): mode 16 renders either the small chenille
   // pompom or the DAHLIA APEX FORM (p1 M6/S15: denser petal tufts + a dark core hole + ~28-32%
   // dia). Rolled once per dwell — the ref holds one form for the whole appearance.
@@ -2485,9 +2580,12 @@
   // bars/corridor/kaleido/wash/bands ≈ 42% of the time) → effectively ~1 per 4-5 min.
   // 4 entries ≈ one per ~110-150s effective = the ref band.
   // ripple flower (24) ×2 (user 2026-07-11; the 1080p 1:40-1:42 set-piece) ≈ one per ~2 min.
+  // spiro-bloom (25) ×3 + one anemone slot converted (user 2026-07-11: the anemone's thick
+  // watercolour render was the "sad" flower — the Abide 3:50-4:00 thin-line mandala is the
+  // faithful flower motif and takes the flower-primary weight).
   var MOTIF_BAG = [
-    0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
-    17, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24,
+    0, 25, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
+    17, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2497,8 +2595,8 @@
   var PAIR = {
     4: [15, 14, 17], // bars → mandala/mountains/spiro (stem-standing; tangle + pompom dropped)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
-    1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
-    5: [9, 0, 24], // flat wash → ONE dominant organic ball / the ripple flower (its own ground is the wash)
+    1: [0, 2, 10, 15, 6, 17, 25], // kaleido → radial motifs that mirror well
+    5: [9, 0, 24, 25], // flat wash → ONE dominant organic ball / the ripple/bloom flowers (the Abide bloom sits on a flat green wash)
     6: [15, 10], // bands → small centre motif (tangle + pompom dropped)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
@@ -2954,6 +3052,12 @@
       Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley/tangle/ripple-flower get the warm-core pupil (orb-eye — mode 24's tan hub blob, 1080p 1:41)
     valleyAmt += ((mCur === 12 ? 1 : 0) - valleyAmt) * Math.min(1, dt * 0.5); // valley → forward dolly
 
+    // mEff = the pin-honouring effective motif (moved up from the spiro block: the mode-25
+    // set-piece overrides in the MOTIF contract below need it — `var` hoisting made a
+    // later declaration read as undefined there, silently disabling the block).
+    var mEff = mCur;
+    if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
+      mEff = Math.floor(window.__ALC_FORCE.q30 + 0.5);
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
     // locked at center) so — as the hue clock advances + the feedback diffuses — it PAINTS a flowing,
     // multi-hued WATERCOLOUR trail (the #1 reference signature, 1:29-1:36 / 2:11-2:30), like the
@@ -2995,6 +3099,17 @@
     // motif PULSE strengthened (19s clip: the net-dome visibly puffs AND flashes on hits) —
     // size rides the smoothed beat harder, and q4 below carries a brightness flash
     t.q5 = scaleFor(mCur) * (0.82 + 0.3 * (bassA - 1) + 0.28 * pulse) * bloomMul; // beat-puff tamed 0.45→0.28; bloomMul = the B4a entrance
+    // spiro-bloom (25) OWNS its set-piece (rule 6): the Abide 3:50-4:00 mandala is CENTRED
+    // and its size steady — the morphing lives in the SHAPE, never in scale (hub roam +
+    // beat-puff cropped the figure at the frame edge in the first pin-render), and its
+    // lines are crisp over a FAST-fading ghost (~0.5s), not the scene's long watercolour
+    // hold (the default 0.957 decay stacked nested ghost copies).
+    if (mEff === 25) {
+      t.q2 = 0.5;
+      t.q3 = 0.5;
+      t.q5 = scaleFor(25) * 0.97 * bloomMul; // steady — no bass term (nested-ring stacking)
+      t.q1 = Math.min(t.q1, 0.935);
+    }
     t.q6 = 0.05;
     t.q9 = time * 0.06; // slow self-spin
     t.q10 = 0.4 * Math.max(0, bassA - 1);
@@ -3003,10 +3118,8 @@
     // ── SPIRO per-stamp re-roll (doc 08 A1; p0 burst_54: consecutive stamps alternate
     //    wreath<->star<->wheel, ~1-2s cadence ~= beat groups; h1: feathery ghosting = slight
     //    rotation between stamps). Debug gotcha: __ALC_FORCE overrides q30 AFTER frame() (below),
-    //    so honour it here too or a pinned self-render never re-rolls variants. ──
-    var mEff = mCur;
-    if (typeof window !== "undefined" && window.__ALC_FORCE && window.__ALC_FORCE.q30 !== undefined)
-      mEff = Math.floor(window.__ALC_FORCE.q30 + 0.5);
+    //    so honour it here too or a pinned self-render never re-rolls variants.
+    //    (mEff itself is now computed ABOVE the MOTIF contract — see the note there.) ──
     // ── SPIRO CONTINUOUS MORPH (★ 2026-07-11 rebuild — user design-language correction +
     //    frame-by-frame 480p 0:50-0:52 @15fps: the original NEVER holds a static construction —
     //    the ONE waveform flower MORPHS continuously (wheel→bow-tie→dahlia→fur-ball inside ~2s),
@@ -3057,6 +3170,78 @@
       spiroK = spiroKFrom + (spiroKTo - spiroKFrom) * spiroMorphE;
     } else {
       spiroNext = -1;
+    }
+    // ── SPIRO-BLOOM morph driver (mode 25; Abide 720p 3:50-4:00): every ~1.2-3s (beat-gated,
+    //    same cadence law as the spiro) the mandala eases toward a DIFFERENT form archetype —
+    //    spiky star / rounded scallop / square lattice / inner loop-chain / ring+star. Petal
+    //    count steps occasionally; precession runs continuously; the duo hues step per leg. ──
+    if (mEff === 25) {
+      if (bloomNext < 0) {
+        bloomNext = time;
+        bloomRot = Math.random() * 6.2832;
+        bloomRotV = (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? -1 : 1);
+        bloomDuo = 0.3 + Math.random() * 0.2;
+        bloomKF = bloomKT = bloomK = 11 + Math.floor(Math.random() * 4);
+        bloomMorph = 1;
+      }
+      if (bloomMorph >= 1 && time >= bloomNext && (f > 0.5 || time >= bloomNext + 2.6)) {
+        var pvB = bloomForm;
+        while (bloomForm === pvB) bloomForm = Math.floor(Math.random() * 5);
+        if (FORCE && FORCE._bloomForm !== undefined) bloomForm = FORCE._bloomForm;
+        bloomAF = bloomA;
+        bloomShF = bloomSharp;
+        bloomLpF = bloomLoop;
+        bloomAsF = bloomAsym;
+        bloomKF = bloomK;
+        bloomAsT = 1;
+        if (bloomForm === 0) {
+          // spiky star — deep narrow spikes, flat valleys hugging the ellipse (the
+          // straight-chord {12/5} look emerges at the deep end)
+          bloomAT = 0.38 + Math.random() * 0.17;
+          bloomShT = 1.7 + Math.random() * 1.1;
+          bloomLpT = 0;
+        } else if (bloomForm === 1) {
+          // rounded scallop bumps
+          bloomAT = 0.18 + Math.random() * 0.12;
+          bloomShT = 0.8 + Math.random() * 0.4;
+          bloomLpT = Math.random() < 0.4 ? 0.02 : 0;
+        } else if (bloomForm === 2) {
+          // square-wave lattice — flat chords + radial jumps crisscrossing
+          bloomAT = 0.2 + Math.random() * 0.12;
+          bloomShT = 0.16 + Math.random() * 0.14;
+          bloomLpT = 0;
+        } else if (bloomForm === 3) {
+          // loop-chain — small hypotrochoid loops around the base ring
+          bloomAT = 0.08 + Math.random() * 0.09;
+          bloomShT = 0.9;
+          bloomLpT = 0.06 + Math.random() * 0.05;
+        } else {
+          // ring+star — strand 1 collapses to a near-plain ellipse under strand 0's star
+          bloomAT = 0.4 + Math.random() * 0.15;
+          bloomShT = 1.8 + Math.random() * 0.8;
+          bloomLpT = 0;
+          bloomAsT = 0.1 + Math.random() * 0.15;
+        }
+        if (Math.random() < 0.3) bloomKT = 11 + Math.floor(Math.random() * 4);
+        // strand offset per leg: clean half-petal interleave ~60%, else the X-crossing pose
+        bloomOff = Math.random() < 0.6 ? 0.5 : 0.24 + Math.random() * 0.14;
+        bloomHue += 0.05 + Math.random() * 0.08;
+        bloomMorph = 0;
+        bloomDur = 0.8 + Math.random() * 1.1;
+        bloomNext = time + bloomDur + 0.4 + Math.random() * 1.0;
+      }
+      bloomMorph = Math.min(1, bloomMorph + dt / (bloomDur || 1));
+      var bE = bloomMorph * bloomMorph * (3 - 2 * bloomMorph);
+      bloomA = bloomAF + (bloomAT - bloomAF) * bE;
+      bloomSharp = bloomShF + (bloomShT - bloomShF) * bE;
+      bloomLoop = bloomLpF + (bloomLpT - bloomLpF) * bE;
+      bloomAsym = bloomAsF + (bloomAsT - bloomAsF) * bE;
+      bloomK = bloomKF + (bloomKT - bloomKF) * bE;
+      bloomRot += dt * bloomRotV;
+      bloomPh += dt * 0.15;
+      bloomLPh += dt * 0.23;
+    } else {
+      bloomNext = -1;
     }
     // ring lifecycle (user, 480p 51-56): the dahlia appears → a round waveform CONNECTS the petals
     // (the "wheel") → the ring melts away. Eased so it grows/fades instead of popping with the roll.
