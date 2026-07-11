@@ -1926,6 +1926,16 @@
     }
     return a;
   }
+  // OPENING BLOOM (mode 27 — Abide 720p 0:00-0:10; user 2026-07-11: "lock a single flower motif,
+  // a big one with a big hole, ~12 petals"). The motif IS the real fBloom flower (design language:
+  // ONE morphing waveform, rule 1) — the scene coupling in frame() LOCKS its morph params to ONE
+  // fixed big-hole 12-petal pose so it holds a single consistent flower for the whole dwell
+  // (variety lives ACROSS dwells, not within — the same idea as mode 26, but here big-hole /
+  // centred / slowly precessing over a growing watercolour wash instead of marching). Reused via
+  // fBloom directly (never re-derive a factory — kit rule).
+  function fBloomHold(a) {
+    return fBloom(a);
+  }
   // MESH COCOON / NET-BALL / dreamcatcher (480p 8.5-15.5/59.6 · 19s clip 0-8 · p2 157 · A2):
   // a closed rounded wire CAGE — wobbly RIM + concentric inner rings + spokes + hooked rim spikes —
   // re-stamped over its own feedback ghost with per-frame node jitter and (step 3+) per-stamp
@@ -2105,6 +2115,7 @@
     fRippleFlower, // id 24 (user 2026-07-11: the 1080p 1:40-1:42 water-ripple flower + rotors)
     fBloom, // id 25 (user 2026-07-11: the Abide 720p 3:50-4:00 morphing spiro-bloom mandala)
     fMarchFan, // id 26 (user 2026-07-11: the Abide 720p 0:33-0:40 flower + 2 rotating lines marching right)
+    fBloomHold, // id 27 (user 2026-07-11: the Abide 720p 0:00-0:10 opening — ONE locked big-hole 12-petal flower)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -2142,6 +2153,8 @@
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
     0.5, // ripple flower (24): 14 additive strands pile up near the hub — dense-class alpha
     0.7, // spiro-bloom (25): two thin closed lines, no pileup — outline-class
+    0.7, // marching flower (26): the fBloom flower — outline-class
+    0.7, // opening bloom (27): the fBloom flower locked to one pose — outline-class
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -2159,6 +2172,7 @@
     if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
     if (m === 25) return 0.34; // spiro-bloom: star tips reach ~±0.32 UV ≈ the ref's ~65% height
     if (m === 26) return 0.36; // marching flower — the bloom is the focal point; rotor lines min-clamped full-frame
+    if (m === 27) return 0.32; // opening bloom — a BIG single flower (~65% frame height, tips ~±0.3 UV), the ref's focal object
     if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
     // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
     // cross the frame borders on either side)
@@ -2258,10 +2272,12 @@
     // swimmer scene (mode 22): ALWAYS the simple chord (user round 6 — the ref's between-orb
     // line in this scene is always the plain jagged waveform, never a construction)
     var swimOn = Math.abs((a.q30 || 0) - 22) < 0.5;
-    // ripple-flower scene (mode 24): NO tether at all — the chord between the parked orbs
-    // read as a "third small line" beside the two rotors (user live round 1); the ref
-    // window (1080p 1:40-1:42) shows no between-orb line
-    if (Math.abs((a.q30 || 0) - 24) < 0.5) {
+    // ripple-flower scene (mode 24) + opening-bloom scene (mode 27): NO tether at all — the chord
+    // between the parked orbs read as a "third small line" (mode 24, user live round 1) / a bright
+    // diagonal beam straight through the flower (mode 27); the ref windows (1080p 1:40-1:42 and
+    // Abide 0:00-0:10) show independent side orbs with no between-orb line. (Zeroing t.q26 does NOT
+    // kill it — the draw floors `a.q26 || 0.03` — so kill it here at the source.)
+    if (Math.abs((a.q30 || 0) - 24) < 0.5 || Math.abs((a.q30 || 0) - 27) < 0.5) {
       a.x = 0.5;
       a.y = 0.5;
       a.a = 0;
@@ -2522,6 +2538,10 @@
     // NO lines). Rolled on fresh entry so each dwell is ONE clean consistent flow (user: "keep same flow
     // per phase" + "I still see lines in phase 2" — a mid-dwell ramp didn't reliably clear them).
     marchLineAmt = 0, // rotating-line entrance envelope (read by fMarchFan)
+    // ── mode-27 OPENING BLOOM (Abide 720p 0:00-0:10): ONE locked big-hole 12-petal fBloom flower,
+    //    centred, slowly precessing over a growing watercolour wash, 2 side orbs (user 2026-07-11). ──
+    bloomOpenAmt = 0, // eased engagement
+    bloomOpenT0 = -9, // dwell entry (the wash's growth clock)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -2801,7 +2821,7 @@
   // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
-    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26,
+    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -3152,6 +3172,10 @@
     // pinning ring+orb+thread to the frozen diagonal chord — which the chase-pan then
     // deposited as a repeating tadpole train. New rails already can't spawn here.
     if (railWant && corridorAmt > 0.3 && !(FORCE && FORCE.rail)) railWant = 0;
+    // …and except the OPENING BLOOM (mode 27): the rail parks the orbs on its endpoints and its
+    // RAIL POSTS block runs after the scene's coupling → a bright diagonal chord beaded straight
+    // through the flower (self-render). The ref opening has no rail — disengage it here.
+    if (railWant && Math.floor((t.q30 || 0) + 0.5) === 27 && !(FORCE && FORCE.rail)) railWant = 0;
     railAmt += ((railWant ? 1 : 0) - railAmt) * Math.min(1, dt * 2);
     if (railAmt > 0.01) {
       var rmx = (railAx + railBx) / 2,
@@ -3502,7 +3526,7 @@
     //    Also runs for mode 24 (the water scene): its central flower IS the real fBloom motif
     //    (drawn small by fRippleFlower), so it must morph with the same live state (user
     //    2026-07-11: "use the waveform flower we created, a small variant — not that dahlia").
-    if (mEff === 25 || mEff === 24 || mEff === 26) {
+    if (mEff === 25 || mEff === 24 || mEff === 26 || mEff === 27) {
       if (bloomNext < 0) {
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
@@ -4936,6 +4960,78 @@
       t.q14 = 0.2 * ma * (1 - marchP2); // orb B
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
+    }
+    // ── MODE-27 OPENING BLOOM (Abide 720p 0:00-0:10): the video OPENS on ONE big flower — ~12
+    //    petals, a big clean centre hole — that blooms from a crisp rotating star into a hairy
+    //    12-petal flower and then HOLDS one consistent shape while it slowly precesses, 2 orbs
+    //    parked to the sides, a soft pink/blue watercolour wash growing beneath, hue slowly
+    //    cycling. It is the real fBloom motif LOCKED to one pose (variety ACROSS dwells, not
+    //    within — rule 1 + user 2026-07-11 "lock a single flower, big, big hole, ~12 petals").
+    //    Centred + STATIC camera (C1: the original camera is static; the wash is the growing
+    //    TRAIL, never a pan). No march/roll/swirl — the opposite of mode 26. ──
+    var bloomOpenEff = Math.floor((t.q30 || 0) + 0.5) === 27 ? 1 : 0;
+    if (bloomOpenEff && bloomOpenAmt < 0.02) bloomOpenT0 = time;
+    bloomOpenAmt += (bloomOpenEff - bloomOpenAmt) * Math.min(1, dt * 0.7);
+    if (bloomOpenAmt > 0.01) {
+      var bo = bloomOpenAmt;
+      // centred, static camera (the wash grows in place — zero pan/roll/swirl; rule 4)
+      t.q2 += (0.5 - t.q2) * bo;
+      t.q3 += (0.5 - t.q3) * bo;
+      t.q18 *= 1 - bo;
+      t.q19 *= 1 - bo;
+      t.q16 *= 1 - bo;
+      t.q17 *= 1 - bo;
+      // ★ LOCK the flower to ONE big 12-petal big-hole pose (variety across dwells, not within —
+      // the driver still churns its morph state so the petals DANCE with live jag/lightning, but
+      // every shape param is pinned here each frame so the archetype never changes mid-dwell).
+      bloomK += (12 - bloomK) * bo; // ~12 petals
+      bloomRing += (0.5 - bloomRing) * bo; // BIG clean centre hole (the ~1-in-4 large-hole mandala)
+      bloomSharp += (1.7 - bloomSharp) * bo; // spiky-ish hairy petals
+      bloomA += (0.72 - bloomA) * bo; // petals reach ~R
+      bloomPoly *= 1 - bo; // no triangle/square morph
+      bloomLoop *= 1 - bo; // no inner loop-chain morph
+      bloomTip += (0.22 - bloomTip) * bo; // OPEN hairy tips (2 lines loosely meet, never joined — rule 1)
+      // ★ HOLD the flower STEADY: the driver still churns its morph legs (so the petals keep their
+      // live lightning jag), but its periodic COLLAPSE-BUMP jag spike (bloomJagX up to 2.2) would
+      // make a LOCKED flower scribble/kink every ~2s. Pin it to baseline — gentle live jag, no
+      // violent re-strike (this scene HOLDS one shape; the mode-25 mandala is the one that morphs).
+      bloomJagX += (1 - bloomJagX) * bo;
+      // slow continuous precession is KEPT (the ref star rotates as it blooms) — bloomRotV is left
+      // as the driver rolled it (~2-6°/s, random sense), unlike mode 26 which freezes the spin.
+      // STEADY size, big; only a whisper of beat (a size wobble stacks nested ghost rings — rule 5).
+      t.q5 = scaleFor(27) * 0.97 * (1 + 0.05 * pulse);
+      // CRISP HAIRY petals over a soft ghost (the ref's "solid-strokes-over-soft-trail"): the ref's
+      // filaments are CRISP open strands (design-language rule 1), NOT soft solid lobes — high blur
+      // fuses the two petal strands into a filled lobe. Low blur (like mode 25's crisp mandala) keeps
+      // the strands legible; a moderate decay leaves the soft after-image wash. ★ q15 outward
+      // advection is KILLED: it pushes every parked bright deposit radially outward, so the two side
+      // orbs (roughly opposite across centre) streaked into one bright diagonal comet-beam.
+      t.q1 = Math.max(t.q1, 0.972 + 0.004 * bo);
+      t.q28 = Math.min(t.q28, 0.09);
+      t.q15 = Math.min(t.q15, 0.0006);
+      // 2 ORBS PARKED TO THE SIDES of the flower, OUTSIDE the hole (user + ref: the orbs sit at the
+      // sides — image-9 style — never inside the centre hole). Single-axis rule: they don't move.
+      t.q21 += (0.7 - t.q21) * bo; // orb A upper-right
+      t.q22 += (0.64 - t.q22) * bo;
+      t.q23 += (0.3 - t.q23) * bo; // orb B lower-left
+      t.q24 += (0.36 - t.q24) * bo;
+      t.q25 = Math.max(t.q25, 0.25 * bo);
+      t.q14 = Math.max(t.q14, 0.25 * bo);
+      // the two side orbs are INDEPENDENT (the ref never strings them) — the tether is killed at its
+      // source in fTether (mode-27 branch); here just kill all the free accessory lines so nothing
+      // but the flower + orbs + wash is on screen (rule 6: the scene owns its set-piece).
+      accVis *= 1 - bo;
+      // KILL the persistent rail here too: the disengage at line ~3167 uses the raw t.q30 (which
+      // isn't the pinned 27 yet in a self-render), and the RAIL POSTS block below parks the orbs on
+      // the rail endpoints (a bright diagonal chord through the flower). Zeroing railAmt after its
+      // update makes both the rail wave AND the posts block (gated railAmt>0.01) drop out.
+      railAmt *= 1 - bo;
+      corridorAmt *= 1 - bo; // never let the corridor chase engage under this centred scene
+      // the scene owns its ground: DARK wavy-fluid (m0). ★ Do NOT use the corridor void (q29=3) for
+      // "black" — that regime ALSO gates the waves[3] corridor thread + tether corOn (`q29≈3 &&
+      // q14>0.3`), which strung a bright diagonal beam between the two side orbs. m0 is the dark
+      // ground with no such side effect. Guarded so a FORCE q29 pin wins.
+      if (bloomOpenAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
