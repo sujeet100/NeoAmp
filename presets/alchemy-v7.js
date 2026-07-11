@@ -1771,17 +1771,23 @@
     hsA -= Math.floor(hsA);
     var hsB = Math.sin((ai + 1) * 7.13 + strand * 37.1) * 43758.5453;
     hsB -= Math.floor(hsB);
-    var tqA = Math.floor(lastT * 10 + hsA),
-      tqB = Math.floor(lastT * 10 + hsB);
+    // 14Hz + bloomKick (a beat forces a WHOLE-figure re-strike) — round 8 'violent & jerky'
+    var tqA = Math.floor(lastT * 14 + hsA) + bloomKick,
+      tqB = Math.floor(lastT * 14 + hsB) + bloomKick;
     var h1 = Math.sin(ai * 12.9898 + strand * 51.7 + tqA * 78.233) * 43758.5453;
     h1 -= Math.floor(h1);
     var h2 = Math.sin((ai + 1) * 12.9898 + strand * 51.7 + tqB * 78.233) * 43758.5453;
     h2 -= Math.floor(h2);
-    var zig = (h1 + (h2 - h1) * af - 0.5) * 2;
+    // bias offsets toward the extremes (pow 0.6) — soft mid-range jumps read fluid
+    var z1 = 2 * h1 - 1,
+      z2 = 2 * h2 - 1;
+    z1 = (z1 < 0 ? -1 : 1) * Math.pow(Math.abs(z1), 0.6);
+    z2 = (z2 < 0 ? -1 : 1) * Math.pow(Math.abs(z2), 0.6);
+    var zig = z1 + (z2 - z1) * af;
     var wob =
       zig *
       R *
-      0.05 *
+      0.075 *
       // CLAMPED-STRING envelope (user round 6: "wiggle while keeping ends relatively
       // closer... if they move a lot the flower loses the petal shape") — 4·s01·(1-s01)
       // peaks mid-edge and pins BOTH ends (tip s01≈1, ring base s01≈0) to a small residual
@@ -2571,6 +2577,8 @@
     // 7: "most of the times the radius of the center hole does not change when a motif
     // appears"); ~30% of dwells are the small-hole/LARGE-petal variant
     bloomJagX = 1, // jag multiplier — spiked mid-transition (the collapse kink)
+    bloomKick = 0, // beat-strike seed: increments on every beat flash -> whole-figure re-strike
+    bloomJerkT = 0, // stepped-jerk clock (the petal phase RANDOM-WALKS, never glides)
     bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
     bloomNext = -1, // next leg roll time (-1 = not in dwell)
     bloomDur = 1.2, // current leg duration
@@ -3353,8 +3361,18 @@
       bloomDuo = bloomDuoF + (bloomDuoT - bloomDuoF) * bE;
       bloomJagX = 1 + 1.2 * bumpB;
       bloomRot += dt * bloomRotV;
-      bloomPh += dt * 0.15;
-      bloomLPh += dt * 0.23;
+      // VIOLENT & JERKY (round 8): a beat re-strikes the WHOLE figure at once, and the
+      // petal phase random-walks in ~0.12s steps (a smooth drift read fluid; the ref
+      // twitches). Precession stays continuous underneath (rule 5).
+      if (f > 0.5) bloomKick++;
+      if (bloomJerkT < time - 1) bloomJerkT = time;
+      var bloomJerkG = 0;
+      while (time - bloomJerkT > 0.12 && bloomJerkG++ < 10) {
+        bloomJerkT += 0.12;
+        bloomPh += (Math.random() - 0.5) * 0.16;
+        bloomLPh += (Math.random() - 0.5) * 0.2;
+        bloomRot += (Math.random() - 0.5) * 0.014;
+      }
     } else {
       bloomNext = -1;
     }
