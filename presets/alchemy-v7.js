@@ -1753,8 +1753,20 @@
       (0.45 + 0.9 * rag);
     var jr = (a.value1 || 0) * jm,
       jt = (a.value2 || 0) * jm * 0.5;
-    lox += jr * Math.cos(u) - jt * Math.sin(u);
-    loy += jr * Math.sin(u) + jt * Math.cos(u);
+    // S-WAVE UNDULATION (user round 4: "the petal lines don't move in an S shape like a
+    // snake or wave — or it's not noticeable") — the jag above is fine flicker; the ref's
+    // snaking is a LARGE slow wave TRAVELLING along the strand: ~2.6 cycles per petal,
+    // phase sweeping at ~3.3 rad/s via the q9 clock (precedent: fRippleFlower's big crest —
+    // a fixed-λ sine carries the MOTION while the real waveform keeps the jaggedness).
+    // Tangential, strongest toward the tips, swelling with the beat carrier.
+    var wob =
+      Math.sin(p * 2.6 + u * 1.7 + (a.q9 || 0) * 55.0 + strand * 2.1) *
+      R *
+      0.045 *
+      (0.35 + 0.65 * s01) *
+      (1 + 0.6 * ((a.q32 || 1) - 1));
+    lox += jr * Math.cos(u) - (jt + wob) * Math.sin(u);
+    loy += jr * Math.sin(u) + (jt + wob) * Math.cos(u);
     if (strand) {
       // rotate the whole curve by bloomOff petals: 0.5 = clean interleave (ref 085's
       // alternating blue/green petals), ~0.3 = the X-crossing tips (ref 025's star)
