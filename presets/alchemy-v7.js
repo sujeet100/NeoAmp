@@ -67,7 +67,12 @@
     // bends everything crossing a crest (rotor trails included) into concentric waves.
     // Radius-ramped so the hub/crossing stays registered; compounds on the held trail.
     "  pd *= 1.0 + (1.0 - watr) * rip * 0.018 * sin(pr * 125.6 - time * 30.0);\n" +
-    "  pd.y += watr * rip * 0.015 * sin(pr * 34.0 - time * 1.6) * smoothstep(0.06, 0.3, pr);\n" +
+    // 0.004 (was 0.015): the shift COMPOUNDS at 60fps live — 8x faster than the ~7fps
+    // headless preview — and at 0.015 the differential smear bleached the frame white and
+    // exposed the crest/ramp contours as giant circles (user live round 8). Target: a
+    // trail accumulates ~0.03 UV of wave over its ~1s crisp life (0.14·0.004·60·~0.7s wave-
+    // coherent window ≈ 0.024).
+    "  pd.y += watr * rip * 0.004 * sin(pr * 34.0 - time * 1.6) * smoothstep(0.06, 0.4, pr);\n" +
     // MAGNIFY: q15>0 shrinks the sample offset → the old buffer appears slightly bigger each frame, so
     // every deposit GROWS as it ages (the "traces grow in size before disappearing" note). Small.
     "  pd *= (1.0 - q15);\n" +
