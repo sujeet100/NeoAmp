@@ -2142,6 +2142,64 @@
     a.a = kill ? 0 : bandA * (0.45 + 0.55 * cocEnv); // fresh stamp crisp; thins over its ghost
     return a;
   }
+  // BIG SAWTOOTH WAVE (mode 31 — 480p Alchemy Random 2:40-2:50): the bold green/gold/white
+  // zigzag PEAKS sweeping the frame. Trail-built (rule 1): LIVE = ONE full-frame audio-waveform
+  // line (2 analogous strands) rotating SLOWLY and continuously about a low-left pivot; the tall
+  // sawtooth peaks are the REAL audio samples displaced perpendicular (big amplitude — the
+  // terminology rule: a "zigzag line" is always the live waveform, never a synthetic zig-zag).
+  // The ref's lower-left COMB-FAN is this line's aged copies fanned outward from the pivot by the
+  // scene's radial magnify (q15>0 about q20/q27, forced in frame()). Never draw N comb lines.
+  function fBigWave(a) {
+    var s = a.sample || 0;
+    var line = s < 0.5 ? 0 : 1,
+      u = (s - line * 0.5) * 2,
+      tt = u * 2 - 1; // -1..1 THROUGH the pivot — full length both ways
+    var px = a.q2 !== undefined ? a.q2 : 0.5,
+      py = a.q3 !== undefined ? a.q3 : 0.5;
+    var ang = lastT * 0.26 + line * 0.14; // slow continuous rotation; 2nd strand a touch offset
+    var ct = Math.cos(ang),
+      st = Math.sin(ang);
+    var len = Math.max(0.98, (a.q5 || 0.4) * 2.0); // full-frame line (crosses the borders)
+    // BIG perpendicular audio displacement = the tall sawtooth peaks (much taller than the tether/
+    // urchin jag). Real samples give the dense angular jaggedness for free.
+    var v = (line ? a.value2 : a.value1) || 0;
+    var amp = v * (a.q6 || 0.05) * 9.5; // BIG amplitude → the ref's tall sawtooth peaks
+    a.x = px + tt * len * ct - amp * st;
+    a.y = py + tt * len * st + amp * ct;
+    var h = (a.q8 || 0) + (line ? 0.12 : 0) + 0.05 * u; // green/gold analogous duo + slight ramp
+    var end = Math.abs(tt) > 0.9 ? 1.35 : 1; // slightly brighter ends
+    a.r = orbCol(h, 0) * end;
+    a.g = orbCol(h, 0.33) * end;
+    a.b = orbCol(h, 0.67) * end;
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
+    return a;
+  }
+  // MOUNTAIN MASS (mode 32 — 480p Alchemy Random 2:54-3:02): the big glowing triangular MOUND with
+  // a hairy filament crown. Trail-built (rule 1, the fMountains mechanism): LIVE = ONE crest line
+  // tracing a single triangular arch (∧), its top jagged by the REAL waveform (the hairy crown);
+  // the SOLID body below is 100% feedback — the crest's trail sinks (scene's -q19) and accumulates
+  // into the filled mass. One central pinch → one peak (fMountains draws ~3.5 edge-to-edge peaks).
+  function fMound(a) {
+    var s = a.sample || 0;
+    var strand = s < 0.5 ? 0 : 1, // 2 strands (crest + a slightly offset companion → fuller crest)
+      u = (s - strand * 0.5) * 2; // 0..1 across the base
+    var R = a.q5 || 0.4,
+      W = R * 2.0; // base width
+    var pinch = Math.pow(Math.sin(u * 3.14159), 1.7); // 0 at edges → 1 at centre: a single sharp peak
+    var v = (strand ? a.value2 : a.value1) || 0; // live crest jag = the hairy top
+    var crest = pinch * (R * 0.95) + Math.abs(v) * (a.q6 || 0.05) * 3.2 * pinch;
+    var lx = (u - 0.5) * W;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    a.x = cx + lx;
+    a.y = cy + crest + strand * 0.004; // peak UP (larger y = up here); body fills DOWN via the sink
+    var h = (a.q8 || 0) + 0.04 * u + strand * 0.06; // analogous; the profile supplies the lime-gold
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.82; // always-on crest (the sink builds the solid body)
+    return a;
+  }
   // MODES — flower/mandala/beam/n-gon/net/vortex/jelly/12-star/bead-chain/valley + organic-tangle + mountains
   // + tri-mandala (15) + dandelion fluff ball (16).
   // ROSE/ROTLINE removed (user-rejected). fNet is the DELIBERATE woven net. Radial-tunnel DEPTH = q29=2.
@@ -2176,6 +2234,13 @@
     fBloomHold, // id 27 (user 2026-07-11: the Abide 720p 0:00-0:10 opening — spiky pulsing flower, drifts UP / tips back)
     fBloomHold, // id 28 (user 2026-07-11: the SAME flower REVERSED — drifts DOWN / tips forward; the mirror variant)
     fVortexCross, // id 29 (user 2026-07-11: the Abide 720p 4:25-4:35 rotating cross over a water vortex)
+    fUrchin, // id 30 (user 2026-07-11: the 480p Alchemy Random 1:03-1:10 — spiky urchin tangle +
+    // 2 corner orbs joined by a thick jagged diagonal lightning tether; reuses the urchin rosette,
+    // the scene block adds the corner orbs / always-on lightning tether / diagonal trail-streaks)
+    fBigWave, // id 31 (user 2026-07-11: the 480p Alchemy Random 2:33-2:50 — bold sawtooth waveform
+    // peaks + lower-left comb-fan)
+    fMound, // id 32 (user 2026-07-11: the 480p Alchemy Random 2:54-3:02 — the glowing triangular
+    // mountain mass + floating orbs)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -2218,6 +2283,9 @@
     0.7, // opening bloom (27): the fBloom flower locked to one pose — outline-class
     0.7, // opening bloom REVERSED (28): the 27 mirror — outline-class
     0.7, // vortex cross (29): two thin full-frame lines — the fanned bowtie is their swirled trail
+    0.5, // urchin lightning (30): dense spiky rosette — additive pileup, keep it low like urchin (2)
+    0.7, // big sawtooth wave (31): two thin full-frame lines — the comb-fan is their trail (outline-class)
+    0.5, // mountain mass (32): solid feedback body under a crest — dense-class alpha (the tone-map caps it)
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -2227,11 +2295,13 @@
     // became small piles, the valley bow-tie halved, ribbons stopped crossing the frame:
     // ZOOM pass (user, recording round 3: "motif covers larger part in the original — zoom
     // onto the motifs"; frame-checked 0:34-0:40: the pompom fills ~75% with the orbs INSIDE):
-    if (m === 3 || m === 12 || m === 14 || m === 23 || m === 29) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan / vortex-cross (near full-frame; the lines are min-clamped internally)
+    if (m === 3 || m === 12 || m === 14 || m === 23 || m === 29 || m === 31) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan / vortex-cross / big-wave (near full-frame; the lines are min-clamped internally)
+    if (m === 32) return 0.36; // mountain mass — a big triangular mound (base width scales off q5)
     if (m === 7) return 0.3; // wireframe net dome — a big scene object in the ref
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
+    if (m === 30) return 0.24; // urchin lightning — a denser, slightly bigger spiky tangle
     if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
     if (m === 25) return 0.34; // spiro-bloom: star tips reach ~±0.32 UV ≈ the ref's ~65% height
     if (m === 26) return 0.36; // marching flower — the bloom is the focal point; rotor lines min-clamped full-frame
@@ -2245,7 +2315,7 @@
   // discs where h2 §2.8 measured the centre-out hue front. The tangle (13) is EXCLUDED:
   // h2 has it re-tinting whole-cluster per stamp (its own walk), never as a front. The pompom
   // (16) moved to its own BOTTOM-UP front (doc 11 step 4, below).
-  var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1 };
+  var RADIAL_FRONT = { 0: 1, 2: 1, 8: 1, 9: 1, 30: 1 };
   // STAR FAMILY — the closed-polygon constructions (tri/square/hexagram/12-star/tri-mandala).
   // All share the ref's bloom kinematics (1080p 1:30-1:40): continuous rotation + hue sweep +
   // growth + the dive-into-centre exit. (Star-net 1 excluded: diameter rays, sketchbook class.)
@@ -2648,6 +2718,19 @@
     vortexTethT0 = -99, // last rare-tether window open time
     vortexTethNext = 0, // next window schedule time
     vortexTethGate = 0, // 0..1 rare-tether envelope (read by waves[2] under q30≈29)
+    // ── the three 480p Alchemy Random scenes (user 2026-07-11) ──
+    // mode-30 URCHIN LIGHTNING (1:03-1:10): spiky urchin tangle + 2 corner orbs + a thick jagged
+    //   diagonal lightning tether always strung between them; gentle diagonal trail-streaks; teal ground.
+    ulAmt = 0,
+    ulT0 = -9,
+    // mode-31 BIG SAWTOOTH WAVE (2:33-2:50): a full-frame audio-waveform line rotating slowly about a
+    //   low-left pivot → bold peaks + a lower-left comb-fan (its aged copies magnified outward).
+    bwAmt = 0,
+    bwT0 = -9,
+    // mode-32 MOUNTAIN MASS (2:54-3:02): one triangular crest whose sinking trail fills a solid mound;
+    //   floating orbs, a jagged tether, base fan rays; dark ground.
+    mdAmt = 0,
+    mdT0 = -9,
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -2932,6 +3015,9 @@
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 2, 25, 25, 12, 12, 14, 19, 14, 25, 25, 8, 25, 25,
     25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28,
     28, 29, 29, 29, 29,
+    // the three 480p Alchemy Random scenes (user 2026-07-11): urchin-lightning · big-sawtooth-wave · mountain-mass
+    30,
+    30, 30, 31, 31, 31, 32, 32, 32,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -5241,6 +5327,116 @@
       corridorAmt *= 1 - vx; // never let the corridor chase engage under this centred scene
       railAmt *= 1 - vx; // and no persistent rail chord (its posts would drag the parked orbs)
     } else vortexTethGate = 0;
+    // ── MODE-30 URCHIN LIGHTNING (480p Alchemy Random 1:03-1:10): a dense spiky URCHIN tangle at
+    //    centre, two big soft orbs PARKED at opposite CORNERS (top-left ↔ bottom-right), a THICK
+    //    JAGGED lightning tether always strung between them through the tangle, and a gentle
+    //    DIAGONAL trail-stream that smears the aged trail into the ref's parallel diagonal comb-
+    //    streaks (perpendicular to the tether). Teal wavy-fluid ground; the urchin spins so its
+    //    feedback trail builds the hairy tangle (rule 1). ──
+    var ulEff = Math.floor((t.q30 || 0) + 0.5) === 30 ? 1 : 0;
+    if (ulEff && ulAmt < 0.02) ulT0 = time;
+    ulAmt += (ulEff - ulAmt) * Math.min(1, dt * 0.6);
+    if (ulAmt > 0.01) {
+      var ul = ulAmt;
+      t.q2 += (0.5 - t.q2) * ul; // centred tangle hub
+      t.q3 += (0.5 - t.q3) * ul;
+      t.q9 = lastT * 0.9; // faster continuous spin → the trail builds the dense hairy urchin
+      // gentle DIAGONAL trail-stream (up-right: +q18 right, +q19 up) = the parallel diagonal combs;
+      // zero roll/swirl/growth (rule 4 — the diagonal drift owns the field motion)
+      t.q18 += (0.0045 - t.q18) * ul;
+      t.q19 += (0.0045 - t.q19) * ul;
+      t.q16 *= 1 - ul;
+      t.q17 *= 1 - ul;
+      t.q15 *= 1 - ul;
+      t.q1 = Math.min(Math.max(t.q1, 0.966), 0.972); // medium-long decay accumulates the tangle
+      t.q28 = Math.min(t.q28, 0.08); // low blur keeps the spikes legible
+      // ORBS PARKED at opposite CORNERS, both steadily bright (the two soft glowing discs)
+      t.q21 += (0.13 - t.q21) * ul; // orb A top-left
+      t.q22 += (0.83 - t.q22) * ul;
+      t.q23 += (0.87 - t.q23) * ul; // orb B bottom-right
+      t.q24 += (0.17 - t.q24) * ul;
+      t.q25 += (0.85 - t.q25) * ul;
+      t.q14 += (0.85 - t.q14) * ul;
+      // THICK JAGGED lightning tether, ALWAYS strung (waves[2] has a mode-30 always-on branch)
+      tetherKind = 3;
+      t.q26 = Math.max(t.q26, 0.07 * (0.8 + 0.7 * bassA));
+      accVis *= 1 - 0.7 * ul; // scene owns its set-piece — hold free accessory lines low
+      corridorAmt *= 1 - ul;
+      railAmt *= 1 - ul;
+      if (ulAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0; // teal wavy-fluid ground
+    }
+    // ── MODE-31 BIG SAWTOOTH WAVE (480p Alchemy Random 2:33-2:50): bold green/gold/white audio-
+    //    waveform PEAKS sweeping the frame + a lower-left COMB-FAN. Trail-built: fBigWave rotates
+    //    slowly about a LOW-LEFT pivot; the scene MAGNIFIES its aged copies outward from that pivot
+    //    (q15>0 about q20/q27) → the fanned comb. Small side orbs, no tether. Zero pan/roll/swirl
+    //    (rule 4 — the rotation + radial magnify own the motion). ──
+    var bwEff = Math.floor((t.q30 || 0) + 0.5) === 31 ? 1 : 0;
+    if (bwEff && bwAmt < 0.02) bwT0 = time;
+    bwAmt += (bwEff - bwAmt) * Math.min(1, dt * 0.6);
+    if (bwAmt > 0.01) {
+      var bw = bwAmt;
+      // LOW-LEFT pivot for BOTH the line rotation (q2/q3) and the magnify (q20/q27) → the comb-fan
+      // radiates from the lower-left (the ref composition)
+      t.q2 += (0.22 - t.q2) * bw;
+      t.q3 += (0.3 - t.q3) * bw;
+      t.q20 += (0.22 - t.q20) * bw;
+      t.q27 += (0.3 - t.q27) * bw;
+      t.q15 += (0.004 - t.q15) * bw; // radial magnify outward = the fan spread of the aged copies
+      t.q18 *= 1 - bw; // zero pan + roll + swirl (rule 4)
+      t.q19 *= 1 - bw;
+      t.q16 *= 1 - bw;
+      t.q17 *= 1 - bw;
+      t.q1 = Math.min(Math.max(t.q1, 0.968), 0.975); // long-ish decay for the persistent comb-fan
+      t.q28 = Math.min(t.q28, 0.07); // low blur keeps the peaks crisp
+      // SMALL orbs parked to the left (the ref's small bead/orb clusters), lightly present; both
+      // vis < 0.45 so the between-orb tether gate stays shut (this scene shows no tether)
+      t.q21 += (0.14 - t.q21) * bw;
+      t.q22 += (0.5 - t.q22) * bw;
+      t.q23 += (0.24 - t.q23) * bw;
+      t.q24 += (0.62 - t.q24) * bw;
+      t.q25 += (0.4 - t.q25) * bw;
+      t.q14 += (0.35 - t.q14) * bw;
+      accVis *= 1 - 0.6 * bw;
+      corridorAmt *= 1 - bw;
+      railAmt *= 1 - bw;
+      if (bwAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0; // calm wavy-fluid ground
+    }
+    // ── MODE-32 MOUNTAIN MASS (480p Alchemy Random 2:54-3:02): the big glowing triangular MOUND
+    //    with a hairy crown. Trail-built (the fMountains mechanism): fMound draws ONE triangular
+    //    crest; the scene SINKS its trail (-q19) so the solid body accumulates below. Two floating
+    //    orbs drift near the peak, a jagged tether strings them, a gentle base fan (low-pivot
+    //    magnify). Dark ground; zero lateral pan / roll / swirl. ──
+    var mdEff = Math.floor((t.q30 || 0) + 0.5) === 32 ? 1 : 0;
+    if (mdEff && mdAmt < 0.02) mdT0 = time;
+    mdAmt += (mdEff - mdAmt) * Math.min(1, dt * 0.6);
+    if (mdAmt > 0.01) {
+      var md = mdAmt;
+      t.q2 += (0.5 - t.q2) * md; // the mound sits low-centre so the mass fills the lower frame
+      t.q3 += (0.3 - t.q3) * md; // base low (larger y = up) → peak reaches mid-frame, body fills below
+      t.q19 += (-0.004 - t.q19) * md; // SINK: the crest's trail streams DOWN → the solid body
+      t.q18 *= 1 - md; // zero lateral pan / roll / swirl
+      t.q16 *= 1 - md;
+      t.q17 *= 1 - md;
+      // gentle outward magnify from a LOW pivot = the base FAN rays fanning up from the base
+      t.q20 += (0.5 - t.q20) * md;
+      t.q27 += (0.2 - t.q27) * md;
+      t.q15 += (0.0018 - t.q15) * md;
+      t.q1 = Math.min(Math.max(t.q1, 0.972), 0.978); // long decay keeps the body solid
+      t.q28 = Math.max(Math.min(t.q28, 0.14), 0.08); // moderate blur for the glow
+      // TWO orbs floating near the peak / upper area (the ref's drifting orbs), steadily present
+      t.q21 += (0.34 - t.q21) * md;
+      t.q22 += (0.74 - t.q22) * md;
+      t.q23 += (0.7 - t.q23) * md;
+      t.q24 += (0.68 - t.q24) * md;
+      t.q25 += (0.7 - t.q25) * md;
+      t.q14 += (0.6 - t.q14) * md;
+      tetherKind = 3; // jagged lightning tether between the two floating orbs (always-on branch)
+      t.q26 = Math.max(t.q26, 0.04 * (0.8 + 0.6 * bassA));
+      accVis *= 1 - 0.6 * md;
+      corridorAmt *= 1 - md;
+      railAmt *= 1 - md;
+      if (mdAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0; // dark wavy-fluid ground
+    }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
     if (railAmt > 0.01) {
@@ -5618,6 +5814,15 @@
         if (Math.abs((a.q30 || 0) - 29) < 0.5) {
           fTether(a);
           a.a = (a.a === undefined ? 0.9 : a.a) * vortexTethGate;
+          return a;
+        }
+        // URCHIN-LIGHTNING (30) + MOUNTAIN MASS (32): the thick jagged lightning tether is ALWAYS
+        // strung between the two orbs — drive its alpha by the scene engagement, not the rare
+        // beat scheduler (the tetherKind=3 + high q26 come from those scene blocks).
+        var mQt = Math.floor((a.q30 || 0) + 0.5);
+        if (mQt === 30 || mQt === 32) {
+          fTether(a);
+          a.a = (a.a === undefined ? 0.9 : a.a) * (mQt === 30 ? ulAmt : mdAmt);
           return a;
         }
         fTether(a);
