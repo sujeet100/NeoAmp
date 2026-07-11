@@ -3015,9 +3015,12 @@
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 2, 25, 25, 12, 12, 14, 19, 14, 25, 25, 8, 25, 25,
     25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28,
     28, 29, 29, 29, 29,
-    // the three 480p Alchemy Random scenes (user 2026-07-11): urchin-lightning · big-sawtooth-wave · mountain-mass
-    30,
-    30, 30, 31, 31, 31, 32, 32, 32,
+    // the 480p Alchemy Random scenes (user 2026-07-11): urchin-lightning · big-sawtooth-wave.
+    // mountain-mass (32) PULLED (user 2026-07-11: "ugly scene" — the crest accumulates into a
+    // flat-topped green MESA with battlement notches at the 2-strand seams, the orbs stretch into
+    // pills, colours clash; fMound + its scene block kept dormant in MODES for a future faithful
+    // rebuild — the sink-built body needs live iteration, headless couldn't show it).
+    30, 30, 30, 31, 31, 31,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
