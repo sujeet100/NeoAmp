@@ -2115,7 +2115,8 @@
     fRippleFlower, // id 24 (user 2026-07-11: the 1080p 1:40-1:42 water-ripple flower + rotors)
     fBloom, // id 25 (user 2026-07-11: the Abide 720p 3:50-4:00 morphing spiro-bloom mandala)
     fMarchFan, // id 26 (user 2026-07-11: the Abide 720p 0:33-0:40 flower + 2 rotating lines marching right)
-    fBloomHold, // id 27 (user 2026-07-11: the Abide 720p 0:00-0:10 opening — ONE locked big-hole 12-petal flower)
+    fBloomHold, // id 27 (user 2026-07-11: the Abide 720p 0:00-0:10 opening — spiky pulsing flower, drifts UP / tips back)
+    fBloomHold, // id 28 (user 2026-07-11: the SAME flower REVERSED — drifts DOWN / tips forward; the mirror variant)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -2155,6 +2156,7 @@
     0.7, // spiro-bloom (25): two thin closed lines, no pileup — outline-class
     0.7, // marching flower (26): the fBloom flower — outline-class
     0.7, // opening bloom (27): the fBloom flower locked to one pose — outline-class
+    0.7, // opening bloom REVERSED (28): the 27 mirror — outline-class
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -2172,7 +2174,7 @@
     if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
     if (m === 25) return 0.34; // spiro-bloom: star tips reach ~±0.32 UV ≈ the ref's ~65% height
     if (m === 26) return 0.36; // marching flower — the bloom is the focal point; rotor lines min-clamped full-frame
-    if (m === 27) return 0.32; // opening bloom — a BIG single flower (~65% frame height, tips ~±0.3 UV), the ref's focal object
+    if (m === 27 || m === 28) return 0.32; // opening bloom (+ its reversed mirror) — a BIG single flower, the ref's focal object
     if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
     // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
     // cross the frame borders on either side)
@@ -2250,16 +2252,18 @@
       a.x = tcx + (a.x - tcx) * keys;
       a.y = tcy + rely * (1 - 0.52 * starTilt);
     }
-    // OPENING-BLOOM tilt (mode 27; user 2026-07-11: "the camera is tilted a little to side" — the
+    // OPENING-BLOOM tilt (modes 27/28; user 2026-07-11: "the camera is tilted a little to side" — the
     // ref flower is a disc tipped toward z, viewed from slightly below, not a flat upright figure).
-    // Same keystone (screen-up FAR edge narrows) + y-squash as the star family, fixed for the whole
-    // dwell (eased in via bloomOpenAmt). wave y is BOTTOM-UP, so rely>0 = the upper petals converge.
-    if (m === 27 && bloomOpenAmt > 0.01) {
+    // Same keystone (FAR edge narrows) + y-squash as the star family, fixed for the whole dwell (eased
+    // in via bloomOpenAmt). wave y is BOTTOM-UP; mode 28 is the MIRROR (btdir −1: it tips the OTHER
+    // way — the near/bottom edge narrows — pairing with its reversed drift).
+    if ((m === 27 || m === 28) && bloomOpenAmt > 0.01) {
       var btcx = a.q2 !== undefined ? a.q2 : 0.5,
         btcy = a.q3 !== undefined ? a.q3 : 0.5;
       var brely = a.y - btcy;
       var btilt = 0.6 * bloomOpenAmt;
-      var bkeys = 1 - 0.62 * btilt * Math.max(0, Math.min(1, brely * 2.4));
+      var btdir = m === 28 ? -1 : 1;
+      var bkeys = 1 - 0.62 * btilt * Math.max(0, Math.min(1, brely * 2.4 * btdir));
       a.x = btcx + (a.x - btcx) * bkeys;
       a.y = btcy + brely * (1 - 0.5 * btilt);
     }
@@ -2290,7 +2294,11 @@
     // diagonal beam straight through the flower (mode 27); the ref windows (1080p 1:40-1:42 and
     // Abide 0:00-0:10) show independent side orbs with no between-orb line. (Zeroing t.q26 does NOT
     // kill it — the draw floors `a.q26 || 0.03` — so kill it here at the source.)
-    if (Math.abs((a.q30 || 0) - 24) < 0.5 || Math.abs((a.q30 || 0) - 27) < 0.5) {
+    if (
+      Math.abs((a.q30 || 0) - 24) < 0.5 ||
+      Math.abs((a.q30 || 0) - 27) < 0.5 ||
+      Math.abs((a.q30 || 0) - 28) < 0.5
+    ) {
       a.x = 0.5;
       a.y = 0.5;
       a.a = 0;
@@ -2834,7 +2842,8 @@
   // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
-    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27,
+    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28,
+    28,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -3185,10 +3194,12 @@
     // pinning ring+orb+thread to the frozen diagonal chord — which the chase-pan then
     // deposited as a repeating tadpole train. New rails already can't spawn here.
     if (railWant && corridorAmt > 0.3 && !(FORCE && FORCE.rail)) railWant = 0;
-    // …and except the OPENING BLOOM (mode 27): the rail parks the orbs on its endpoints and its
+    // …and except the OPENING BLOOM (modes 27/28): the rail parks the orbs on its endpoints and its
     // RAIL POSTS block runs after the scene's coupling → a bright diagonal chord beaded straight
     // through the flower (self-render). The ref opening has no rail — disengage it here.
-    if (railWant && Math.floor((t.q30 || 0) + 0.5) === 27 && !(FORCE && FORCE.rail)) railWant = 0;
+    var moRailBloom = Math.floor((t.q30 || 0) + 0.5);
+    if (railWant && (moRailBloom === 27 || moRailBloom === 28) && !(FORCE && FORCE.rail))
+      railWant = 0;
     railAmt += ((railWant ? 1 : 0) - railAmt) * Math.min(1, dt * 2);
     if (railAmt > 0.01) {
       var rmx = (railAx + railBx) / 2,
@@ -3539,7 +3550,7 @@
     //    Also runs for mode 24 (the water scene): its central flower IS the real fBloom motif
     //    (drawn small by fRippleFlower), so it must morph with the same live state (user
     //    2026-07-11: "use the waveform flower we created, a small variant — not that dahlia").
-    if (mEff === 25 || mEff === 24 || mEff === 26 || mEff === 27) {
+    if (mEff === 25 || mEff === 24 || mEff === 26 || mEff === 27 || mEff === 28) {
       if (bloomNext < 0) {
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
@@ -4981,8 +4992,13 @@
     //    the whole scene drifting UP (user: "the orbs + motif is moving up" — camera-follow: motif
     //    parked, trail streams down), 2 translucent side orbs, a pink/blue watercolour wash, on a
     //    PURE-BLACK ground. It is the real fBloom motif LOCKED to one pose (variety ACROSS dwells,
-    //    not within — rule 1). The tilt is applied in centralDraw (mode-27 branch). ──
-    var bloomOpenEff = Math.floor((t.q30 || 0) + 0.5) === 27 ? 1 : 0;
+    //    not within — rule 1). The tilt is applied in centralDraw. ★ MODE 28 is the MIRROR variant
+    //    (user 2026-07-11: "keep this one too and add another scene where direction is reversed"):
+    //    identical flower, but the vertical drift AND the tilt are flipped (bloomOpenDir), so it
+    //    reads as moving DOWN / tipping forward instead of up / tipping back. ──
+    var moBloomOpen = Math.floor((t.q30 || 0) + 0.5);
+    var bloomOpenEff = moBloomOpen === 27 || moBloomOpen === 28 ? 1 : 0;
+    var bloomOpenDir = moBloomOpen === 28 ? -1 : 1; // 28 = the reversed mirror
     if (bloomOpenEff && bloomOpenAmt < 0.02) bloomOpenT0 = time;
     bloomOpenAmt += (bloomOpenEff - bloomOpenAmt) * Math.min(1, dt * 0.7);
     if (bloomOpenAmt > 0.01) {
@@ -4996,7 +5012,9 @@
       t.q18 *= 1 - bo;
       t.q16 *= 1 - bo;
       t.q17 *= 1 - bo;
-      t.q19 += (0.0045 - t.q19) * bo; // gentle downward trail-stream = the camera-follow rise
+      // gentle vertical trail-stream = the camera-follow drift. Mode 27: DOWN-stream (motif reads as
+      // RISING). Mode 28: the sign flips → UP-stream (motif reads as FALLING) — the reversed mirror.
+      t.q19 += (0.0045 * bloomOpenDir - t.q19) * bo;
       // ★ LOCK the flower to ONE pose — the LONG-PETAL / SMALL-HOLE variant (user 2026-07-11:
       // "longer petals, a little smaller hole") — but PULSING VIOLENTLY with the music (user: "the
       // flower pulses with music violently"). The driver still churns its morph state so the petals
@@ -5019,7 +5037,7 @@
       // ★ VIOLENT figure-size pulse too (user: pulses violently): a big beat swing on q5 on top of
       // the petal-length pulse. The nested-ghost "woolly band" the steady mandala avoids is WANTED
       // here — the throbbing petals' trails ARE the ref's pulsing bloom.
-      t.q5 = scaleFor(27) * (0.82 + 0.34 * pulse);
+      t.q5 = scaleFor(moBloomOpen) * (0.82 + 0.34 * pulse);
       // CRISP HAIRY petals over a soft ghost (the ref's "solid-strokes-over-soft-trail"): the ref's
       // filaments are CRISP open strands (design-language rule 1), NOT soft solid lobes — high blur
       // fuses the two petal strands into a filled lobe. Low blur (like mode 25's crisp mandala) keeps
