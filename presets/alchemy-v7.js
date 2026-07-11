@@ -4917,19 +4917,23 @@
       bloomLoop *= 1 - ma; // no inner loop-chain morph
       bloomTip *= 1 - 0.7 * ma; // petals stay solid/closed
       bloomRotV *= 1 - ma; // freeze the flower's spin (the rotating LINES still rotate; the flower does not)
-      // STEADY size — user 2026-07-11: "reduce the pulsing for the motif". Override the general q5's
-      // bass/pulse throb with a near-constant size (only a whisper of beat), and GROW it for phase 2
-      // (still many-petal, tiny-hole) so the flower becomes the whole scene; medium in phase 1.
-      t.q5 = scaleFor(26) * 0.95 * (1 + 0.06 * pulse) * (1 + 0.6 * marchP2);
+      // STEADY size (user: "reduce the pulsing") with a clear phase contrast (user 2026-07-11:
+      // "smaller in phase 1, bigger in phase 2"): ~0.55× base when marching with the lines/orbs,
+      // ~1.7× base when it marches alone. Only a whisper of beat.
+      t.q5 = scaleFor(26) * (0.55 + 0.75 * marchP2) * 0.95 * (1 + 0.06 * pulse);
       // ORBS PARKED near the flower (single-axis rule): the rightward pan streams their wake into the
       // ref's rightward bead-chain — the SAME mechanism as the corridor (parked orb + streaming wake
       // = the bead row), NOT orbs traversing the screen. They FADE OUT in phase 2 (flower marches alone).
-      t.q21 += (0.36 - t.q21) * ma;
-      t.q22 += (0.56 - t.q22) * ma;
-      t.q23 += (0.48 - t.q23) * ma;
-      t.q24 += (0.5 - t.q24) * ma;
-      t.q25 = Math.max(t.q25, 0.18 * ma * (1 - marchP2)); // orb A — quiet (the flower is the focus), gone in phase 2
-      t.q14 = Math.max(t.q14, 0.18 * ma * (1 - marchP2)); // orb B
+      // orbs sit to the SIDE of the flower (user 2026-07-11: "orbs are on the side of the flower")
+      // — parked to its RIGHT, the rightward pan streaming their wake into the bead-chain beyond.
+      t.q21 += (0.58 - t.q21) * ma;
+      t.q22 += (0.5 - t.q22) * ma;
+      t.q23 += (0.67 - t.q23) * ma;
+      t.q24 += (0.52 - t.q24) * ma;
+      // OVERRIDE the default orb come-and-go (direct assign, not Math.max — Math.max left the
+      // default value so orbs lingered in phase 2). On in phase 1 (to the side), fully OFF in phase 2.
+      t.q25 = 0.2 * ma * (1 - marchP2); // orb A
+      t.q14 = 0.2 * ma * (1 - marchP2); // orb B
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
