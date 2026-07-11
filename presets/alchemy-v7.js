@@ -1511,10 +1511,10 @@
       a.x = cx + Math.cos(ang2) * rr;
       a.y = cy + Math.sin(ang2) * rr;
       var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
-      // 1.05 (was 1.35): at the scene's ~0.99 decay each deposit survives ~100 frames —
-      // the bright pale emit accumulated the whole field to a washed milky haze (user
-      // round 6); the ref keeps saturated midtones with dark gaps between spokes
-      var lit = 1.05 - 0.3 * u;
+      // 1.18: the wash-out ↔ dusky balance (rounds 6-7). Steady-state field ∝
+      // alpha·lit/(1−q1): 1.35/0.8/0.99 washed milky, 1.05/0.5/0.982 went grey-dark —
+      // the ref surface is BRIGHT saturated teal, ~2/3 of the way back up
+      var lit = 1.18 - 0.3 * u;
       a.r = Math.min(1, orbCol(h, 0) * lit);
       a.g = Math.min(1, orbCol(h, 0.33) * lit);
       a.b = Math.min(1, orbCol(h, 0.67) * lit);
@@ -1528,7 +1528,7 @@
       a.x = cx + (a.x - cx) * (1 - 0.24 * Math.max(0, Math.min(1, rely * 2.2)));
       // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
-      a.a = u < 0.04 ? 0 : 0.5 * Math.min(1, (u - 0.04) / 0.12); // 0.5 (was 0.8): wash-out fix, see lit
+      a.a = u < 0.04 ? 0 : 0.62 * Math.min(1, (u - 0.04) / 0.12); // wash-out↔dusky balance, see lit
     } else {
       // TWO ROTATING LINES — full-frame (the line rule), dead straight, pale
       var ls = (s - 0.72) / 0.28;
@@ -4225,10 +4225,9 @@
       t.q25 = Math.max(t.q25, 0.6 * ra);
       t.q14 = Math.max(t.q14, 0.6 * ra);
       t.q15 = Math.max(t.q15, 0.0065 * ra); // the outward stream that carries the crests
-      // ~0.982 (was 0.99): the 100-frame deposit lifetime integrated the whole disc to a
-      // milky wash even after the emit cuts (round 6) — 55 frames still lets the stream
-      // carry a crest ~70% of the radius, and the field stays saturated
-      t.q1 = Math.max(t.q1, 0.968 + 0.014 * ra);
+      // ~0.985: 0.99 (100-frame life) washed milky, 0.982 went dusky-dark — ~65 frames
+      // keeps the field bright-saturated and still carries a crest most of the radius
+      t.q1 = Math.max(t.q1, 0.971 + 0.014 * ra);
       t.q28 += (0.18 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined; 0.24 milked the gaps between spokes (wash-out round)
       t.q18 *= 1 - ra;
       t.q19 *= 1 - ra;
