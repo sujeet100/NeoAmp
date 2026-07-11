@@ -1516,10 +1516,10 @@
       a.x = cx + Math.cos(ang2) * rr;
       a.y = cy + Math.sin(ang2) * rr;
       var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
-      // 1.18: the wash-out ↔ dusky balance (rounds 6-7). Steady-state field ∝
-      // alpha·lit/(1−q1): 1.35/0.8/0.99 washed milky, 1.05/0.5/0.982 went grey-dark —
-      // the ref surface is BRIGHT saturated teal, ~2/3 of the way back up
-      var lit = 1.18 - 0.3 * u;
+      // (rounds 6-9 tried dimmer emit / shorter decay / lower blur against a "washed"
+      // read — the user judged every variant worse and asked for THIS original balance
+      // back; don't re-tune these without a fresh ask)
+      var lit = 1.35 - 0.4 * u; // pale fresh strands (h_002: whitish tuft), dimming tipward
       a.r = Math.min(1, orbCol(h, 0) * lit);
       a.g = Math.min(1, orbCol(h, 0.33) * lit);
       a.b = Math.min(1, orbCol(h, 0.67) * lit);
@@ -1533,7 +1533,7 @@
       a.x = cx + (a.x - cx) * (1 - 0.24 * Math.max(0, Math.min(1, rely * 2.2)));
       // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
-      a.a = u < 0.04 ? 0 : 0.62 * Math.min(1, (u - 0.04) / 0.12); // wash-out↔dusky balance, see lit
+      a.a = u < 0.04 ? 0 : 0.8 * Math.min(1, (u - 0.04) / 0.12); // hide the strand-to-strand connector
     } else {
       // TWO ROTATING LINES — full-frame (the line rule), dead straight, pale
       var ls = (s - 0.72) / 0.28;
@@ -1552,9 +1552,9 @@
       // full-frame line, and the ref's rotors stay dead straight)
       a.y = cy + (tt * len * st + fine * ct) * 0.5;
       var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
-      a.r = Math.min(1, orbCol(h2, 0) * 1.25);
-      a.g = Math.min(1, orbCol(h2, 0.33) * 1.25);
-      a.b = Math.min(1, orbCol(h2, 0.67) * 1.25);
+      a.r = Math.min(1, orbCol(h2, 0) * 1.45);
+      a.g = Math.min(1, orbCol(h2, 0.33) * 1.45);
+      a.b = Math.min(1, orbCol(h2, 0.67) * 1.45);
       // alpha rides the BEAT (q32 carrier): the ref's cross flashes crisp on hits and its
       // faded between-hit deposits stay a whisper — a constant-bright line accumulated a
       // straight-ray starburst under this scene's long decay (first pin-render), and the
@@ -4225,16 +4225,13 @@
       t.q22 += (0.35 - t.q22) * ra;
       t.q23 += (0.44 - t.q23) * ra;
       t.q24 += (0.64 - t.q24) * ra;
-      // 0.42: a PARKED orb under this scene's long decay accumulates its halo in place (0.85
-      // blazed, r3), and the q15 outward stream drags the hue-cycling halo into a RAINBOW
-      // COMET TAIL (user round 9 screenshot) — the ref pair is small, quiet, tail-less
-      t.q25 = Math.max(t.q25, 0.42 * ra);
-      t.q14 = Math.max(t.q14, 0.42 * ra);
+      // 0.6: a PARKED orb under this scene's ~0.99 decay accumulates its halo additively in
+      // place — at 0.85 it blazed to a giant blob (r3 render); the ref pair is small + quiet
+      t.q25 = Math.max(t.q25, 0.6 * ra);
+      t.q14 = Math.max(t.q14, 0.6 * ra);
       t.q15 = Math.max(t.q15, 0.0065 * ra); // the outward stream that carries the crests
-      // ~0.985: 0.99 (100-frame life) washed milky, 0.982 went dusky-dark — ~65 frames
-      // keeps the field bright-saturated and still carries a crest most of the radius
-      t.q1 = Math.max(t.q1, 0.971 + 0.014 * ra);
-      t.q28 += (0.14 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined; 0.24/0.18 milked the gaps between spokes into grey fog (rounds 6/9)
+      t.q1 = Math.max(t.q1, 0.972 + 0.018 * ra); // rings survive to the frame edge (~5s)
+      t.q28 += (0.24 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined
       t.q18 *= 1 - ra;
       t.q19 *= 1 - ra;
       t.q16 *= 1 - ra;
