@@ -1759,10 +1759,27 @@
     // phase sweeping at ~3.3 rad/s via the q9 clock (precedent: fRippleFlower's big crest —
     // a fixed-λ sine carries the MOTION while the real waveform keeps the jaggedness).
     // Tangential, strongest toward the tips, swelling with the beat carrier.
+    // FAST LIGHTNING RE-STRIKE (user round 7: "the strands move like fast lightning, not
+    // like a smooth wave" — the round-4/5 travelling sine glided too smoothly). Piecewise-
+    // LINEAR zigzag between anchors (~3 per petal) whose offsets RE-ROLL on a ~10Hz stepped
+    // clock, staggered per anchor so the strand re-strikes like an arc instead of strobing
+    // whole. Clamped-string envelope kept (round 6): both petal ends stay pinned.
+    var fa = (s * 512) / 7,
+      ai = Math.floor(fa),
+      af = fa - ai;
+    var hsA = Math.sin(ai * 7.13 + strand * 37.1) * 43758.5453;
+    hsA -= Math.floor(hsA);
+    var hsB = Math.sin((ai + 1) * 7.13 + strand * 37.1) * 43758.5453;
+    hsB -= Math.floor(hsB);
+    var tqA = Math.floor(lastT * 10 + hsA),
+      tqB = Math.floor(lastT * 10 + hsB);
+    var h1 = Math.sin(ai * 12.9898 + strand * 51.7 + tqA * 78.233) * 43758.5453;
+    h1 -= Math.floor(h1);
+    var h2 = Math.sin((ai + 1) * 12.9898 + strand * 51.7 + tqB * 78.233) * 43758.5453;
+    h2 -= Math.floor(h2);
+    var zig = (h1 + (h2 - h1) * af - 0.5) * 2;
     var wob =
-      // q9×140 ≈ 8.4 rad/s phase sweep (user round 5: "the petal movement needs to be
-      // faster" — 55 ≈ 3.3 rad/s read too slow live; a full S-cycle now passes in ~0.75s)
-      Math.sin(p * 2.6 + u * 1.7 + (a.q9 || 0) * 140.0 + strand * 2.1) *
+      zig *
       R *
       0.05 *
       // CLAMPED-STRING envelope (user round 6: "wiggle while keeping ends relatively
@@ -2547,9 +2564,12 @@
     bloomTip = 0, // open-tip cut amount (0 closed · 1 wide fork) — eased like the rest
     bloomTipF = 0,
     bloomTipT = 0,
-    bloomRing = 0.5, // hole-edge radius as a fraction of R (rolled per leg; spider ~0.12)
+    bloomRing = 0.5, // hole-edge radius as a fraction of R
     bloomRingF = 0.5,
     bloomRingT = 0.5,
+    bloomRingDwell = 0.5, // ★ the hole radius is rolled ONCE PER DWELL and held (user round
+    // 7: "most of the times the radius of the center hole does not change when a motif
+    // appears"); ~30% of dwells are the small-hole/LARGE-petal variant
     bloomJagX = 1, // jag multiplier — spiked mid-transition (the collapse kink)
     bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
     bloomNext = -1, // next leg roll time (-1 = not in dwell)
@@ -3238,7 +3258,11 @@
         bloomRotV = (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? -1 : 1);
         bloomDuoF = bloomDuoT = bloomDuo = 0.3 + Math.random() * 0.2;
         bloomKF = bloomKT = bloomK = 11 + Math.floor(Math.random() * 4);
-        bloomRingF = bloomRingT = bloomRing = 0.46 + Math.random() * 0.12;
+        bloomRingDwell =
+          Math.random() < 0.3
+            ? 0.22 + Math.random() * 0.1 // small hole, LARGE petals (user round 7 refs)
+            : 0.42 + Math.random() * 0.16;
+        bloomRingF = bloomRingT = bloomRing = bloomRingDwell;
         bloomMorph = 1;
       }
       // ★ EVERY dwell target is a FLOWER (user round 2: "the motif almost all the time
@@ -3270,21 +3294,18 @@
           bloomShT = 1.7 + Math.random() * 1.1;
           bloomLpT = 0;
           bloomTipT = 0.08 + Math.random() * 0.2;
-          bloomRingT = 0.42 + Math.random() * 0.16;
         } else if (bloomForm === 1) {
           // wavy-petal flower (the ref's rounder sun, 085 — still clearly petalled)
           bloomAT = 0.55 + Math.random() * 0.25;
           bloomShT = 0.9 + Math.random() * 0.4;
           bloomLpT = Math.random() < 0.4 ? 0.02 : 0;
           bloomTipT = 0.08 + Math.random() * 0.18;
-          bloomRingT = 0.46 + Math.random() * 0.14;
         } else if (bloomForm === 2) {
           // loop-base star (the user's own ref shots 2/6: full petals + base loop chain)
           bloomAT = 0.6 + Math.random() * 0.3;
           bloomShT = 1.5 + Math.random() * 0.7;
           bloomLpT = 0.028 + Math.random() * 0.022; // small base loops — bigger read as the rejected coil ring
           bloomTipT = 0.08 + Math.random() * 0.2;
-          bloomRingT = 0.44 + Math.random() * 0.14;
         } else if (bloomForm === 3) {
           // ring+star — strand 1 collapses to a near-plain ellipse under strand 0's star
           bloomAT = 0.75 + Math.random() * 0.25;
@@ -3292,7 +3313,6 @@
           bloomLpT = 0;
           bloomAsT = 0.1 + Math.random() * 0.15;
           bloomTipT = 0.08 + Math.random() * 0.16; // star strand open; the ring strand is amp-gated
-          bloomRingT = 0.44 + Math.random() * 0.14;
         } else {
           // SPARSE SPIDER (user: "the motif around 4:00... with lesser petals") — the SAME
           // engine at k 3-6 with a TINY ring: the arms converge at a knot near the hub
@@ -3300,9 +3320,10 @@
           bloomShT = 2.2 + Math.random() * 1.0;
           bloomLpT = 0;
           bloomTipT = 0.15 + Math.random() * 0.25;
-          bloomRingT = 0.1 + Math.random() * 0.08;
         }
         bloomKT = bloomForm === 4 ? 3 + Math.floor(Math.random() * 4) : kBand;
+        // hole HELD per dwell (user round 7); only the spider dips to its centre knot
+        bloomRingT = bloomForm === 4 ? Math.min(bloomRingDwell, 0.14) : bloomRingDwell;
         // strand offset per leg: the X-crossing pose dominates (user: the 2 lines LOOSELY
         // MEET at petals — a clean half-petal interleave reads too tidy for the ref)
         bloomOff = Math.random() < 0.4 ? 0.5 : 0.22 + Math.random() * 0.2;
