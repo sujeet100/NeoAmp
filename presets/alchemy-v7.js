@@ -1901,14 +1901,15 @@
       a.q5 = oq;
       a.a = Math.min(1, a.a * 1.4); // bright live flower — must dominate its own streamed wake
     } else {
-      // TWO ROTATING LINES pivoting just BELOW the flower hub, sweeping continuously (one direction,
-      // two rates → the ref's doubled fan). Full-frame (line rule); pale; alpha rides the beat.
+      // TWO ROTATING LINES pivoting at the FLOWER'S HOLE CENTRE (the hub), sweeping continuously
+      // (one direction, two rates → the ref's doubled fan). Full-frame (line rule); pale (user
+      // 2026-07-11: the cross should rotate through the centre of the flower's hole, not below it).
       var ls = (s - 0.55) / 0.45;
       var line = ls < 0.5 ? 0 : 1,
         u2 = (ls - line * 0.5) * 2,
         tt = u2 * 2 - 1; // -1..1 through the pivot
       var pvx = cx,
-        pvy = cy - 0.16; // pivot below the flower (ref: lines converge low, fan sweeps up)
+        pvy = cy; // pivot = the flower hub / hole centre
       var ang = line ? lastT * 0.8 + 0.7 : lastT * 1.5; // ~two continuous rates, same sense (slowed)
       var ct = Math.cos(ang),
         st = Math.sin(ang);
@@ -4906,9 +4907,10 @@
       bloomRing += (0.06 - bloomRing) * ma;
       bloomA = Math.max(bloomA, 0.55 * ma);
       bloomTip *= 1 - 0.7 * ma;
-      // PHASE 2: the flower GROWS to a big bloom (still many-petal, tiny-hole) and becomes the whole
-      // scene; in phase 1 it stays medium next to the lines/orbs.
-      t.q5 *= 1 + 0.6 * marchP2;
+      // STEADY size — user 2026-07-11: "reduce the pulsing for the motif". Override the general q5's
+      // bass/pulse throb with a near-constant size (only a whisper of beat), and GROW it for phase 2
+      // (still many-petal, tiny-hole) so the flower becomes the whole scene; medium in phase 1.
+      t.q5 = scaleFor(26) * 0.95 * (1 + 0.06 * pulse) * (1 + 0.6 * marchP2);
       // ORBS PARKED near the flower (single-axis rule): the rightward pan streams their wake into the
       // ref's rightward bead-chain — the SAME mechanism as the corridor (parked orb + streaming wake
       // = the bead row), NOT orbs traversing the screen. They FADE OUT in phase 2 (flower marches alone).
