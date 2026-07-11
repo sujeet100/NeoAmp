@@ -236,7 +236,7 @@ startup loads "Dance of the Freaky Circles" (known-good).
 and differ only in a `makeComp(PROFILE)` colour profile: **`P["Alchemy (Pastel)"]` (the DEFAULT — the
 accurate muted/dusty WMP colour, validated by measurement against the 480p reference) + `P["Alchemy (Vivid)"]`
 (punchier).** It is a single self-sequencing preset: a watercolour FEEDBACK engine (decay + compounding
-blur diffusion + tiny growth) over a dark wavy-fluid ground, with (as of 2026-07) **24 motif modes** and
+blur diffusion + tiny growth) over a dark wavy-fluid ground, with (as of 2026-07) **25 motif modes** and
 **15 background regimes** (see the `MODES` array + the `q29` comp branches in `alchemy-v7.js` — several
 were later PULLED from the bags for faithfulness: bead-chain, pompom, radial-tunnel, wallpaper),
 glowing pulsing orbs + a colour-cycling waveform tether, and an abrupt-snap-pan / valley-dolly camera.

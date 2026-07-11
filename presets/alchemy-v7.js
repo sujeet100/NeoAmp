@@ -1448,6 +1448,79 @@
     if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
     return a;
   }
+  // WATER-RIPPLE FLOWER (user 2026-07-11; 1080p 1:40-1:42, frame-stepped @10fps + a 30fps
+  // line-track at 1:41.1): a central flower of ~14 LIVE wavy waveform strands, plus TWO
+  // straight full-frame lines rotating continuously in the SAME direction at different
+  // measured rates (~230°/s and ~80°/s — the crisp ~8°-apart frame copies read as the
+  // ref's doubled parallel pairs). The water surface is TRAIL-BUILT: the strand ripple is
+  // keyed to RADIUS with a STATIC phase, so successive trail copies REGISTER into
+  // concentric crests, and the mode-24 coupling's q15 outward stream carries them out as
+  // expanding water rings (nothing draws the far field). The flower appears first; the
+  // rotor lines fade in ~1.3s into the dwell (rippLineAmt, staged in frame()).
+  function fRippleFlower(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    if (s < 0.68) {
+      // FLOWER: 14 strands, each traced root→tip
+      var fk = (s / 0.68) * 14,
+        strand = Math.floor(fk),
+        u = fk - strand;
+      if (strand > 13) {
+        strand = 13;
+        u = 1;
+      }
+      // QUANTIZED fan rotation (fMoth's stepped-clock trick): 4° every 0.35s — the copies
+      // land at DISTINCT angles, so the trail builds the ref's separated wavy spokes;
+      // continuous rotation at 60fps would smear them into a solid bullseye (r3 render)
+      var baseAng = strand * 0.4488 + Math.floor(lastT / 0.35) * 0.0698;
+      var rr = 0.025 + u * (a.q5 || 0.4) * 0.62;
+      // radius-keyed smooth ripple + a live waveform jag riding the outer half — transverse
+      // offset ⇒ dAng = dPerp/rr (fMoth's crimp mechanism; the near-static spatial phase is
+      // what lets the crests register into concentric fronts).
+      // λ≈0.055 (ref reads ~0.04 but 25 pts/strand alias below ~6 pts/cycle into angular
+      // chevrons — the first pin-render; the outward stream coarsens it toward the ref anyway).
+      // Small per-strand phase: the fronts stay concentric but WOBBLE (the ref's rings are
+      // wavy water circles, never geometric bullseye rings)
+      var rip = Math.sin(rr * 114.0 + strand * 0.9) * 0.011 * u + (a.value1 || 0) * 0.007 * u;
+      var ang2 = baseAng + rip / Math.max(rr, 0.045);
+      a.x = cx + Math.cos(ang2) * rr;
+      a.y = cy + Math.sin(ang2) * rr;
+      var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
+      var lit = 1.35 - 0.4 * u; // pale fresh strands (h_002: whitish tuft), dimming tipward
+      a.r = Math.min(1, orbCol(h, 0) * lit);
+      a.g = Math.min(1, orbCol(h, 0.33) * lit);
+      a.b = Math.min(1, orbCol(h, 0.67) * lit);
+      // root ramp: 14 strands converge at the hub — without it the additive pileup blows
+      // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
+      a.a = u < 0.04 ? 0 : 0.8 * Math.min(1, (u - 0.04) / 0.12);
+    } else {
+      // TWO ROTATING LINES — full-frame (the line rule), dead straight, pale
+      var ls = (s - 0.68) / 0.32;
+      var line = ls < 0.5 ? 0 : 1,
+        u2 = (ls - line * 0.5) * 2,
+        tt = u2 * 2 - 1; // -1..1 through the hub
+      var ang = line ? lastT * 1.4 + 1.1 : lastT * 4.0; // ~80°/s + ~230°/s, one direction
+      var ct = Math.cos(ang),
+        st = Math.sin(ang);
+      var len = Math.max(0.95, (a.q5 || 0.4) * 1.9);
+      var fine = (a.value1 || 0) * 0.004; // whisper of live jag — the ref lines are straight
+      a.x = cx + tt * len * ct - fine * st;
+      a.y = cy + tt * len * st + fine * ct;
+      var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
+      a.r = Math.min(1, orbCol(h2, 0) * 1.45);
+      a.g = Math.min(1, orbCol(h2, 0.33) * 1.45);
+      a.b = Math.min(1, orbCol(h2, 0.67) * 1.45);
+      // alpha rides the BEAT (q32 carrier): the ref's cross flashes crisp on hits and its
+      // faded between-hit deposits stay a whisper — a constant-bright line accumulated a
+      // straight-ray starburst under this scene's long decay (first pin-render), and the
+      // flash cadence is ALSO what reads as the ref's doubled parallel pairs (x_07/x_13)
+      var flash = 0.28 + 0.62 * Math.max(0, Math.min(1, (a.q32 || 1) - 1));
+      // staged entrance + hidden seams (flower→line and line→line connectors)
+      a.a = (u2 < 0.02 || u2 > 0.98 ? 0 : flash) * rippLineAmt;
+    }
+    return a;
+  }
   // SPIROGRAPH PETAL FLOWER family (480p 27.5-30/35.3/49.8/51-56 · 1080p 83.5-86 · A1):
   // k petal LOOPS traced as ONE closed stroke from a hollow centre; construction identity
   // re-rolls PER STAMP (spiro* closure state, step 2). Live-waveform wobble on the stroke.
@@ -1750,6 +1823,7 @@
     fSpinner, // id 21 (doc 14 A20 oblate spinner disc)
     fSwimmer, // id 22 (doc 15 A11 swimmer stalks)
     fScissorFan, // id 23 (user 2026-07-10: the 0:39-0:45 rotating scissor fan)
+    fRippleFlower, // id 24 (user 2026-07-11: the 1080p 1:40-1:42 water-ripple flower + rotors)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -1785,6 +1859,7 @@
     0.45, // spinner (21): dense furry disc — same white-out trap as jelly, keep it low
     0.55, // swimmer (22): ONE rotating line — the stalks are the orb heads' wakes
     0.7, // scissor fan (23): two thin full-frame lines — the trail does the filling
+    0.5, // ripple flower (24): 14 additive strands pile up near the hub — dense-class alpha
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -1799,6 +1874,7 @@
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
+    if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
     if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
     // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
     // cross the frame borders on either side)
@@ -1898,7 +1974,10 @@
     // swimmer scene (mode 22): ALWAYS the simple chord (user round 6 — the ref's between-orb
     // line in this scene is always the plain jagged waveform, never a construction)
     var swimOn = Math.abs((a.q30 || 0) - 22) < 0.5;
-    var tk = railOn || corOn || swimOn ? 0 : tetherKind;
+    // ripple-flower scene (mode 24): plain chord too — a helix/staircase construction's
+    // trail would deposit foreign structure over the registered water rings
+    var ripOn = Math.abs((a.q30 || 0) - 24) < 0.5;
+    var tk = railOn || corOn || swimOn || ripOn ? 0 : tetherKind;
     var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
@@ -2139,6 +2218,9 @@
     swimAmt = 0, // mode-22 swimmer engagement: orb heads = the rising stalk emitters
     swimT0 = -9, // mode-22 entry time (the heads' rise clock)
     crossXAmt = 0, // mode-3 zigzag engagement (q12 ink-shear on the rotating line's trail)
+    rippleAmt = 0, // mode-24 water-ripple flower engagement (q15 outward stream + registered rings)
+    rippleT0 = -9, // mode-24 dwell entry (stages the scene: flower first, rotor lines later)
+    rippLineAmt = 0, // mode-24 rotor-line entrance envelope (read by fRippleFlower)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -2352,9 +2434,10 @@
   // NAIVE, and PAIR damps it further (23 is favoured under NO bg → passes at 35% under
   // bars/corridor/kaleido/wash/bands ≈ 42% of the time) → effectively ~1 per 4-5 min.
   // 4 entries ≈ one per ~110-150s effective = the ref band.
+  // ripple flower (24) ×2 (user 2026-07-11; the 1080p 1:40-1:42 set-piece) ≈ one per ~2 min.
   var MOTIF_BAG = [
     0, 0, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
-    17, 19, 20, 21, 21, 22, 23, 23, 23, 23,
+    17, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2365,7 +2448,7 @@
     4: [15, 14, 17], // bars → mandala/mountains/spiro (stem-standing; tangle + pompom dropped)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
     1: [0, 2, 10, 15, 6, 17], // kaleido → radial motifs that mirror well
-    5: [9, 0], // flat wash → ONE dominant organic ball (tangle/cocoon/pompom dropped)
+    5: [9, 0, 24], // flat wash → ONE dominant organic ball / the ripple flower (its own ground is the wash)
     6: [15, 10], // bands → small centre motif (tangle + pompom dropped)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
@@ -2814,8 +2897,11 @@
     }
 
     focusAmt +=
-      ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 ? 1 : 0) - focusAmt) *
-      Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley/tangle get the warm-core pupil (orb-eye)
+      ((mCur === 0 || mCur === 2 || mCur === 9 || mCur === 12 || mCur === 13 || mCur === 24
+        ? 1
+        : 0) -
+        focusAmt) *
+      Math.min(1, dt * 0.6); // anemone/urchin/jelly/valley/tangle/ripple-flower get the warm-core pupil (orb-eye — mode 24's tan hub blob, 1080p 1:41)
     valleyAmt += ((mCur === 12 ? 1 : 0) - valleyAmt) * Math.min(1, dt * 0.5); // valley → forward dolly
 
     // MOTIF contract (read by the point fns). The central motif DRIFTS gently around the frame (not
@@ -4040,6 +4126,61 @@
       // the stream rate under q30 22 — the moving background colours give the camera-follow
       // read, the ref's soft pink/slate zones
       if (swimAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 6;
+    }
+    // ── WATER-RIPPLE FLOWER scene driver (mode 24) — user 2026-07-11, 1080p 1:40-1:42:
+    //    the flower's strand trails STREAM OUTWARD (q15 magnify) and their radius-keyed
+    //    ripple crests REGISTER into concentric expanding rings = the water surface; the
+    //    two rotor lines sweep through it. Purely RADIAL scene: every other field channel
+    //    zeroed (rule 4 — pan/sink would de-centre the rings, roll/swirl would smear them
+    //    tangentially, the cartesian q12 shear would bend them asymmetrically). Post-FORCE
+    //    so a {q30:24} pin exercises it. ──
+    var ripEff = Math.floor((t.q30 || 0) + 0.5) === 24 ? 1 : 0;
+    if (ripEff && rippleAmt < 0.02) {
+      rippleT0 = time;
+      // SNAP the orb posts parked (C1 spawn-in-place): a roaming orb under this scene's
+      // long decay + outward stream deposits a dotted ghost row across the rings (the
+      // first pin-render); the ref's two ringed orbs sit QUIET near the hub (h_022)
+      t.q21 = 0.555;
+      t.q22 = 0.35;
+      t.q23 = 0.44;
+      t.q24 = 0.64;
+      stgAx = t.q21;
+      stgAy = t.q22;
+      stgBx = t.q23;
+      stgBy = t.q24;
+      stgNext = Math.max(stgNext, time + 8);
+    }
+    rippleAmt += (ripEff - rippleAmt) * Math.min(1, dt * 0.7);
+    // staged entrance (ref: the flower tuft builds first, the crisp rotor cross reads
+    // ~1.3s later): eased 0→1 over 0.8s, read by fRippleFlower's line branch
+    rippLineAmt = ripEff ? Math.max(0, Math.min(1, (time - rippleT0 - 1.3) / 0.8)) : 0;
+    if (rippleAmt > 0.01) {
+      var ra = rippleAmt;
+      // FIXED CENTRED hub — expanding water rings must share one centre (the roam would
+      // drag the ripple origin and smear the registered crests)
+      t.q2 += (0.5 - t.q2) * ra;
+      t.q3 += (0.5 - t.q3) * ra;
+      // orbs PARKED at the ref pair's spots (single-axis rule: they don't move at all) —
+      // full-strength blend, the D15 staging re-writes the posts every frame
+      t.q21 += (0.555 - t.q21) * ra;
+      t.q22 += (0.35 - t.q22) * ra;
+      t.q23 += (0.44 - t.q23) * ra;
+      t.q24 += (0.64 - t.q24) * ra;
+      // 0.6: a PARKED orb under this scene's ~0.99 decay accumulates its halo additively in
+      // place — at 0.85 it blazed to a giant blob (r3 render); the ref pair is small + quiet
+      t.q25 = Math.max(t.q25, 0.6 * ra);
+      t.q14 = Math.max(t.q14, 0.6 * ra);
+      t.q15 = Math.max(t.q15, 0.0065 * ra); // the outward stream that carries the crests
+      t.q1 = Math.max(t.q1, 0.972 + 0.018 * ra); // rings survive to the frame edge (~5s)
+      t.q28 += (0.24 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined
+      t.q18 *= 1 - ra;
+      t.q19 *= 1 - ra;
+      t.q16 *= 1 - ra;
+      t.q17 *= 1 - ra;
+      t.q12 *= 1 - 0.85 * ra;
+      // the scene owns its ground: dim flat wash — the ref surface is entirely the trail
+      // field itself. Guarded so an explicit FORCE q29 pin wins.
+      if (rippleAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
