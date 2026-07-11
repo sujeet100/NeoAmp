@@ -206,7 +206,7 @@
       "  else if (m > 4.5 && m < 5.5) {\n" +
       "    float wf = time * 0.85; float ws = floor(wf); float wu = fract(wf);\n" +
       "    float wmix = mix(hash21(vec2(ws, 3.0)), hash21(vec2(ws + 1.0, 3.0)), smoothstep(0.0, 0.35, wu));\n" +
-      "    ground = mix(pal(hb), pal(hb + 0.33), wmix);\n" +
+      "    ground = mix(pal(hb), pal(hb + 0.12), wmix);\n" + // near-analogous (profiles round 12; +0.33 dragged the wash off-hue)
       "    float gl = dot(ground, vec3(0.333)); ground = mix(vec3(gl), ground, 0.5);\n" +
       "    ground *= 0.15 + 0.03 * n;\n" + // faint fbm tooth so it's not dead-flat
       "  }\n" +
@@ -404,6 +404,15 @@
       //    owns the frame — and fully during the dive's 0.013.
       "  float diveDuck = smoothstep(0.006, 0.0125, q15);\n" +
       "  ground *= 1.0 - 0.9 * diveDuck;\n" +
+      // ── PROFILE ground tier (see ALC_PROFILES): floor(q8) = gvIdx*10 + gsIdx packed by
+      //    frame(); scales the GROUND's saturation + brightness only (trail/glow keep their
+      //    birth colours). Neutral (pre-profile) ≈ gs 5 / gv 42 → scales ≈ 1.0. ──
+      "  float svc = floor(q8 + 0.0001);\n" +
+      "  float gSs = pow(max(mod(svc, 10.0), 0.001) / 5.0, 1.15);\n" +
+      "  float gVv = pow(max(floor(svc / 10.0), 0.5) / 42.0, 1.25);\n" +
+      "  float ggl2 = dot(ground, vec3(0.333));\n" +
+      "  ground = mix(vec3(ggl2), ground, clamp(gSs, 0.0, 1.6));\n" +
+      "  ground *= gVv;\n" +
       "  vec3 col = ground + trail * (1.15 + 0.25 * diveDuck) + glow * 0.55;\n" +
       "  col *= q31;\n" + // exposure (smoothed beat lift)
       // ── tone-map + MEASURED resaturate. Reinhard compresses highlights to colour not white; then a
@@ -2338,7 +2347,7 @@
 
   // ── director state (closure → persists; ONE preset, never reloaded) ──
   var lastT = 0,
-    huePhase = 0,
+    huePhase = 0, // (legacy continuous clock — still ticks, no longer drives q8; see profiles)
     hueStep = 0,
     lastBgMode = -1,
     alcKV = 0, // doc 10 step 2: kaleido lattice variant, picked once per visit (0 diamonds ·1 bowtie ·2 lens ·3 rainbow-bands)
@@ -2768,6 +2777,72 @@
     stgSlideVY = 0,
     stgForce = ""; // debug pin: "hold" | "slide"
 
+  // ── ★ COLOUR PROFILES (2026-07-11, user: "alchemy actually rotates between multiple color
+  //    profiles" — MEASURED from all 3 reference videos via 1fps median-bg timelines + per-
+  //    segment frame checks; full catalogue in memory alchemy-color-profiles). Each profile =
+  //    [ground hue, ground-sat idx 0-9, ground-bright idx 0-99, emitter hue, accent hue].
+//    ★ Hues are in the COSINE-PALETTE space pal()/orbCol share (R=0, B=1/3, G=2/3 —
+//    REVERSED vs HSV; convert measured HSV hues via h_pal = (1 - h_hsv) mod 1).
+  //    Neutral tier (the pre-profile look) ≈ gs 5 / gv 42. The tier is PACKED into floor(q8)
+  //    (svc = gv*10 + gs; hue stays in fract) — safe because every q8 consumer (orbCol JS-side,
+  //    pal() GLSL-side) is a period-1 cosine, so integer parts pass through them unchanged;
+  //    the comp decodes floor(q8) to scale the GROUND only. Switch grammar (measured 25fps):
+  //    EMITTERS snap to the new palette at the roll; the GROUND hue/tier EASES over ~2-4s
+  //    (the trail "inherits" — old colour washes out under the new deposits). ──
+  var ALC_PROFILES = [
+    [0.895, 8, 55, 0.98, 0.87], // amber-gold wallpaper · salmon/red lightning (Abide 0:15)
+    [0.625, 3, 42, 0.87, 0.28], // grey-green felt · yellow+lavender (the classic, 0:21)
+    [0.49, 7, 52, 0.13, 0.67], // bright turquoise · magenta+green (0:30 — BOLD)
+    [0.045, 6, 40, 0.01, 0.42], // dusty maroon · red tangle + blue orbs (0:53)
+    [0.22, 3, 43, 0.65, 0.4], // mauve/lilac · green orbs + blue tether (1:26)
+    [0.67, 3, 36, 0.85, 0.25], // mid-green felt · yellow/green (1:42)
+    [0.05, 7, 52, 0.07, 0.9], // raspberry · pink/white (1:50)
+    [0.875, 7, 52, 0.92, 0.85], // mustard/khaki · brown vortex + yellow core (1:53)
+    [0.69, 7, 40, 0.86, 0.27], // grass green · yellow + lavender (1:59)
+    [0.935, 6, 29, 0.97, 0.52], // dark umber · red/orange + teal lace (2:15-2:33)
+    [0.845, 8, 43, 0.87, 0.96], // olive/chartreuse · yellow strand + orange patches (2:39)
+    [0.23, 5, 48, 0.22, 0.7], // violet · white/lilac waveforms (2:44)
+    [0.41, 4, 46, 0.4, 0.87], // steel blue · pale strands (2:48)
+    [0.3, 6, 46, 0.86, 0.4], // indigo · YELLOW accents (3:09 — complement)
+    [0.6, 7, 29, 0.73, 0.1], // forest green · lime + pink (3:23)
+    [0.79, 7, 40, 0.86, 0.28], // olive-lime felt · yellow+lavender (the 3:49 flower scene)
+    [0.815, 7, 40, 0.53, 0.5], // olive · TEAL fluff/bead-chain (4:00 — bold complement)
+    [0.4, 3, 25, 0.4, 0.86], // slate blue-grey · blue lightning + yellow (4:39)
+    [0.06, 6, 15, 0.15, 0.88], // deep maroon · magenta/violet fans (5:10)
+    [0.15, 4, 9, 0.12, 0.86], // near-black plum · bright magenta/yellow (5:21)
+    // — the 480p Alchemy Random video —
+    [0.915, 4, 38, 0.94, 0.45], // warm tan · salmon + blue (0:13)
+    [0.07, 4, 62, 0.1, 0.65], // bright dusty pink · magenta + green (0:32)
+    [0.32, 3, 70, 0.3, 0.05], // bright periwinkle · lilac + pink (0:48)
+    [0.51, 7, 42, 0.55, 0.9], // emerald/teal · teal + warm white (1:02)
+    [0.765, 8, 35, 0.8, 0.9], // vivid leaf green · lime (1:59)
+    [0.335, 4, 33, 0.35, 0.95], // navy · blue + warm accent (2:38)
+    // — the 1080p video —
+    [0.4, 1, 4, 0.45, 0.1], // near-BLACK · pastel teal/pink emitters (opening scenes)
+    [0.415, 6, 48, 0.45, 0.87], // ocean blue · teal + gold (0:52)
+    [0.435, 7, 51, 0.5, 0.05], // cerulean · teal + pink (1:15, 16s)
+    [0.21, 6, 17, 0.2, 0.7], // dark plum · violet (0:35)
+    [0.955, 6, 19, 0.95, 0.5], // dark rust · red/orange + teal (1:55)
+    [0.085, 6, 19, 0.1, 0.85], // dark magenta-plum · magenta + gold (2:22)
+  ];
+  var profIdx = -1, // current profile (-1 = not initialised; FORCE._profile pins)
+    profGH = 0.375, // target ground hue · eased value below
+    profGHe = 0.375,
+    profSVg = 42, // eased ground-bright idx (0-99; integer-packed per frame)
+    profSVs = 5, // eased ground-sat idx (0-9)
+    profEH = 0.13, // emitter (motif) anchor hue — motifHue walks WITHIN ±0.16 of this
+    profAH = 0.72, // accent-family anchor hue
+    profT0 = -99; // roll time (fallback re-roll on very long scenes)
+  function rollProfile(time, FORCE) {
+    var pv = profIdx;
+    while (profIdx === pv) profIdx = Math.floor(Math.random() * ALC_PROFILES.length);
+    if (FORCE && FORCE._profile !== undefined) profIdx = FORCE._profile;
+    var pr = ALC_PROFILES[profIdx];
+    profGH = pr[0]; // sat/bright targets are read from the table each frame and eased
+    profEH = pr[3];
+    profAH = pr[4];
+    profT0 = time;
+  }
   function frame(t) {
     var time = t.time || 0;
     // __ALC_FORCE debug keys (doc 03 Step 0; PRODUCTION NO-OP — the object is never set live).
@@ -2799,8 +2874,12 @@
     if (bgMode !== lastBgMode) {
       if (lastBgMode >= 0)
         hueStep += (0.08 + 0.14 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      // ★ PROFILE ROLL at the scene boundary (~70%; measured: profiles hold 2-47s and switch
+      // at scene changes; a fallback below re-rolls very long dwells)
+      if (lastBgMode >= 0 && Math.random() < 0.7) rollProfile(time, FORCE);
       lastBgMode = bgMode;
     }
+    if (profIdx < 0 || time - profT0 > 26 + 14 * Math.sin(profIdx * 7.7)) rollProfile(time, FORCE);
     // ── TYPED BEAT-EVENT SCHEDULER (doc 03 B2): at most ONE typed event fires per qualifying
     //    hit — min gap 0.8s, mean 1.5-3s in busy phases, SILENT in rests (p2 §3.5: no events
     //    during rests). The old inline hue snap moved in here (same visual rate, now mutually
@@ -2847,7 +2926,7 @@
         evTetherDropNext = time + 1 + Math.random() * 1.5; // first flicker no sooner than ~1s in
         // B1: the accent ink snaps PER EVENT (bounded q8 offset ±0.36 — never a raw hue, stays muted)
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
-        accentHue = huePhase + hueStep + inkOff; // B7: the event RE-ANCHORS the held accent ink
+        accentHue = profAH + inkOff; // B7 re-anchor — now on the PROFILE accent hue
         accentSnapT = time;
         // A5: per-appearance construction re-roll (chord dominant); rope (4) is persistent ~5s (h1)
         tetherKind = TETHER_BAG[(Math.random() * TETHER_BAG.length) | 0];
@@ -2905,7 +2984,7 @@
         // HUE SNAP (480p 2:56-3:10 + the 19s clip: palette jumps within a beat or two on hits)
         hueStep += (0.05 + 0.07 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
         inkOff = (0.06 + 0.3 * Math.random()) * (Math.random() < 0.5 ? -1 : 1); // accent rides the snap
-        accentHue = huePhase + hueStep + inkOff; // B7: re-anchor (see the tether branch)
+        accentHue = profAH + inkOff; // B7 re-anchor (see the tether branch) — profile accent
         accentSnapT = time;
       }
       evNextT = time + 0.8 + Math.random() * 1.7; // mean gap ~1.65s (was ~1.9 — user: tether too rare)
@@ -2929,7 +3008,7 @@
     //    orbs; r0: 1.5-3s per event — beat-gating spans both depending on the music). Bounded
     //    walk steps keep it inside the muted envelope; rests are naturally silent (no beats). ──
     if (accentSnapT < -1) {
-      accentHue = huePhase + hueStep + inkOff; // first-frame seed
+      accentHue = profAH + inkOff; // first-frame seed — profile accent
       accentSnapT = time;
     }
     if (f > 0.6 && time - accentSnapT > 0.6) {
@@ -2988,7 +3067,24 @@
       railBy = rmy - (r1x * rs + r1y * rc);
     }
     evStarOn = time < evStarT0 + evStarLife; // read by the waves[1] stamp branch
-    t.q8 = huePhase + hueStep + 0.03 * pulse; // small per-beat hue nudge
+    // ── q8 = PACKED profile ground channel: fract = eased ground hue (+ the beat nudge),
+    //    floor = sat/bright tier (svc = gvIdx*10 + gsIdx; decoded in the comp — see the
+    //    ALC_PROFILES note). The ground INHERITS a new profile over ~2-4s while emitters
+    //    snap (the measured switch grammar). huePhase/hueStep still tick but no longer
+    //    drive q8 (kept: cheap, and a future scene may want the legacy clock). ──
+    var prNow = ALC_PROFILES[Math.max(0, profIdx)];
+    var dGH = profGH - profGHe;
+    dGH -= Math.round(dGH); // shortest way around the hue circle
+    profGHe += dGH * Math.min(1, dt * 0.45);
+    profGHe -= Math.floor(profGHe);
+    profSVg += (prNow[2] - profSVg) * Math.min(1, dt * 0.45);
+    profSVs += (prNow[1] - profSVs) * Math.min(1, dt * 0.45);
+    var gh01 = profGHe + 0.03 * pulse + 0.02 * Math.sin(time * 0.07);
+    gh01 -= Math.floor(gh01);
+    t.q8 =
+      Math.round(Math.max(0, Math.min(99, profSVg))) * 10 +
+      Math.round(Math.max(0, Math.min(9, profSVs))) +
+      gh01;
 
     t.q31 = 0.92 * (1 + 0.1 * (bassA - 1) + 0.2 * pulse); // exposure — gentle smoothed beat lift
     t.q32 = 1 + 1.3 * pulse;
@@ -3075,7 +3171,7 @@
     //    Stamp-walk modes (tangle 13 / mountains 14 / spiro 17 / cocoon 18) own their per-stamp
     //    hue cadence — the base HOLDS while they're up so hue never double-steps. ──
     if (motifStepT < -1) {
-      motifHue = t.q8 + 0.1; // first-frame seed near the ground family
+      motifHue = profEH + 0.05; // first-frame seed — the PROFILE emitter hue
       motifHueOld = motifHue;
       motifStepT = time;
     }
@@ -3103,6 +3199,11 @@
     if (!ownWalk && time >= motifStepNext) {
       motifHueOld = motifHue;
       motifHue += (0.06 + 0.1 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+      // tether the walk to the PROFILE emitter hue (the ref's emitters stay in-palette for
+      // the scene; the walk wanders around the anchor, never off into the wheel)
+      var dME = motifHue - profEH;
+      dME -= Math.round(dME);
+      motifHue = profEH + Math.max(-0.16, Math.min(0.16, dME));
       motifStepT = time;
       motifStepNext = time + 0.75 + 1.25 * Math.random() * (1.2 - Math.min(0.7, pulse));
     }
@@ -3398,10 +3499,20 @@
         // MEET at petals — a clean half-petal interleave reads too tidy for the ref)
         bloomOff = Math.random() < 0.4 ? 0.5 : 0.22 + Math.random() * 0.2;
         // colour mode per leg (user: NOT always two-tone — some scenes one colour, some
-        // alternating): ~40% MONO (gap eases to 0, both strands share the hue), else duo
+        // alternating): ~40% MONO (gap eases to 0, both strands share the hue), else the
+        // duo gap comes from the PROFILE's emitter->accent pairing (jittered), so the two
+        // strands are the scene's palette pair, not a random wheel spin
         bloomDuoF = bloomDuo;
-        bloomDuoT = Math.random() < 0.4 ? 0 : 0.28 + Math.random() * 0.22;
-        bloomHue += 0.05 + Math.random() * 0.08;
+        var profGap = profAH - profEH;
+        profGap -= Math.round(profGap);
+        profGap = Math.max(0.2, Math.min(0.5, Math.abs(profGap)));
+        bloomDuoT = Math.random() < 0.4 ? 0 : profGap * (0.85 + Math.random() * 0.3);
+        // bounded in-palette walk (profiles round 12): the old unbounded accumulation
+        // walked the strands right off the scene's palette within a few legs
+        bloomHue = Math.max(
+          -0.13,
+          Math.min(0.13, bloomHue + (0.05 + Math.random() * 0.08) * (Math.random() < 0.5 ? -1 : 1))
+        );
         bloomMorph = 0;
         bloomDur = 0.8 + Math.random() * 1.1;
         bloomNext = time + bloomDur + 0.4 + Math.random() * 1.0;
