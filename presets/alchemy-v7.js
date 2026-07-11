@@ -2469,15 +2469,29 @@
     a.x = ax + tt * dx + nx * (disp + off);
     a.y = ay + tt * dy + ny * (disp + off);
     if (tk === 0 && !railOn && knotOn) {
-      // mid-span scribble KNOT (h2: ~80-120px cluster roaming around mid-span, re-shuffling live).
-      // knotOn gates it to a RARE per-spawn flag (user 2026-07-10: in the original the simple plain
-      // tether dominates; the "motif in the centre" knot variant appears only rarely).
-      var kp = knotPos + 0.05 * Math.sin((a.q9 || 0) * 11.7);
-      var ku = (tt - kp) / 0.05;
+      // TINY FLOWER at the tether mid-span (user 2026-07-11: the ref's "motif in the centre" of
+      // the tether is a small version of the bloom flower we added, NOT the old procedural
+      // scribble). Reuse the REAL fBloom motif (design-language rule 1 + the kit rule: CALL the
+      // factory, never re-derive a mini copy) at a tiny scale, centred on the knot point along the
+      // chord, for the samples inside the knot window; the rest of the chord draws normally. It
+      // rides the live bloom* state (a still small flower when no bloom scene is driving it).
+      var kp = knotPos; // mid-span (0.35-0.65), rolled per spawn
+      var ku = (tt - kp) / 0.08;
       if (ku > -1 && ku < 1) {
-        var kw = 1 - ku * ku;
-        a.x += 0.06 * Math.sin(ku * 25 + tetherSeed) * kw * ((a.value1 || 0) * 0.5 + 0.5);
-        a.y += 0.06 * Math.cos(ku * 19 + tetherSeed) * kw * ((a.value1 || 0) * 0.5 + 0.5);
+        var osK = a.sample,
+          oq5K = a.q5,
+          oq2K = a.q2,
+          oq3K = a.q3;
+        a.sample = (ku + 1) / 2; // remap the knot window → fBloom's full 0..1 two-strand sweep
+        a.q5 = 0.05; // TINY flower (~10% frame)
+        a.q2 = ax + kp * dx; // centre it on the knot point on the chord
+        a.q3 = ay + kp * dy;
+        fBloom(a); // sets a.x/a.y/a.r/a.g/a.b/a.a from the live bloom* state
+        a.sample = osK;
+        a.q5 = oq5K;
+        a.q2 = oq2K;
+        a.q3 = oq3K;
+        return a; // the flower owns these samples — skip the chord colour/alpha below
       }
     }
     var twigDim = 1;
@@ -2912,7 +2926,10 @@
   // polygon strokes). Bloom form 5 now rolls 3-6 sides; the spike-star form covers the
   // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
-    25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
+    // fJelly (9) PULLED (user 2026-07-11: drawn 64-filament oblate disc, off the trail-built
+    // language — same class as the removed fTangle furball); its two slots → vortex (8, kept) /
+    // urchin (2, a clean waveform rosette). fn kept dormant in MODES for pins.
+    25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 2, 25, 25, 12, 12, 14, 19, 14, 25, 25, 8, 25, 25,
     25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28,
     28, 29, 29, 29, 29,
   ];
@@ -2925,7 +2942,7 @@
     4: [25, 14], // bars → the bloom mandala / mountains (anemone+spiro retired round 10)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
     1: [2, 25], // kaleido → radial motifs that mirror well (star polygons retired round 11)
-    5: [9, 24, 25], // flat wash → ONE dominant organic ball / the ripple/bloom flowers (the Abide bloom sits on a flat green wash)
+    5: [24, 25], // flat wash → the ripple/bloom flowers (the Abide bloom sits on a flat green wash; jelly pulled)
     6: [25], // bands → small centre motif (12-star retired round 11)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
@@ -3184,8 +3201,9 @@
           evTetherLife =
             Math.random() < 0.8 ? 0.25 + Math.random() * 0.25 : 1.6 + Math.random() * 0.6;
         else evTetherLife = 1.2 + Math.random();
-        knotPos = 0.35 + 0.3 * Math.random(); // the scribble knot lands somewhere mid-span (h2)
-        knotOn = Math.random() < 0.12; // RARE: only ~12% of chord spawns get the mid-span knot
+        knotPos = 0.35 + 0.3 * Math.random(); // the mid-span flower lands somewhere mid-span (h2)
+        knotOn = Math.random() < 0.12; // RARE: only ~12% of chord spawns get the mid-span flower
+        if (FORCE && FORCE._knot !== undefined) knotOn = !!FORCE._knot; // debug pin (self-render)
         // MOTH scene guard (user's 2026-07-11 "diagonal ladder" flag): under the moth's
         // radial-out field a LONG-lived chord's trail advects into a stacked segmented ladder
         // across the frame. The ref moth scene only shows BRIEF dumbbell stamps (t=88.25,
