@@ -839,30 +839,32 @@
   // jag riding on top. Per-ribbon DUO hues (green / red-pink class), never a per-sample
   // rainbow. The ribbons SCISSOR about the shared node (~±20°, ~1 swing / few seconds) —
   // the pivot sweep's trail copies are the ref's "folding-screen" stamp fan (doc-03 cadence).
+  // ★ REBUILT TRAIL-BUILT (user 2026-07-11 — "the zigzag effect is also a rotated line: it
+  // rotates around the centre and the ink-like background distorts its trail into the
+  // zigzag"; frame-stepped 1080p 2:01-2:07 @10fps, the 5th trail-built correction). LIVE =
+  // ONE straight full-frame line with small bright bead ENDS, rotating CONTINUOUSLY about
+  // the hub at the measured ~130°/s (the crisp line steps ~13°/frame-pair across the 0.1s
+  // frames at 2:01.9-2:02.5). The zigzag ribbons are its AGED COPIES bent by the q12
+  // sawtooth shear (the mode-3 coupling below) — never drawn. The crossing "X" = two age
+  // families of the same trail, half a rotation apart.
   function fCrossX(a) {
-    var NRIB = 2,
-      fk = (a.sample || 0) * NRIB,
-      rib = Math.floor(fk),
-      u = fk - rib;
-    var s = u * 2 - 1;
-    var swing = 0.35 * Math.sin((a.q9 || 0) * 3.2); // scissor open/close (q9 = time*0.06)
-    var ang = (rib ? 1 : -1) * (0.7854 + swing);
+    var u = a.sample || 0,
+      s = u * 2 - 1; // -1..1 through the hub
+    var ang = lastT * 2.27; // ~130°/s, continuous — never stops or reverses
     var ct = Math.cos(ang),
       st = Math.sin(ang);
-    var len = (a.q5 || 0.4) * 1.6;
-    var tri = Math.abs(((u * 7) % 1) * 2 - 1) * 2 - 1; // triangle CLOCK, 7 apexes, -1..1
-    var coarse = tri * (a.q5 || 0.4) * 0.28; // apex heights ride q5 → breathe with bass
-    var fine = (a.value1 || 0) * (a.q6 || 0.05) * 1.4; // fine live jag on top
-    var perp = coarse + fine;
+    var len = Math.max(0.95, (a.q5 || 0.4) * 1.9); // full-frame (the line rule)
+    var fine = (a.value1 || 0) * 0.005; // whisper of live jag — the ref line is straight
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
-    a.x = cx + s * len * ct - perp * st;
-    a.y = cy + s * len * st + perp * ct;
-    var h = (a.q8 || 0) + (rib ? 0.42 : 0.0); // per-ribbon DUO hue, muted
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
-    if (u < 0.02 || u > 0.98) a.a = 0; // hide the ribbon-to-ribbon connector + tips
+    a.x = cx + s * len * ct - fine * st;
+    a.y = cy + s * len * st + fine * ct;
+    var h = (a.q8 || 0) + 0.06 * s; // gentle gradient end-to-end
+    var end = Math.abs(s) > 0.93 ? 1.6 : 1; // the ref's bright bead ends
+    a.r = orbCol(h, 0) * end;
+    a.g = orbCol(h, 0.33) * end;
+    a.b = orbCol(h, 0.67) * end;
+    a.a = u < 0.02 || u > 0.98 ? 0 : 0.75;
     return a;
   }
   // ── N-GON MOTIFS (the user asked: "square, triangle, double triangle, mandala using triangles"). The
@@ -2136,6 +2138,7 @@
     accWormAng = 0,
     swimAmt = 0, // mode-22 swimmer engagement: orb heads = the rising stalk emitters
     swimT0 = -9, // mode-22 entry time (the heads' rise clock)
+    crossXAmt = 0, // mode-3 zigzag engagement (q12 ink-shear on the rotating line's trail)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -3922,6 +3925,21 @@
       mothAmt > 0.5 && mcAge > 4.0 && mcAge < 5.5
         ? Math.min(1, Math.min(mcAge - 4.0, 5.5 - mcAge) / 0.25)
         : 0;
+    // ── CROSS-X ZIGZAG scene driver (mode 3) — ★ TRAIL-BUILT rework (user 2026-07-11): the
+    //    zigzag ribbons are the rotating line's AGED COPIES bent by the compounding q12
+    //    sawtooth x-shear (the ink-field distortion); the live line stays straight. 0.35 ≈
+    //    the ref's coarse ±5%-width apexes (the swimmer's 0.3 "giant zigzags" lesson, used
+    //    ON PURPOSE here). Pan/roll damped so the two fan age-families stay registered as
+    //    the crossing X. Post-FORCE so a q30:3 pin exercises it. ──
+    var xzEff = Math.floor((t.q30 || 0) + 0.5) === 3 ? 1 : 0;
+    crossXAmt += (xzEff - crossXAmt) * Math.min(1, dt * 0.8);
+    if (crossXAmt > 0.01) {
+      t.q12 = Math.max(t.q12, 0.35 * crossXAmt);
+      t.q18 *= 1 - 0.8 * crossXAmt;
+      t.q19 *= 1 - 0.8 * crossXAmt;
+      t.q16 *= 1 - 0.8 * crossXAmt; // roll would smear the registered X tangentially
+      t.q1 = Math.max(t.q1, 0.955 + 0.02 * crossXAmt); // copies live ~2s: zigzag builds, then melts
+    }
     // ── SWIMMER scene driver (mode 22) — ★ TRAIL-BUILT rework (user 2026-07-10; 19s-clip
     //    frame-step 8-16s @8fps): the two PULSING orb heads RISE from the floor while swaying
     //    (~1.8s S-period, ~0.02 UV amplitude) — their solid wakes ARE the wavy stalks (left
