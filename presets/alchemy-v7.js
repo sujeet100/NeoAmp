@@ -2250,6 +2250,19 @@
       a.x = tcx + (a.x - tcx) * keys;
       a.y = tcy + rely * (1 - 0.52 * starTilt);
     }
+    // OPENING-BLOOM tilt (mode 27; user 2026-07-11: "the camera is tilted a little to side" — the
+    // ref flower is a disc tipped toward z, viewed from slightly below, not a flat upright figure).
+    // Same keystone (screen-up FAR edge narrows) + y-squash as the star family, fixed for the whole
+    // dwell (eased in via bloomOpenAmt). wave y is BOTTOM-UP, so rely>0 = the upper petals converge.
+    if (m === 27 && bloomOpenAmt > 0.01) {
+      var btcx = a.q2 !== undefined ? a.q2 : 0.5,
+        btcy = a.q3 !== undefined ? a.q3 : 0.5;
+      var brely = a.y - btcy;
+      var btilt = 0.6 * bloomOpenAmt;
+      var bkeys = 1 - 0.62 * btilt * Math.max(0, Math.min(1, brely * 2.4));
+      a.x = btcx + (a.x - btcx) * bkeys;
+      a.y = btcy + brely * (1 - 0.5 * btilt);
+    }
     mutRGB(a); // D13: the motif is NOT the accent — mild emit-time desaturate
     // PULSAR oblate squash REMOVED (user 2026-07-10 "aggressive — crisp & symmetric": the y-squash
     // turned the symmetric anemone/urchin into ovals — the '2 overlapping ovals' they flagged). The
@@ -4961,45 +4974,52 @@
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
-    // ── MODE-27 OPENING BLOOM (Abide 720p 0:00-0:10): the video OPENS on ONE big flower — ~12
-    //    petals, a big clean centre hole — that blooms from a crisp rotating star into a hairy
-    //    12-petal flower and then HOLDS one consistent shape while it slowly precesses, 2 orbs
-    //    parked to the sides, a soft pink/blue watercolour wash growing beneath, hue slowly
-    //    cycling. It is the real fBloom motif LOCKED to one pose (variety ACROSS dwells, not
-    //    within — rule 1 + user 2026-07-11 "lock a single flower, big, big hole, ~12 petals").
-    //    Centred + STATIC camera (C1: the original camera is static; the wash is the growing
-    //    TRAIL, never a pan). No march/roll/swirl — the opposite of mode 26. ──
+    // ── MODE-27 OPENING BLOOM (Abide 720p 0:00-0:10): the video OPENS on ONE spiky flower with
+    //    LONG petals + a SMALL hole (user round 2: "longer petals, a little smaller hole") that
+    //    PULSES VIOLENTLY with the music (user: "the flower pulses with music violently"), TILTED
+    //    toward z like a disc viewed from below (user: "the camera is tilted a little to side"),
+    //    the whole scene drifting UP (user: "the orbs + motif is moving up" — camera-follow: motif
+    //    parked, trail streams down), 2 translucent side orbs, a pink/blue watercolour wash, on a
+    //    PURE-BLACK ground. It is the real fBloom motif LOCKED to one pose (variety ACROSS dwells,
+    //    not within — rule 1). The tilt is applied in centralDraw (mode-27 branch). ──
     var bloomOpenEff = Math.floor((t.q30 || 0) + 0.5) === 27 ? 1 : 0;
     if (bloomOpenEff && bloomOpenAmt < 0.02) bloomOpenT0 = time;
     bloomOpenAmt += (bloomOpenEff - bloomOpenAmt) * Math.min(1, dt * 0.7);
     if (bloomOpenAmt > 0.01) {
       var bo = bloomOpenAmt;
-      // centred, static camera (the wash grows in place — zero pan/roll/swirl; rule 4)
+      // centred hub; camera FOLLOWS the rising motif (rule 2 = subject parked, world streams): the
+      // motif holds screen-centre while the TRAIL streams gently downward, so the wash sinks/pools
+      // below and the pulsing petals shoot up — the "orbs + motif moving up" feel (user 2026-07-11).
+      // No horizontal pan / roll / swirl (rule 4 — this is a purely vertical directional scene).
       t.q2 += (0.5 - t.q2) * bo;
       t.q3 += (0.5 - t.q3) * bo;
       t.q18 *= 1 - bo;
-      t.q19 *= 1 - bo;
       t.q16 *= 1 - bo;
       t.q17 *= 1 - bo;
-      // ★ LOCK the flower to ONE big 12-petal big-hole pose (variety across dwells, not within —
-      // the driver still churns its morph state so the petals DANCE with live jag/lightning, but
-      // every shape param is pinned here each frame so the archetype never changes mid-dwell).
-      bloomK += (12 - bloomK) * bo; // ~12 petals
-      bloomRing += (0.5 - bloomRing) * bo; // BIG clean centre hole (the ~1-in-4 large-hole mandala)
-      bloomSharp += (1.7 - bloomSharp) * bo; // spiky-ish hairy petals
-      bloomA += (0.72 - bloomA) * bo; // petals reach ~R
+      t.q19 += (0.0045 - t.q19) * bo; // gentle downward trail-stream = the camera-follow rise
+      // ★ LOCK the flower to ONE pose — the LONG-PETAL / SMALL-HOLE variant (user 2026-07-11:
+      // "longer petals, a little smaller hole") — but PULSING VIOLENTLY with the music (user: "the
+      // flower pulses with music violently"). The driver still churns its morph state so the petals
+      // keep their live lightning jag; every shape param is pinned here each frame so the archetype
+      // holds, EXCEPT the petal length + figure size, which now RIDE the beat hard.
+      bloomK += (10 - bloomK) * bo; // ~10 long petals (fewer, longer — the ref's spiky star flower)
+      bloomRing += (0.26 - bloomRing) * bo; // SMALLER hole (long-petal / small-hole class)
+      bloomSharp += (2.0 - bloomSharp) * bo; // spiky, narrow petals
+      // ★ VIOLENT petal-length pulse: bloomA (how far the petals reach past the ring) shoots out on
+      // every beat — 0.68 at rest → ~1.25 on a hit (petals lance well past R, like the ref's spikes).
+      bloomA += (0.68 + 0.6 * pulse - bloomA) * bo;
       bloomPoly *= 1 - bo; // no triangle/square morph
       bloomLoop *= 1 - bo; // no inner loop-chain morph
       bloomTip += (0.22 - bloomTip) * bo; // OPEN hairy tips (2 lines loosely meet, never joined — rule 1)
-      // ★ HOLD the flower STEADY: the driver still churns its morph legs (so the petals keep their
-      // live lightning jag), but its periodic COLLAPSE-BUMP jag spike (bloomJagX up to 2.2) would
-      // make a LOCKED flower scribble/kink every ~2s. Pin it to baseline — gentle live jag, no
-      // violent re-strike (this scene HOLDS one shape; the mode-25 mandala is the one that morphs).
+      // keep the collapse-bump jag spike pinned OFF (its ~2s scribble is the mode-25 morph grammar,
+      // not this scene's pulse — the pulse lives in bloomA + q5, the live lightning stays in the jag).
       bloomJagX += (1 - bloomJagX) * bo;
       // slow continuous precession is KEPT (the ref star rotates as it blooms) — bloomRotV is left
       // as the driver rolled it (~2-6°/s, random sense), unlike mode 26 which freezes the spin.
-      // STEADY size, big; only a whisper of beat (a size wobble stacks nested ghost rings — rule 5).
-      t.q5 = scaleFor(27) * 0.97 * (1 + 0.05 * pulse);
+      // ★ VIOLENT figure-size pulse too (user: pulses violently): a big beat swing on q5 on top of
+      // the petal-length pulse. The nested-ghost "woolly band" the steady mandala avoids is WANTED
+      // here — the throbbing petals' trails ARE the ref's pulsing bloom.
+      t.q5 = scaleFor(27) * (0.82 + 0.34 * pulse);
       // CRISP HAIRY petals over a soft ghost (the ref's "solid-strokes-over-soft-trail"): the ref's
       // filaments are CRISP open strands (design-language rule 1), NOT soft solid lobes — high blur
       // fuses the two petal strands into a filled lobe. Low blur (like mode 25's crisp mandala) keeps
@@ -5015,8 +5035,11 @@
       t.q22 += (0.64 - t.q22) * bo;
       t.q23 += (0.3 - t.q23) * bo; // orb B lower-left
       t.q24 += (0.36 - t.q24) * bo;
-      t.q25 = Math.max(t.q25, 0.25 * bo);
-      t.q14 = Math.max(t.q14, 0.25 * bo);
+      // orb vis DIRECT-assigned just under 0.3: on the q29=3 black ground below, the waves[3]
+      // corridor thread + head-rings both gate on orb vis >0.3 — keeping it 0.28 gives the ref's
+      // translucent green side-discs with NO corridor artefact (the beam trap, mode27 memory).
+      t.q25 = 0.28 * bo;
+      t.q14 = 0.28 * bo;
       // the two side orbs are INDEPENDENT (the ref never strings them) — the tether is killed at its
       // source in fTether (mode-27 branch); here just kill all the free accessory lines so nothing
       // but the flower + orbs + wash is on screen (rule 6: the scene owns its set-piece).
@@ -5027,11 +5050,12 @@
       // update makes both the rail wave AND the posts block (gated railAmt>0.01) drop out.
       railAmt *= 1 - bo;
       corridorAmt *= 1 - bo; // never let the corridor chase engage under this centred scene
-      // the scene owns its ground: DARK wavy-fluid (m0). ★ Do NOT use the corridor void (q29=3) for
-      // "black" — that regime ALSO gates the waves[3] corridor thread + tether corOn (`q29≈3 &&
-      // q14>0.3`), which strung a bright diagonal beam between the two side orbs. m0 is the dark
-      // ground with no such side effect. Guarded so a FORCE q29 pin wins.
-      if (bloomOpenAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0;
+      // the scene owns its ground: pure-black VOID (q29=3) — the ref background here is dead black,
+      // the only colour is the flower + its wash. ★ This regime ALSO gates the waves[3] corridor
+      // thread + head-rings + tether corOn, but ALL of them need orb vis >0.3 (kept 0.28 above) and
+      // the tether is killed at source — so we get the black with none of the corridor artefacts.
+      // Guarded so a FORCE q29 pin wins.
+      if (bloomOpenAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 3;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
