@@ -1760,7 +1760,9 @@
     // a fixed-λ sine carries the MOTION while the real waveform keeps the jaggedness).
     // Tangential, strongest toward the tips, swelling with the beat carrier.
     var wob =
-      Math.sin(p * 2.6 + u * 1.7 + (a.q9 || 0) * 55.0 + strand * 2.1) *
+      // q9×140 ≈ 8.4 rad/s phase sweep (user round 5: "the petal movement needs to be
+      // faster" — 55 ≈ 3.3 rad/s read too slow live; a full S-cycle now passes in ~0.75s)
+      Math.sin(p * 2.6 + u * 1.7 + (a.q9 || 0) * 140.0 + strand * 2.1) *
       R *
       0.045 *
       (0.35 + 0.65 * s01) *
