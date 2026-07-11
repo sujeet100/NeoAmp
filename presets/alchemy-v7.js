@@ -4225,15 +4225,16 @@
       t.q22 += (0.35 - t.q22) * ra;
       t.q23 += (0.44 - t.q23) * ra;
       t.q24 += (0.64 - t.q24) * ra;
-      // 0.6: a PARKED orb under this scene's ~0.99 decay accumulates its halo additively in
-      // place — at 0.85 it blazed to a giant blob (r3 render); the ref pair is small + quiet
-      t.q25 = Math.max(t.q25, 0.6 * ra);
-      t.q14 = Math.max(t.q14, 0.6 * ra);
+      // 0.42: a PARKED orb under this scene's long decay accumulates its halo in place (0.85
+      // blazed, r3), and the q15 outward stream drags the hue-cycling halo into a RAINBOW
+      // COMET TAIL (user round 9 screenshot) — the ref pair is small, quiet, tail-less
+      t.q25 = Math.max(t.q25, 0.42 * ra);
+      t.q14 = Math.max(t.q14, 0.42 * ra);
       t.q15 = Math.max(t.q15, 0.0065 * ra); // the outward stream that carries the crests
       // ~0.985: 0.99 (100-frame life) washed milky, 0.982 went dusky-dark — ~65 frames
       // keeps the field bright-saturated and still carries a crest most of the radius
       t.q1 = Math.max(t.q1, 0.971 + 0.014 * ra);
-      t.q28 += (0.18 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined; 0.24 milked the gaps between spokes (wash-out round)
+      t.q28 += (0.14 - t.q28) * 0.7 * ra; // low blur: the ref's ripple lines stay defined; 0.24/0.18 milked the gaps between spokes into grey fog (rounds 6/9)
       t.q18 *= 1 - ra;
       t.q19 *= 1 - ra;
       t.q16 *= 1 - ra;
