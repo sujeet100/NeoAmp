@@ -2409,7 +2409,10 @@
     spinStyle = 0, // doc 14 A20 spinner: fringe style 0 lash · 1 scribble · 2 spikes
     spinNext = -1, // fringe restyle clock (~1-2s, h0 M9)
     cometNext = 15, // doc 15 A6: next comet-eligibility check (rare, calm-gated)
-    cometT0 = -99, // traverse birth (~3.3s corner-to-corner)
+    cometT0 = -99, // traverse birth (kept for pin/telemetry)
+    cometProg = 2, // ★ INTENSITY-DRIVEN traverse progress 0..1 (>1 = inactive). Advances per-frame
+    // by an energy-scaled rate, NOT a fixed wall clock, so the head/orbs crawl when the music is
+    // quiet and surge on hits (user: the fixed 3.3s march read too fast + disconnected from the beat).
     cometFromX = 0.12, // traverse endpoints (opposite corners, lower→upper)
     cometFromY = 0.85,
     cometToX = 0.88,
@@ -2705,8 +2708,8 @@
   // polygon strokes). Bloom form 5 now rolls 3-6 sides; the spike-star form covers the
   // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
-    25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25,
-    25, 25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
+    25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
+    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2781,8 +2784,8 @@
   //    profiles" — MEASURED from all 3 reference videos via 1fps median-bg timelines + per-
   //    segment frame checks; full catalogue in memory alchemy-color-profiles). Each profile =
   //    [ground hue, ground-sat idx 0-9, ground-bright idx 0-99, emitter hue, accent hue].
-//    ★ Hues are in the COSINE-PALETTE space pal()/orbCol share (R=0, B=1/3, G=2/3 —
-//    REVERSED vs HSV; convert measured HSV hues via h_pal = (1 - h_hsv) mod 1).
+  //    ★ Hues are in the COSINE-PALETTE space pal()/orbCol share (R=0, B=1/3, G=2/3 —
+  //    REVERSED vs HSV; convert measured HSV hues via h_pal = (1 - h_hsv) mod 1).
   //    Neutral tier (the pre-profile look) ≈ gs 5 / gv 42. The tier is PACKED into floor(q8)
   //    (svc = gv*10 + gs; hue stays in fract) — safe because every q8 consumer (orbCol JS-side,
   //    pal() GLSL-side) is a period-1 cosine, so integer parts pass through them unchanged;
@@ -3285,6 +3288,7 @@
         (mCur === 7 || mCur === 13) && energy < 1.2 && corridorAmt < 0.1 && restAmt < 0.2;
       if (canComet && Math.random() < 0.5) {
         cometT0 = time;
+        cometProg = 0; // launch: traverse advances by the energy-scaled rate below
         cometFromX = Math.random() < 0.5 ? 0.12 : 0.88; // LL→UR or LR→UL
         cometFromY = 0.85;
         cometToX = 1 - cometFromX;
@@ -3292,8 +3296,13 @@
         cometNext = time + 26 + Math.random() * 20;
       } else cometNext = time + 8 + Math.random() * 8;
     }
-    if (FORCE && FORCE.cometForce && time - cometT0 > 3.3) cometT0 = time - 1.1; // pin: mid-traverse
-    var cp = (time - cometT0) / 3.3;
+    // ── INTENSITY-DRIVEN traverse rate (replaces the fixed 3.3s clock). Base ~0.11/s = a ~9s crawl
+    //    when the music is quiet; each unit of energy-excess adds ~0.5/s so a hit surges it to ~3s.
+    //    The head/orbs now move WITH the beat instead of a constant march. ──
+    if (cometProg <= 1)
+      cometProg = Math.min(1.0001, cometProg + dt * (0.11 + 0.5 * Math.max(0, energy - 1)));
+    if (FORCE && FORCE.cometForce && cometProg > 1) cometProg = 0.33; // pin: hold mid-traverse
+    var cp = cometProg;
     var cometAmt = cp >= 0 && cp <= 1 ? Math.sin(cp * 3.14159) : 0;
     // roam REVERTED to CENTRED (user recording round 4: "everything looks off center" — the
     // ±0.25 slow Lissajous has a ~140s period, so it parked the whole composition off-centre
@@ -3438,8 +3447,8 @@
         var kBand =
           Math.random() < 0.15
             ? 16 + Math.floor(Math.random() * 6) // MANY-petal variant (user: also combines
-            // with the small-hole dwell — the ring is rolled independently per dwell)
-            : 8 + Math.floor((Math.random() + Math.random()) * 0.5 * 8);
+            : // with the small-hole dwell — the ring is rolled independently per dwell)
+              8 + Math.floor((Math.random() + Math.random()) * 0.5 * 8);
         // ★ tips ALWAYS open but the gap is SMALL (user round 3: "the ends should meet in
         // such a way that they create a point, the gap should be very less") — the two
         // free ends converge to a near-point; the X-cross pose supplies the meeting look
