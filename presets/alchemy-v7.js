@@ -1731,6 +1731,21 @@
       c >= 0
         ? R * (bloomRing + (1 - bloomRing) * ampl * s01)
         : R * bloomRing * (1 - 0.22 * Math.min(1, ampl) * s01);
+    // TRIANGLE/POLYGON branch (round 10: the triangle flower joins the SAME family/line
+    // language — user). Flat sides via the polygon law r = Rp/cos(θ_side); the interior IS
+    // the hole; vertices reach ~2.3·Rp (k=3). s01 becomes the side coordinate so the
+    // clamped envelope pins the VERTICES and the tip cut opens the corners.
+    if (bloomPoly > 0.01) {
+      var sect = 6.2832 / Math.max(3, Math.round(k));
+      var thl = ((p % 6.2832) + 6.2832) % 6.2832;
+      thl = (thl / 6.2832 - 0.5) * sect;
+      var Rp = R * Math.min(bloomRing * 1.15, 0.45);
+      var rPoly = Rp / Math.max(0.35, Math.cos(thl));
+      var sP = Math.abs(thl) / (sect * 0.5);
+      r = r * (1 - bloomPoly) + rPoly * bloomPoly;
+      s01 = s01 * (1 - bloomPoly) + sP * bloomPoly;
+      c = c * (1 - bloomPoly) + (2 * sP - 1) * bloomPoly; // tip cut rides the corner
+    }
     var lox = r * Math.cos(u),
       loy = r * Math.sin(u);
     // hypotrochoid pen: -(k-1) keeps k-fold symmetry with the loops chained INSIDE, at the
@@ -1771,9 +1786,9 @@
     hsA -= Math.floor(hsA);
     var hsB = Math.sin((ai + 1) * 7.13 + strand * 37.1) * 43758.5453;
     hsB -= Math.floor(hsB);
-    // 14Hz + bloomKick (a beat forces a WHOLE-figure re-strike) — round 8 'violent & jerky'
-    var tqA = Math.floor(lastT * 14 + hsA) + bloomKick,
-      tqB = Math.floor(lastT * 14 + hsB) + bloomKick;
+    // intensity-driven clock + bloomKick (a beat forces a WHOLE-figure re-strike)
+    var tqA = Math.floor(bloomStrike + hsA) + bloomKick,
+      tqB = Math.floor(bloomStrike + hsB) + bloomKick;
     var h1 = Math.sin(ai * 12.9898 + strand * 51.7 + tqA * 78.233) * 43758.5453;
     h1 -= Math.floor(h1);
     var h2 = Math.sin((ai + 1) * 12.9898 + strand * 51.7 + tqB * 78.233) * 43758.5453;
@@ -2577,8 +2592,15 @@
     // 7: "most of the times the radius of the center hole does not change when a motif
     // appears"); ~30% of dwells are the small-hole/LARGE-petal variant
     bloomJagX = 1, // jag multiplier — spiked mid-transition (the collapse kink)
+    bloomPoly = 0, // polygon blend (0 flower law · 1 flat-sided triangle/square) — eased
+    bloomPolyF = 0,
+    bloomPolyT = 0,
     bloomKick = 0, // beat-strike seed: increments on every beat flash -> whole-figure re-strike
     bloomJerkT = 0, // stepped-jerk clock (the petal phase RANDOM-WALKS, never glides)
+    bloomStrike = 0, // ★ INTENSITY-DRIVEN strike clock (user round 10b): accumulates at
+    // ~5Hz in calm passages and ~18Hz under hits — the lagging/thrash rate rides the
+    // music instead of a fixed 14Hz (ref: the 3:50 mandala barely quivers on the quiet
+    // bed; the 0:43 hairball thrashes on the loud section)
     bloomForm = 0, // archetype: 0 star · 1 scallop · 2 lattice · 3 loop-chain · 4 ring+star
     bloomNext = -1, // next leg roll time (-1 = not in dwell)
     bloomDur = 1.2, // current leg duration
@@ -2662,12 +2684,15 @@
   // bars/corridor/kaleido/wash/bands ≈ 42% of the time) → effectively ~1 per 4-5 min.
   // 4 entries ≈ one per ~110-150s effective = the ref band.
   // ripple flower (24) ×2 (user 2026-07-11; the 1080p 1:40-1:42 set-piece) ≈ one per ~2 min.
-  // spiro-bloom (25) ×3 + one anemone slot converted (user 2026-07-11: the anemone's thick
-  // watercolour render was the "sad" flower — the Abide 3:50-4:00 thin-line mandala is the
-  // faithful flower motif and takes the flower-primary weight).
+  // ★ OLD FLOWER MOTIFS RETIRED from the rotation (user 2026-07-11 round 10: "take a look
+  // at earlier flower motifs we created and remove them since we now have a better version"):
+  // anemone (0), spiro dahlia (17) and tri-mandala (15) slots all -> spiro-bloom (25), whose
+  // form rotation covers them (petal flowers, wheel, TRIANGLE family, spider). The fns stay
+  // in MODES for pins + the REST_CYCLE sketchbook; the star-polygon outlines (4/5/6/10)
+  // remain for now (a different construction class — migrate later if asked).
   var MOTIF_BAG = [
-    0, 25, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 15, 12, 12, 6, 10, 14, 15, 15, 9, 0, 17, 17, 15,
-    17, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
+    25, 25, 1, 1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 9, 10, 25, 12, 12, 6, 10, 14, 25, 25, 9, 25, 25, 25,
+    25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -2675,11 +2700,11 @@
   //    Disfavoured combos still pass at ~35% (weight, never forbid). ──
   var FEAT_PAIRING = true;
   var PAIR = {
-    4: [15, 14, 17], // bars → mandala/mountains/spiro (stem-standing; tangle + pompom dropped)
+    4: [25, 14], // bars → the bloom mandala / mountains (anemone+spiro retired round 10)
     3: [14, 7], // corridor/near-black → mountains / the wireframe net (the opening signature)
-    1: [0, 2, 10, 15, 6, 17, 25], // kaleido → radial motifs that mirror well
-    5: [9, 0, 24, 25], // flat wash → ONE dominant organic ball / the ripple/bloom flowers (the Abide bloom sits on a flat green wash)
-    6: [15, 10], // bands → small centre motif (tangle + pompom dropped)
+    1: [2, 10, 6, 25], // kaleido → radial motifs that mirror well (retired flowers removed)
+    5: [9, 24, 25], // flat wash → ONE dominant organic ball / the ripple/bloom flowers (the Abide bloom sits on a flat green wash)
+    6: [25, 10], // bands → small centre motif (tri-mandala -> bloom, round 10)
   };
   var curBgMode = 0; // frame() refreshes this before the motif clock runs (accept cb reads it)
   function acceptMotif(idx) {
@@ -3285,9 +3310,10 @@
       // flower pose extends out (25fps study of 3:56.5-3:59.7).
       if (bloomMorph >= 1 && time >= bloomNext && (f > 0.5 || time >= bloomNext + 2.6)) {
         var pvB = bloomForm;
-        while (bloomForm === pvB) bloomForm = Math.floor(Math.random() * 5);
+        while (bloomForm === pvB) bloomForm = Math.floor(Math.random() * 6);
         if (FORCE && FORCE._bloomForm !== undefined) bloomForm = FORCE._bloomForm;
         bloomAF = bloomA;
+        bloomPolyF = bloomPoly;
         bloomShF = bloomSharp;
         bloomLpF = bloomLoop;
         bloomAsF = bloomAsym;
@@ -3297,7 +3323,11 @@
         bloomAsT = 1;
         // WIDE petal-count variation (user round 3: "there are many variations") — 8-15
         // for the mandala band, weighted toward 10-13 by the double roll
-        var kBand = 8 + Math.floor((Math.random() + Math.random()) * 0.5 * 8);
+        var kBand =
+          Math.random() < 0.15
+            ? 16 + Math.floor(Math.random() * 6) // MANY-petal variant (user: also combines
+            // with the small-hole dwell — the ring is rolled independently per dwell)
+            : 8 + Math.floor((Math.random() + Math.random()) * 0.5 * 8);
         // ★ tips ALWAYS open but the gap is SMALL (user round 3: "the ends should meet in
         // such a way that they create a point, the gap should be very less") — the two
         // free ends converge to a near-point; the X-cross pose supplies the meeting look
@@ -3326,15 +3356,32 @@
           bloomLpT = 0;
           bloomAsT = 0.1 + Math.random() * 0.15;
           bloomTipT = 0.08 + Math.random() * 0.16; // star strand open; the ring strand is amp-gated
-        } else {
+        } else if (bloomForm === 4) {
           // SPARSE SPIDER (user: "the motif around 4:00... with lesser petals") — the SAME
           // engine at k 3-6 with a TINY ring: the arms converge at a knot near the hub
           bloomAT = 0.9 + Math.random() * 0.1;
           bloomShT = 2.2 + Math.random() * 1.0;
           bloomLpT = 0;
           bloomTipT = 0.15 + Math.random() * 0.25;
+        } else {
+          // TRIANGLE flower (round 10) — the tri-mandala in the bloom line language:
+          // flat-sided polygon (k=3, occasionally 4), open corners, hexagram when the
+          // strand offset is a half-side; the crisp trail + precession stacks the ref's
+          // rotated-triangles mandala
+          bloomAT = 0.5;
+          bloomShT = 1.5;
+          bloomLpT = 0;
+          bloomTipT = 0.1 + Math.random() * 0.2;
         }
-        bloomKT = bloomForm === 4 ? 3 + Math.floor(Math.random() * 4) : kBand;
+        bloomKT =
+          bloomForm === 4
+            ? 3 + Math.floor(Math.random() * 4)
+            : bloomForm === 5
+              ? Math.random() < 0.85
+                ? 3
+                : 4
+              : kBand;
+        bloomPolyT = bloomForm === 5 ? 1 : 0;
         // hole HELD per dwell (user round 7); only the spider dips to its centre knot
         bloomRingT = bloomForm === 4 ? Math.min(bloomRingDwell, 0.14) : bloomRingDwell;
         // strand offset per leg: the X-crossing pose dominates (user: the 2 lines LOOSELY
@@ -3363,6 +3410,7 @@
       bloomK = bloomKF + (bloomKT - bloomKF) * bE;
       bloomTip = bloomTipF + (bloomTipT - bloomTipF) * bE;
       bloomRing = bloomRingF + (bloomRingT - bloomRingF) * bE;
+      bloomPoly = bloomPolyF + (bloomPolyT - bloomPolyF) * bE;
       bloomDuo = bloomDuoF + (bloomDuoT - bloomDuoF) * bE;
       bloomJagX = 1 + 1.2 * bumpB;
       bloomRot += dt * bloomRotV;
@@ -3370,6 +3418,7 @@
       // petal phase random-walks in ~0.12s steps (a smooth drift read fluid; the ref
       // twitches). Precession stays continuous underneath (rule 5).
       if (f > 0.5) bloomKick++;
+      bloomStrike += dt * (5 + 13 * Math.max(0, Math.min(1, (t.q32 || 1) - 0.85)));
       if (bloomJerkT < time - 1) bloomJerkT = time;
       var bloomJerkG = 0;
       while (time - bloomJerkT > 0.12 && bloomJerkG++ < 10) {
