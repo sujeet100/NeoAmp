@@ -1888,15 +1888,35 @@
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     if (s < 0.55) {
-      // FLOWER — the real fBloom, medium/fur-ball, remapped into 0..1
-      var os = a.sample,
-        oq = a.q5;
-      a.sample = os / 0.55;
-      a.q5 = oq; // scaleFor(26) already sizes the flower as the focal point
-      fBloom(a);
-      a.sample = os;
-      a.q5 = oq;
-      a.a = Math.min(1, a.a * 1.25); // a touch denser so the flower reads over the bright lines
+      // FUR-BALL FLOWER (user chose 2026-07-11: match the ref's DENSE dandelion tuft, not fBloom's
+      // hollow petal ring). A radial fan of many LIVE waveform strands from the hub — solid pale
+      // core dimming outward, each strand carrying live-waveform wiggle that GROWS toward the tip
+      // (the fuzzy filament look). Same construction as the water tuft, tuned denser + rounder.
+      var K = 26; // dense filaments
+      var fk = (s / 0.55) * K,
+        strand = Math.floor(fk),
+        u = fk - strand;
+      if (strand > K - 1) {
+        strand = K - 1;
+        u = 1;
+      }
+      // QUANTIZED rotation (the water tuft's proven density trick): copies land at DISTINCT angles
+      // every 0.3s, so the feedback trail STACKS many angular filaments into a dense fuzzy ball —
+      // continuous spin under this decay smeared them into a hollow ring instead.
+      var ang = strand * (6.2832 / K) + Math.floor(lastT / 0.3) * 0.09;
+      var lv = 0.68 + 0.5 * ((strand * 0.618034) % 1); // per-strand golden-ratio length spread
+      var R = (a.q5 || 0.4) * 1.0;
+      var rr = 0.02 + u * R * lv; // root at the hub → filaments radiate out
+      var jag = (a.value1 || 0) * 0.02 * u; // live-waveform wiggle, strongest at the tips
+      var a2 = ang + jag / Math.max(rr, 0.05);
+      a.x = cx + Math.cos(a2) * rr;
+      a.y = cy + Math.sin(a2) * rr;
+      var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
+      var lit = 1.32 - 0.42 * u; // pale/whitish core, dimming toward the tips
+      a.r = Math.min(1, orbCol(h, 0) * lit);
+      a.g = Math.min(1, orbCol(h, 0.33) * lit);
+      a.b = Math.min(1, orbCol(h, 0.67) * lit);
+      a.a = u < 0.04 ? 0 : 0.78 * Math.min(1, (u - 0.04) / 0.12); // hide the hub connector; dark hub
     } else {
       // TWO ROTATING LINES pivoting just BELOW the flower hub, sweeping continuously (one direction,
       // two rates → the ref's doubled fan). Full-frame (line rule); pale; alpha rides the beat.
@@ -3496,7 +3516,7 @@
     //    Also runs for mode 24 (the water scene): its central flower IS the real fBloom motif
     //    (drawn small by fRippleFlower), so it must morph with the same live state (user
     //    2026-07-11: "use the waveform flower we created, a small variant — not that dahlia").
-    if (mEff === 25 || mEff === 24 || mEff === 26) {
+    if (mEff === 25 || mEff === 24) {
       if (bloomNext < 0) {
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
@@ -4884,23 +4904,28 @@
       t.q16 *= 1 - ma; // zero roll/swirl/growth — directional scene (rule 4)
       t.q17 *= 1 - ma;
       t.q15 *= 1 - 0.6 * ma;
-      // CRISP engine (like mode 25): fBloom is a thin-line motif — the soft watercolour blur
-      // dissolved its petals into a faint ghost ring. Long decay + near-zero blur keeps the flower
-      // petals AND the rotating-line fan legible; the wide fan IS the lines' rotation trail.
-      t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
+      // Medium decay (0.966): enough for the fur-ball's angular filament copies to build density
+      // and the rotating lines to fan out, but short enough that the marching orbs don't bloom into
+      // big blobs (0.972 did). Low blur keeps the filaments + fan legible.
+      t.q1 = Math.min(Math.max(t.q1, 0.966), 0.97);
       t.q28 = Math.min(t.q28, 0.05);
-      // TAME the free accessories: the roaming orb halos + accessory lines cluttered the clean
-      // flower+fan composition (first render was a bokeh smear). Dim them hard for this scene.
+      // dim the free accessory LINES (they cluttered the clean flower+fan), but keep the ORBS —
+      // they become the ref's marching bead-chain (below).
       accVis *= 1 - 0.85 * ma;
-      t.q25 *= 1 - 0.8 * ma; // orb A
-      t.q14 *= 1 - 0.88 * ma; // orb B
-      // ★ FUR-BALL flower (side-by-side vs ref 0:36: the ref centre is a DENSE fuzzy tuft, not
-      // fBloom's thin petal RING which read as a hollow scribble). Force MANY filaments (high k)
-      // + open hairy tips so the same fBloom motif renders as the ref's fur-ball. Overrides the
-      // morph driver's k each frame (this coupling runs after it).
-      bloomK += (30 - bloomK) * ma;
-      bloomTip = Math.max(bloomTip, 0.6 * ma);
-      bloomA = Math.max(bloomA, 0.5 * ma);
+      // ★ MARCHING ORBS / bead-chain (user 2026-07-11): two orbs travel RIGHT along the flower's
+      // row, a bit ahead of it, wrapping — their feedback wakes string out into the ref's rightward
+      // bead-chain. Positions marched in lockstep with the flower's own rightward drift.
+      var orbRow = 0.52;
+      var oaX = marchX + 0.14,
+        obX = marchX + 0.32; // two beads leading the flower to the right
+      if (oaX > 1.15) oaX -= 1.33;
+      if (obX > 1.15) obX -= 1.33;
+      t.q21 += (oaX - t.q21) * ma;
+      t.q22 += (orbRow - t.q22) * ma;
+      t.q23 += (obX - t.q23) * ma;
+      t.q24 += (orbRow + 0.02 - t.q24) * ma;
+      t.q25 = Math.max(t.q25, 0.32 * ma); // orb A visible (small, quiet — not a big blob)
+      t.q14 = Math.max(t.q14, 0.32 * ma); // orb B visible
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
