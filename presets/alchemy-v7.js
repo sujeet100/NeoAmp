@@ -3401,9 +3401,13 @@
         bloomRotV = (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? -1 : 1);
         bloomDuoF = bloomDuoT = bloomDuo = 0.3 + Math.random() * 0.2;
         bloomKF = bloomKT = bloomK = 11 + Math.floor(Math.random() * 4);
+        // small-hole/large-petal DOMINANT (user round 12: "the small radius flower motifs
+        // should be more common than the large radius motifs"); the roll happens ONLY at a
+        // fresh dwell entry — form morphs inside one appearance keep the radius, and a new
+        // radius comes only when the bloom RE-appears after another motif (also user r12)
         bloomRingDwell =
-          Math.random() < 0.3
-            ? 0.22 + Math.random() * 0.1 // small hole, LARGE petals (user round 7 refs)
+          Math.random() < 0.62
+            ? 0.2 + Math.random() * 0.14
             : 0.42 + Math.random() * 0.16;
         if (FORCE && FORCE._bloomRing !== undefined) bloomRingDwell = FORCE._bloomRing;
         bloomRingF = bloomRingT = bloomRing = bloomRingDwell;
