@@ -3406,9 +3406,11 @@
         // fresh dwell entry — form morphs inside one appearance keep the radius, and a new
         // radius comes only when the bloom RE-appears after another motif (also user r12)
         bloomRingDwell =
-          Math.random() < 0.62
-            ? 0.2 + Math.random() * 0.14
-            : 0.42 + Math.random() * 0.16;
+          Math.random() < 0.72
+            ? 0.14 + Math.random() * 0.18 // small-to-knot centres — the ref's dominant class
+            : 0.4 + Math.random() * 0.16; // the big clean-hole mandala (3:49-4:36) is the exception
+        // (MEASURED round 12b across both ref videos: Abide 0:02-0:13 / 0:43 / 4:00 + 480p
+        // 0:28 / 0:52 / 1:04 are all small/knot; the large-hole mandala ~1 in 4)
         if (FORCE && FORCE._bloomRing !== undefined) bloomRingDwell = FORCE._bloomRing;
         bloomRingF = bloomRingT = bloomRing = bloomRingDwell;
         bloomMorph = 1;
