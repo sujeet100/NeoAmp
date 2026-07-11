@@ -1474,6 +1474,44 @@
     if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector
     return a;
   }
+  // ── VORTEX CROSS (mode 29 — Abide 720p 4:25-4:35; user 2026-07-11: "two lines crossing each
+  //    other rotate at the centre, on a water-like surface; orbs on the two extreme ends with a
+  //    thicker tether joining them rarely; the camera moves toward the centre — a vortex illusion").
+  //    The ONLY live geometry is TWO straight lines through the hub, co-rotating on two slow
+  //    continuous rates (design-language rule 1). Everything else — the dense fanned bowtie of
+  //    parallel rays, its spiral into the bright eye — is the FEEDBACK TRAIL bent by the scene's
+  //    strong 1/r SWIRL (q17, forced in frame()); the wavy WATER ground (q29=0) + heavy diffusion
+  //    do the wet bleed. The two lines rotate SLOWLY (the "cross rotates"); the swirl supplies the
+  //    inward spiral curl of the aged copies (straight at the edges, curling into the centre — the
+  //    ref's rays). Chromatic-doubled colour (the ref's yellow ray flanked by a red copy) via a
+  //    per-line hue split + a ramp along u. ──
+  function fVortexCross(a) {
+    var s = a.sample || 0;
+    var line = s < 0.5 ? 0 : 1,
+      u = (s - line * 0.5) * 2,
+      tt = u * 2 - 1; // -1..1 THROUGH the centre — full length both ways
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    // TWO slow continuous rates, same sense: the pair crosses at a shallow angle that DRIFTS over
+    // ~60s (the rate difference), so the bowtie opens/closes like the ref. Slow enough that only
+    // ~1s of crisp copies survive the moderate decay → a narrow fan, never a full-circle mesh.
+    var ang = line ? lastT * 0.34 + 0.6 : lastT * 0.22;
+    var ct = Math.cos(ang),
+      st = Math.sin(ang);
+    // min-clamped full-frame (line rule): the arms always cross the borders on both sides
+    var len = Math.max(0.98, (a.q5 || 0.4) * 2.0);
+    var wav = (a.value1 || 0) * 0.006; // whisper of live audio jag; the ref rotor lines are near-straight
+    a.x = cx + tt * len * ct - wav * st;
+    a.y = cy + tt * len * st + wav * ct;
+    // CHROMATIC DOUBLE: line 0 rides the emitter hue, line 1 a warm offset; a ramp along u so the
+    // fanned trail copies read as the ref's yellow→red→green graded rays.
+    var h = (a.q8 || 0) + (line ? 0.16 : 0) + 0.08 * u;
+    a.r = orbCol(h, 0);
+    a.g = orbCol(h, 0.33);
+    a.b = orbCol(h, 0.67);
+    if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector at the tips
+    return a;
+  }
   // WATER-RIPPLE FLOWER (user 2026-07-11; 1080p 1:40-1:42, frame-stepped @10fps + a 30fps
   // line-track at 1:41.1): a central flower of ~14 LIVE wavy waveform strands, plus TWO
   // straight full-frame lines rotating continuously in the SAME direction at different
@@ -2117,6 +2155,7 @@
     fMarchFan, // id 26 (user 2026-07-11: the Abide 720p 0:33-0:40 flower + 2 rotating lines marching right)
     fBloomHold, // id 27 (user 2026-07-11: the Abide 720p 0:00-0:10 opening — spiky pulsing flower, drifts UP / tips back)
     fBloomHold, // id 28 (user 2026-07-11: the SAME flower REVERSED — drifts DOWN / tips forward; the mirror variant)
+    fVortexCross, // id 29 (user 2026-07-11: the Abide 720p 4:25-4:35 rotating cross over a water vortex)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -2157,6 +2196,7 @@
     0.7, // marching flower (26): the fBloom flower — outline-class
     0.7, // opening bloom (27): the fBloom flower locked to one pose — outline-class
     0.7, // opening bloom REVERSED (28): the 27 mirror — outline-class
+    0.7, // vortex cross (29): two thin full-frame lines — the fanned bowtie is their swirled trail
   ];
   function scaleFor(m) {
     // SPAN CLASSES (user's 2026-07-10 recording round 2, "still not filling the screen" —
@@ -2166,7 +2206,7 @@
     // became small piles, the valley bow-tie halved, ribbons stopped crossing the frame:
     // ZOOM pass (user, recording round 3: "motif covers larger part in the original — zoom
     // onto the motifs"; frame-checked 0:34-0:40: the pompom fills ~75% with the orbs INSIDE):
-    if (m === 3 || m === 12 || m === 14 || m === 23) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan (near full-frame)
+    if (m === 3 || m === 12 || m === 14 || m === 23 || m === 29) return 0.4; // scene-scale: X-ribbons / valley / terrain / scissor-fan / vortex-cross (near full-frame; the lines are min-clamped internally)
     if (m === 7) return 0.3; // wireframe net dome — a big scene object in the ref
     if (m === 9 || m === 16 || m === 21) return 0.3; // organic balls (0:34-0:40: ~60-75% pompoms)
     if (m === 1 || m === 4 || m === 5 || m === 6 || m === 10 || m === 15 || m === 17) return 0.28; // stars/n-gons/mandalas/petal-flowers (ref ~45%)
@@ -2289,6 +2329,9 @@
     // swimmer scene (mode 22): ALWAYS the simple chord (user round 6 — the ref's between-orb
     // line in this scene is always the plain jagged waveform, never a construction)
     var swimOn = Math.abs((a.q30 || 0) - 22) < 0.5;
+    // vortex scene (mode 29): ALWAYS the plain jagged chord too — the ref's rare tether is a thick
+    // straight waveform between the two edge orbs, never a helix/rope construction.
+    var vtxOn = Math.abs((a.q30 || 0) - 29) < 0.5;
     // ripple-flower scene (mode 24) + opening-bloom scene (mode 27): NO tether at all — the chord
     // between the parked orbs read as a "third small line" (mode 24, user live round 1) / a bright
     // diagonal beam straight through the flower (mode 27); the ref windows (1080p 1:40-1:42 and
@@ -2304,7 +2347,7 @@
       a.a = 0;
       return a;
     }
-    var tk = railOn || corOn || swimOn ? 0 : tetherKind;
+    var tk = railOn || corOn || swimOn || vtxOn ? 0 : tetherKind;
     var ax = railOn ? railAx : a.q21 !== undefined ? a.q21 : 0.4,
       ay = railOn ? railAy : a.q22 !== undefined ? a.q22 : 0.5;
     var bx = railOn ? railBx : a.q23 !== undefined ? a.q23 : 0.6,
@@ -2563,6 +2606,13 @@
     //    centred, slowly precessing over a growing watercolour wash, 2 side orbs (user 2026-07-11). ──
     bloomOpenAmt = 0, // eased engagement
     bloomOpenT0 = -9, // dwell entry (the wash's growth clock)
+    // ── mode-29 VORTEX CROSS (Abide 720p 4:25-4:35): two co-rotating lines over a water vortex,
+    //    orbs parked at the extreme ends, a thick tether that appears only in rare windows. ──
+    vortexAmt = 0, // eased engagement (read by the scene block + waves[2] tether gate)
+    vortexEntered = false, // fresh-entry latch (seeds the rare-tether schedule)
+    vortexTethT0 = -99, // last rare-tether window open time
+    vortexTethNext = 0, // next window schedule time
+    vortexTethGate = 0, // 0..1 rare-tether envelope (read by waves[2] under q30≈29)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -2843,7 +2893,7 @@
   var MOTIF_BAG = [
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
     25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 27, 28, 28,
-    28,
+    28, 29, 29, 29, 29,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -5075,6 +5125,70 @@
       // Guarded so a FORCE q29 pin wins.
       if (bloomOpenAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 3;
     }
+    // ── MODE-29 VORTEX CROSS (Abide 720p 4:25-4:35): two lines cross at a bright eye and slowly
+    //    rotate; their trail — bent by a strong 1/r SWIRL (q17) with a gentle inward dolly (q15<0)
+    //    — spirals into the centre, the "camera diving toward the vortex" illusion. A wavy WATER
+    //    ground (q29=0) with heavy diffusion bleeds the rays. Two orbs PARK at the extreme left/
+    //    right ends; their inward-streaming trail feeds the vortex (the ref's converging red rays),
+    //    and a THICK jagged tether strings them only in RARE windows (vortexTethGate → waves[2]). ──
+    var moVtx = Math.floor((t.q30 || 0) + 0.5);
+    var vtxEff = moVtx === 29 ? 1 : 0;
+    if (vtxEff && !vortexEntered) {
+      vortexEntered = true;
+      vortexTethNext = time + 6 + Math.random() * 8; // first tether a while into the scene
+    } else if (!vtxEff) vortexEntered = false;
+    vortexAmt += (vtxEff - vortexAmt) * Math.min(1, dt * 0.6);
+    if (vortexAmt > 0.01) {
+      var vx = vortexAmt;
+      // the crossing hub (motif centre) AND the warp swirl/roll pivot both sit at screen centre,
+      // so the vortex is centred and the lines cross exactly on the eye.
+      t.q2 += (0.5 - t.q2) * vx;
+      t.q3 += (0.5 - t.q3) * vx;
+      t.q20 += (0.5 - t.q20) * vx;
+      t.q27 += (0.5 - t.q27) * vx;
+      // STRONG 1/r SWIRL = the vortex spiral. Capped ≤0.09 (memory: above that the 1/r whips the
+      // centre into an asymmetric smear). Beat-breathing so the spiral pulses with the music.
+      t.q17 += (0.055 + 0.02 * Math.max(0, bassA - 1) - t.q17) * vx;
+      // gentle INWARD dolly = "the camera moves toward the centre": the sampled buffer scales up
+      // slightly each frame so aged deposits crawl toward the eye (q15<0 = drain). The orb POSTS
+      // are re-pinned every frame below, so only their TRAIL streaks inward, never the live orbs.
+      t.q15 += (-0.0016 - t.q15) * vx;
+      // centred rotational scene → zero pan + constant roll (rule 4: the swirl owns the rotation).
+      t.q18 *= 1 - vx;
+      t.q19 *= 1 - vx;
+      t.q16 *= 1 - vx;
+      // WATER surface: moderate decay (a short crisp fan, never a full-circle mesh) + heavy
+      // diffusion (the wet ink bleed that softens the rays into the ref's watercolour spiral).
+      t.q1 = Math.min(Math.max(t.q1, 0.96), 0.966);
+      t.q28 = Math.max(t.q28, 0.45);
+      // the scene owns its ground: the wavy WATER fluid (q29=0). Guarded so a FORCE q29 pin wins.
+      if (vortexAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 0;
+      // ORBS PARKED at the two EXTREME ENDS (left/right edges), slightly tilted like the ref.
+      // Single-axis rule: they hold; their inward-streaming trail is the vortex feed.
+      t.q21 += (0.055 - t.q21) * vx; // orb A far-left, a touch high
+      t.q22 += (0.42 - t.q22) * vx;
+      t.q23 += (0.945 - t.q23) * vx; // orb B far-right, a touch low
+      t.q24 += (0.6 - t.q24) * vx;
+      t.q25 += (0.6 - t.q25) * vx; // both orbs steadily present (translucent side discs)
+      t.q14 += (0.6 - t.q14) * vx;
+      // THICK tether jag (user: "the tether lines are thicker") — a bigger waveform reads bolder.
+      t.q26 = Math.max(t.q26, 0.1 * (0.6 + 0.7 * bassA));
+      // RARE tether: a slow schedule opens a ~2.8s window every ~14-26s; vortexTethGate drives
+      // waves[2]'s alpha for THIS scene (the default per-1.65s scheduler would read as "often").
+      if (time >= vortexTethNext) {
+        vortexTethT0 = time;
+        vortexTethNext = time + 14 + Math.random() * 12;
+      }
+      var vtw = time - vortexTethT0,
+        vtLife = 2.8;
+      vortexTethGate =
+        vtw >= 0 && vtw < vtLife ? Math.min(1, vtw * 5) * Math.min(1, (vtLife - vtw) * 3) : 0;
+      if (FORCE && FORCE._vtxTeth !== undefined) vortexTethGate = +FORCE._vtxTeth; // debug pin
+      // the scene owns its set-piece (rule 6): the cross + vortex + orbs are all that's on screen.
+      accVis *= 1 - 0.75 * vx; // hold the free accessory lines low
+      corridorAmt *= 1 - vx; // never let the corridor chase engage under this centred scene
+      railAmt *= 1 - vx; // and no persistent rail chord (its posts would drag the parked orbs)
+    } else vortexTethGate = 0;
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
     if (railAmt > 0.01) {
@@ -5444,6 +5558,14 @@
         // stands down while the kaleido bg is up; orbs mirror as mini-orbs instead.
         if (Math.abs((a.q29 || 0) - 1) < 0.5) {
           a.a = 0;
+          return a;
+        }
+        // VORTEX scene (mode 29): the tether is RARE — its own slow-window envelope (vortexTethGate,
+        // scheduled in frame()) drives the alpha, not the default per-1.65s scheduler. The orbs are
+        // always present here so we skip the both-orbs gate; the thick jag comes from the raised q26.
+        if (Math.abs((a.q30 || 0) - 29) < 0.5) {
+          fTether(a);
+          a.a = (a.a === undefined ? 0.9 : a.a) * vortexTethGate;
           return a;
         }
         fTether(a);
