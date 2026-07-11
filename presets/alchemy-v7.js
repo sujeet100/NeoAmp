@@ -3270,6 +3270,7 @@
           Math.random() < 0.3
             ? 0.22 + Math.random() * 0.1 // small hole, LARGE petals (user round 7 refs)
             : 0.42 + Math.random() * 0.16;
+        if (FORCE && FORCE._bloomRing !== undefined) bloomRingDwell = FORCE._bloomRing;
         bloomRingF = bloomRingT = bloomRing = bloomRingDwell;
         bloomMorph = 1;
       }
