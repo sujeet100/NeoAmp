@@ -55,7 +55,14 @@
     // sweep outward for ~1s during the rare starburst finale. q13 belongs to the kaleido fold when
     // q29==1, so the ripple reads it ONLY outside kaleido (the event writer also never fires there).
     "  float rip = (abs(q29 - 1.0) < 0.5) ? 0.0 : q13;\n" +
-    "  pd *= 1.0 + rip * 0.018 * sin(pr * 125.6 - time * 30.0);\n" +
+    // WATER branch (mode 24, user round 3 "2-3 big ripples like original"): the ripple-flower
+    // scene holds q13 on continuously, but the C8 event's λ≈5%-frame fast-swept bands read as
+    // MANY SMALL ripples — under q30 24 the same channel becomes ~2-3 BIG slow crests
+    // (λ≈18% frame, crest crawl ~0.05 UV/s) that compound tall waves onto the held trails.
+    "  float watr = (abs(q30 - 24.0) < 0.5) ? 1.0 : 0.0;\n" +
+    // gain 0.012: at the scene's continuous q13 0.14 this COMPOUNDS every frame on the held
+    // trail — 0.04 accordioned the whole buffer into giant smeared arcs (r8 render)
+    "  pd *= 1.0 + mix(rip * 0.018 * sin(pr * 125.6 - time * 30.0), rip * 0.012 * sin(pr * 34.0 - time * 1.6), watr);\n" +
     // MAGNIFY: q15>0 shrinks the sample offset → the old buffer appears slightly bigger each frame, so
     // every deposit GROWS as it ages (the "traces grow in size before disappearing" note). Small.
     "  pd *= (1.0 - q15);\n" +
@@ -1476,15 +1483,15 @@
       // continuous rotation at 60fps would smear them into a solid bullseye (r3 render)
       var baseAng = strand * 0.3491 + Math.floor(lastT / 0.35) * 0.0698;
       var rr = 0.025 + u * (a.q5 || 0.4) * 0.62;
-      // radius-keyed smooth ripple + a live waveform jag riding the outer half — transverse
-      // offset ⇒ dAng = dPerp/rr (fMoth's crimp mechanism; the near-static spatial phase is
-      // what lets the crests register into concentric fronts).
-      // λ≈0.055 (ref reads ~0.04 but 25 pts/strand alias below ~6 pts/cycle into angular
-      // chevrons — the first pin-render; the outward stream coarsens it toward the ref anyway).
-      // Small per-strand phase: the fronts stay concentric but WOBBLE (the ref's rings are
-      // wavy water circles, never geometric bullseye rings)
-      var rip = Math.sin(rr * 114.0 + strand * 0.9) * 0.011 * u + (a.value1 || 0) * 0.007 * u;
-      var ang2 = baseAng + rip / Math.max(rr, 0.045);
+      // radius-keyed smooth ripple + a live waveform jag riding the outer half. λ≈0.175 UV
+      // → ~2-3 BIG crests across the surface (user round 3: "too many small ripples, we
+      // want 2-3 big ripples like original"; was λ≈0.055 = many small). The near-static
+      // spatial phase lets the crests register into concentric fronts; the small per-strand
+      // phase keeps the fronts wavy, never geometric bullseye rings.
+      var rip = Math.sin(rr * 36.0 + strand * 0.35) * 0.02 * u + (a.value1 || 0) * 0.007 * u;
+      // the crest displacement is mostly VERTICAL LIFT (added after the tilt below) so the
+      // waves read as HEIGHT seen from the tilted angle — only a little stays in-plane
+      var ang2 = baseAng + (rip * 0.4) / Math.max(rr, 0.045);
       a.x = cx + Math.cos(ang2) * rr;
       a.y = cy + Math.sin(ang2) * rr;
       var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
@@ -1492,14 +1499,14 @@
       a.r = Math.min(1, orbCol(h, 0) * lit);
       a.g = Math.min(1, orbCol(h, 0.33) * lit);
       a.b = Math.min(1, orbCol(h, 0.67) * lit);
-      // PERSPECTIVE TILT (user live round 1 "the plane should be tilted a bit", round 2
-      // "angle needs to be a bit more") — the ref's water surface is a plane seen at an
-      // angle: y foreshortened about the hub + a mild keystone (the far/upper edge
-      // narrows; wave y is BOTTOM-UP). The trails inherit it, so the ripple rings read
-      // as ellipses on a receding plane.
+      // PERSPECTIVE TILT (user rounds 1-3, "as if you can actually see height of ripple
+      // from that angle") — the ref's water surface is a plane seen at an angle: y
+      // foreshortened about the hub + a mild keystone (the far/upper edge narrows; wave y
+      // is BOTTOM-UP), and the crest displacement re-added as out-of-plane VERTICAL LIFT
+      // (never squashed) so the waves carry visible height above the receding plane.
       var rely = a.y - cy;
-      a.y = cy + rely * 0.62;
-      a.x = cx + (a.x - cx) * (1 - 0.2 * Math.max(0, Math.min(1, rely * 2.2)));
+      a.y = cy + rely * 0.5 + rip * 0.85;
+      a.x = cx + (a.x - cx) * (1 - 0.24 * Math.max(0, Math.min(1, rely * 2.2)));
       // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
       a.a = u < 0.04 ? 0 : 0.8 * Math.min(1, (u - 0.04) / 0.12);
@@ -1512,12 +1519,14 @@
       var ang = line ? lastT * 1.4 + 1.1 : lastT * 4.0; // ~80°/s + ~230°/s, one direction
       var ct = Math.cos(ang),
         st = Math.sin(ang);
-      var len = Math.max(0.95, (a.q5 || 0.4) * 1.9);
+      // min 1.05: at the round-3 tilt (y-squash 0.5) a vertical rotor's half-extent is
+      // len*0.5 — it must stay ≥ the 0.5 half-frame so the line ALWAYS crosses the borders
+      var len = Math.max(1.05, (a.q5 || 0.4) * 1.9);
       var fine = (a.value1 || 0) * 0.004; // whisper of live jag — the ref lines are straight
       a.x = cx + tt * len * ct - fine * st;
       // same plane tilt as the flower (y-squash only — the keystone would visibly BEND a
       // full-frame line, and the ref's rotors stay dead straight)
-      a.y = cy + (tt * len * st + fine * ct) * 0.62;
+      a.y = cy + (tt * len * st + fine * ct) * 0.5;
       var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
       a.r = Math.min(1, orbCol(h2, 0) * 1.45);
       a.g = Math.min(1, orbCol(h2, 0.33) * 1.45);
@@ -4181,6 +4190,11 @@
       // drag the ripple origin and smear the registered crests)
       t.q2 += (0.5 - t.q2) * ra;
       t.q3 += (0.5 - t.q3) * ra;
+      // pin the WARP PIVOT to the hub too — the magnify stream and the water ripple are
+      // hub-centred physics; the free-drifting q20/q27 pivot swept the rings off-centre
+      // into one-sided arcs (r8 render)
+      t.q20 += (0.5 - t.q20) * ra;
+      t.q27 += (0.5 - t.q27) * ra;
       // orbs PARKED at the ref pair's spots (single-axis rule: they don't move at all) —
       // full-strength blend, the D15 staging re-writes the posts every frame
       t.q21 += (0.555 - t.q21) * ra;
