@@ -1555,10 +1555,23 @@
       // min 1.05: at the round-3 tilt (y-squash 0.5) a vertical rotor's half-extent is
       // len*0.5 — it must stay ≥ the 0.5 half-frame so the line ALWAYS crosses the borders
       var len = Math.max(1.05, (a.q5 || 0.4) * 1.9);
-      var fine = (a.value1 || 0) * 0.004; // whisper of live jag — the ref lines are straight
+      // ★ RIPPLE-DISTORTED (user 2026-07-11: "the 2 cross rotating lines should get distorted,
+      // resulting in a wave-like effect because of the ripples"). The lines lie ON the rippling
+      // water, so a TRAVELLING transverse wave rides each line: crests move OUTWARD from the hub
+      // (−lastT phase, same as the water rings), the amplitude stays CALM at the hub and GROWS
+      // toward the tips (smoothstep on |tt|, matching the water's "ripples farther from centre"),
+      // and swells with the beat (q32). Perpendicular to the line via the (−st, ct) basis.
+      var pr = Math.abs(tt);
+      var wg = Math.max(0, Math.min(1, (pr - 0.12) / 0.3));
+      wg = wg * wg * (3 - 2 * wg); // calm hub → full wave over the outer line
+      var ripple =
+        0.06 *
+        Math.sin(pr * 7.5 - lastT * 3.2 + line * 1.9) *
+        wg *
+        (0.8 + 0.7 * Math.max(0, (a.q32 || 1) - 1));
+      var fine = (a.value1 || 0) * 0.006 + ripple; // live jag + the water ripple
       a.x = cx + tt * len * ct - fine * st;
-      // same plane tilt as the flower (y-squash only — the keystone would visibly BEND a
-      // full-frame line, and the ref's rotors stay dead straight)
+      // same plane tilt as the flower (y-squash only, applied to the whole rippled line)
       a.y = cy + (tt * len * st + fine * ct) * 0.5;
       var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
       a.r = Math.min(1, orbCol(h2, 0) * 1.45);
