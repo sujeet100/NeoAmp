@@ -1888,35 +1888,18 @@
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     if (s < 0.55) {
-      // FUR-BALL FLOWER (user chose 2026-07-11: match the ref's DENSE dandelion tuft, not fBloom's
-      // hollow petal ring). A radial fan of many LIVE waveform strands from the hub — solid pale
-      // core dimming outward, each strand carrying live-waveform wiggle that GROWS toward the tip
-      // (the fuzzy filament look). Same construction as the water tuft, tuned denser + rounder.
-      var K = 26; // dense filaments
-      var fk = (s / 0.55) * K,
-        strand = Math.floor(fk),
-        u = fk - strand;
-      if (strand > K - 1) {
-        strand = K - 1;
-        u = 1;
-      }
-      // QUANTIZED rotation (the water tuft's proven density trick): copies land at DISTINCT angles
-      // every 0.3s, so the feedback trail STACKS many angular filaments into a dense fuzzy ball —
-      // continuous spin under this decay smeared them into a hollow ring instead.
-      var ang = strand * (6.2832 / K) + Math.floor(lastT / 0.3) * 0.09;
-      var lv = 0.68 + 0.5 * ((strand * 0.618034) % 1); // per-strand golden-ratio length spread
-      var R = (a.q5 || 0.4) * 1.0;
-      var rr = 0.02 + u * R * lv; // root at the hub → filaments radiate out
-      var jag = (a.value1 || 0) * 0.02 * u; // live-waveform wiggle, strongest at the tips
-      var a2 = ang + jag / Math.max(rr, 0.05);
-      a.x = cx + Math.cos(a2) * rr;
-      a.y = cy + Math.sin(a2) * rr;
-      var h = (a.q8 || 0) + 0.05 * Math.sin(strand * 2.4);
-      var lit = 1.32 - 0.42 * u; // pale/whitish core, dimming toward the tips
-      a.r = Math.min(1, orbCol(h, 0) * lit);
-      a.g = Math.min(1, orbCol(h, 0.33) * lit);
-      a.b = Math.min(1, orbCol(h, 0.67) * lit);
-      a.a = u < 0.04 ? 0 : 0.78 * Math.min(1, (u - 0.04) / 0.12); // hide the hub connector; dark hub
+      // ★ THE REAL fBloom FLOWER, configured as a MANY-PETAL fur-ball with the SMALLEST hole
+      // (user 2026-07-11: "use a flower motif we created, smallest radius hole + many petals").
+      // High bloomK + tiny bloomRing are forced for mode 26 in frame(), so the petals fill toward
+      // the centre → a dense flower, not a hollow ring. Reused via a remapped sample (design language).
+      var os = a.sample,
+        oq = a.q5;
+      a.sample = os / 0.55;
+      a.q5 = oq; // scaleFor(26) sizes it as the focal point
+      fBloom(a);
+      a.sample = os;
+      a.q5 = oq;
+      a.a = Math.min(1, a.a * 1.4); // bright live flower — must dominate its own streamed wake
     } else {
       // TWO ROTATING LINES pivoting just BELOW the flower hub, sweeping continuously (one direction,
       // two rates → the ref's doubled fan). Full-frame (line rule); pale; alpha rides the beat.
@@ -3515,7 +3498,7 @@
     //    Also runs for mode 24 (the water scene): its central flower IS the real fBloom motif
     //    (drawn small by fRippleFlower), so it must morph with the same live state (user
     //    2026-07-11: "use the waveform flower we created, a small variant — not that dahlia").
-    if (mEff === 25 || mEff === 24) {
+    if (mEff === 25 || mEff === 24 || mEff === 26) {
       if (bloomNext < 0) {
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
@@ -4886,17 +4869,27 @@
     var marEff = Math.floor((t.q30 || 0) + 0.5) === 26 ? 1 : 0;
     if (marEff && marchAmt < 0.02) marchT0 = time;
     marchAmt += (marEff - marchAmt) * Math.min(1, dt * 0.7);
-    marchLineAmt = marEff ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) : 0;
+    // ★ PHASE 2 (Abide 720p 0:41-0:50): the scene CONVERTS — the rotating cross-lines + orbs fade
+    // OUT and the flower GROWS to a big many-petal bloom, still marching the same way (user
+    // 2026-07-11). Ramps in over ~2.5s starting ~6s into the dwell. (FORCE._marchP2 pins it.)
+    var marchP2 = Math.max(0, Math.min(1, (time - marchT0 - 6) / 2.5));
+    marchP2 = marchP2 * marchP2 * (3 - 2 * marchP2);
+    if (FORCE && FORCE._marchP2 !== undefined) marchP2 = FORCE._marchP2;
+    // lines fade in ~0.8s after entry, then fade back OUT as phase 2 takes over
+    marchLineAmt = marEff
+      ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) * (1 - marchP2)
+      : 0;
     if (marchAmt > 0.01) {
       var ma = marchAmt;
       // PARK the flower + lines a touch left-of-centre (the camera is locked to them) so the
       // rightward-streaming wake has room to trail off to the right — the ref composition.
       t.q2 += (0.4 - t.q2) * ma;
       t.q3 += (0.5 - t.q3) * ma;
-      // ★ WORLD STREAMS RIGHT = the march (the camera pans right WITH the parked subject, like the
-      // corridor chase). This streams the flower's + orbs' + lines' feedback trails into the marching
-      // wake; nothing traverses the screen, so there is no restart pop.
-      t.q18 += (0.02 - t.q18) * ma;
+      // ★ WORLD STREAMS RIGHT = the march (the camera pans right WITH the parked subject). GENTLE
+      // (0.006, not 0.02): the pan streams the ONE feedback buffer — including the flower — so a strong
+      // pan smeared the flower into a horizontal comet (everything read as bead-chains). Gentle = the
+      // flower accumulates in place with a short rightward wake, which IS the march.
+      t.q18 += (0.006 - t.q18) * ma;
       t.q19 *= 1 - ma; // pure horizontal — no vertical drift
       t.q16 *= 1 - ma; // zero roll/swirl/growth — directional scene (rule 4)
       t.q17 *= 1 - ma;
@@ -4906,15 +4899,25 @@
       t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
       t.q28 = Math.min(t.q28, 0.05);
       accVis *= 1 - 0.85 * ma; // dim the free accessory lines (kept the flower+fan clean)
+      // ★ MANY-PETAL fur-ball with the SMALLEST hole (user): force high k + a tiny ring each frame
+      // (overrides the morph driver, which runs above) so fBloom's petals fill toward the centre —
+      // a dense flower, not the hollow petal ring. bloomTip small keeps the petal caps closed (dense).
+      bloomK += (32 - bloomK) * ma;
+      bloomRing += (0.06 - bloomRing) * ma;
+      bloomA = Math.max(bloomA, 0.55 * ma);
+      bloomTip *= 1 - 0.7 * ma;
+      // PHASE 2: the flower GROWS to a big bloom (still many-petal, tiny-hole) and becomes the whole
+      // scene; in phase 1 it stays medium next to the lines/orbs.
+      t.q5 *= 1 + 0.6 * marchP2;
       // ORBS PARKED near the flower (single-axis rule): the rightward pan streams their wake into the
       // ref's rightward bead-chain — the SAME mechanism as the corridor (parked orb + streaming wake
-      // = the bead row), NOT orbs traversing the screen.
+      // = the bead row), NOT orbs traversing the screen. They FADE OUT in phase 2 (flower marches alone).
       t.q21 += (0.36 - t.q21) * ma;
       t.q22 += (0.56 - t.q22) * ma;
       t.q23 += (0.48 - t.q23) * ma;
       t.q24 += (0.5 - t.q24) * ma;
-      t.q25 = Math.max(t.q25, 0.34 * ma); // orb A (small, quiet — the wake does the chain)
-      t.q14 = Math.max(t.q14, 0.34 * ma); // orb B
+      t.q25 = Math.max(t.q25, 0.18 * ma * (1 - marchP2)); // orb A — quiet (the flower is the focus), gone in phase 2
+      t.q14 = Math.max(t.q14, 0.18 * ma * (1 - marchP2)); // orb B
       // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
       if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
