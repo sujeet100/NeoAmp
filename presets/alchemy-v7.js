@@ -60,11 +60,14 @@
     // MANY SMALL ripples — under q30 24 the same channel becomes ~2-3 BIG slow crests
     // (λ≈18% frame, crest crawl ~0.05 UV/s) that compound tall waves onto the held trails.
     "  float watr = (abs(q30 - 24.0) < 0.5) ? 1.0 : 0.0;\n" +
-    // water gain COMPOUNDS every frame on the held trail (0.04 flat accordioned the buffer
-    // into giant smeared arcs — r8 render). Radius-RAMPED (user round 4, ref stills): the
-    // hub zone stays registered/calm while the far field waves big — this is what bends the
-    // rotors' aged copies ("the cross rotating lines should be distorted with ripple effect").
-    "  pd *= 1.0 + mix(rip * 0.018 * sin(pr * 125.6 - time * 30.0), rip * 0.022 * sin(pr * 34.0 - time * 1.6) * smoothstep(0.08, 0.35, pr), watr);\n" +
+    // ★ water displacement is VERTICAL, not radial (user round 5: "the rotating cross
+    // lines are still not getting distorted"): every rotor passes THROUGH the hub, so a
+    // radial push moves its points ALONG the line — it can never bend them. A surface
+    // wave seen from the tilt LIFTS crests vertically on screen: suv.y keyed to radius
+    // bends everything crossing a crest (rotor trails included) into concentric waves.
+    // Radius-ramped so the hub/crossing stays registered; compounds on the held trail.
+    "  pd *= 1.0 + (1.0 - watr) * rip * 0.018 * sin(pr * 125.6 - time * 30.0);\n" +
+    "  pd.y += watr * rip * 0.015 * sin(pr * 34.0 - time * 1.6) * smoothstep(0.06, 0.3, pr);\n" +
     // MAGNIFY: q15>0 shrinks the sample offset → the old buffer appears slightly bigger each frame, so
     // every deposit GROWS as it ages (the "traces grow in size before disappearing" note). Small.
     "  pd *= (1.0 - q15);\n" +
