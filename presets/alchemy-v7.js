@@ -1191,34 +1191,51 @@
   // GREEN VALLEY (survey scene, 2:58-end): two line-SHEETS converging to a central vanishing point form an
   // X/VALLEY, with a vertical live-waveform SPINE marching down the seam to the VP. The star nucleus at the
   // VP = the focus pupil; a forward dolly (valley camera coupling) flies into it. Reads as 3D depth-corridor.
+  // ★ REBUILT TRAIL-BUILT (user 2026-07-11: "make it 2 lines rotating, like we've done in other
+  // places"). The old fValley hand-DREW 8+8 straight sheet-lines converging to a VP — a drawn
+  // N-line fan (the "static fan with a middle line" the user flagged), violating the design
+  // language. The 1080p 2:58-3:06 X-valley is the TRAIL of two lines crossing at the hub: rows
+  // 3:00.5-3:02 show them sweeping/fanning, then they settle into the green X-corridor receding to
+  // the vanishing point. So LIVE = two full-frame lines rotating slowly on two rates (their swept
+  // trail fills the two green X-sheets — lines through the hub are narrow at centre / wide at the
+  // edges = the converging-perspective corridor for free), plus the persistent central WAVEFORM
+  // SPINE (the "marching mirrored-waveform spine" — the middle line). Same mechanism as
+  // fMoth/fScissorFan/fVortexCross; SLOW rotation (the valley turns gently, not the vortex's spin).
   function fValley(a) {
     var s = a.sample || 0;
     var cx = a.q2 !== undefined ? a.q2 : 0.5,
       cy = a.q3 !== undefined ? a.q3 : 0.5;
     var L = a.q5 || 0.4;
-    var h = (a.q8 || 0) + 0.2; // green-lean (the reference valley is green/yellow)
-    if (s < 0.42 || (s >= 0.42 && s < 0.84)) {
-      var rightSheet = s >= 0.42;
-      var ss = rightSheet ? (s - 0.42) / 0.42 : s / 0.42;
-      var NL = 8,
-        fk = ss * NL,
-        seg = Math.floor(fk),
-        u = fk - seg;
-      var nearY = (seg / (NL - 1) - 0.5) * 1.7 * L; // near-edge points spread vertically
-      var nearX = (rightSheet ? 1.7 : -1.7) * L;
-      a.x = cx + nearX * (1 - u); // line from near-edge → VP at center (converging perspective)
-      a.y = cy + nearY * (1 - u);
-      if (u > 0.98 || u < 0.02) a.a = 0; // hide line-to-line jumps + the pile-up at the VP
+    if (s < 0.88) {
+      // TWO rotating lines through the hub (the X-corridor is their trail). Slow continuous rates;
+      // the small rate difference breathes the crossing angle so the two sheets open/close.
+      var line = s < 0.44 ? 0 : 1,
+        u = line ? (s - 0.44) / 0.44 : s / 0.44,
+        tt = u * 2 - 1; // -1..1 THROUGH the hub — full length both ways
+      var ang = line ? lastT * 0.62 + 0.6 : lastT * 0.48;
+      var ct = Math.cos(ang),
+        st = Math.sin(ang);
+      var len = Math.max(0.98, L * 2.0); // full-frame (line rule)
+      var jag = (a.value1 || 0) * 0.006; // whisper of live jag; the ref sheets are near-straight
+      a.x = cx + tt * len * ct - jag * st;
+      a.y = cy + tt * len * st + jag * ct;
+      var h = (a.q8 || 0) + 0.2 + (line ? 0.08 : 0); // green-lean (the ref valley is green/yellow)
+      a.r = orbCol(h, 0);
+      a.g = orbCol(h, 0.33);
+      a.b = orbCol(h, 0.67);
+      if (u < 0.02 || u > 0.98) a.a = 0; // hide the line-to-line connector at the tips
     } else {
-      var u2 = (s - 0.84) / 0.16; // central vertical WAVEFORM SPINE down the seam
-      var jag = (a.value1 || 0) * (a.q6 || 0.05) * 1.6;
-      a.x = cx + jag;
-      a.y = cy + (u2 - 0.5) * 1.5 * L;
-      h = (a.q8 || 0) + 0.5; // spine in the complementary hue (pink over green)
+      // CENTRAL WAVEFORM SPINE (the "middle line") — a persistent near-full-height vertical live-
+      // audio waveform in the complementary hue (pink over green), down the seam. Kept from the ref.
+      var u2 = (s - 0.88) / 0.12;
+      var jag2 = (a.value1 || 0) * (a.q6 || 0.05) * 1.6;
+      a.x = cx + jag2;
+      a.y = cy + (u2 - 0.5) * 1.05; // near-full frame height
+      var h2 = (a.q8 || 0) + 0.5;
+      a.r = orbCol(h2, 0);
+      a.g = orbCol(h2, 0.33);
+      a.b = orbCol(h2, 0.67);
     }
-    a.r = orbCol(h, 0);
-    a.g = orbCol(h, 0.33);
-    a.b = orbCol(h, 0.67);
     return a;
   }
   // ORGANIC FILAMENT TANGLE / hairball (480p survey — THE most-recurring central motif there): ~20 curly
@@ -2179,9 +2196,10 @@
     0.34,
     0.62,
     0.82,
-    // valley (12) 0.72→0.48: 16 always-drawn sheet lines + spine piled the wedges to blown
-    // white (user's 84s clip); the ref valley is a muted dark-green scene
-    0.48,
+    // valley (12): trail-built rework (2 rotating lines + spine, 2026-07-11) deposits far less
+    // than the old 16 always-drawn sheet lines, so raise 0.48→0.62 (outline-class like the other
+    // rotating-line motifs); the trail still fills the X-sheets, the tone-map caps the highlights
+    0.62,
     0.5,
     0.66,
     0.66,
