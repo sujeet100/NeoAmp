@@ -1877,6 +1877,51 @@
     if (bloomTip > 0.02 && c > 1 - bloomTip * 0.3 && (strand ? bloomAsym : 1) > 0.5) a.a = 0;
     return a;
   }
+  // MARCHING FLOWER + TWO ROTATING LINES (mode 26 — Abide 720p 0:33-0:40; user 2026-07-11:
+  // "two rotating lines and a flower motif marching towards the right"). The flower IS the real
+  // fBloom motif (design language: ONE morphing waveform, reused via a remapped sample); the two
+  // lines are LIVE straight strands pivoting BELOW the flower, rotating continuously at two rates
+  // so their swept feedback copies build the ref's radiating fan (trail-built, rule 1). The whole
+  // group drifts rightward across the dwell (marchX, driven in frame()).
+  function fMarchFan(a) {
+    var s = a.sample || 0;
+    var cx = a.q2 !== undefined ? a.q2 : 0.5,
+      cy = a.q3 !== undefined ? a.q3 : 0.5;
+    if (s < 0.55) {
+      // FLOWER — the real fBloom, medium/fur-ball, remapped into 0..1
+      var os = a.sample,
+        oq = a.q5;
+      a.sample = os / 0.55;
+      a.q5 = oq; // scaleFor(26) already sizes the flower as the focal point
+      fBloom(a);
+      a.sample = os;
+      a.q5 = oq;
+      a.a = Math.min(1, a.a * 1.25); // a touch denser so the flower reads over the bright lines
+    } else {
+      // TWO ROTATING LINES pivoting just BELOW the flower hub, sweeping continuously (one direction,
+      // two rates → the ref's doubled fan). Full-frame (line rule); pale; alpha rides the beat.
+      var ls = (s - 0.55) / 0.45;
+      var line = ls < 0.5 ? 0 : 1,
+        u2 = (ls - line * 0.5) * 2,
+        tt = u2 * 2 - 1; // -1..1 through the pivot
+      var pvx = cx,
+        pvy = cy - 0.16; // pivot below the flower (ref: lines converge low, fan sweeps up)
+      var ang = line ? lastT * 0.8 + 0.7 : lastT * 1.5; // ~two continuous rates, same sense (slowed)
+      var ct = Math.cos(ang),
+        st = Math.sin(ang);
+      var len = Math.max(1.15, (a.q5 || 0.4) * 2.1);
+      var fine = (a.value1 || 0) * 0.006; // whisper of live jag; the ref rotor lines are straight
+      a.x = pvx + tt * len * ct - fine * st;
+      a.y = pvy + tt * len * st + fine * ct;
+      var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
+      a.r = Math.min(1, orbCol(h2, 0) * 1.42);
+      a.g = Math.min(1, orbCol(h2, 0.33) * 1.42);
+      a.b = Math.min(1, orbCol(h2, 0.67) * 1.42);
+      var flash = 0.5 + 0.5 * Math.max(0, Math.min(1, (a.q32 || 1) - 1)); // pale but visible; crisp on hits
+      a.a = (u2 < 0.02 || u2 > 0.98 ? 0 : flash) * marchLineAmt;
+    }
+    return a;
+  }
   // MESH COCOON / NET-BALL / dreamcatcher (480p 8.5-15.5/59.6 · 19s clip 0-8 · p2 157 · A2):
   // a closed rounded wire CAGE — wobbly RIM + concentric inner rings + spokes + hooked rim spikes —
   // re-stamped over its own feedback ghost with per-frame node jitter and (step 3+) per-stamp
@@ -2055,6 +2100,7 @@
     fScissorFan, // id 23 (user 2026-07-10: the 0:39-0:45 rotating scissor fan)
     fRippleFlower, // id 24 (user 2026-07-11: the 1080p 1:40-1:42 water-ripple flower + rotors)
     fBloom, // id 25 (user 2026-07-11: the Abide 720p 3:50-4:00 morphing spiro-bloom mandala)
+    fMarchFan, // id 26 (user 2026-07-11: the Abide 720p 0:33-0:40 flower + 2 rotating lines marching right)
   ];
   // COCOON_ID keyed off the array (land-order independent, per doc 09) — the cocoon director/eyes
   // below all gate on this id, so it stays correct whatever else appends.
@@ -2108,6 +2154,7 @@
     if (m === 2 || m === 8) return 0.2; // urchin / vortex — mid-size radials
     if (m === 24) return 0.35; // ripple flower: live tuft ~±0.24 (1080p 1:40 — the far field is trail)
     if (m === 25) return 0.34; // spiro-bloom: star tips reach ~±0.32 UV ≈ the ref's ~65% height
+    if (m === 26) return 0.36; // marching flower — the bloom is the focal point; rotor lines min-clamped full-frame
     if (m === 20) return 0.26; // moth: q5 now only sizes the puff exceed — the rotor length
     // is min-clamped full-frame in fMoth (user 2026-07-10: the rotating lines must always
     // cross the frame borders on either side)
@@ -2463,6 +2510,12 @@
     rippleAmt = 0, // mode-24 water-ripple flower engagement (q15 outward stream + registered rings)
     rippleT0 = -9, // mode-24 dwell entry (stages the scene: flower first, rotor lines later)
     rippLineAmt = 0, // mode-24 rotor-line entrance envelope (read by fRippleFlower)
+    // ── mode-26 MARCHING scene (Abide 720p 0:33-0:40): a fBloom flower + two rotating lines
+    //    drift RIGHTWARD together over a flat teal ground (user 2026-07-11). ──
+    marchAmt = 0, // eased engagement
+    marchT0 = -9, // dwell entry (resets the rightward drift + line-fade stage)
+    marchX = 0.28, // flower hub X — drifts right across the dwell (the "march")
+    marchLineAmt = 0, // rotating-line entrance envelope (read by fMarchFan)
     swimSeed = 0, // per-visit sway phase
     swimHubX = 0.5, // hub CAPTURED at entry (the live q2/q3 roam dragged the parked heads
     swimHubY = 0.5; // diagonally — the columns must stand still, round 6 render)
@@ -2742,7 +2795,7 @@
   // 12-star. 4 of the 7 freed slots -> 25, 3 -> valley/mountains/scallop for variety.
   var MOTIF_BAG = [
     25, 25, 1, 1, 2, 3, 25, 25, 25, 12, 7, 7, 8, 9, 25, 25, 12, 12, 14, 19, 14, 25, 25, 9, 25, 25,
-    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25,
+    25, 25, 25, 19, 20, 21, 21, 22, 23, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26,
   ];
   // ── B11 (doc 04 step 1): bg×motif PAIRING weights — the refs' scenes are composed set-pieces,
   //    not a uniform cross-product (bars + stem-standing organic · corridor + terrain/net ·
@@ -3443,7 +3496,7 @@
     //    Also runs for mode 24 (the water scene): its central flower IS the real fBloom motif
     //    (drawn small by fRippleFlower), so it must morph with the same live state (user
     //    2026-07-11: "use the waveform flower we created, a small variant — not that dahlia").
-    if (mEff === 25 || mEff === 24) {
+    if (mEff === 25 || mEff === 24 || mEff === 26) {
       if (bloomNext < 0) {
         bloomNext = time;
         bloomRot = Math.random() * 6.2832;
@@ -4804,6 +4857,45 @@
       // the scene owns its ground: dim flat wash — the ref surface is entirely the trail
       // field itself. Guarded so an explicit FORCE q29 pin wins.
       if (rippleAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
+    }
+    // ── MODE-26 MARCHING scene (Abide 720p 0:33-0:40): the fBloom flower + two rotating lines
+    //    drift RIGHTWARD together over a flat teal ground. On entry the hub resets to the left and
+    //    drifts right across the dwell; the lines fade in ~0.8s after the flower (staged like 24). ──
+    var marEff = Math.floor((t.q30 || 0) + 0.5) === 26 ? 1 : 0;
+    if (marEff && marchAmt < 0.02) {
+      marchT0 = time;
+      marchX = 0.2; // enter from the left, then march right
+    }
+    marchAmt += (marEff - marchAmt) * Math.min(1, dt * 0.7);
+    marchLineAmt = marEff ? Math.max(0, Math.min(1, (time - marchT0 - 0.9) / 0.8)) : 0;
+    if (marchAmt > 0.01) {
+      var ma = marchAmt;
+      // rightward MARCH: drift the flower hub right (~0.05/s ≈ the ref's gentle travel); once it
+      // sails off the right it wraps back to the left so the march is continuous, not a one-shot.
+      marchX += dt * 0.05 * ma;
+      if (marchX > 1.18) marchX = -0.18;
+      t.q2 += (marchX - t.q2) * ma;
+      t.q3 += (0.52 - t.q3) * ma; // hub a touch above centre — the fan sweeps up from below
+      // The march comes ENTIRELY from the hub drifting right — the flower's own feedback wake
+      // (deposits left behind at old positions) reads as the rightward travel. NO world pan: a
+      // rightward pan dragged the rotating-line trails into messy horizontal smears (first render).
+      t.q18 *= 1 - ma;
+      t.q19 *= 1 - ma; // no vertical drift
+      t.q16 *= 1 - ma; // zero roll/swirl/growth — directional scene (rule 4)
+      t.q17 *= 1 - ma;
+      t.q15 *= 1 - 0.6 * ma;
+      // CRISP engine (like mode 25): fBloom is a thin-line motif — the soft watercolour blur
+      // dissolved its petals into a faint ghost ring. Long decay + near-zero blur keeps the flower
+      // petals AND the rotating-line fan legible; the wide fan IS the lines' rotation trail.
+      t.q1 = Math.min(Math.max(t.q1, 0.965), 0.97);
+      t.q28 = Math.min(t.q28, 0.05);
+      // TAME the free accessories: the roaming orb halos + accessory lines cluttered the clean
+      // flower+fan composition (first render was a bokeh smear). Dim them hard for this scene.
+      accVis *= 1 - 0.85 * ma;
+      t.q25 *= 1 - 0.8 * ma; // orb A
+      t.q14 *= 1 - 0.88 * ma; // orb B
+      // the scene owns its ground: flat teal wash (the ref field is flat teal + a horizontal bar).
+      if (marchAmt > 0.4 && !(FORCE && FORCE.q29 !== undefined)) t.q29 = 5;
     }
     // ── RAIL POSTS (doc 06 step 5; answered README Q11): while a rail lives the orbs park on
     //    its endpoints — the staging posts blend back in when the rail dies. ──
