@@ -1492,13 +1492,14 @@
       a.r = Math.min(1, orbCol(h, 0) * lit);
       a.g = Math.min(1, orbCol(h, 0.33) * lit);
       a.b = Math.min(1, orbCol(h, 0.67) * lit);
-      // PERSPECTIVE TILT (user live round 1: "the plane should be tilted a bit") — the
-      // ref's water surface is a plane seen at an angle: y foreshortened about the hub +
-      // a mild keystone (the far/upper edge narrows; wave y is BOTTOM-UP). The trails
-      // inherit it, so the ripple rings read as ellipses on a receding plane.
+      // PERSPECTIVE TILT (user live round 1 "the plane should be tilted a bit", round 2
+      // "angle needs to be a bit more") — the ref's water surface is a plane seen at an
+      // angle: y foreshortened about the hub + a mild keystone (the far/upper edge
+      // narrows; wave y is BOTTOM-UP). The trails inherit it, so the ripple rings read
+      // as ellipses on a receding plane.
       var rely = a.y - cy;
-      a.y = cy + rely * 0.75;
-      a.x = cx + (a.x - cx) * (1 - 0.16 * Math.max(0, Math.min(1, rely * 2.2)));
+      a.y = cy + rely * 0.62;
+      a.x = cx + (a.x - cx) * (1 - 0.2 * Math.max(0, Math.min(1, rely * 2.2)));
       // root ramp: 18 strands converge at the hub — without it the additive pileup blows
       // a bright cloud where the ref keeps a DARK hub (the pupil's eye)
       a.a = u < 0.04 ? 0 : 0.8 * Math.min(1, (u - 0.04) / 0.12);
@@ -1516,7 +1517,7 @@
       a.x = cx + tt * len * ct - fine * st;
       // same plane tilt as the flower (y-squash only — the keystone would visibly BEND a
       // full-frame line, and the ref's rotors stay dead straight)
-      a.y = cy + (tt * len * st + fine * ct) * 0.75;
+      a.y = cy + (tt * len * st + fine * ct) * 0.62;
       var h2 = (a.q8 || 0) + 0.12 + 0.05 * line;
       a.r = Math.min(1, orbCol(h2, 0) * 1.45);
       a.g = Math.min(1, orbCol(h2, 0.33) * 1.45);
@@ -3671,7 +3672,8 @@
     // (+ moth 20: the radial-out field advects any accessory stroke into frame-wide diagonal
     //  stripe pileup — the ref's S8 moth scene has no crossing accessory)
     accTerrVis +=
-      ((mCur === 14 || mCur === 19 || mCur === 20 ? 0 : 1) - accTerrVis) * Math.min(1, dt * 1.5);
+      ((mCur === 14 || mCur === 19 || mCur === 20 || mCur === 24 ? 0 : 1) - accTerrVis) *
+      Math.min(1, dt * 1.5); // 24: a rolled lighthouse read as a "small third line rotating independently" over the water (user live round 2)
     accVis *= accTerrVis;
     // corridor: NO standing accessories (ref 0:06-0:16 shows only heads/wake-rows/net; the
     // strong chase-pan drags any stationary rod/curtain into a repeated-copy train — the
