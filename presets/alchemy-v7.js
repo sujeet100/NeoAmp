@@ -3121,6 +3121,13 @@
     [0.4, 3, 25, 0.4, 0.86], // slate blue-grey · blue lightning + yellow (4:39)
     [0.06, 6, 15, 0.15, 0.88], // deep maroon · magenta/violet fans (5:10)
     [0.15, 4, 9, 0.12, 0.86], // near-black plum · bright magenta/yellow (5:21)
+    // — 720p full-video rescan (2026-07-11 late: BOLD saturated regimes the first 20 samples
+    //   missed; the Abide 720p is the richest reference — measured via 1fps ground+emitter scan) —
+    [0.44, 7, 64, 0.45, 0.13], // vivid azure-blue · cyan + magenta (0:29 — brighter/bluer than the 0:30 turquoise)
+    [0.4, 6, 20, 0.49, 0.5], // dark saturated navy · bright cyan lace tangle (2:35)
+    [0.26, 8, 55, 0.27, 0.12], // vivid violet/purple kaleido · violet + pink centre (3:10)
+    [0.61, 9, 42, 0.78, 0.02], // deep emerald green · gold vortex streak + pink (3:28 — bolder than forest P14)
+    [0.78, 9, 62, 0.77, 0.9], // vivid bright lime/chartreuse · lime tangle (4:07 — brighter than the olive felts)
     // — the 480p Alchemy Random video —
     [0.915, 4, 38, 0.94, 0.45], // warm tan · salmon + blue (0:13)
     [0.07, 4, 62, 0.1, 0.65], // bright dusty pink · magenta + green (0:32)
