@@ -3042,6 +3042,12 @@
     [0.51, 7, 42, 0.55, 0.9], // emerald/teal · teal + warm white (1:02)
     [0.765, 8, 35, 0.8, 0.9], // vivid leaf green · lime (1:59)
     [0.335, 4, 33, 0.35, 0.95], // navy · blue + warm accent (2:38)
+    // — 480p full-video rescan (2026-07-11: regimes the first 6 samples missed) —
+    [0.17, 6, 36, 0.5, 0.9], // magenta-purple felt · teal/cyan mesh + warm white (2:33)
+    [0.3, 5, 18, 0.78, 0.65], // dark indigo · pale-white + lime-gold bold waveforms (2:44)
+    [0.96, 5, 16, 0.8, 0.02], // dark warm ground · LIME-GOLD mass + red/orange lightning (2:56 mountain)
+    [0.1, 6, 38, 0.12, 0.5], // vivid crimson-rose · red/rose radial burst (1:28 / 2:09)
+    [0.95, 2, 55, 0.95, 0.06], // milky washed warm-tan/mauve · soft rose (3:45 finale)
     // — the 1080p video —
     [0.4, 1, 4, 0.45, 0.1], // near-BLACK · pastel teal/pink emitters (opening scenes)
     [0.415, 6, 48, 0.45, 0.87], // ocean blue · teal + gold (0:52)
